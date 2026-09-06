@@ -351,3 +351,28 @@
   .acc__t { font-size: 14px; }
   .acc__b { padding: 4px 12px 18px; }
 }
+
+
+/* ============================================================
+   版本切換底下的 Function Calling 就地說明
+   ============================================================ */
+.fcx { border: 1px solid var(--c-line-2); background: var(--c-panel); margin: -6px 0 8px; }
+.fcx[open] { border-color: rgba(10,186,181,.35); background: var(--c-bg); }
+.fcx__h {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 11px 14px; list-style: none; user-select: none;
+  font-size: 13px; font-weight: 600; color: var(--c-text-2);
+}
+.fcx__h::-webkit-details-marker { display: none; }
+.fcx__h:hover { color: var(--c-glow); background: rgba(10,186,181,.06); }
+.fcx[open] .fcx__h { color: var(--c-hi); border-bottom: 1px solid var(--c-line); }
+
+.fcx__ic { position: relative; width: 11px; height: 11px; flex: 0 0 11px; }
+.fcx__ic i { position: absolute; background: var(--c-dim); }
+.fcx__ic i:first-child { left: 0; right: 0; top: 5px; height: 1.5px; }
+.fcx__ic i:last-child  { top: 0; bottom: 0; left: 5px; width: 1.5px; }
+.fcx[open] .fcx__ic i:last-child { display: none; }
+.fcx__h:hover .fcx__ic i { background: var(--c-glow); }
+.fcx[open] .fcx__ic i { background: var(--c-accent); }
+
+.fcx__b { padding: 4px 14px 18px; }

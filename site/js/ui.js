@@ -195,7 +195,7 @@
   }
 
   /* ---- 即時更新：SSE 為主，連不上才退回輪詢 ---- */
-  var es = null, pollTimer = 0, live = false, lastSig = '';
+  var es = null, pollTimer = 0, live = false, lastSig = '', esFails = 0, esRetry = 0;
 
   function sigOf(list) {
     return (list || []).map(function (p) { return p.member + ':' + p.project; }).join(',');
@@ -243,13 +243,19 @@
     try { es = new EventSource(API + '/api/stream'); }
     catch (e) { startPoll(); return; }
 
-    es.onopen = function () { stopPoll(); live = true; render(); };
+    es.onopen = function () { esFails = 0; stopPoll(); live = true; render(); };
     es.onmessage = function (ev) {
       try { applyPicks(JSON.parse(ev.data), true); } catch (e) {}
     };
     es.onerror = function () {
-      // EventSource 自己會重連；在它重連成功之前先用輪詢頂著
       live = false; render(); startPoll();
+      esFails++;
+      // 服務真的掛了就別再敲——瀏覽器預設每三秒重連一次，會把 console 洗爆
+      if (esFails >= 3) {
+        closeStream();
+        clearTimeout(esRetry);
+        esRetry = setTimeout(function () { esFails = 0; connectStream(); }, 60000);
+      }
     };
   }
 

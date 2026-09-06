@@ -46,8 +46,25 @@
     }).join('') + '</div>';
     h += '</section>';
 
+    /* -- Function Calling 說明（卡片上到處是 FC 標記，先講清楚） -- */
+    var F = META.fcHome || {};
+    h += '<section class="wrap fcn">';
+    h += '<div class="fcn__k">FUNCTION CALLING</div>';
+    h += '<p class="fcn__lede">' + R.inline(F.lede || '') + '</p>';
+    h += '<div class="fcn__cols">' + (F.cols || []).map(function (c) {
+      return '<div class="fcn__c"><div class="fcn__ct"><b>' + esc(c[0]) + '</b>' +
+             '<span>' + esc(c[1]) + '</span></div>' +
+             '<p>' + R.inline(c[2]) + '</p></div>';
+    }).join('') + '</div>';
+    h += '<p class="fcn__tail">' + R.inline(F.tail || '') + '</p>';
+    h += '</section>';
+
     /* -- Top 10 -- */
     h += '<section class="wrap section" id="top20">';
+    h += '<button class="docs-cta" data-go="about">' +
+         '<span class="docs-cta__k">專案說明文件</span>' +
+         '<span class="docs-cta__t">題目怎麼來的、依據什麼限制篩選、每一項分數怎麼給、所有數字的出處</span>' +
+         '<span class="docs-cta__go">開啟</span></button>';
     h += secHead('', 'Top 10 專題排名', 'SCORED / EVIDENCE-BASED');
     h += '<div class="filters" id="filters">';
     h += '<button data-f="all" class="is-on">ALL · ' + PJ.length + '</button>';
@@ -63,7 +80,6 @@
     /* -- 頁尾：只留一句話與專案說明入口 -- */
     h += '<footer class="wrap foot">';
     h += '<div class="foot__note">' + R.inline(META.footNote) + '</div>';
-    h += '<button class="foot__more" data-go="about">專案說明文件 · 題目怎麼來的、分數怎麼給、資料出處</button>';
     h += '</footer>';
 
     return h;
@@ -206,6 +222,13 @@
     h += '<button class="vswitch__b' + (ver === 'fc' ? ' is-on' : '') + '" data-v="fc">' +
          '<b>使用 Function Calling</b><small>TOOL-AUGMENTED / LIVE LOOKUP</small></button>';
     h += '</div>';
+
+    /* -- 版本切換就地說明（預設收合，第一次看的人才需要） -- */
+    h += '<details class="fcx">';
+    h += '<summary class="fcx__h"><span class="fcx__ic" aria-hidden="true"><i></i><i></i></span>' +
+         '這兩個版本差在哪？什麼是 Function Calling</summary>';
+    h += '<div class="fcx__b"><div class="body">' + R.blocks(META.fcPrimer || []) + '</div></div>';
+    h += '</details>';
 
     /* -- 3/4/5（依版本切換） -- */
     h += '<div id="vbody">' + versionHTML(p, ver) + '</div>';
