@@ -1,0 +1,36 @@
+INFO:     Started server process [7984]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51198 - "OPTIONS /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51198 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64816 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64817 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64818 - "PUT /api/picks HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:64819 - "PUT /api/picks HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:64812 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62328 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61502 - "PUT /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61503 - "PUT /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61504 - "PUT /api/picks HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:61505 - "PUT /api/picks HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:61506 - "DELETE /api/picks/%E6%98%8E%E6%A8%BA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61500 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50272 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50272 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50705 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54928 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60243 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51543 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64532 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56479 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49364 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65457 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61828 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53137 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63447 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54522 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59886 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50060 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50965 - "GET /api/picks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58411 - "GET /api/picks HTTP/1.1" 200 OK
