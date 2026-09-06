@@ -1,0 +1,294 @@
+/* ============================================================
+   app.js — 路由、主頁（Top 20）、詳細頁、版本切換、連續瀏覽
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var root = document.getElementById('root');
+  var R = window.Render, D = window.Diagram;
+  var PJ = window.PROJECTS || [];
+  var META = window.META || {};
+
+  PJ.sort(function (a, b) { return a.rank - b.rank; });
+  var byId = {};
+  PJ.forEach(function (p) { byId[p.id] = p; });
+
+  /* ---------- 背景電路裝飾 ---------- */
+  var cir = document.getElementById('circuitry');
+  if (cir) cir.innerHTML = D.circuitry();
+
+  /* ---------- 工具 ---------- */
+  function esc(s) { return R.esc(s); }
+
+  function piTag(p) {
+    var m = { '核心': 'pi-core', '選配': 'pi-opt', '不需要': 'pi-no' };
+    return '<span class="tag tag--' + (m[p.pi.k] || 'pi-no') + '">RPi:' + esc(p.pi.k) + '</span>';
+  }
+  function fcTag(p) {
+    var m = { '必要': 'fc-must', '加分': 'fc-good', '有限': 'fc-low' };
+    return '<span class="tag tag--' + (m[p.fc.k] || 'fc-low') + '">FC:' + esc(p.fc.k) + '</span>';
+  }
+
+  /* ============================================================
+     主頁
+     ============================================================ */
+  function homeHTML() {
+    var h = '';
+
+    /* -- Hero -- */
+    h += '<section class="wrap hero">';
+    h += '<div class="hero__kicker">' + esc(META.kicker) + '</div>';
+    h += '<h1 class="hero__title">' + META.title + '</h1>';
+    h += '<p class="hero__lede">' + R.inline(META.lede) + '</p>';
+    h += '<div class="spec">' + META.spec.map(function (s) {
+      return '<div class="spec__cell"><div class="spec__k">' + esc(s[0]) + '</div><div class="spec__v">' + R.inline(s[1]) +
+        (s[2] ? '<br><small>' + esc(s[2]) + '</small>' : '') + '</div></div>';
+    }).join('') + '</div>';
+    h += '</section>';
+
+    /* -- 研究方法 -- */
+    h += '<section class="wrap section" id="method">';
+    h += secHead('01', '研究方法：先分析需求，再從現實問題發展題目', 'PIPELINE / 13 STAGES');
+    h += '<p class="hero__lede" style="margin-bottom:16px">' + R.inline(META.methodLede) + '</p>';
+    h += '<div class="pipe">' + META.pipeline.map(function (s, i) {
+      return '<div class="pipe__step"><div class="pipe__n">' + String(i + 1).padStart(2, '0') + '</div><div class="pipe__t">' + esc(s) + '</div></div>';
+    }).join('') + '</div>';
+    h += '</section>';
+
+    /* -- 團隊與限制 -- */
+    h += '<section class="wrap section" id="constraints">';
+    h += secHead('02', '團隊能力與資源限制（所有排名的分母）', 'CONSTRAINTS');
+    h += '<div class="body" style="max-width:none">' + R.blocks(META.constraints) + '</div>';
+    h += '</section>';
+
+    /* -- Top 20 -- */
+    h += '<section class="wrap section" id="top20">';
+    h += secHead('03', 'Top 20 專題排名', 'SCORED / EVIDENCE-BASED');
+    h += '<div class="filters" id="filters">';
+    h += '<button data-f="all" class="is-on">ALL · 20</button>';
+    META.domains.forEach(function (d) {
+      var n = PJ.filter(function (p) { return p.domain === d; }).length;
+      h += '<button data-f="' + esc(d) + '">' + esc(d) + ' · ' + n + '</button>';
+    });
+    h += '</div>';
+    h += '<div class="list" id="list">' + PJ.map(rowHTML).join('') + '</div>';
+    h += '</section>';
+
+    /* -- 揭露 -- */
+    h += '<section class="wrap section" id="disclosure">';
+    h += secHead('04', '誠實揭露：樹莓派與 Function Calling 不是每題都用', 'DISCLOSURE');
+    h += '<div class="body" style="max-width:none">' + R.blocks(META.disclosure) + '</div>';
+    h += '</section>';
+
+    /* -- 頁尾 -- */
+    h += '<footer class="wrap foot" id="sources">';
+    h += '<div class="foot__grid">' + META.foot.map(function (c) {
+      return '<div><div class="foot__t">' + esc(c.t) + '</div>' +
+        '<ul style="padding-left:16px">' + c.items.map(function (i) { return '<li>' + R.inline(i) + '</li>'; }).join('') + '</ul></div>';
+    }).join('') + '</div>';
+    h += '<div class="foot__note">' + R.inline(META.footNote) + '</div>';
+    h += '</footer>';
+
+    return h;
+  }
+
+  function secHead(no, t, sub) {
+    return '<div class="sec-head"><span class="sec-head__no">' + no + '</span>' +
+      '<h2 class="sec-head__t">' + esc(t) + '</h2>' +
+      '<span class="sec-head__sub">' + esc(sub) + '</span></div>';
+  }
+
+  function rowHTML(p) {
+    return '<div class="row" data-go="' + p.id + '" data-dom="' + esc(p.domain) + '" role="link" tabindex="0">' +
+      '<div class="row__rank">' + String(p.rank).padStart(2, '0') + '<sup>' + esc(p.code) + '</sup></div>' +
+      '<div class="row__main">' +
+        '<div class="row__t">' + esc(p.title) + '</div>' +
+        '<div class="row__s">' + R.inline(p.summary) + '</div>' +
+      '</div>' +
+      '<div class="row__meta"><div class="tagline">' +
+        '<span class="tag tag--dom">' + esc(p.domain) + '</span>' + piTag(p) + fcTag(p) +
+      '</div></div>' +
+      '<div class="row__score">' +
+        '<div class="row__num">' + p.score + '<span>/100</span></div>' +
+        '<div class="row__bar"><i style="width:' + p.score + '%"></i></div>' +
+        '<div class="row__go">OPEN &#9656;</div>' +
+      '</div></div>';
+  }
+
+  /* ============================================================
+     詳細頁
+     ============================================================ */
+  function detailHTML(p, ver) {
+    var h = '';
+    var prev = PJ[p.rank - 2], next = PJ[p.rank];
+
+    /* -- 標頭 -- */
+    h += '<section class="wrap dt-head">';
+    h += '<div class="dt-head__crumb"><a href="#/">MAIN</a><span>/</span>TOP 20<span>/</span>' +
+         esc(p.code) + ' &nbsp;RANK ' + String(p.rank).padStart(2, '0') + '</div>';
+    h += '<div class="progress">' + PJ.map(function (q) {
+      return '<i class="' + (q.rank <= p.rank ? 'on' : '') + '"></i>';
+    }).join('') + '</div>';
+    h += '<div class="dt-head__top">';
+    h += '<div class="dt-head__rank">' + String(p.rank).padStart(2, '0') + '<sup>SCORE ' + p.score + '</sup></div>';
+    h += '<div class="dt-head__tt"><h1 class="dt-head__t">' + esc(p.title) + '</h1>' +
+         '<p class="dt-head__sub">' + R.inline(p.subtitle) + '</p>' +
+         '<div class="tagline" style="margin-top:10px">' +
+           '<span class="tag tag--dom">' + esc(p.domain) + '</span>' + piTag(p) + fcTag(p) +
+           p.tags.map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') +
+         '</div></div>';
+    h += '</div>';
+    h += '<div class="kpi">' + p.kpi.map(function (k) {
+      return '<div class="kpi__c"><div class="kpi__k">' + esc(k[0]) + '</div><div class="kpi__v">' + R.inline(k[1]) + '</div></div>';
+    }).join('') + '</div>';
+    h += '</section>';
+
+    h += '<div class="wrap">';
+
+    /* -- 1 源起 / 2 前提摘要（兩版共用） -- */
+    h += block('01', '源起', 'ORIGIN', p.origin);
+    h += block('02', '前提摘要', 'PREMISE', p.premise);
+
+    /* -- 版本切換 -- */
+    h += '<div class="vswitch" id="vswitch">';
+    h += '<div class="vswitch__lbl">VERSION</div>';
+    h += '<button class="vswitch__b' + (ver === 'nofc' ? ' is-on' : '') + '" data-v="nofc">' +
+         '<b>不使用 Function Calling</b><small>BASELINE / STATIC CONTEXT</small></button>';
+    h += '<button class="vswitch__b' + (ver === 'fc' ? ' is-on' : '') + '" data-v="fc">' +
+         '<b>使用 Function Calling</b><small>TOOL-AUGMENTED / LIVE LOOKUP</small></button>';
+    h += '</div>';
+
+    /* -- 3/4/5（依版本切換） -- */
+    h += '<div id="vbody">' + versionHTML(p, ver) + '</div>';
+
+    /* -- 6 結語（共用 + 版本判定） -- */
+    h += block('06', '結語', 'CONCLUSION', p.conclusion);
+
+    /* -- 底部導覽 -- */
+    h += '<div class="pager">';
+    h += prev
+      ? '<button class="pager__b" data-go="' + prev.id + '"><span class="pager__k">&#9666; PREV · ' + String(prev.rank).padStart(2, '0') + '</span><span class="pager__t">' + esc(prev.title) + '</span></button>'
+      : '<button class="pager__b" disabled><span class="pager__k">&#9666; PREV</span><span class="pager__t">已是第一個專題</span></button>';
+    h += '<button class="pager__b pager__b--home" data-go="home"><span class="pager__k">INDEX</span><span class="pager__t">返回主頁</span></button>';
+    h += next
+      ? '<button class="pager__b pager__b--next" data-go="' + next.id + '"><span class="pager__k">NEXT · ' + String(next.rank).padStart(2, '0') + ' &#9656;</span><span class="pager__t">' + esc(next.title) + '</span></button>'
+      : '<button class="pager__b pager__b--next" disabled><span class="pager__k">NEXT &#9656;</span><span class="pager__t">已是最後一個專題</span></button>';
+    h += '</div>';
+
+    h += '</div>';
+    return h;
+  }
+
+  function versionHTML(p, ver) {
+    var v = p.versions[ver];
+    var badge = ver === 'fc'
+      ? '<span class="tag tag--fc-must">WITH FUNCTION CALLING</span>'
+      : '<span class="tag">WITHOUT FUNCTION CALLING</span>';
+    return block('03', '專案說明及分析', 'ANALYSIS', v.analysis, badge) +
+           block('04', '分工', 'WORK BREAKDOWN', v.division, badge) +
+           block('05', '時間規劃安排', 'SCHEDULE', v.schedule, badge);
+  }
+
+  function block(no, title, en, body, badge) {
+    return '<section class="blk"><div class="blk__h">' +
+      '<span class="blk__n">' + no + '</span>' +
+      '<h2 class="blk__t">' + esc(title) + '</h2>' +
+      '<span class="sec-head__sub">' + esc(en) + '</span>' +
+      (badge ? '<span class="blk__tag">' + badge + '</span>' : '') +
+      '</div><div class="body">' + R.blocks(body) + '</div></section>';
+  }
+
+  /* ============================================================
+     路由
+     ============================================================ */
+  function parse() {
+    var raw = (location.hash || '#/').replace(/^#\/?/, '');
+    var seg = raw.split('/').filter(Boolean);
+    return { id: seg[0] || null, ver: (seg[1] === 'fc' ? 'fc' : 'nofc') };
+  }
+
+  var current = { id: null, ver: 'nofc' };
+
+  function paint(keepScroll) {
+    var r = parse();
+    var p = r.id ? byId[r.id] : null;
+
+    // 只有版本變動 → 局部更新，不重畫整頁、不重新載入
+    if (p && current.id === r.id && current.ver !== r.ver) {
+      current.ver = r.ver;
+      document.getElementById('vbody').innerHTML = versionHTML(p, r.ver);
+      Array.prototype.forEach.call(document.querySelectorAll('.vswitch__b'), function (b) {
+        b.classList.toggle('is-on', b.dataset.v === r.ver);
+      });
+      markNav();
+      return;
+    }
+
+    current = { id: r.id, ver: r.ver };
+    root.innerHTML = p ? detailHTML(p, r.ver) : homeHTML();
+    if (!keepScroll) window.scrollTo(0, 0);
+    markNav();
+  }
+
+  function markNav() {
+    var onHome = !parse().id;
+    Array.prototype.forEach.call(document.querySelectorAll('.hdr__nav a'), function (a) {
+      a.classList.toggle('is-on', onHome && a.getAttribute('href').indexOf('#') === 0);
+    });
+  }
+
+  /* ---------- 事件委派 ---------- */
+  document.addEventListener('click', function (e) {
+    var v = e.target.closest ? e.target.closest('[data-v]') : null;
+    if (v) {
+      var r = parse();
+      if (!r.id) return;
+      // 用 replace 避免版本切換塞爆瀏覽器歷史
+      location.replace('#/' + r.id + (v.dataset.v === 'fc' ? '/fc' : ''));
+      return;
+    }
+    var g = e.target.closest ? e.target.closest('[data-go]') : null;
+    if (g) {
+      var to = g.dataset.go;
+      location.hash = (to === 'home') ? '#/' : '#/' + to;
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    // 清單以鍵盤開啟
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('row')) {
+      e.preventDefault();
+      location.hash = '#/' + e.target.dataset.go;
+      return;
+    }
+    // 詳細頁：左右鍵連續瀏覽
+    var r = parse();
+    if (!r.id || e.metaKey || e.ctrlKey || e.altKey) return;
+    var p = byId[r.id]; if (!p) return;
+    if (e.key === 'ArrowLeft' && PJ[p.rank - 2])  location.hash = '#/' + PJ[p.rank - 2].id;
+    if (e.key === 'ArrowRight' && PJ[p.rank])     location.hash = '#/' + PJ[p.rank].id;
+  });
+
+  // 主頁領域篩選
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('#filters button') : null;
+    if (!b) return;
+    Array.prototype.forEach.call(document.querySelectorAll('#filters button'), function (x) {
+      x.classList.toggle('is-on', x === b);
+    });
+    var f = b.dataset.f;
+    Array.prototype.forEach.call(document.querySelectorAll('#list .row'), function (row) {
+      row.style.display = (f === 'all' || row.dataset.dom === f) ? '' : 'none';
+    });
+  });
+
+  window.addEventListener('hashchange', function () { paint(false); });
+
+  /* ---------- 啟動 ---------- */
+  if (!PJ.length) {
+    root.innerHTML = '<div class="wrap section"><div class="note note--risk"><div class="note__k">LOAD ERROR</div>' +
+      '<p>專題內容尚未載入完成，請重新整理頁面。</p></div></div>';
+  } else {
+    paint(false);
+  }
+})();

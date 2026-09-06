@@ -1,0 +1,142 @@
+/* ============================================================
+   base.css — 設計 token、重置、科技圖騰背景
+   規範：全域禁止 border-radius；所有切角以 clip-path 斜切完成
+   ============================================================ */
+
+:root {
+  /* -- 底色階層 -------------------------------------------- */
+  --c-void:      #06080A;   /* 最底 */
+  --c-bg:        #0A0D0F;   /* 頁面 */
+  --c-panel:     #0E1316;   /* 面板 */
+  --c-panel-2:   #121A1E;   /* 次面板 / 表頭 */
+  --c-raise:     #161F23;   /* 抬高 */
+
+  /* -- 線條 ------------------------------------------------ */
+  --c-line:      #1D272B;
+  --c-line-2:    #2A383D;
+  --c-line-hot:  #0ABAB5;
+
+  /* -- 文字 ------------------------------------------------ */
+  --c-text:      #C8D2D5;
+  --c-text-2:    #93A2A6;
+  --c-dim:       #64757A;
+  --c-faint:     #3D4B4F;
+
+  /* -- 重點色（蒂芬妮綠） ---------------------------------- */
+  --c-accent:    #0ABAB5;
+  --c-glow:      #2BFFE0;
+  --c-glow-dim:  rgba(43, 255, 224, 0.14);
+
+  /* -- 語意色 ---------------------------------------------- */
+  --c-warn:      #D9A247;
+  --c-risk:      #D9614B;
+  --c-ok:        #4FBF8B;
+  --c-fc:        #7E9BD9;
+
+  /* -- 字體 ------------------------------------------------ */
+  --f-mono: "JetBrains Mono", "IBM Plex Mono", "Cascadia Mono", "Consolas",
+            "Roboto Mono", "Noto Sans Mono CJK TC", monospace;
+  --f-sans: "Inter", "Segoe UI", "PingFang TC", "Noto Sans TC",
+            "Microsoft JhengHei", "Helvetica Neue", sans-serif;
+
+  /* -- 尺度 ------------------------------------------------ */
+  --sp: 4px;
+  --maxw: 1320px;
+  --hdr-h: 52px;
+}
+
+* { box-sizing: border-box; border-radius: 0 !important; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--f-sans);
+  font-size: 15px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body { min-height: 100vh; overflow-x: hidden; }
+
+/* ============================================================
+   科技圖騰背景：三層疊加（低對比、細線條、襯底不搶主角）
+   L1 精細網格  L2 粗座標格  L3 邊緣暈影
+   ============================================================ */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    /* L1 精細網格 8px */
+    linear-gradient(to right,  rgba(45, 62, 67, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(45, 62, 67, 0.16) 1px, transparent 1px),
+    /* L2 粗座標格 96px */
+    linear-gradient(to right,  rgba(60, 84, 90, 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(60, 84, 90, 0.22) 1px, transparent 1px);
+  background-size: 8px 8px, 8px 8px, 96px 96px, 96px 96px;
+}
+body::after {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(10,186,181,0.055), transparent 60%),
+    radial-gradient(ellipse 100% 60% at 50% 110%, rgba(10,186,181,0.035), transparent 60%),
+    linear-gradient(180deg, rgba(6,8,10,0.0) 0%, rgba(6,8,10,0.55) 100%);
+}
+
+/* 電路走線裝飾層（由 app.js 注入 SVG） */
+#circuitry {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: 0.5;
+}
+
+#root { position: relative; z-index: 1; }
+
+/* ============================================================
+   通用排版
+   ============================================================ */
+a { color: var(--c-accent); text-decoration: none; }
+a:hover { color: var(--c-glow); text-shadow: 0 0 8px var(--c-glow-dim); }
+
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: .01em; }
+p { margin: 0 0 12px; }
+ul, ol { margin: 0 0 12px; padding-left: 20px; }
+li { margin: 0 0 6px; }
+strong { color: #E4EDEF; font-weight: 600; }
+code {
+  font-family: var(--f-mono); font-size: .88em;
+  background: var(--c-panel-2); color: var(--c-glow);
+  padding: 1px 5px; border: 1px solid var(--c-line);
+}
+
+/* 等寬標籤（規格書欄位名） */
+.mono { font-family: var(--f-mono); }
+.lbl {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--c-dim);
+}
+
+/* 斜切角容器（取代圓角） */
+.chamfer { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+.chamfer-tr { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%); }
+
+/* 分隔線：帶刻度的科技感 rule */
+.rule {
+  height: 1px; border: 0; margin: 0;
+  background: linear-gradient(90deg, var(--c-line-2) 0%, var(--c-line) 40%, transparent 100%);
+}
+
+/* 捲軸 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--c-void); }
+::-webkit-scrollbar-thumb { background: var(--c-line-2); border: 2px solid var(--c-void); }
+::-webkit-scrollbar-thumb:hover { background: var(--c-accent); }
+
+::selection { background: rgba(10,186,181,.3); color: #EAF7F6; }
+
+/* 焦點可見性（鍵盤操作） */
+:focus-visible { outline: 1px solid var(--c-glow); outline-offset: 2px; }
