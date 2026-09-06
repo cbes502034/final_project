@@ -2,3 +2,4 @@
 picks.json
 server.log
 __pycache__/
+picks.local.json

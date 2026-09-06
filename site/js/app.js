@@ -36,7 +36,7 @@
     var h = '';
 
     /* -- Hero -- */
-    h += '<section class="wrap hero" id="sec-intro" data-sec="報告總覽">';
+    h += '<section class="wrap hero" id="sec-intro">';
     h += '<div class="hero__kicker">' + esc(META.kicker) + '</div>';
     h += '<h1 class="hero__title">' + META.title + '</h1>';
     h += '<p class="hero__lede">' + R.inline(META.lede) + '</p>';
@@ -46,24 +46,9 @@
     }).join('') + '</div>';
     h += '</section>';
 
-    /* -- 研究方法 -- */
-    h += '<section class="wrap section" id="method" data-sec="研究方法">';
-    h += secHead('01', '研究方法：先分析需求，再從現實問題發展題目', 'PIPELINE / 13 STAGES');
-    h += '<p class="hero__lede" style="margin-bottom:16px">' + R.inline(META.methodLede) + '</p>';
-    h += '<div class="pipe">' + META.pipeline.map(function (s, i) {
-      return '<div class="pipe__step"><div class="pipe__n">' + String(i + 1).padStart(2, '0') + '</div><div class="pipe__t">' + esc(s) + '</div></div>';
-    }).join('') + '</div>';
-    h += '</section>';
-
-    /* -- 團隊與限制 -- */
-    h += '<section class="wrap section" id="constraints" data-sec="團隊與限制">';
-    h += secHead('02', '團隊能力與資源限制（所有排名的分母）', 'CONSTRAINTS');
-    h += '<div class="body" style="max-width:none">' + R.blocks(META.constraints) + '</div>';
-    h += '</section>';
-
     /* -- Top 10 -- */
-    h += '<section class="wrap section" id="top20" data-sec="Top 10 排名">';
-    h += secHead('03', 'Top 10 專題排名', 'SCORED / EVIDENCE-BASED');
+    h += '<section class="wrap section" id="top20">';
+    h += secHead('', 'Top 10 專題排名', 'SCORED / EVIDENCE-BASED');
     h += '<div class="filters" id="filters">';
     h += '<button data-f="all" class="is-on">ALL · ' + PJ.length + '</button>';
     META.domains.forEach(function (d) {
@@ -75,22 +60,74 @@
     h += '<div class="grid" id="list">' + PJ.map(cardHTML).join('') + '</div>';
     h += '</section>';
 
-    /* -- 候選池處理結果 -- */
-    h += '<section class="wrap section" id="disclosure" data-sec="候選池結果">';
-    h += secHead('04', '候選池的處理結果', 'CANDIDATE POOL');
-    h += '<div class="body" style="max-width:none">' + R.blocks(META.disclosure) + '</div>';
-    h += '</section>';
-
-    /* -- 頁尾 -- */
-    h += '<footer class="wrap foot" id="sources" data-sec="資料來源">';
-    h += '<div class="foot__grid">' + META.foot.map(function (c) {
-      return '<div><div class="foot__t">' + esc(c.t) + '</div>' +
-        '<ul style="padding-left:16px">' + c.items.map(function (i) { return '<li>' + R.inline(i) + '</li>'; }).join('') + '</ul></div>';
-    }).join('') + '</div>';
+    /* -- 頁尾：只留一句話與專案說明入口 -- */
+    h += '<footer class="wrap foot">';
     h += '<div class="foot__note">' + R.inline(META.footNote) + '</div>';
+    h += '<button class="foot__more" data-go="about">專案說明文件 · 題目怎麼來的、分數怎麼給、資料出處</button>';
     h += '</footer>';
 
     return h;
+  }
+
+  /* ============================================================
+     專案說明文件（獨立頁，抽屜式，預設全部收合）
+     ============================================================ */
+  function aboutHTML() {
+    var h = '<div class="wrap ab">';
+    h += '<div class="ab-head">';
+    h += '<div class="dt-head__crumb"><a href="#/">TOP 10</a><span>/</span>專案說明</div>';
+    h += '<h1 class="ab-head__t">專案說明文件</h1>';
+    h += '<p class="ab-head__lede">' + R.inline(META.aboutLede) + '</p>';
+    h += '<div class="ab-head__act">';
+    h += '<button class="ab-tog" data-acc="open">全部展開</button>';
+    h += '<button class="ab-tog" data-acc="close">全部收合</button>';
+    h += '</div></div>';
+
+    (META.about || []).forEach(function (d, i) {
+      h += '<details class="acc" id="' + esc(d.id) + '" data-sec="' + esc(d.t.split('：')[0].split('（')[0]) + '">';
+      h += '<summary class="acc__h">';
+      h += '<span class="acc__n">' + String(i + 1).padStart(2, '0') + '</span>';
+      h += '<span class="acc__t">' + esc(d.t) + '</span>';
+      h += '<span class="acc__en">' + esc(d.en) + '</span>';
+      h += '<span class="acc__ic" aria-hidden="true"><i></i><i></i></span>';
+      h += '</summary>';
+      h += '<div class="acc__b">' + aboutBody(d.use) + '</div>';
+      h += '</details>';
+    });
+
+    h += '<div class="pager"><button class="pager__b pager__b--home" data-go="home">' +
+         '<span class="pager__k">INDEX</span><span class="pager__t">返回 Top 10</span></button></div>';
+    h += '</div>';
+    return h;
+  }
+
+  function aboutBody(use) {
+    if (use === 'pipeline') {
+      return '<p class="ab-lede">' + R.inline(META.methodLede) + '</p>' +
+        '<div class="pipe">' + META.pipeline.map(function (x, i) {
+          return '<div class="pipe__step"><div class="pipe__n">' + String(i + 1).padStart(2, '0') +
+                 '</div><div class="pipe__t">' + esc(x) + '</div></div>';
+        }).join('') + '</div>';
+    }
+    if (use === 'scoring') {
+      var rows = (META.scoreItems || []).map(function (it) {
+        return [it[0], String(it[1]), it[2]];
+      });
+      return '<div class="body">' + R.blocks([
+        { t: 'table', head: ['評分項目', '配分', '判斷依據'], rows: rows },
+        { t: 'note', k: '未來延展性', kind: 'info',
+          x: '刻意不計分，只在分數接近時作為參考。理由是延展性人人都能講，' +
+             '一旦計分就會變成比誰想像力好，而不是比誰的證據紮實。' }
+      ]) + '</div>';
+    }
+    if (use === 'sources') {
+      return '<div class="foot__grid">' + (META.foot || []).map(function (c) {
+        return '<div><div class="foot__t">' + esc(c.t) + '</div><ul>' +
+          c.items.map(function (i) { return '<li>' + R.inline(i) + '</li>'; }).join('') +
+          '</ul></div>';
+      }).join('') + '</div>';
+    }
+    return '<div class="body">' + R.blocks(META[use] || []) + '</div>';
   }
 
   function secHead(no, t, sub) {
@@ -283,7 +320,8 @@
     }
 
     current = { id: r.id, ver: r.ver };
-    root.innerHTML = p ? detailHTML(p, r.ver) : homeHTML();
+    root.innerHTML = p ? detailHTML(p, r.ver)
+                   : (r.id === 'about' ? aboutHTML() : homeHTML());
     if (!keepScroll) window.scrollTo(0, 0);
     mountFloating(p);
   }
@@ -385,6 +423,13 @@
     Array.prototype.forEach.call(document.querySelectorAll('#list .chip-c'), function (row) {
       row.style.display = (f === 'all' || row.dataset.dom === f) ? '' : 'none';
     });
+  });
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-acc]') : null;
+    if (!t) return;
+    var open = t.dataset.acc === 'open';
+    Array.prototype.forEach.call(document.querySelectorAll('.acc'), function (d) { d.open = open; });
   });
 
   window.addEventListener('hashchange', function () { paint(false); });

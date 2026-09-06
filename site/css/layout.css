@@ -328,3 +328,17 @@
 .chip-c--sw     .chip-c__hw { color: var(--c-dim); border-style: dashed; }
 .chip-c--hwopt  .chip-c__hw { color: var(--c-warn); border-color: rgba(217,162,71,.45); }
 .chip-c--hwcore .chip-c__hw { color: var(--c-ok); border-color: rgba(79,191,139,.5); background: rgba(79,191,139,.08); font-weight: 700; }
+
+
+/* 主頁頁尾：專案說明文件入口 */
+.foot__more {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  margin-top: 18px; padding: 16px 18px;
+  background: var(--c-panel); border: 1px solid var(--c-line-2); color: var(--c-text-2);
+  font-size: 13.5px; font-weight: 600; letter-spacing: .01em;
+}
+.foot__more:hover {
+  border-color: var(--c-glow); color: var(--c-glow);
+  background: rgba(10,186,181,.07); box-shadow: 0 0 20px rgba(43,255,224,.08);
+}
+.hdr__home--doc { font-family: var(--f-sans); font-size: 12px; letter-spacing: .02em; }

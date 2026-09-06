@@ -7,21 +7,33 @@
   1. 有 DATABASE_URL  → PostgreSQL（正式部署用，重啟不會遺失）
   2. 沒有             → 本機 JSON 檔（開發用；雲端免費方案重啟會遺失）
 
+即時更新：
+  GET /api/stream 是 Server-Sent Events。整個服務只有「一個」背景工作在輪詢
+  儲存層，發現有變動才推給所有連線中的瀏覽器，所以連線數再多也不會加重資料庫。
+  自己送出的 PUT / DELETE 會直接廣播，不必等下一次輪詢。
+
 刻意保持極小：沒有帳號、沒有密碼，只用固定的四個名字做白名單。
 這是給四個人自己用的內部工具，不是公開服務。
 """
+import asyncio
 import json
 import os
 import threading
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 
 MEMBERS = ("冠文", "明樺", "囷洧", "宇傑")
 MAX_PROJECT_ID_LEN = 8
+
+# 背景輪詢間隔；代理層通常 30–60 秒無資料就砍連線，所以心跳要比那個短
+POLL_SECONDS = 1.0
+HEARTBEAT_SECONDS = 15.0
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 JSON_PATH = Path(os.getenv("PICKS_FILE", "picks.json"))
@@ -32,7 +44,60 @@ ALLOWED_ORIGINS = [
     ).split(",") if o.strip()
 ]
 
-app = FastAPI(title="Capstone Pick Service", docs_url=None, redoc_url=None)
+_subscribers: "set[asyncio.Queue]" = set()
+_last_signature = None
+
+
+LF = chr(10)
+
+
+def _sse(payload):
+    """組一個 SSE 訊框：data 行 + 空行結尾。"""
+    return "data: " + json.dumps(payload, ensure_ascii=False) + LF + LF
+
+
+def _signature(payload):
+    return json.dumps(payload["picks"], sort_keys=True, ensure_ascii=False)
+
+
+def _broadcast(payload):
+    """把最新狀態丟給所有連線中的瀏覽器。慢的連線就讓它掉，不拖累其他人。"""
+    global _last_signature
+    _last_signature = _signature(payload)
+    for q in list(_subscribers):
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            _subscribers.discard(q)
+
+
+async def _watch_store():
+    """全服務只有這一個輪詢者，所以資料庫負擔與連線人數無關。"""
+    global _last_signature
+    while True:
+        try:
+            payload = await asyncio.to_thread(_payload)
+            if _signature(payload) != _last_signature:
+                _broadcast(payload)
+        except Exception as exc:
+            print(f"[picks] watcher error: {exc}")
+        await asyncio.sleep(POLL_SECONDS)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    task = asyncio.create_task(_watch_store())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(
+    title="Capstone Pick Service", docs_url=None, redoc_url=None, lifespan=lifespan
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -178,19 +243,58 @@ def list_picks():
 
 
 @app.put("/api/picks")
-def set_pick(body: PickIn):
-    store.put(
-        body.member, body.project, datetime.now(timezone.utc).isoformat()
+async def set_pick(body: PickIn):
+    await asyncio.to_thread(
+        store.put, body.member, body.project, datetime.now(timezone.utc).isoformat()
     )
-    return _payload()
+    payload = await asyncio.to_thread(_payload)
+    _broadcast(payload)          # 不必等下一次輪詢，其他人立刻看到
+    return payload
 
 
 @app.delete("/api/picks/{member}")
-def clear_pick(member: str):
+async def clear_pick(member: str):
     if member not in MEMBERS:
         raise HTTPException(status_code=404, detail="unknown member")
-    store.delete(member)
-    return _payload()
+    await asyncio.to_thread(store.delete, member)
+    payload = await asyncio.to_thread(_payload)
+    _broadcast(payload)
+    return payload
+
+
+@app.get("/api/stream")
+async def stream(request: Request):
+    """Server-Sent Events：一有人改選擇，其他人畫面立刻更新。"""
+    queue: asyncio.Queue = asyncio.Queue(maxsize=8)
+    _subscribers.add(queue)
+
+    async def events():
+        try:
+            first = await asyncio.to_thread(_payload)
+            yield _sse(first)
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    payload = await asyncio.wait_for(
+                        queue.get(), timeout=HEARTBEAT_SECONDS
+                    )
+                except asyncio.TimeoutError:
+                    yield ": keep-alive" + LF + LF     # 讓代理層不要砍掉閒置連線
+                    continue
+                yield _sse(payload)
+        finally:
+            _subscribers.discard(queue)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",     # 關掉反向代理的緩衝，否則會積在中間
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @app.get("/healthz")

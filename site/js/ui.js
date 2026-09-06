@@ -34,7 +34,10 @@
         var b = e.target.closest('[data-jump]');
         if (b) {
           var t = document.getElementById(b.dataset.jump);
-          if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 68, behavior: 'smooth' });
+          if (t) {
+            if (t.tagName === 'DETAILS') t.open = true;   // 跳到抽屜就順手打開
+            window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 68, behavior: 'smooth' });
+          }
           secNavEl.classList.remove('is-open');
           return;
         }
@@ -101,9 +104,7 @@
 
   function loadPicks() {
     return api('').then(function (d) {
-      picks = (d && d.picks) || [];
-      render();
-      if (global.App && global.App.onPicks) global.App.onPicks(picks);
+      applyPicks(d, live);
       return picks;
     }).catch(function () {
       picks = null;             // null = 服務未就緒
@@ -188,10 +189,85 @@
           if (!ok && warm < 12) { warm++; setTimeout(retry, 5000); }
         });
       })();
-      setInterval(loadPicks, 20000);   // 讓四個人看到彼此的更新
+      connectStream();
     }
     render();
   }
+
+  /* ---- 即時更新：SSE 為主，連不上才退回輪詢 ---- */
+  var es = null, pollTimer = 0, live = false, lastSig = '';
+
+  function sigOf(list) {
+    return (list || []).map(function (p) { return p.member + ':' + p.project; }).join(',');
+  }
+
+  function applyPicks(d, isLive) {
+    var next = (d && d.picks) || [];
+    var sig = sigOf(next);
+    var changed = sig !== lastSig;
+    var before = {};
+    (picks || []).forEach(function (p) { before[p.member] = p.project; });
+
+    picks = next; lastSig = sig; live = !!isLive;
+    render();
+    if (global.App && global.App.onPicks) global.App.onPicks(picks);
+
+    // 別人剛剛改動的那一列閃一下，不然畫面靜靜換掉不會被注意到
+    if (changed) {
+      next.forEach(function (p) {
+        if (before[p.member] !== p.project && p.member !== me) flashRow(p.member);
+      });
+    }
+  }
+
+  function flashRow(member) {
+    if (!voteEl) return;
+    var i = MEMBERS.indexOf(member);
+    var row = voteEl.querySelectorAll('.vote__row')[i];
+    var cell = document.querySelectorAll('.picks__c')[i];
+    [row, cell].forEach(function (el) {
+      if (!el) return;
+      el.classList.remove('is-fresh');
+      void el.offsetWidth;              // 重新觸發動畫
+      el.classList.add('is-fresh');
+      setTimeout(function () { el.classList.remove('is-fresh'); }, 2400);
+    });
+  }
+
+  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = 0; } }
+  function startPoll() { if (!pollTimer) pollTimer = setInterval(loadPicks, 15000); }
+
+  function connectStream() {
+    if (!API || typeof EventSource === 'undefined') { startPoll(); return; }
+    if (es) return;
+    try { es = new EventSource(API + '/api/stream'); }
+    catch (e) { startPoll(); return; }
+
+    es.onopen = function () { stopPoll(); live = true; render(); };
+    es.onmessage = function (ev) {
+      try { applyPicks(JSON.parse(ev.data), true); } catch (e) {}
+    };
+    es.onerror = function () {
+      // EventSource 自己會重連；在它重連成功之前先用輪詢頂著
+      live = false; render(); startPoll();
+    };
+  }
+
+  function closeStream() {
+    if (es) { es.close(); es = null; }
+    live = false;
+  }
+
+  // 分頁切到背景就收掉連線，回來再接。免得閒置連線一直把免費方案的服務吊著
+  var idleTimer = 0;
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      idleTimer = setTimeout(function () { closeStream(); stopPoll(); }, 60000);
+    } else {
+      clearTimeout(idleTimer);
+      if (!es) { connectStream(); loadPicks(); }
+    }
+  });
 
   function render() {
     if (!voteEl) return;
@@ -219,7 +295,9 @@
         '<span class="vote__cnt">' + done + '<i>/4</i></span>' +
       '</button>' +
       '<div class="vote__panel">' +
-        '<div class="vote__hd">選題投票<button class="vote__close" type="button" aria-label="關閉">×</button></div>' +
+        '<div class="vote__hd">選題投票' +
+          '<span class="vote__live' + (live ? ' is-on' : '') + '">' + (live ? '即時同步' : '連線中') + '</span>' +
+          '<button class="vote__close" type="button" aria-label="關閉">×</button></div>' +
         '<div class="vote__body">' +
           '<label class="vote__lb">我是</label>' +
           '<select class="vote__sel" data-me>' +
