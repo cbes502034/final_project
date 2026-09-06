@@ -71,7 +71,7 @@
       h += '<button data-f="' + esc(d) + '">' + esc(d) + ' · ' + n + '</button>';
     });
     h += '</div>';
-    h += '<div class="list" id="list">' + PJ.map(rowHTML).join('') + '</div>';
+    h += '<div class="grid" id="list">' + PJ.map(cardHTML).join('') + '</div>';
     h += '</section>';
 
     /* -- 揭露 -- */
@@ -98,21 +98,20 @@
       '<span class="sec-head__sub">' + esc(sub) + '</span></div>';
   }
 
-  function rowHTML(p) {
-    return '<div class="row" data-go="' + p.id + '" data-dom="' + esc(p.domain) + '" role="link" tabindex="0">' +
-      '<div class="row__rank">' + String(p.rank).padStart(2, '0') + '<sup>' + esc(p.code) + '</sup></div>' +
-      '<div class="row__main">' +
-        '<div class="row__t">' + esc(p.title) + '</div>' +
-        '<div class="row__s">' + R.inline(p.summary) + '</div>' +
-      '</div>' +
-      '<div class="row__meta"><div class="tagline">' +
+  function cardHTML(p) {
+    return '<article class="chip-c" data-go="' + p.id + '" data-dom="' + esc(p.domain) + '" role="link" tabindex="0" aria-label="' + esc(p.title) + '">' +
+      '<div class="chip-c__top"><i class="chip-c__pin1"></i><span class="chip-c__code">' + esc(p.code) + '</span></div>' +
+      '<div class="chip-c__rank">' + String(p.rank).padStart(2, '0') + '</div>' +
+      '<div class="chip-c__hr"></div>' +
+      '<h3 class="chip-c__t">' + esc(p.title) + '</h3>' +
+      '<p class="chip-c__s">' + R.inline(p.summary) + '</p>' +
+      '<div class="chip-c__meta">' +
         '<span class="tag tag--dom">' + esc(p.domain) + '</span>' + piTag(p) + fcTag(p) +
-      '</div></div>' +
-      '<div class="row__score">' +
-        '<div class="row__num">' + p.score + '<span>/100</span></div>' +
-        '<div class="row__bar"><i style="width:' + p.score + '%"></i></div>' +
-        '<div class="row__go">OPEN &#9656;</div>' +
-      '</div></div>';
+      '</div>' +
+      '<div class="chip-c__score">' +
+        '<div class="chip-c__bar"><i style="width:' + p.score + '%"></i></div>' +
+        '<div class="chip-c__num">' + p.score + '<span>/100</span></div>' +
+      '</div></article>';
   }
 
   /* ============================================================
@@ -256,7 +255,7 @@
 
   document.addEventListener('keydown', function (e) {
     // 清單以鍵盤開啟
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('row')) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('chip-c')) {
       e.preventDefault();
       location.hash = '#/' + e.target.dataset.go;
       return;
@@ -277,7 +276,7 @@
       x.classList.toggle('is-on', x === b);
     });
     var f = b.dataset.f;
-    Array.prototype.forEach.call(document.querySelectorAll('#list .row'), function (row) {
+    Array.prototype.forEach.call(document.querySelectorAll('#list .chip-c'), function (row) {
       row.style.display = (f === 'all' || row.dataset.dom === f) ? '' : 'none';
     });
   });
