@@ -149,7 +149,7 @@
 - **USER** 資安分析師
 - **DATA** VirusTotal／AbuseIPDB／WHOIS API
 - **FC** 極高
-- **RISK** **與隊長既有個人專案 Threat Intel Agent 高度重疊，四人專題重做的新意不足**
+- **RISK** **與冠文既有個人專案 Threat Intel Agent 高度重疊，四人專題重做的新意不足**
 - **判定** → 直接降權，不進 Top 20
 
 ### C08 資安事件報告自動生成

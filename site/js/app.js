@@ -71,6 +71,7 @@
       h += '<button data-f="' + esc(d) + '">' + esc(d) + ' · ' + n + '</button>';
     });
     h += '</div>';
+    h += '<div class="picks" id="picks"></div>';
     h += '<div class="grid" id="list">' + PJ.map(cardHTML).join('') + '</div>';
     h += '</section>';
 
@@ -310,6 +311,26 @@
       var card = n.closest('.chip-c');
       if (card) card.classList.toggle('is-picked', !!who);
     });
+
+    var board = document.getElementById('picks');
+    if (board) {
+      var members = (global.UI && global.UI.MEMBERS) || [];
+      var done = (picks || []).length;
+      board.innerHTML =
+        '<div class="picks__hd"><span class="picks__t">大家選了什麼</span>' +
+          '<span class="picks__n">' + done + ' / ' + members.length + ' 人已選</span></div>' +
+        '<div class="picks__row">' + members.map(function (m) {
+          var v = (picks || []).filter(function (x) { return x.member === m; })[0];
+          var pj = v && byId[v.project];
+          return '<div class="picks__c' + (v ? ' is-done' : '') + '">' +
+            '<div class="picks__m">' + esc(m) + '</div>' +
+            (pj
+              ? '<button class="picks__p" data-go="' + pj.id + '">' +
+                  '<b>' + String(pj.rank).padStart(2, '0') + '</b>' + esc(pj.title) + '</button>'
+              : '<span class="picks__none">尚未選擇</span>') +
+          '</div>';
+        }).join('') + '</div>';
+    }
 
     var hd = document.querySelector('[data-detail-votes]');
     if (hd) {

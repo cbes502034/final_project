@@ -7,7 +7,7 @@
   'use strict';
 
   var MEMBERS = ['冠文', '明樺', '囷洧', '宇傑'];
-  var ROLE = { '冠文': 'LLM/BackEnd/DepOps', '明樺': '資工／影像', '囷洧': '環工/雜項', '宇傑': '前端／測試' };
+  var ROLE = { '冠文': 'LLM/BackEnd/DevOps', '明樺': '資工／影像', '囷洧': '環工/雜項', '宇傑': '前端／測試' };
 
   /* API 位址：同源優先；若靜態站與投票服務分開部署，用 data-vote-api 覆寫 */
   var API = (function () {
@@ -249,6 +249,21 @@
         '</div>' +
       '</div>';
   }
+
+  /* 點面板以外的地方自動收起，避免浮動面板一直擋住內容 */
+  document.addEventListener('click', function (e) {
+    if (voteEl && voteEl.classList.contains('is-open') && !voteEl.contains(e.target)) {
+      voteEl.classList.remove('is-open');
+    }
+    if (secNavEl && secNavEl.classList.contains('is-open') && !secNavEl.contains(e.target)) {
+      secNavEl.classList.remove('is-open');
+    }
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (voteEl) voteEl.classList.remove('is-open');
+    if (secNavEl) secNavEl.classList.remove('is-open');
+  });
 
   global.UI = {
     mountSectionNav: mountSectionNav,
