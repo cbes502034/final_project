@@ -131,7 +131,8 @@
   }
 
   function secHead(no, t, sub) {
-    return '<div class="sec-head"><span class="sec-head__no">' + no + '</span>' +
+    return '<div class="sec-head">' +
+      (no ? '<span class="sec-head__no">' + no + '</span>' : '') +
       '<h2 class="sec-head__t">' + esc(t) + '</h2>' +
       '<span class="sec-head__sub">' + esc(sub) + '</span></div>';
   }
