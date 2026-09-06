@@ -7,7 +7,6 @@
   'use strict';
 
   var MEMBERS = ['冠文', '明樺', '囷洧', '宇傑'];
-  var ROLE = { '冠文': 'Python 後端' };
 
   /* API 位址：同源優先；若靜態站與投票服務分開部署，用 data-vote-api 覆寫 */
   var API = (function () {
@@ -206,7 +205,7 @@
       board = '<div class="vote__board">' + MEMBERS.map(function (m) {
         var f = picks.filter(function (p) { return p.member === m; })[0];
         return '<div class="vote__row' + (f ? ' is-done' : '') + (m === me ? ' is-me' : '') + '">' +
-          '<div class="vote__who"><b>' + esc(m) + '</b><small>' + esc(ROLE[m] || '') + '</small></div>' +
+          '<div class="vote__who"><b>' + esc(m) + '</b></div>' +
           (f
             ? '<button class="vote__pk" type="button" data-goto="' + f.project + '">' + esc(titleOf(f.project)) + '</button>'
             : '<span class="vote__none">尚未選擇</span>') +
@@ -226,7 +225,7 @@
           '<select class="vote__sel" data-me>' +
             '<option value="">— 選擇你的名字 —</option>' +
             MEMBERS.map(function (m) {
-              return '<option value="' + m + '"' + (m === me ? ' selected' : '') + '>' + esc(m) + (ROLE[m] ? '（' + esc(ROLE[m]) + '）' : '') + '</option>';
+              return '<option value="' + m + '"' + (m === me ? ' selected' : '') + '>' + esc(m) + '</option>';
             }).join('') +
           '</select>' +
 
