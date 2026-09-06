@@ -278,7 +278,6 @@
       Array.prototype.forEach.call(document.querySelectorAll('.vswitch__b'), function (b) {
         b.classList.toggle('is-on', b.dataset.v === r.ver);
       });
-      markNav();
       mountFloating(p);
       return;
     }
@@ -286,7 +285,6 @@
     current = { id: r.id, ver: r.ver };
     root.innerHTML = p ? detailHTML(p, r.ver) : homeHTML();
     if (!keepScroll) window.scrollTo(0, 0);
-    markNav();
     mountFloating(p);
   }
 
@@ -343,12 +341,6 @@
 
   global.App = { onPicks: paintVotes };
 
-  function markNav() {
-    var onHome = !parse().id;
-    Array.prototype.forEach.call(document.querySelectorAll('.hdr__nav a'), function (a) {
-      a.classList.toggle('is-on', onHome && a.getAttribute('href').indexOf('#') === 0);
-    });
-  }
 
   /* ---------- 事件委派 ---------- */
   document.addEventListener('click', function (e) {

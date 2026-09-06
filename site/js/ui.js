@@ -1,13 +1,13 @@
 /* ============================================================
-   ui.js — 兩個跟著畫面走的浮動元件
-   1. 章節導覽：隨滾動高亮目前章節，點擊跳轉
-   2. 選題投票：四人各選一題，共用區域即時可見
+   ui.js — 兩個導覽元件
+   1. 章節導覽（頁首）：隨滾動高亮目前章節，點擊跳轉
+   2. 選題投票（右下）：四人各選一題，共用區域即時可見
    ============================================================ */
 (function (global) {
   'use strict';
 
   var MEMBERS = ['冠文', '明樺', '囷洧', '宇傑'];
-  var ROLE = { '冠文': 'LLM/BackEnd/DevOps', '明樺': '資工／影像', '囷洧': '環工/雜項', '宇傑': '前端／測試' };
+  var ROLE = { '冠文': 'Python 後端' };
 
   /* API 位址：同源優先；若靜態站與投票服務分開部署，用 data-vote-api 覆寫 */
   var API = (function () {
@@ -23,16 +23,14 @@
   }
 
   /* ============================================================
-     1. 浮動章節導覽
+     1. 頁首章節導覽
      ============================================================ */
   var secNavEl = null, secItems = [], spyRaf = 0;
 
   function mountSectionNav() {
     if (!secNavEl) {
-      secNavEl = document.createElement('nav');
-      secNavEl.className = 'secnav';
-      secNavEl.setAttribute('aria-label', '章節導覽');
-      document.body.appendChild(secNavEl);
+      secNavEl = document.getElementById('secnav');
+      if (!secNavEl) return;
       secNavEl.addEventListener('click', function (e) {
         var b = e.target.closest('[data-jump]');
         if (b) {
@@ -51,12 +49,12 @@
       return { id: n.id, label: n.dataset.sec, el: n };
     });
 
-    if (!secItems.length) { secNavEl.style.display = 'none'; return; }
-    secNavEl.style.display = '';
+    if (!secItems.length) { secNavEl.hidden = true; return; }
+    secNavEl.hidden = false;
 
     secNavEl.innerHTML =
       '<button class="secnav__toggle" type="button" aria-label="開啟章節選單">' +
-        '<span class="secnav__bars"><i></i><i></i><i></i></span><span class="secnav__tt">章節</span>' +
+        '<span class="secnav__tt">章節</span><span class="secnav__car"></span>' +
       '</button>' +
       '<div class="secnav__list">' +
         '<div class="secnav__hd">章節跳轉</div>' +
@@ -228,7 +226,7 @@
           '<select class="vote__sel" data-me>' +
             '<option value="">— 選擇你的名字 —</option>' +
             MEMBERS.map(function (m) {
-              return '<option value="' + m + '"' + (m === me ? ' selected' : '') + '>' + esc(m) + '（' + esc(ROLE[m]) + '）</option>';
+              return '<option value="' + m + '"' + (m === me ? ' selected' : '') + '>' + esc(m) + (ROLE[m] ? '（' + esc(ROLE[m]) + '）' : '') + '</option>';
             }).join('') +
           '</select>' +
 
