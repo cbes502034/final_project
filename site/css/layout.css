@@ -31,7 +31,7 @@
 .hdr__nav a {
   font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em;
   color: var(--c-dim); padding: 6px 11px; border: 1px solid transparent;
-  text-transform: uppercase;
+  text-transform: uppercase; white-space: nowrap;
 }
 .hdr__nav a:hover {
   color: var(--c-glow); border-color: var(--c-accent);
@@ -216,7 +216,9 @@
   .wrap { padding: 0 14px; }
   .hdr { gap: 10px; padding: 0 12px; }
   .hdr__mark span.hdr__long { display: none; }
-  .hdr__nav a { padding: 6px 8px; font-size: 10px; letter-spacing: .06em; }
+  .hdr__nav { flex-wrap: nowrap; }
+  .hdr__nav a { padding: 6px 6px; font-size: 9.5px; letter-spacing: .04em; }
+  .hdr__mark { font-size: 10.5px; gap: 7px; }
   .hero { padding: 34px 0 24px; }
   .section { padding: 30px 0; }
   .sec-head__t { font-size: 18px; }
