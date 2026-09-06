@@ -228,3 +228,40 @@
   .chip-c__t { font-size: 17px; }
   .pipe__step { flex: 1 1 100%; }
 }
+
+/* ============================================================
+   卡片的硬體標示：晶片有沒有接腳 = 這題有沒有硬體
+   ============================================================ */
+
+/* 純軟體：沒有接腳（沒有硬體就沒有腳），pin-1 改為空心，左緣加虛線帶 */
+.chip-c--sw::before, .chip-c--sw::after { display: none; }
+.chip-c--sw { border-left: 3px double var(--c-line-2); }
+.chip-c--sw:hover { border-left-color: var(--c-glow); }
+.chip-c--sw .chip-c__pin1 { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c-faint); }
+.chip-c--sw:hover .chip-c__pin1 { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c-glow); }
+
+/* 含樹莓派（選配）：接腳為琥珀色 */
+.chip-c--hwopt::before, .chip-c--hwopt::after {
+  background-image: repeating-linear-gradient(to bottom, var(--c-warn) 0 1.5px, transparent 1.5px 15px);
+  opacity: .75;
+}
+
+/* 樹莓派為核心：接腳更密、恆亮綠 */
+.chip-c--hwcore::before, .chip-c--hwcore::after {
+  top: 18px; bottom: 18px; width: 9px;
+  background-image: repeating-linear-gradient(to bottom, var(--c-ok) 0 2px, transparent 2px 11px);
+}
+.chip-c--hwcore::before { left: -9px; }
+.chip-c--hwcore::after  { right: -9px; }
+.chip-c--hwcore { border-color: rgba(79,191,139,.45); }
+
+/* 硬體標籤 */
+.chip-c__hw {
+  margin-left: 9px;
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .1em;
+  padding: 2px 6px; border: 1px solid var(--c-line-2); color: var(--c-faint);
+  line-height: 1.4; white-space: nowrap;
+}
+.chip-c--sw     .chip-c__hw { color: var(--c-dim); border-style: dashed; }
+.chip-c--hwopt  .chip-c__hw { color: var(--c-warn); border-color: rgba(217,162,71,.45); }
+.chip-c--hwcore .chip-c__hw { color: var(--c-ok); border-color: rgba(79,191,139,.5); background: rgba(79,191,139,.08); font-weight: 700; }

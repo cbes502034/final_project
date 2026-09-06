@@ -1,0 +1,160 @@
+/* ============================================================
+   float.css — 兩個浮動元件
+   左：章節導覽（跟著捲動高亮）　右下：選題投票
+   ============================================================ */
+
+/* ---------- 章節導覽 ---------- */
+.secnav { position: fixed; z-index: 60; left: 14px; top: 50%; transform: translateY(-50%); }
+
+.secnav__toggle { display: none; }
+
+.secnav__list {
+  background: rgba(10, 14, 16, .93);
+  border: 1px solid var(--c-line-2);
+  backdrop-filter: blur(6px);
+  padding: 10px 0 8px;
+  min-width: 168px; max-width: 210px;
+}
+.secnav__hd {
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .2em;
+  color: var(--c-faint); padding: 0 12px 8px; text-transform: uppercase;
+}
+.secnav__i {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: none; border: 0; border-left: 2px solid transparent;
+  padding: 6px 12px; cursor: pointer; text-align: left; color: var(--c-dim);
+}
+.secnav__n { font-family: var(--f-mono); font-size: 9.5px; color: var(--c-faint); flex: 0 0 auto; }
+.secnav__l { font-size: 12px; line-height: 1.4; }
+.secnav__i:hover { color: var(--c-glow); background: rgba(10,186,181,.07); border-left-color: var(--c-glow); }
+.secnav__i:hover .secnav__n { color: var(--c-glow); }
+.secnav__i.is-on { color: var(--c-hi); border-left-color: var(--c-accent); background: rgba(10,186,181,.09); }
+.secnav__i.is-on .secnav__n { color: var(--c-accent); }
+
+/* ---------- 選題投票 ---------- */
+.vote { position: fixed; z-index: 61; right: 18px; bottom: 18px; }
+
+.vote__fab {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--c-accent); color: var(--c-void);
+  border: 1px solid var(--c-accent); cursor: pointer;
+  padding: 11px 15px; font-weight: 800;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+.vote__fab:hover { background: var(--c-glow); border-color: var(--c-glow); box-shadow: 0 6px 26px rgba(43,255,224,.25); }
+.vote__fabk { font-size: 13.5px; letter-spacing: .06em; }
+.vote__cnt { font-family: var(--f-mono); font-size: 16px; font-weight: 800; line-height: 1; }
+.vote__cnt i { font-style: normal; font-size: 10px; opacity: .65; }
+
+.vote__panel {
+  display: none;
+  position: absolute; right: 0; bottom: calc(100% + 10px);
+  width: 330px; max-width: calc(100vw - 36px);
+  background: rgba(10, 14, 16, .97);
+  border: 1px solid var(--c-line-2);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 40px rgba(0,0,0,.6);
+}
+.vote.is-open .vote__panel { display: block; }
+
+.vote__hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; border-bottom: 1px solid var(--c-line-2);
+  background: var(--c-panel-2); color: var(--c-hi);
+  font-size: 14px; font-weight: 700;
+}
+.vote__close { background: none; border: 0; color: var(--c-dim); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.vote__close:hover { color: var(--c-glow); }
+
+.vote__body { padding: 13px 14px 15px; max-height: min(64vh, 520px); overflow-y: auto; }
+
+.vote__lb { display: block; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .18em;
+            color: var(--c-dim); text-transform: uppercase; margin: 0 0 6px; }
+.vote__lb--sep { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-line); }
+
+.vote__sel {
+  width: 100%; background: var(--c-void); color: var(--c-text);
+  border: 1px solid var(--c-line-2); padding: 9px 10px; margin-bottom: 12px;
+  font-family: var(--f-sans); font-size: 13px; cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--c-dim) 50%),
+                    linear-gradient(135deg, var(--c-dim) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.vote__sel:hover, .vote__sel:focus { border-color: var(--c-glow); color: var(--c-hi); outline: none; }
+
+.vote__act {
+  width: 100%; padding: 11px 12px; margin-bottom: 12px; cursor: pointer;
+  background: var(--c-panel-2); color: var(--c-text);
+  border: 1px solid var(--c-line-2); font-size: 13px; font-weight: 600;
+}
+.vote__act:hover { border-color: var(--c-glow); color: var(--c-glow); background: rgba(10,186,181,.08); }
+.vote__act.is-on { background: rgba(79,191,139,.12); border-color: rgba(79,191,139,.5); color: var(--c-ok); cursor: default; }
+
+.vote__clear { background: none; border: 0; color: var(--c-dim); font-size: 11.5px;
+               cursor: pointer; padding: 2px 0; text-decoration: underline; }
+.vote__clear:hover { color: var(--c-risk); }
+
+.vote__hint { font-size: 12px; color: var(--c-dim); line-height: 1.75;
+              border-left: 2px solid var(--c-line-2); padding-left: 10px; }
+.vote__off { font-size: 12px; color: var(--c-warn); line-height: 1.7;
+             border: 1px dashed rgba(217,162,71,.4); padding: 9px 11px; }
+
+.vote__msg { font-size: 11.5px; color: var(--c-risk); min-height: 0; opacity: 0; transition: opacity .2s; }
+.vote__msg.is-on { opacity: 1; min-height: 18px; }
+
+.vote__board { display: flex; flex-direction: column; gap: 1px; background: var(--c-line); border: 1px solid var(--c-line); }
+.vote__row { display: flex; align-items: center; gap: 10px; background: var(--c-panel); padding: 8px 10px; }
+.vote__row.is-me { background: var(--c-panel-2); box-shadow: inset 2px 0 0 var(--c-accent); }
+.vote__who { flex: 0 0 74px; }
+.vote__who b { display: block; font-size: 13px; color: var(--c-hi); font-weight: 700; }
+.vote__who small { display: block; font-size: 9.5px; color: var(--c-faint); font-family: var(--f-mono); margin-top: 1px; }
+.vote__pk { flex: 1; text-align: left; background: none; border: 0; cursor: pointer;
+            font-size: 11.5px; color: var(--c-accent); line-height: 1.45; padding: 0; }
+.vote__pk:hover { color: var(--c-glow); text-decoration: underline; }
+.vote__none { flex: 1; font-size: 11.5px; color: var(--c-faint); }
+
+/* ---------- 被選中的卡片與標記 ---------- */
+.chip-c.is-picked { border-color: rgba(79,191,139,.55); box-shadow: 0 0 0 1px rgba(79,191,139,.18); }
+.chip-c.is-picked:hover { border-color: var(--c-glow); box-shadow: 0 0 0 1px rgba(43,255,224,.18), 0 0 22px rgba(43,255,224,.10); }
+.chip-c__votes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 11px; }
+.chip-c__votes:empty { display: none; }
+
+.vtag {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .02em;
+  color: var(--c-ok); background: rgba(79,191,139,.12);
+  border: 1px solid rgba(79,191,139,.45); padding: 3px 7px; line-height: 1.4;
+}
+.vtag--lg { font-size: 11.5px; padding: 4px 9px; }
+.dt-head__votes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.dt-head__votes:empty { display: none; }
+
+/* ============================================================
+   RWD：窄畫面把章節導覽收成左下角按鈕
+   ============================================================ */
+@media (max-width: 1420px) {
+  .secnav { left: 14px; bottom: 18px; top: auto; transform: none; }
+  .secnav__toggle {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    background: rgba(10,14,16,.95); color: var(--c-text-2);
+    border: 1px solid var(--c-line-2); padding: 11px 14px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  }
+  .secnav__toggle:hover { border-color: var(--c-glow); color: var(--c-glow); }
+  .secnav__tt { font-size: 13px; font-weight: 700; }
+  .secnav__bars { display: flex; flex-direction: column; gap: 3px; }
+  .secnav__bars i { display: block; width: 13px; height: 1.5px; background: currentColor; }
+  .secnav__list { display: none; position: absolute; left: 0; bottom: calc(100% + 10px); }
+  .secnav.is-open .secnav__list { display: block; }
+}
+
+@media (max-width: 560px) {
+  .vote { right: 12px; bottom: 12px; }
+  .secnav { left: 12px; bottom: 12px; }
+  .vote__fab, .secnav__toggle { padding: 10px 12px; }
+  .vote__fabk, .secnav__tt { font-size: 12px; }
+  .vote__panel { width: calc(100vw - 24px); right: -12px; }
+  .secnav__list { min-width: 180px; }
+}

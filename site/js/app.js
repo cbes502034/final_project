@@ -1,7 +1,7 @@
 /* ============================================================
-   app.js — 路由、主頁（Top 20）、詳細頁、版本切換、連續瀏覽
+   app.js — 路由、主頁（Top 10）、詳細頁、版本切換、連續瀏覽
    ============================================================ */
-(function () {
+(function (global) {
   'use strict';
 
   var root = document.getElementById('root');
@@ -36,7 +36,7 @@
     var h = '';
 
     /* -- Hero -- */
-    h += '<section class="wrap hero">';
+    h += '<section class="wrap hero" id="sec-intro" data-sec="報告總覽">';
     h += '<div class="hero__kicker">' + esc(META.kicker) + '</div>';
     h += '<h1 class="hero__title">' + META.title + '</h1>';
     h += '<p class="hero__lede">' + R.inline(META.lede) + '</p>';
@@ -47,7 +47,7 @@
     h += '</section>';
 
     /* -- 研究方法 -- */
-    h += '<section class="wrap section" id="method">';
+    h += '<section class="wrap section" id="method" data-sec="研究方法">';
     h += secHead('01', '研究方法：先分析需求，再從現實問題發展題目', 'PIPELINE / 13 STAGES');
     h += '<p class="hero__lede" style="margin-bottom:16px">' + R.inline(META.methodLede) + '</p>';
     h += '<div class="pipe">' + META.pipeline.map(function (s, i) {
@@ -56,16 +56,16 @@
     h += '</section>';
 
     /* -- 團隊與限制 -- */
-    h += '<section class="wrap section" id="constraints">';
+    h += '<section class="wrap section" id="constraints" data-sec="團隊與限制">';
     h += secHead('02', '團隊能力與資源限制（所有排名的分母）', 'CONSTRAINTS');
     h += '<div class="body" style="max-width:none">' + R.blocks(META.constraints) + '</div>';
     h += '</section>';
 
-    /* -- Top 20 -- */
-    h += '<section class="wrap section" id="top20">';
-    h += secHead('03', 'Top 20 專題排名', 'SCORED / EVIDENCE-BASED');
+    /* -- Top 10 -- */
+    h += '<section class="wrap section" id="top20" data-sec="Top 10 排名">';
+    h += secHead('03', 'Top 10 專題排名', 'SCORED / EVIDENCE-BASED');
     h += '<div class="filters" id="filters">';
-    h += '<button data-f="all" class="is-on">ALL · 20</button>';
+    h += '<button data-f="all" class="is-on">ALL · ' + PJ.length + '</button>';
     META.domains.forEach(function (d) {
       var n = PJ.filter(function (p) { return p.domain === d; }).length;
       h += '<button data-f="' + esc(d) + '">' + esc(d) + ' · ' + n + '</button>';
@@ -75,13 +75,13 @@
     h += '</section>';
 
     /* -- 候選池處理結果 -- */
-    h += '<section class="wrap section" id="disclosure">';
+    h += '<section class="wrap section" id="disclosure" data-sec="候選池結果">';
     h += secHead('04', '候選池的處理結果', 'CANDIDATE POOL');
     h += '<div class="body" style="max-width:none">' + R.blocks(META.disclosure) + '</div>';
     h += '</section>';
 
     /* -- 頁尾 -- */
-    h += '<footer class="wrap foot" id="sources">';
+    h += '<footer class="wrap foot" id="sources" data-sec="資料來源">';
     h += '<div class="foot__grid">' + META.foot.map(function (c) {
       return '<div><div class="foot__t">' + esc(c.t) + '</div>' +
         '<ul style="padding-left:16px">' + c.items.map(function (i) { return '<li>' + R.inline(i) + '</li>'; }).join('') + '</ul></div>';
@@ -98,9 +98,15 @@
       '<span class="sec-head__sub">' + esc(sub) + '</span></div>';
   }
 
+  var HW_CLS = { '核心': 'chip-c--hwcore', '選配': 'chip-c--hwopt', '不需要': 'chip-c--sw' };
+  var HW_TXT = { '核心': '樹莓派為核心', '選配': '含樹莓派（選配）', '不需要': '純軟體' };
+
   function cardHTML(p) {
-    return '<article class="chip-c" data-go="' + p.id + '" data-dom="' + esc(p.domain) + '" role="link" tabindex="0" aria-label="' + esc(p.title) + '">' +
-      '<div class="chip-c__top"><i class="chip-c__pin1"></i><span class="chip-c__code">' + esc(p.code) + '</span></div>' +
+    var hw = HW_CLS[p.pi.k] || 'chip-c--sw';
+    return '<article class="chip-c ' + hw + '" data-go="' + p.id + '" data-dom="' + esc(p.domain) + '" data-hw="' + esc(p.pi.k) + '" role="link" tabindex="0" aria-label="' + esc(p.title) + '">' +
+      '<div class="chip-c__top"><i class="chip-c__pin1"></i>' +
+        '<span class="chip-c__hw">' + esc(HW_TXT[p.pi.k] || '純軟體') + '</span>' +
+        '<span class="chip-c__code">' + esc(p.code) + '</span></div>' +
       '<div class="chip-c__rank">' + String(p.rank).padStart(2, '0') + '</div>' +
       '<div class="chip-c__hr"></div>' +
       '<h3 class="chip-c__t">' + esc(p.title) + '</h3>' +
@@ -111,7 +117,8 @@
       '<div class="chip-c__score">' +
         '<div class="chip-c__bar"><i style="width:' + p.score + '%"></i></div>' +
         '<div class="chip-c__num">' + p.score + '<span>/100</span></div>' +
-      '</div></article>';
+      '</div>' +
+      '<div class="chip-c__votes" data-votes="' + p.id + '"></div></article>';
   }
 
   /* ============================================================
@@ -123,7 +130,7 @@
 
     /* -- 標頭 -- */
     h += '<section class="wrap dt-head">';
-    h += '<div class="dt-head__crumb"><a href="#/">MAIN</a><span>/</span>TOP 20<span>/</span>' +
+    h += '<div class="dt-head__crumb"><a href="#/">MAIN</a><span>/</span>TOP 10<span>/</span>' +
          esc(p.code) + ' &nbsp;RANK ' + String(p.rank).padStart(2, '0') + '</div>';
     h += '<div class="progress">' + PJ.map(function (q) {
       return '<i class="' + (q.rank <= p.rank ? 'on' : '') + '"></i>';
@@ -135,7 +142,8 @@
          '<div class="tagline" style="margin-top:10px">' +
            '<span class="tag tag--dom">' + esc(p.domain) + '</span>' + piTag(p) + fcTag(p) +
            p.tags.map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') +
-         '</div></div>';
+         '</div>' +
+         '<div class="dt-head__votes" data-detail-votes="' + p.id + '"></div></div>';
     h += '</div>';
     h += '<div class="kpi">' + p.kpi.map(function (k) {
       return '<div class="kpi__c"><div class="kpi__k">' + esc(k[0]) + '</div><div class="kpi__v">' + R.inline(k[1]) + '</div></div>';
@@ -181,6 +189,12 @@
     return h;
   }
 
+  function landClass(lv) {
+    if (lv === '極低' || lv === '低') return 'ok';
+    if (lv === '中') return 'mid';
+    return 'hi';
+  }
+
   function evalPanel(p) {
     var items = META.scoreItems || [];
     var rows = items.map(function (it, i) {
@@ -188,29 +202,38 @@
       var pct = Math.round(v / mx * 100);
       var lvl = pct >= 90 ? ' is-hi' : (pct >= 70 ? '' : ' is-lo');
       return '<div class="ev__row' + lvl + '" title="' + esc(it[2]) + '">' +
-        '<div class="ev__lbl">' + esc(it[0]) + '</div>' +
+        '<div class="ev__lbl">' + R.inline(it[0]) + '</div>' +
         '<div class="ev__bar"><i style="width:' + pct + '%"></i></div>' +
         '<div class="ev__val">' + v + '<span>/' + mx + '</span></div>' +
       '</div>';
     }).join('');
 
-    return '<section class="blk"><div class="blk__h">' +
+    return '<section class="blk" id="blk-00" data-sec="評估明細"><div class="blk__h">' +
       '<span class="blk__n">00</span><h2 class="blk__t">評估明細</h2>' +
       '<span class="sec-head__sub">SCORING</span></div>' +
       '<div class="ev">' +
         '<div class="ev__grid">' + rows + '</div>' +
         '<div class="ev__side">' +
+          '<div class="ev__card ev__card--total"><div class="ev__k">總分</div>' +
+            '<div class="ev__v ev__v--big">' + p.score + '<span>/100</span></div>' +
+            '<p class="ev__n">十題中排名第 ' + p.rank + '</p></div>' +
           '<div class="ev__card"><div class="ev__k">樹莓派角色</div>' +
             '<div class="ev__v">' + esc(p.pi.k) + '</div>' +
             '<p class="ev__n">' + R.inline(p.pi.note) + '</p></div>' +
           '<div class="ev__card"><div class="ev__k">Function Calling 價值</div>' +
             '<div class="ev__v">' + esc(p.fc.k) + '</div>' +
             '<p class="ev__n">' + R.inline(p.fc.note) + '</p></div>' +
-          '<div class="ev__card ev__card--total"><div class="ev__k">總分</div>' +
-            '<div class="ev__v ev__v--big">' + p.score + '<span>/100</span></div>' +
-            '<p class="ev__n">二十題中排名第 ' + p.rank + '</p></div>' +
         '</div>' +
-      '</div></section>';
+      '</div>' +
+      (p.landing ? '<div class="ev__extra">' +
+        '<div class="ev__x ev__x--' + landClass(p.landing.lv) + '">' +
+          '<div class="ev__k">實務落地障礙<b>' + esc(p.landing.lv) + '</b></div>' +
+          '<p class="ev__n">' + R.inline(p.landing.x) + '</p></div>' +
+        (p.future ? '<div class="ev__x ev__x--future">' +
+          '<div class="ev__k">未來延展性<b>不計分</b></div>' +
+          '<p class="ev__n">' + R.inline(p.future) + '</p></div>' : '') +
+      '</div>' : '') +
+      '</section>';
   }
 
   function versionHTML(p, ver) {
@@ -224,7 +247,7 @@
   }
 
   function block(no, title, en, body, badge) {
-    return '<section class="blk"><div class="blk__h">' +
+    return '<section class="blk" id="blk-' + no + '" data-sec="' + esc(title) + '"><div class="blk__h">' +
       '<span class="blk__n">' + no + '</span>' +
       '<h2 class="blk__t">' + esc(title) + '</h2>' +
       '<span class="sec-head__sub">' + esc(en) + '</span>' +
@@ -255,6 +278,7 @@
         b.classList.toggle('is-on', b.dataset.v === r.ver);
       });
       markNav();
+      mountFloating(p);
       return;
     }
 
@@ -262,7 +286,41 @@
     root.innerHTML = p ? detailHTML(p, r.ver) : homeHTML();
     if (!keepScroll) window.scrollTo(0, 0);
     markNav();
+    mountFloating(p);
   }
+
+  /* 浮動章節導覽 + 選題投票（主頁與詳細頁都有） */
+  function mountFloating(p) {
+    if (!global.UI) return;
+    global.UI.mountSectionNav();
+    global.UI.mountVote(p ? { id: p.id, title: p.title } : { id: null, title: '' });
+    paintVotes(global.UI.getPicks());
+  }
+
+  /* 把「誰選了這一題」標到卡片與詳細頁標頭 */
+  function paintVotes(picks) {
+    var byProj = {};
+    (picks || []).forEach(function (v) { (byProj[v.project] = byProj[v.project] || []).push(v.member); });
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-votes]'), function (n) {
+      var who = byProj[n.dataset.votes];
+      n.innerHTML = who ? who.map(function (m) {
+        return '<span class="vtag">' + esc(m) + ' 選了這題</span>';
+      }).join('') : '';
+      var card = n.closest('.chip-c');
+      if (card) card.classList.toggle('is-picked', !!who);
+    });
+
+    var hd = document.querySelector('[data-detail-votes]');
+    if (hd) {
+      var who2 = byProj[hd.dataset.detailVotes];
+      hd.innerHTML = who2 ? who2.map(function (m) {
+        return '<span class="vtag vtag--lg">' + esc(m) + ' 選了這題</span>';
+      }).join('') : '';
+    }
+  }
+
+  global.App = { onPicks: paintVotes };
 
   function markNav() {
     var onHome = !parse().id;
@@ -325,4 +383,4 @@
   } else {
     paint(false);
   }
-})();
+})(window);

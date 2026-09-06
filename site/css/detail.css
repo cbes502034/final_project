@@ -111,9 +111,12 @@
 /* 甘特／時程條 */
 .gantt { border: 1px solid var(--c-line); margin: 18px 0; overflow-x: auto; }
 .gantt table { border-collapse: collapse; width: 100%; min-width: 640px; }
-.gantt th { background: var(--c-panel-2); font-family: var(--f-mono); font-size: 9.5px;
-            letter-spacing: .12em; color: var(--c-dim); padding: 7px 8px; text-align: center;
-            border-bottom: 1px solid var(--c-line-2); border-right: 1px solid var(--c-line); }
+.gantt th { background: var(--c-panel-2); padding: 6px 6px; text-align: center;
+            border-bottom: 1px solid var(--c-line-2); border-right: 1px solid var(--c-line);
+            font-weight: 600; }
+.gantt th .g-wk   { display: block; font-size: 11.5px; color: var(--c-text); letter-spacing: .02em; }
+.gantt th .g-half { display: block; font-size: 9.5px; color: var(--c-dim); font-weight: 400; margin-top: 1px; }
+.gantt th:first-child { font-family: var(--f-mono); font-size: 9.8px; letter-spacing: .14em; color: var(--c-dim); }
 .gantt th:first-child { text-align: left; width: 200px; }
 .gantt td { border-bottom: 1px solid var(--c-line); border-right: 1px solid var(--c-line);
             padding: 0; height: 30px; position: relative; }
@@ -254,3 +257,30 @@
   .ev__bar { grid-column: 1 / -1; }
   .ev__lbl { font-size: 12.5px; }
 }
+
+
+/* 甘特圖圖例 */
+.g-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+            margin: -8px 0 20px; padding: 8px 12px;
+            border: 1px solid var(--c-line); border-top: 0; background: var(--c-panel); }
+.g-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--c-dim); }
+.g-k { width: 14px; height: 9px; display: inline-block; }
+.g-k--on { background: rgba(10,186,181,.30); box-shadow: inset 0 0 0 1px rgba(43,255,224,.35); }
+.g-k--ms { background: var(--c-accent); }
+.g-legend__note { margin-left: auto; font-family: var(--f-mono); font-size: 10.5px; color: var(--c-faint); }
+@media (max-width: 560px) { .g-legend__note { margin-left: 0; flex-basis: 100%; } }
+
+/* 落地障礙與未來延展性 */
+.ev__extra { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.ev__x { border: 1px solid var(--c-line-2); background: var(--c-panel); padding: 13px 15px; border-left-width: 3px; }
+.ev__x .ev__k { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ev__x .ev__k b { font-size: 13px; font-weight: 800; letter-spacing: 0; }
+.ev__x--ok  { border-left-color: var(--c-ok); }
+.ev__x--ok  .ev__k b { color: var(--c-ok); }
+.ev__x--mid { border-left-color: var(--c-warn); }
+.ev__x--mid .ev__k b { color: var(--c-warn); }
+.ev__x--hi  { border-left-color: var(--c-risk); }
+.ev__x--hi  .ev__k b { color: var(--c-risk); }
+.ev__x--future { border-left-color: var(--c-fc); }
+.ev__x--future .ev__k b { color: var(--c-fc); font-weight: 400; font-size: 10px; font-family: var(--f-mono); }
+@media (max-width: 900px) { .ev__extra { grid-template-columns: 1fr; } }

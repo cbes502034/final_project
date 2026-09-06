@@ -1,4 +1,11 @@
+databases:
+  - name: capstone-picks-db
+    plan: free
+    databaseName: capstone_picks
+    user: capstone
+
 services:
+  # 報告站台：純靜態，走 CDN，載入即時
   - type: web
     name: llm-capstone-top20
     runtime: static
@@ -16,3 +23,22 @@ services:
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
+
+  # 選題投票：只服務投票 API，報告本身不依賴它
+  - type: web
+    name: llm-capstone-votes
+    runtime: python
+    plan: free
+    rootDir: votes
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: ALLOWED_ORIGINS
+        value: https://llm-capstone-top20.onrender.com,http://localhost:5173
+      - key: DATABASE_URL
+        fromDatabase:
+          name: capstone-picks-db
+          property: connectionString

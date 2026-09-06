@@ -83,8 +83,12 @@
   };
 
   B.gantt = function (b) {
-    var h = '<div class="gantt"><table><thead><tr><th>' + esc(b.axis || 'TASK / OWNER') + '</th>';
-    b.weeks.forEach(function (w) { h += '<th>' + esc(w) + '</th>'; });
+    var h = '<div class="gantt"><table><thead><tr><th>' + esc(b.axis || '工作項目 / 負責人') + '</th>';
+    b.weeks.forEach(function (w) {
+      var parts = String(w).split('/');
+      h += '<th><span class="g-wk">' + esc(parts[0]) + '</span>' +
+           (parts[1] ? '<span class="g-half">' + esc(parts[1]) + '</span>' : '') + '</th>';
+    });
     h += '</tr></thead><tbody>';
     b.rows.forEach(function (r) {
       h += '<tr><td>' + inline(r.name) + '<span class="g-owner">' + esc(r.owner) + '</span></td>';
@@ -94,7 +98,13 @@
       });
       h += '</tr>';
     });
-    return h + '</tbody></table></div>';
+    h += '</tbody></table></div>';
+    h += '<div class="g-legend">' +
+         '<span><i class="g-k g-k--on"></i>進行中</span>' +
+         '<span><i class="g-k g-k--ms"></i>里程碑（此時要驗收）</span>' +
+         '<span class="g-legend__note">每格代表半週，約 3–4 天</span>' +
+         '</div>';
+    return h;
   };
 
   function blocks(list) {
