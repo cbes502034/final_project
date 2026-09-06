@@ -74,9 +74,9 @@
     h += '<div class="grid" id="list">' + PJ.map(cardHTML).join('') + '</div>';
     h += '</section>';
 
-    /* -- 揭露 -- */
+    /* -- 候選池處理結果 -- */
     h += '<section class="wrap section" id="disclosure">';
-    h += secHead('04', '誠實揭露：樹莓派與 Function Calling 不是每題都用', 'DISCLOSURE');
+    h += secHead('04', '候選池的處理結果', 'CANDIDATE POOL');
     h += '<div class="body" style="max-width:none">' + R.blocks(META.disclosure) + '</div>';
     h += '</section>';
 
@@ -144,6 +144,9 @@
 
     h += '<div class="wrap">';
 
+    /* -- 評估面板 -- */
+    h += evalPanel(p);
+
     /* -- 1 源起 / 2 前提摘要（兩版共用） -- */
     h += block('01', '源起', 'ORIGIN', p.origin);
     h += block('02', '前提摘要', 'PREMISE', p.premise);
@@ -176,6 +179,38 @@
 
     h += '</div>';
     return h;
+  }
+
+  function evalPanel(p) {
+    var items = META.scoreItems || [];
+    var rows = items.map(function (it, i) {
+      var v = (p.scores && p.scores[i]) || 0, mx = it[1];
+      var pct = Math.round(v / mx * 100);
+      var lvl = pct >= 90 ? ' is-hi' : (pct >= 70 ? '' : ' is-lo');
+      return '<div class="ev__row' + lvl + '" title="' + esc(it[2]) + '">' +
+        '<div class="ev__lbl">' + esc(it[0]) + '</div>' +
+        '<div class="ev__bar"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="ev__val">' + v + '<span>/' + mx + '</span></div>' +
+      '</div>';
+    }).join('');
+
+    return '<section class="blk"><div class="blk__h">' +
+      '<span class="blk__n">00</span><h2 class="blk__t">評估明細</h2>' +
+      '<span class="sec-head__sub">SCORING</span></div>' +
+      '<div class="ev">' +
+        '<div class="ev__grid">' + rows + '</div>' +
+        '<div class="ev__side">' +
+          '<div class="ev__card"><div class="ev__k">樹莓派角色</div>' +
+            '<div class="ev__v">' + esc(p.pi.k) + '</div>' +
+            '<p class="ev__n">' + R.inline(p.pi.note) + '</p></div>' +
+          '<div class="ev__card"><div class="ev__k">Function Calling 價值</div>' +
+            '<div class="ev__v">' + esc(p.fc.k) + '</div>' +
+            '<p class="ev__n">' + R.inline(p.fc.note) + '</p></div>' +
+          '<div class="ev__card ev__card--total"><div class="ev__k">總分</div>' +
+            '<div class="ev__v ev__v--big">' + p.score + '<span>/100</span></div>' +
+            '<p class="ev__n">二十題中排名第 ' + p.rank + '</p></div>' +
+        '</div>' +
+      '</div></section>';
   }
 
   function versionHTML(p, ver) {

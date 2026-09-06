@@ -148,22 +148,22 @@
 
 /* 標題：明顯大於內文且接近白色 */
 .chip-c__t {
-  font-size: 18.5px; font-weight: 700; line-height: 1.4;
+  font-size: 19px; font-weight: 700; line-height: 1.45;
   color: var(--c-hi); letter-spacing: .005em;
-  margin-bottom: 9px;
+  margin-bottom: 10px;
 }
-.chip-c:hover .chip-c__t { color: var(--c-glow); text-shadow: 0 0 14px var(--c-glow-dim); }
 
-/* 摘要：明顯小於標題且更暗 */
+/* 摘要：讓人在卡片上就知道這題在解決什麼 */
 .chip-c__s {
-  font-size: 12px; line-height: 1.75; color: var(--c-dim);
-  margin-bottom: 14px; flex: 1 1 auto;
+  font-size: 12.2px; line-height: 1.8; color: var(--c-dim);
+  margin-bottom: 15px; flex: 1 1 auto;
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
 }
 .chip-c__s strong { color: var(--c-text-2); font-weight: 600; }
 .chip-c__s .cite { display: none; }
+.chip-c:hover .chip-c__t { color: var(--c-glow); text-shadow: 0 0 14px var(--c-glow-dim); }
 
-.chip-c__meta { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 13px; }
+.chip-c__meta { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
 
 .chip-c__score { display: flex; align-items: center; gap: 11px; }
 .chip-c__bar { flex: 1; height: 4px; background: var(--c-raise); }
