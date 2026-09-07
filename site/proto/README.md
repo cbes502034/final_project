@@ -151,19 +151,6 @@ trace[]      { s, tool, args, res, ms, cache, quota }
 
 ---
 
-## 部署
-
-原型發布在報告站台底下：<https://llm-capstone-top20.onrender.com/proto/>
-報告站台第 5 題的卡片點下去就會到這裡。
-
-`site/proto/` 是這個目錄的副本，為了讓靜態站台能直接發布而一起提交
-（Render 上的服務是手動建立的，`render.yaml` 的建置指令不會生效）。
-**這個目錄才是原始碼**，改完之後同步一次：
-
-```bash
-rm -rf site/proto && cp -r working_space site/proto
-```
-
 ## 本機執行
 
 ```bash
