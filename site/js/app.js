@@ -158,7 +158,12 @@
 
   function cardHTML(p) {
     var hw = HW_CLS[p.pi.k] || 'chip-c--sw';
-    return '<article class="chip-c ' + hw + '" data-go="' + p.id + '" data-dom="' + esc(p.domain) + '" data-hw="' + esc(p.pi.k) + '" role="link" tabindex="0" aria-label="' + esc(p.title) + '">' +
+    // 已選定要做的題目：整張卡片點下去直接進前端原型，
+    // 完整分析改由卡片底部的次要連結進入
+    var nav = p.proto ? 'data-proto="' + esc(p.proto) + '"' : 'data-go="' + p.id + '"';
+    return '<article class="chip-c ' + hw + (p.chosen ? ' chip-c--chosen' : '') + '" ' + nav +
+      ' data-dom="' + esc(p.domain) + '" data-hw="' + esc(p.pi.k) + '" role="link" tabindex="0" aria-label="' + esc(p.title) + '">' +
+      (p.chosen ? '<div class="chosen-tab">已選定 · 點此開啟前端原型</div>' : '') +
       '<div class="chip-c__top"><i class="chip-c__pin1"></i>' +
         '<span class="chip-c__hw">' + esc(HW_TXT[p.pi.k] || '純軟體') + '</span>' +
         '<span class="chip-c__code">' + esc(p.code) + '</span></div>' +
@@ -173,7 +178,9 @@
         '<div class="chip-c__bar"><i style="width:' + p.score + '%"></i></div>' +
         '<div class="chip-c__num">' + p.score + '<span>/100</span></div>' +
       '</div>' +
-      '<div class="chip-c__votes" data-votes="' + p.id + '"></div></article>';
+      '<div class="chip-c__votes" data-votes="' + p.id + '"></div>' +
+      (p.chosen ? '<button class="chosen-alt" type="button" data-go="' + p.id + '">看完整分析與分工 &#9656;</button>' : '') +
+      '</article>';
   }
 
   /* ============================================================
@@ -418,14 +425,18 @@
     if (g) {
       var to = g.dataset.go;
       location.hash = (to === 'home') ? '#/' : '#/' + to;
+      return;
     }
+    var pr = e.target.closest ? e.target.closest('[data-proto]') : null;
+    if (pr) location.href = pr.dataset.proto;
   });
 
   document.addEventListener('keydown', function (e) {
     // 清單以鍵盤開啟
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('chip-c')) {
       e.preventDefault();
-      location.hash = '#/' + e.target.dataset.go;
+      if (e.target.dataset.proto) location.href = e.target.dataset.proto;
+      else location.hash = '#/' + e.target.dataset.go;
       return;
     }
     // 詳細頁：左右鍵連續瀏覽

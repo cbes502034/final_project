@@ -165,7 +165,8 @@
         '<td><b class="mono">' + esc(a.id) + '</b></td>' +
         '<td>' + pill(sevCls(a.sev), sevTw(a.sev) + ' ' + a.score) + '</td>' +
         '<td>' + esc(a.extracted.vendor) + ' ' + esc(a.extracted.product) + '</td>' +
-        '<td>' + pill('ok', '命中') + '</td>' +
+        '<td>' + pill('ok', '命中') +
+          (a.extracted.patch === '已釋出' ? '' : ' ' + pill('warn', '無修補版本')) + '</td>' +
         '<td><b>' + esc(asset.name) + '</b> ×' + asset.count + '　' + expoPill(asset.exposure) + '</td>' +
         '<td class="mono">' + esc(a.published) + '</td></tr>';
     }).join('');
@@ -195,6 +196,7 @@
          '<div class="split__raw">' + esc(a.desc) + '</div></div>';
     h += '<div class="split__c"><div class="split__k">抽取結果</div><div class="fields">' +
       field('產品', e.vendor + ' ' + e.product, e.conf.product) +
+      field('弱點類型', e.kind, null) +
       field('受影響版本', e.affected, e.conf.affected) +
       field('修補版本', e.fixed, e.conf.patch) +
       field('攻擊途徑', e.av, null) +
@@ -203,6 +205,18 @@
       field('緩解措施', e.work, e.conf.work) +
       '</div></div>';
     h += '</div>';
+
+    var na = ['affected', 'fixed', 'work', 'priv', 'ui'].filter(function (k) {
+      return e[k] === NA;
+    }).length;
+    if (na) {
+      h += '<div class="note note--warn"><div class="note__k">有 ' + na + ' 個欄位原文沒寫</div><p>' +
+        '這些欄位標成「原文未提供」，<strong>不由模型補上</strong>。' +
+        '版本號尤其危險——猜一個看起來合理的版本號，會讓人升級到不存在的版本，' +
+        '或誤以為自己不受影響。抽不到就要說抽不到，這是硬規則。<br>' +
+        '連帶影響：沒有明確修補版本時，這一題的<strong>修補可得係數降為 0.8</strong>，' +
+        '待辦動作也從「升級到 X」改成「先確認廠商公告」。</p></div>';
+    }
 
     h += '<div class="sh"><h2 class="sh__t">影響面判定</h2><span class="sh__n">CPE MATCH</span></div>';
     h += '<div class="cpe">';
@@ -231,12 +245,18 @@
     return h;
   }
 
+  var NA = '原文未提供';
+
   function field(k, v, conf) {
+    if (v === NA) {
+      return '<div class="field field--na"><div class="field__k">' + esc(k) + '</div>' +
+        '<div class="field__v"><span class="na">原文未提供</span></div></div>';
+    }
     var lo = conf !== null && conf < .8;
     return '<div class="field' + (lo ? ' field--lo' : '') + '">' +
       '<div class="field__k">' + esc(k) + '</div>' +
       '<div class="field__v">' + esc(v) +
-      (conf === null ? '' :
+      (conf === null || conf === 0 ? '' :
         '<div class="field__c"><div class="field__bar"><i style="width:' + Math.round(conf * 100) + '%"></i></div>' +
         '<span class="field__n">信心 ' + Math.round(conf * 100) + '%</span></div>') +
       '</div></div>';

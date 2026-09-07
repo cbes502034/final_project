@@ -384,3 +384,22 @@
   .fcn { padding: 24px 14px 26px; }
   .fcn__cols { margin: 16px 0 14px; }
 }
+
+
+/* ---------- 已選定要做的題目 ---------- */
+.chip-c--chosen { border-color: rgba(10,186,181,.55); padding-top: 34px; }
+.chosen-tab {
+  position: absolute; top: 0; left: 0; right: 0;
+  background: var(--c-accent); color: var(--c-void);
+  font-size: 11px; font-weight: 800; letter-spacing: .04em;
+  padding: 5px 12px; text-align: center;
+}
+.chip-c--chosen:hover .chosen-tab { background: var(--c-glow); }
+.chosen-alt {
+  display: block; width: 100%; margin-top: 12px; cursor: pointer;
+  background: none; border: 1px solid var(--c-line-2); color: var(--c-dim);
+  font-size: 11.5px; font-weight: 600; padding: 7px 10px;
+}
+.chosen-alt:hover {
+  border-color: var(--c-glow); color: var(--c-glow); background: rgba(10,186,181,.08);
+}

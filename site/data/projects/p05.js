@@ -1,6 +1,7 @@
 /* p05 — RANK 5 / C04 */
 (window.PROJECTS = window.PROJECTS || []).push({
   id: 'p05', rank: 5, code: 'C04', score: 90,
+  chosen: true, proto: 'proto/',
   domain: '資訊安全',
   title: '漏洞情資影響面判定與修補優先序系統',
   subtitle: '每天湧入的漏洞公告是散文，公司的資產清單是表格，中間那道「這條跟我有沒有關」的比對，目前全靠人腦。系統把公告抽成結構化欄位，與資產逐項比對，直接給出「你有幾台受影響、先修哪一台」。',

@@ -148,6 +148,12 @@
 .field__n { font-family: var(--f-mono); font-size: 9.5px; color: var(--c-faint); }
 .field--lo .field__bar i { background: var(--c-med); }
 .field--lo .field__n { color: var(--c-med); }
+.field--na .field__v { color: var(--c-faint); }
+.na {
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em;
+  color: var(--c-med); border: 1px dashed rgba(217,162,71,.45);
+  padding: 2px 7px; display: inline-block;
+}
 
 /* ---------- CPE 比對 ---------- */
 .cpe { border: 1px solid var(--c-line-2); background: var(--c-panel); padding: 14px 16px; margin-bottom: 22px; }

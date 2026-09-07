@@ -44,8 +44,8 @@ window.DATA = {
    "name": "Google Chrome（員工端點）",
    "vendor": "google",
    "product": "chrome",
-   "version": "141.0.7390.54",
-   "cpe": "cpe:2.3:a:google:chrome:141.0.7390.54:*:*:*:*:*:*:*",
+   "version": "149.0.7827.41",
+   "cpe": "cpe:2.3:a:google:chrome:149.0.7827.41:*:*:*:*:*:*:*",
    "count": 34,
    "exposure": "對外",
    "owner": "資訊室",
@@ -158,18 +158,19 @@ window.DATA = {
    "extracted": {
     "product": "Chrome",
     "vendor": "Google",
-    "affected": "< 141.0.7390.107",
-    "fixed": "141.0.7390.107",
-    "av": "網路（造訪惡意網頁）",
+    "kind": "Use after free（FileSystem）→ 沙箱逃逸",
+    "affected": "< 149.0.7827.53",
+    "fixed": "149.0.7827.53",
+    "av": "網路（造訪特製網頁）",
     "priv": "不需權限",
     "ui": "需使用者互動",
     "patch": "已釋出",
-    "work": "暫時停用相關功能",
+    "work": "原文未提供",
     "conf": {
      "product": 0.99,
-     "affected": 0.94,
+     "affected": 0.96,
      "patch": 0.96,
-     "work": 0.62
+     "work": 0
     }
    },
    "matched": "A03"
@@ -209,18 +210,19 @@ window.DATA = {
    "extracted": {
     "product": "containerd",
     "vendor": "Linux Foundation",
-    "affected": "< 1.7.28 / < 2.0.6 / < 2.1.5",
-    "fixed": "1.7.28",
-    "av": "本機（容器內）",
-    "priv": "需容器內權限",
+    "kind": "CRI plugin 未驗證映像標籤 → 於主機執行任意指令",
+    "affected": "< 1.7.33 / < 2.0.10 / < 2.1.9 / < 2.2.5 / < 2.3.2",
+    "fixed": "1.7.33（1.7.x 分支）",
+    "av": "本機（透過惡意映像檔的 LABEL）",
+    "priv": "需能提供映像",
     "ui": "不需使用者互動",
     "patch": "已釋出",
-    "work": "限制容器建立權限",
+    "work": "原文未提供",
     "conf": {
      "product": 0.98,
-     "affected": 0.91,
-     "patch": 0.92,
-     "work": 0.77
+     "affected": 0.93,
+     "patch": 0.91,
+     "work": 0
     }
    },
    "matched": "A04"
@@ -258,20 +260,21 @@ window.DATA = {
     "https://phabricator.wikimedia.org/T418533"
    ],
    "extracted": {
-    "product": "MediaWiki",
-    "vendor": "Wikimedia",
-    "affected": "1.39.x – 1.43.x",
-    "fixed": "1.43.4",
+    "product": "UrlShortener 擴充（非 MediaWiki 核心）",
+    "vendor": "Wikimedia Foundation",
+    "kind": "輸入驗證不當，位於 includes/UrlShortenerUtils.php",
+    "affected": "原文未提供",
+    "fixed": "原文未提供",
     "av": "網路",
-    "priv": "需編輯者權限",
-    "ui": "不需使用者互動",
-    "patch": "已釋出",
-    "work": "暫時限制擴充功能",
+    "priv": "原文未提供",
+    "ui": "原文未提供",
+    "patch": "未提供",
+    "work": "原文未提供",
     "conf": {
-     "product": 0.96,
-     "affected": 0.83,
-     "patch": 0.89,
-     "work": 0.68
+     "product": 0.88,
+     "affected": 0,
+     "patch": 0,
+     "work": 0
     }
    },
    "matched": "A05"
@@ -310,20 +313,21 @@ window.DATA = {
     "https://www.watchguard.com/wgrd-psirt/advisory/wgsa-2026-00029"
    ],
    "extracted": {
-    "product": "Fireware OS",
+    "product": "Fireware OS（networkd 程序）",
     "vendor": "WatchGuard",
-    "affected": "12.5.x – 12.10.2（含）",
-    "fixed": "12.10.3",
-    "av": "網路（可遠端觸發）",
-    "priv": "需低權限帳號",
+    "kind": "Out-of-bounds Write，經管理 Web UI 觸發",
+    "affected": "原文未提供",
+    "fixed": "原文未提供",
+    "av": "網路（管理 Web UI）",
+    "priv": "需已驗證的特權使用者",
     "ui": "不需使用者互動",
-    "patch": "已釋出",
-    "work": "關閉管理介面的對外存取",
+    "patch": "未提供",
+    "work": "限制管理介面的對外存取（依攻擊途徑推論，非原文明載）",
     "conf": {
-     "product": 0.97,
-     "affected": 0.86,
-     "patch": 0.93,
-     "work": 0.71
+     "product": 0.95,
+     "affected": 0,
+     "patch": 0,
+     "work": 0.44
     }
    },
    "matched": "A01"
@@ -362,20 +366,21 @@ window.DATA = {
     "https://git.kernel.org/stable/c/dc1490927d79fe9621e29f4a4f5d7b5ccb6aea3e"
    ],
    "extracted": {
-    "product": "Linux Kernel",
+    "product": "Linux Kernel（drm/amd/display）",
     "vendor": "Linux",
-    "affected": "6.6 – 6.11（部分子系統）",
-    "fixed": "隨發行版更新",
+    "kind": "dp_get_eq_aux_rd_interval() 陣列越界讀取",
+    "affected": "原文未提供",
+    "fixed": "已於上游修正，隨發行版更新",
     "av": "本機",
     "priv": "需一般使用者權限",
     "ui": "不需使用者互動",
     "patch": "已釋出",
-    "work": "無",
+    "work": "原文未提供",
     "conf": {
-     "product": 0.99,
-     "affected": 0.74,
-     "patch": 0.88,
-     "work": 0.9
+     "product": 0.97,
+     "affected": 0,
+     "patch": 0.72,
+     "work": 0
     }
    },
    "matched": "A02"
@@ -457,20 +462,20 @@ window.DATA = {
     "cnt": 1.45,
     "patch": 1.0
    },
-   "action": "升級到 141.0.7390.107",
+   "action": "升級到 149.0.7827.53",
    "rank": 1
   },
   {
    "cve": "CVE-2026-13050",
    "asset": "A01",
-   "priority": 82.8,
+   "priority": 66.2,
    "f": {
     "cvss": 7.2,
     "expo": 1.0,
     "cnt": 1.15,
-    "patch": 1.0
+    "patch": 0.8
    },
-   "action": "升級到 12.10.3",
+   "action": "公告未提供修補版本——先確認廠商公告，必要時套用緩解",
    "rank": 2
   },
   {
@@ -483,7 +488,7 @@ window.DATA = {
     "cnt": 1.15,
     "patch": 1.0
    },
-   "action": "升級到 1.7.28",
+   "action": "升級到 1.7.33（1.7.x 分支）",
    "rank": 3
   },
   {
@@ -496,20 +501,20 @@ window.DATA = {
     "cnt": 1.3,
     "patch": 1.0
    },
-   "action": "升級到 隨發行版更新",
+   "action": "升級到 已於上游修正，隨發行版更新",
    "rank": 4
   },
   {
    "cve": "CVE-2026-13706",
    "asset": "A05",
-   "priority": 52.8,
+   "priority": 42.2,
    "f": {
     "cvss": 8.8,
     "expo": 0.6,
     "cnt": 1.0,
-    "patch": 1.0
+    "patch": 0.8
    },
-   "action": "升級到 1.43.4",
+   "action": "公告未提供修補版本——先確認廠商公告，必要時套用緩解",
    "rank": 5
   }
  ],
@@ -544,7 +549,7 @@ window.DATA = {
   {
    "s": 4,
    "tool": "search_cve",
-   "args": "{\"cpe\": \"cpe:2.3:a:google:chrome:141.0.7390.54\"}",
+   "args": "{\"cpe\": \"cpe:2.3:a:google:chrome:149.0.7827.41\"}",
    "res": "命中 1 筆（CVE-2026-10931，CVSS 9.6）",
    "ms": 910,
    "cache": "未命中 → 已回寫",
