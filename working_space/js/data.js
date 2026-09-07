@@ -463,7 +463,19 @@ window.DATA = {
     "patch": 1.0
    },
    "action": "升級到 149.0.7827.53",
-   "rank": 1
+   "rank": 1,
+   "sla": 3,
+   "elapsed": 2,
+   "left": 1,
+   "owner": "資訊室",
+   "status": "open",
+   "sev": "CRITICAL",
+   "score": 9.6,
+   "title": "Google Chrome（員工端點）",
+   "count": 34,
+   "exposure": "對外",
+   "fixed": "149.0.7827.53",
+   "patchable": true
   },
   {
    "cve": "CVE-2026-13050",
@@ -476,7 +488,19 @@ window.DATA = {
     "patch": 0.8
    },
    "action": "公告未提供修補版本——先確認廠商公告，必要時套用緩解",
-   "rank": 2
+   "rank": 2,
+   "sla": 7,
+   "elapsed": 1,
+   "left": 6,
+   "owner": "網管組",
+   "status": "open",
+   "sev": "HIGH",
+   "score": 7.2,
+   "title": "WatchGuard Firebox T145",
+   "count": 2,
+   "exposure": "對外",
+   "fixed": "原文未提供",
+   "patchable": false
   },
   {
    "cve": "CVE-2026-53488",
@@ -489,7 +513,19 @@ window.DATA = {
     "patch": 1.0
    },
    "action": "升級到 1.7.33（1.7.x 分支）",
-   "rank": 3
+   "rank": 3,
+   "sla": 7,
+   "elapsed": 4,
+   "left": 3,
+   "owner": "系統組",
+   "status": "open",
+   "sev": "HIGH",
+   "score": 8.8,
+   "title": "containerd 容器主機",
+   "count": 3,
+   "exposure": "內網",
+   "fixed": "1.7.33（1.7.x 分支）",
+   "patchable": true
   },
   {
    "cve": "CVE-2026-53330",
@@ -502,7 +538,19 @@ window.DATA = {
     "patch": 1.0
    },
    "action": "升級到 已於上游修正，隨發行版更新",
-   "rank": 4
+   "rank": 4,
+   "sla": 7,
+   "elapsed": 6,
+   "left": 1,
+   "owner": "系統組",
+   "status": "open",
+   "sev": "HIGH",
+   "score": 7.1,
+   "title": "Ubuntu 24.04 LTS 伺服器",
+   "count": 6,
+   "exposure": "內網",
+   "fixed": "已於上游修正，隨發行版更新",
+   "patchable": true
   },
   {
    "cve": "CVE-2026-13706",
@@ -515,7 +563,19 @@ window.DATA = {
     "patch": 0.8
    },
    "action": "公告未提供修補版本——先確認廠商公告，必要時套用緩解",
-   "rank": 5
+   "rank": 5,
+   "sla": 7,
+   "elapsed": 9,
+   "left": -2,
+   "owner": "資訊室",
+   "status": "open",
+   "sev": "HIGH",
+   "score": 8.8,
+   "title": "MediaWiki 內部知識庫",
+   "count": 1,
+   "exposure": "內網",
+   "fixed": "原文未提供",
+   "patchable": false
   }
  ],
  "trace": [
@@ -609,5 +669,88 @@ window.DATA = {
    "cache": "—",
    "quota": "7 / 50"
   }
+ ],
+ "trend": [
+  {
+   "d": "08-25",
+   "new": 3,
+   "closed": 1
+  },
+  {
+   "d": "08-26",
+   "new": 7,
+   "closed": 4
+  },
+  {
+   "d": "08-27",
+   "new": 2,
+   "closed": 3
+  },
+  {
+   "d": "08-28",
+   "new": 9,
+   "closed": 2
+  },
+  {
+   "d": "08-29",
+   "new": 4,
+   "closed": 6
+  },
+  {
+   "d": "08-30",
+   "new": 1,
+   "closed": 2
+  },
+  {
+   "d": "08-31",
+   "new": 0,
+   "closed": 1
+  },
+  {
+   "d": "09-01",
+   "new": 6,
+   "closed": 3
+  },
+  {
+   "d": "09-02",
+   "new": 11,
+   "closed": 5
+  },
+  {
+   "d": "09-03",
+   "new": 5,
+   "closed": 8
+  },
+  {
+   "d": "09-04",
+   "new": 3,
+   "closed": 4
+  },
+  {
+   "d": "09-05",
+   "new": 8,
+   "closed": 2
+  },
+  {
+   "d": "09-06",
+   "new": 4,
+   "closed": 7
+  },
+  {
+   "d": "09-07",
+   "new": 12,
+   "closed": 0
+  }
+ ],
+ "weekly": {
+  "opened": 38,
+  "closed": 26,
+  "mttr": 4.2,
+  "backlog": 17
+ },
+ "owners": [
+  "網管組",
+  "系統組",
+  "資訊室"
  ]
 };

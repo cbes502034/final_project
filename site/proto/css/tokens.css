@@ -1,0 +1,126 @@
+/* ============================================================
+   tokens.css — VULNSCOPE 設計系統
+   與報告站台刻意不同：以「風險色」為主要視覺語言，而不是單一主色。
+   保留深色與直角，但改用分層表面、更大的字級落差、以及動態。
+   ============================================================ */
+:root {
+  /* -- 表面分層：越上層越亮，用來造出深度 -- */
+  --s0: #070A0F;   /* 頁面底 */
+  --s1: #0C1119;   /* 面板 */
+  --s2: #121926;   /* 卡片 */
+  --s3: #1A2333;   /* 浮起 */
+  --s4: #232E42;   /* 互動 hover */
+
+  --line:   #1D2637;
+  --line-2: #2B3852;
+  --line-3: #3D4D6B;
+
+  /* -- 文字 -- */
+  --t0: #F4F8FF;   /* 標題 */
+  --t1: #C6D2E4;   /* 內文 */
+  --t2: #8B9AB4;   /* 次要 */
+  --t3: #5D6B84;   /* 弱 */
+  --t4: #3F4B60;   /* 極弱 */
+
+  /* -- 互動主色（沿用蒂芬妮綠家族，這是團隊的偏好） -- */
+  --a:      #00D9C0;
+  --a-lit:  #4DFFE4;
+  --a-dim:  rgba(0, 217, 192, .14);
+  --a-glow: rgba(77, 255, 228, .38);
+
+  /* -- 風險色：這才是本產品的主要視覺語言 -- */
+  --r-crit: #FF4757;
+  --r-high: #FF8A3D;
+  --r-med:  #FFC93C;
+  --r-low:  #5B7085;
+  --r-done: #2FD98A;
+
+  --r-crit-bg: rgba(255, 71, 87, .13);
+  --r-high-bg: rgba(255, 138, 61, .13);
+  --r-med-bg:  rgba(255, 201, 60, .13);
+  --r-low-bg:  rgba(91, 112, 133, .13);
+  --r-done-bg: rgba(47, 217, 138, .13);
+
+  /* -- 字體 -- */
+  --mono: "JetBrains Mono", "IBM Plex Mono", "Cascadia Mono", "Consolas", "Roboto Mono", monospace;
+  --sans: "Inter", "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+
+  /* -- 尺度 -- */
+  --rail: 232px;
+  --bar: 58px;
+  --ease: cubic-bezier(.22, .8, .28, 1);
+}
+
+/* 全站直角，只用切角不用圓角 */
+* { box-sizing: border-box; border-radius: 0 !important; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--s0);
+  color: var(--t1);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* 底層氛圍：兩道極淡的風險色暈，讓畫面不是死黑 */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 900px 500px at 12% -10%, rgba(255, 71, 87, .07), transparent 65%),
+    radial-gradient(ellipse 800px 600px at 95% 105%, rgba(0, 217, 192, .06), transparent 65%);
+}
+
+h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.01em; color: var(--t0); }
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select { font: inherit; }
+a { color: var(--a); text-decoration: none; }
+a:hover { color: var(--a-lit); }
+
+/* 數字一律等寬，欄位才對得齊 */
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* 鍵盤焦點看得見 */
+:focus-visible { outline: 2px solid var(--a-lit); outline-offset: 2px; }
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: var(--s0); }
+::-webkit-scrollbar-thumb { background: var(--line-2); border: 3px solid var(--s0); }
+::-webkit-scrollbar-thumb:hover { background: var(--line-3); }
+
+/* ---------- 通用動態 ---------- */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideL {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.35); }
+}
+@keyframes shimmer {
+  from { background-position: -420px 0; }
+  to   { background-position: 420px 0; }
+}
+@keyframes growW { from { width: 0 !important; } }
+
+.rise { animation: riseIn .5s var(--ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  html { scroll-behavior: auto; }
+}
