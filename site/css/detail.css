@@ -101,7 +101,11 @@
 
 /* 表格 */
 .tw { overflow-x: auto; margin: 18px 0; border: 1px solid var(--c-line); }
-.tw table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 12.8px; }
+.tw table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 12.8px; }
+/* 第一欄放姓名與角色，不要被擠到逐字斷行 */
+.tw td:first-child { min-width: 104px; }
+/* 表格內的條列：每個項目自己一行，讀起來才不會黏成一團 */
+.tw td b + br { line-height: 2.2; }
 .tw th {
   background: var(--c-panel-2); color: var(--c-accent); text-align: left;
   font-family: var(--f-mono); font-size: 9.8px; letter-spacing: .14em; text-transform: uppercase;

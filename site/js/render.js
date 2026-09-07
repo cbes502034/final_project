@@ -14,6 +14,8 @@
   // 行內語法解析（先跳脫，再還原受支援的標記）
   function inline(s) {
     return esc(s)
+      // 只放行 <br> 這一個標籤，其餘 HTML 仍然被跳脫
+      .replace(/&lt;br\s*\/?&gt;/g, '<br>')
       .replace(/\{\{([^|}]+)\|([^}]+)\}\}/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
