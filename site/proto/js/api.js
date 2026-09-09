@@ -2,7 +2,8 @@
    api.js — 前端唯一的資料入口
    ------------------------------------------------------------
    畫面程式碼一律只呼叫 API.xxx()，永遠不要直接讀 window.DATA。
-   這樣後端做好之後，只要把 index.html 的
+
+   要接真後端，只要改 index.html 的
 
        <meta name="api-base" content="">
 
@@ -13,8 +14,20 @@
      mockAdapter — 讀 js/data.js，寫入存在 localStorage，附帶假的網路延遲
      httpAdapter — fetch 真後端
 
-   每個方法上面都標了對應的後端路由，後端照著做即可。
-   所有方法都回傳 Promise。
+   ------------------------------------------------------------
+   後端契約（後端照這張表做即可）
+
+   GET    /api/shift                  本班次統計 + 近 8 班次趨勢
+   GET    /api/campaigns              收斂後群組（可帶 verdict / status / q）
+   GET    /api/campaigns/{id}         單一群組（含成員、指標、判定理由）
+   PATCH  /api/campaigns/{id}         處置 { status?, action? }
+   POST   /api/campaigns/bulk         批次處置 { ids: [], patch: {} }
+   GET    /api/dedup                  三層收斂各收掉多少
+   GET    /api/tactics                話術體系（六類）
+   GET    /api/annotation             標註進度與一致率
+   GET    /api/eval                   模型評測（base vs fine-tuned）
+   GET    /api/schema                 資料表結構與關聯（ER 圖用）
+   POST   /api/ingest                 上傳 .eml 進行分析（Demo 用）
    ============================================================ */
 (function (global) {
   'use strict';
@@ -25,260 +38,173 @@
   })();
 
   var MODE = BASE ? 'http' : 'mock';
-  var LATENCY = 260;                 // 模擬網路延遲，讓載入狀態是真的看得到的
-  var STORE_KEY = 'vulnscope.state.v1';
+  var LATENCY = 240;                 // 模擬網路延遲，讓載入狀態是真的看得到的
+  var KEY = 'phishtriage.state.v1';
 
-  /* ============================================================
-     後端契約
-     ------------------------------------------------------------
-     GET    /api/summary                     總覽數字 + 本週統計 + 近 14 天趨勢
-     GET    /api/queue                       修補待辦（可帶 status / owner / sev / q）
-     PATCH  /api/queue/{cve}                 更新單筆待辦 { status?, owner? }
-     POST   /api/queue/bulk                  批次更新 { cves: [], patch: {} }
-     GET    /api/advisories                  情資清單（可帶 matched / sev / q）
-     GET    /api/advisories/{cve}            單筆情資（含抽取欄位與 CPE 比對）
-     GET    /api/assets                      資產清單
-     POST   /api/assets                      新增資產
-     PATCH  /api/assets/{id}                 修改資產
-     DELETE /api/assets/{id}                 刪除資產
-     GET    /api/trace                       最近一次工具呼叫軌跡
-     GET    /api/quota                       介接額度
-     POST   /api/sync                        觸發一次 NVD 同步
-     ============================================================ */
-
-  function sleep(ms) {
-    return new Promise(function (r) { setTimeout(r, ms); });
-  }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
-  /* ---------- 本機狀態：mock 模式下的「資料庫」 ---------- */
+  /* ---------- mock 模式下的「資料庫」 ---------- */
   var state = null;
 
-  function loadState() {
+  function load() {
     if (state) return state;
-    var base = {
-      queue: clone(global.DATA.queue),
-      assets: clone(global.DATA.assets)
-    };
+    var base = { campaigns: clone(global.DATA.campaigns) };
     try {
-      var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-      if (saved && saved.queue) {
-        // 只還原使用者改過的欄位，其餘仍以 data.js 為準
-        base.queue.forEach(function (q) {
-          var s = saved.queue[q.cve];
-          if (s) { q.status = s.status; q.owner = s.owner; }
+      var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (saved && saved.campaigns) {
+        base.campaigns.forEach(function (c) {
+          var s = saved.campaigns[c.id];
+          if (s) { c.status = s.status; c.verdict = s.verdict; }
         });
-        if (saved.assets) base.assets = saved.assets;
       }
     } catch (e) { /* localStorage 不可用就當作沒存過 */ }
     state = base;
     return state;
   }
 
-  function saveState() {
+  function save() {
     try {
-      var q = {};
-      state.queue.forEach(function (x) { q[x.cve] = { status: x.status, owner: x.owner }; });
-      localStorage.setItem(STORE_KEY, JSON.stringify({ queue: q, assets: state.assets }));
+      var m = {};
+      state.campaigns.forEach(function (c) { m[c.id] = { status: c.status, verdict: c.verdict }; });
+      localStorage.setItem(KEY, JSON.stringify({ campaigns: m }));
     } catch (e) { /* 無痕視窗等情況，靜默略過 */ }
   }
 
   /* ============================================================
      mock 轉接器
      ============================================================ */
-  var mockAdapter = {
+  var mock = {
 
-    summary: function () {
-      var s = loadState();
-      var D = global.DATA;
-      var all = D.advisories.length + D.unmatched.length;
-      var open = s.queue.filter(function (q) { return q.status === 'open'; });
+    shift: function () {
+      var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
+        var open = s.campaigns.filter(function (c) { return c.status === 'open'; });
         return {
-          batch: all,
-          relevant: D.advisories.length,
-          irrelevant: D.unmatched.length,
-          affected: open.reduce(function (n, q) { return n + q.count; }, 0),
-          vague: s.assets.filter(function (a) { return a.clarity === 'vague'; }).length,
-          open: open.length,
-          overdue: open.filter(function (q) { return q.left <= 0; }).length,
-          urgent: open.filter(function (q) { return q.left > 0 && q.left <= 2; }).length,
-          topUnmatched: D.unmatched[0] || null,
-          sevMix: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(function (k) {
-            return { sev: k, n: s.queue.filter(function (q) { return q.sev === k; }).length };
-          }),
-          weekly: clone(D.weekly),
+          meta: clone(D.meta),
+          shift: clone(D.shift),
           trend: clone(D.trend),
-          synced: D.meta.synced,
-          org: D.meta.org
+          open: open.length,
+          openPhishing: open.filter(function (c) { return c.verdict === 'phishing'; }).length,
+          mix: ['phishing', 'spam', 'benign'].map(function (v) {
+            var cs = s.campaigns.filter(function (c) { return c.verdict === v; });
+            return {
+              verdict: v,
+              cards: cs.length,
+              reports: cs.reduce(function (n, c) { return n + c.reports; }, 0)
+            };
+          }),
+          topRisk: clone(s.campaigns.filter(function (c) {
+            return c.verdict === 'phishing' && c.status === 'open';
+          }).sort(function (a, b) { return a.priority - b.priority; })[0] || null)
         };
       });
     },
 
-    queue: function (f) {
+    campaigns: function (f) {
       f = f || {};
-      var s = loadState();
+      var s = load();
       return sleep(LATENCY).then(function () {
-        var rows = s.queue.filter(function (q) {
-          if (f.status && f.status !== 'all' && q.status !== f.status) return false;
-          if (f.sev && f.sev !== 'all' && q.sev !== f.sev) return false;
-          if (f.owner && f.owner !== 'all' && q.owner !== f.owner) return false;
+        var rows = s.campaigns.filter(function (c) {
+          if (f.verdict && f.verdict !== 'all' && c.verdict !== f.verdict) return false;
+          if (f.status && f.status !== 'all' && c.status !== f.status) return false;
           if (f.q) {
-            var hay = (q.cve + ' ' + q.title + ' ' + q.action).toLowerCase();
+            var hay = (c.id + ' ' + c.name + ' ' + c.subject + ' ' + c.from).toLowerCase();
             if (hay.indexOf(f.q.toLowerCase()) < 0) return false;
           }
           return true;
         });
-        var dir = f.desc === false ? 1 : -1;
-        var key = f.sort || 'priority';
+        var order = { phishing: 0, spam: 1, benign: 2 };
         rows.sort(function (a, b) {
-          if (key === 'sla') return (a.left - b.left) * -dir;
-          if (key === 'cvss') return (a.score - b.score) * dir;
-          return (a.priority - b.priority) * dir;
+          if (f.sort === 'reports') return b.reports - a.reports;
+          if (order[a.verdict] !== order[b.verdict]) return order[a.verdict] - order[b.verdict];
+          return a.priority - b.priority;
         });
-        return { queue: clone(rows), total: s.queue.length };
+        return { campaigns: clone(rows), total: s.campaigns.length };
       });
     },
 
-    patchQueue: function (cve, patch) {
-      var s = loadState();
+    campaign: function (id) {
+      var s = load();
       return sleep(180).then(function () {
-        var row = s.queue.filter(function (q) { return q.cve === cve; })[0];
-        if (!row) throw new Error('not found: ' + cve);
-        Object.keys(patch).forEach(function (k) { row[k] = patch[k]; });
-        saveState();
-        return clone(row);
+        var c = s.campaigns.filter(function (x) { return x.id === id; })[0];
+        if (!c) throw new Error('not found: ' + id);
+        return {
+          campaign: clone(c),
+          tactics: clone(global.DATA.tactics.filter(function (t) {
+            return c.tactics.indexOf(t.id) >= 0;
+          }))
+        };
       });
     },
 
-    bulkQueue: function (cves, patch) {
-      var s = loadState();
-      return sleep(240).then(function () {
+    patchCampaign: function (id, patch) {
+      var s = load();
+      return sleep(160).then(function () {
+        var c = s.campaigns.filter(function (x) { return x.id === id; })[0];
+        if (!c) throw new Error('not found: ' + id);
+        Object.keys(patch).forEach(function (k) { c[k] = patch[k]; });
+        save();
+        return clone(c);
+      });
+    },
+
+    bulkCampaign: function (ids, patch) {
+      var s = load();
+      return sleep(220).then(function () {
         var n = 0;
-        s.queue.forEach(function (q) {
-          if (cves.indexOf(q.cve) >= 0) {
-            Object.keys(patch).forEach(function (k) { q[k] = patch[k]; });
+        s.campaigns.forEach(function (c) {
+          if (ids.indexOf(c.id) >= 0) {
+            Object.keys(patch).forEach(function (k) { c[k] = patch[k]; });
             n++;
           }
         });
-        saveState();
+        save();
         return { updated: n };
       });
     },
 
-    advisories: function (f) {
-      f = f || {};
-      var D = global.DATA;
+    dedup: function () {
       return sleep(LATENCY).then(function () {
-        var rows = D.advisories.concat(D.unmatched);
-        rows = rows.filter(function (a) {
-          if (f.matched === 'hit' && !a.matched) return false;
-          if (f.matched === 'miss' && a.matched) return false;
-          if (f.sev && f.sev !== 'all' && a.sev !== f.sev) return false;
-          if (f.q) {
-            var hay = (a.id + ' ' + (a.product || '') + ' ' +
-                       (a.extracted ? a.extracted.vendor + ' ' + a.extracted.product : '')).toLowerCase();
-            if (hay.indexOf(f.q.toLowerCase()) < 0) return false;
-          }
-          return true;
-        });
-        rows.sort(function (a, b) { return b.score - a.score; });
-        return { advisories: clone(rows) };
+        return { dedup: clone(global.DATA.dedup), shift: clone(global.DATA.shift) };
       });
     },
 
-    advisory: function (cve) {
-      var D = global.DATA;
-      return sleep(200).then(function () {
-        var a = D.advisories.filter(function (x) { return x.id === cve; })[0];
-        if (!a) throw new Error('not found: ' + cve);
-        var asset = loadState().assets.filter(function (x) { return x.id === a.matched; })[0];
-        return { advisory: clone(a), asset: clone(asset) };
-      });
-    },
-
-    assets: function (f) {
-      f = f || {};
-      var s = loadState();
+    tactics: function () {
       return sleep(LATENCY).then(function () {
-        var rows = s.assets.filter(function (a) {
-          if (f.clarity && f.clarity !== 'all' && a.clarity !== f.clarity) return false;
-          if (f.q) {
-            var hay = (a.name + ' ' + a.vendor + ' ' + a.product + ' ' + a.tag).toLowerCase();
-            if (hay.indexOf(f.q.toLowerCase()) < 0) return false;
-          }
-          return true;
-        });
-        return { assets: clone(rows), total: s.assets.length };
+        var s = load();
+        return {
+          tactics: global.DATA.tactics.map(function (t) {
+            var cs = s.campaigns.filter(function (c) { return c.tactics.indexOf(t.id) >= 0; });
+            return Object.assign(clone(t), {
+              cards: cs.length,
+              reports: cs.reduce(function (n, c) { return n + c.reports; }, 0)
+            });
+          }),
+          annotation: clone(global.DATA.annotation)
+        };
       });
     },
 
-    createAsset: function (body) {
-      var s = loadState();
-      return sleep(240).then(function () {
-        var id = 'A' + String(s.assets.length + 1).padStart(2, '0');
-        var a = Object.assign({
-          id: id, name: '', vendor: '', product: '', version: '', cpe: '',
-          count: 1, exposure: '內網', owner: '資訊室', tag: '未分類', clarity: 'ok'
-        }, body, { id: id });
-        // 廠牌／產品／版本任一缺漏就組不出 CPE，標成待補
-        if (!a.vendor || !a.product || !a.version) {
-          a.clarity = 'vague';
-          a.cpe = '';
-          a.hint = a.hint || '缺少廠牌、產品或版本，組不出 CPE，因此無法比對。';
-        } else {
-          a.clarity = 'ok';
-          a.cpe = 'cpe:2.3:a:' + a.vendor + ':' + a.product + ':' + a.version + ':*:*:*:*:*:*:*';
-          delete a.hint;
-        }
-        s.assets.push(a);
-        saveState();
-        return clone(a);
+    evaluation: function () {
+      return sleep(LATENCY).then(function () { return { eval: clone(global.DATA.eval) }; });
+    },
+
+    schema: function () {
+      return sleep(LATENCY).then(function () {
+        return { schema: clone(global.DATA.schema), relations: clone(global.DATA.relations) };
       });
     },
 
-    patchAsset: function (id, patch) {
-      var s = loadState();
-      return sleep(200).then(function () {
-        var a = s.assets.filter(function (x) { return x.id === id; })[0];
-        if (!a) throw new Error('not found: ' + id);
-        Object.keys(patch).forEach(function (k) { a[k] = patch[k]; });
-        if (a.vendor && a.product && a.version) {
-          a.clarity = 'ok';
-          a.cpe = 'cpe:2.3:a:' + a.vendor + ':' + a.product + ':' + a.version + ':*:*:*:*:*:*:*';
-          delete a.hint;
-        }
-        saveState();
-        return clone(a);
-      });
-    },
-
-    deleteAsset: function (id) {
-      var s = loadState();
-      return sleep(200).then(function () {
-        s.assets = s.assets.filter(function (x) { return x.id !== id; });
-        saveState();
-        return { deleted: id };
-      });
-    },
-
-    trace: function () {
-      return sleep(LATENCY).then(function () { return { trace: clone(global.DATA.trace) }; });
-    },
-
-    quota: function () {
-      return sleep(120).then(function () { return clone(global.DATA.meta.quota); });
-    },
-
-    sync: function () {
-      // 真後端要打 NVD、寫快取、重跑比對；這裡只是把時間戳往前推
-      return sleep(1400).then(function () {
-        return { started: true, synced: global.DATA.meta.synced, note: 'mock 模式沒有真的同步' };
+    ingest: function () {
+      // 真後端要解析 .eml、去識別化、抽指標、跑收斂；這裡只是示意
+      return sleep(1600).then(function () {
+        return { ok: true, note: 'mock 模式沒有真的解析郵件' };
       });
     },
 
     reset: function () {
-      try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+      try { localStorage.removeItem(KEY); } catch (e) {}
       state = null;
       return sleep(120).then(function () { return { reset: true }; });
     }
@@ -300,46 +226,40 @@
   }
   function qs(f) {
     var p = Object.keys(f || {})
-      .filter(function (k) { return f[k] !== undefined && f[k] !== null && f[k] !== '' && f[k] !== 'all'; })
+      .filter(function (k) { var v = f[k]; return v !== undefined && v !== null && v !== '' && v !== 'all'; })
       .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(f[k]); });
     return p.length ? '?' + p.join('&') : '';
   }
 
-  var httpAdapter = {
-    summary:     function ()          { return req('/api/summary'); },
-    queue:       function (f)         { return req('/api/queue' + qs(f)); },
-    patchQueue:  function (cve, p)    { return req('/api/queue/' + encodeURIComponent(cve), { method: 'PATCH', body: p }); },
-    bulkQueue:   function (cves, p)   { return req('/api/queue/bulk', { method: 'POST', body: { cves: cves, patch: p } }); },
-    advisories:  function (f)         { return req('/api/advisories' + qs(f)); },
-    advisory:    function (cve)       { return req('/api/advisories/' + encodeURIComponent(cve)); },
-    assets:      function (f)         { return req('/api/assets' + qs(f)); },
-    createAsset: function (b)         { return req('/api/assets', { method: 'POST', body: b }); },
-    patchAsset:  function (id, p)     { return req('/api/assets/' + encodeURIComponent(id), { method: 'PATCH', body: p }); },
-    deleteAsset: function (id)        { return req('/api/assets/' + encodeURIComponent(id), { method: 'DELETE' }); },
-    trace:       function ()          { return req('/api/trace'); },
-    quota:       function ()          { return req('/api/quota'); },
-    sync:        function ()          { return req('/api/sync', { method: 'POST' }); },
-    reset:       function ()          { return Promise.resolve({ reset: false, note: '真後端不提供重置' }); }
+  var http = {
+    shift:          function ()        { return req('/api/shift'); },
+    campaigns:      function (f)       { return req('/api/campaigns' + qs(f)); },
+    campaign:       function (id)      { return req('/api/campaigns/' + encodeURIComponent(id)); },
+    patchCampaign:  function (id, p)   { return req('/api/campaigns/' + encodeURIComponent(id), { method: 'PATCH', body: p }); },
+    bulkCampaign:   function (ids, p)  { return req('/api/campaigns/bulk', { method: 'POST', body: { ids: ids, patch: p } }); },
+    dedup:          function ()        { return req('/api/dedup'); },
+    tactics:        function ()        { return req('/api/tactics'); },
+    evaluation:     function ()        { return req('/api/eval'); },
+    schema:         function ()        { return req('/api/schema'); },
+    ingest:         function ()        { return req('/api/ingest', { method: 'POST' }); },
+    reset:          function ()        { return Promise.resolve({ reset: false, note: '真後端不提供重置' }); }
   };
 
-  var impl = MODE === 'http' ? httpAdapter : mockAdapter;
+  var impl = MODE === 'http' ? http : mock;
 
   global.API = {
     mode: MODE,
     base: BASE,
-    summary:     function (f)      { return impl.summary(f); },
-    queue:       function (f)      { return impl.queue(f); },
-    patchQueue:  function (c, p)   { return impl.patchQueue(c, p); },
-    bulkQueue:   function (c, p)   { return impl.bulkQueue(c, p); },
-    advisories:  function (f)      { return impl.advisories(f); },
-    advisory:    function (c)      { return impl.advisory(c); },
-    assets:      function (f)      { return impl.assets(f); },
-    createAsset: function (b)      { return impl.createAsset(b); },
-    patchAsset:  function (i, p)   { return impl.patchAsset(i, p); },
-    deleteAsset: function (i)      { return impl.deleteAsset(i); },
-    trace:       function ()       { return impl.trace(); },
-    quota:       function ()       { return impl.quota(); },
-    sync:        function ()       { return impl.sync(); },
-    reset:       function ()       { return impl.reset(); }
+    shift:          function ()       { return impl.shift(); },
+    campaigns:      function (f)      { return impl.campaigns(f); },
+    campaign:       function (i)      { return impl.campaign(i); },
+    patchCampaign:  function (i, p)   { return impl.patchCampaign(i, p); },
+    bulkCampaign:   function (i, p)   { return impl.bulkCampaign(i, p); },
+    dedup:          function ()       { return impl.dedup(); },
+    tactics:        function ()       { return impl.tactics(); },
+    evaluation:     function ()       { return impl.evaluation(); },
+    schema:         function ()       { return impl.schema(); },
+    ingest:         function ()       { return impl.ingest(); },
+    reset:          function ()       { return impl.reset(); }
   };
 })(window);

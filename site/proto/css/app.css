@@ -502,3 +502,46 @@
   .trc__v, .trc__m, .trc__q { grid-column: 2; }
   .trc__q { text-align: left; }
 }
+
+/* ============================================================
+   收斂漏斗（本系統最直接的價值視覺化）
+   ============================================================ */
+.funnel { display: flex; flex-direction: column; gap: 14px; }
+.fnl { display: grid; grid-template-columns: 140px 1fr 110px; align-items: center; gap: 14px; }
+.fnl__k { font-size: 12.5px; color: var(--t2); }
+.fnl__t { height: 22px; background: var(--s3); position: relative; }
+.fnl__t i { display: block; height: 100%; animation: growW 1s var(--ease) both; }
+.fnl__v { font-family: var(--mono); font-size: 13px; color: var(--t0); text-align: right; font-weight: 700; }
+
+/* ============================================================
+   資料表抽屜（資料庫架構頁）
+   ============================================================ */
+.acc { border: 1px solid var(--line); background: var(--s1); }
+.acc[open] { border-color: var(--line-3); background: var(--s0); }
+.acc__h {
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  padding: 12px 15px; list-style: none; user-select: none; flex-wrap: wrap;
+}
+.acc__h::-webkit-details-marker { display: none; }
+.acc__h:hover { background: var(--a-dim); }
+.acc__code {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--a);
+  background: var(--s2); border: 1px solid var(--line-2); padding: 2px 8px;
+}
+.acc[open] .acc__code { background: var(--a); color: var(--s0); border-color: var(--a); }
+.acc__t { font-size: 13.5px; font-weight: 600; color: var(--t1); }
+.acc__en { margin-left: auto; font-size: 11.5px; color: var(--t3); }
+.acc__ic { position: relative; width: 12px; height: 12px; flex: 0 0 12px; }
+.acc__ic i { position: absolute; background: var(--t3); }
+.acc__ic i:first-child { left: 0; right: 0; top: 5px; height: 1.5px; }
+.acc__ic i:last-child  { top: 0; bottom: 0; left: 5px; width: 1.5px; }
+.acc[open] .acc__ic i:last-child { display: none; }
+.acc[open] .acc__ic i { background: var(--a); }
+.acc__b { padding: 0 15px 14px; border-top: 1px solid var(--line); }
+.acc__b .tbl table { min-width: 480px; }
+
+@media (max-width: 720px) {
+  .fnl { grid-template-columns: 1fr; gap: 6px; }
+  .fnl__v { text-align: left; }
+  .acc__en { display: none; }
+}
