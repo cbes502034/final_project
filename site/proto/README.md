@@ -178,6 +178,7 @@ trace[]      { s, tool, args, res, ms, cache, quota }
 |------|------|------|
 | [`docs/01-field-spec-draft.md`](docs/01-field-spec-draft.md) | 囷洧 | **草稿**，等他接手定稿 |
 | [`docs/02-references.md`](docs/02-references.md) | 全組 | 參考網站與既有產品，已查證 |
+| [`docs/03-target-user-and-sources.md`](docs/03-target-user-and-sources.md) | 全組 | 應用對象輪廓與資料來源總表，已查證 |
 
 第一份是「欄位定義書」的起頭草稿：從 300 則真實 NVD 公告統計出版本寫法有哪八類、
 各佔多少、對應到什麼結構，並附上每一類的真實例句。
@@ -188,6 +189,10 @@ trace[]      { s, tool, args, res, ms, cache, quota }
 （**EPSS** 被實際利用的機率、**CISA KEV** 已知正在被攻擊的清單），
 以及最接近的既有產品 **OWASP Dependency-Track** —— 它跟這題高度重疊，
 報告裡必須主動說清楚差異在哪。
+
+第三份回答兩個問題：**這套系統的對象是誰**（用三種組織的實測命中數說明，
+最適合的是「有網路設備但只有一名 IT」的校園／機關網管），
+以及**資料來源有哪些**（八個來源的總表，含網址、金鑰需求、限流、實測狀態）。
 
 ## 目前的狀態與還沒做的事
 
