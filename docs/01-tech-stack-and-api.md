@@ -292,12 +292,12 @@ final_project/
 
 | # | 方法 | 路徑 | 權限 | 用途 |
 |---|---|---|---|---|
-| 26 | GET | `/api/summary` | 登入 | 摘要。`scope=me\|family`、`period=2026-09` |
-| 27 | GET | `/api/stats` | 登入 | 統計。`periodType=month\|year`、`from`、`to` |
-| 28 | GET | `/api/budgets` | 登入 | 預算與使用率 |
-| 29 | PUT | `/api/budgets` | 本人或 master | 設定預算 |
-| 30 | GET | `/api/savings-goal` | 登入 | **每月存款目標與達成狀態** |
-| 31 | PUT | `/api/savings-goal` | 本人；未成年由 master | **設定每月存款目標**（註冊時也走這支） |
+| 28 | GET | `/api/summary` | 登入 | 摘要。`scope=me\|family`、`period=2026-09` |
+| 29 | GET | `/api/stats` | 登入 | 統計。`periodType=month\|year`、`from`、`to` |
+| 30 | GET | `/api/budgets` | 登入 | 預算與使用率 |
+| 31 | PUT | `/api/budgets` | 本人或 master | 設定預算 |
+| 32 | GET | `/api/savings-goal` | 登入 | **每月存款目標與達成狀態** |
+| 33 | PUT | `/api/savings-goal` | 本人；未成年由 master | **設定每月存款目標**（註冊時也走這支） |
 
 **存款目標的計算**
 
@@ -317,8 +317,8 @@ final_project/
 
 | # | 方法 | 路徑 | 權限 | 用途 |
 |---|---|---|---|---|
-| 30 | GET | `/api/advices` | 登入 | 建議清單。`scope`、`period` |
-| 31 | POST | `/api/advices/generate` ★ | master | 重新產生。**後端先算好數字再餵給模型** |
+| 34 | GET | `/api/advices` | 登入 | 建議清單。`scope`、`period` |
+| 35 | POST | `/api/advices/generate` ★ | master | 重新產生。**後端先算好數字再餵給模型** |
 
 **產生流程（順序不能顛倒）**
 
@@ -340,8 +340,8 @@ final_project/
 
 | # | 方法 | 路徑 | 權限 | 用途 |
 |---|---|---|---|---|
-| 32 | GET | `/healthz` | 公開 | 健康檢查（Render 用） |
-| 33 | GET | `/docs` | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
+| 36 | GET | `/healthz` | 公開 | 健康檢查（Render 用） |
+| 37 | GET | `/docs` | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
 
 ---
 
@@ -407,6 +407,9 @@ final_project/
 ## 6-4　分工心智圖
 
 見 [`分工心智圖.svg`](分工心智圖.svg)。
+
+可填寫的互動版（四個人各自填名字、按儲存後其他人看得到）在 [`專題手冊.html`](專題手冊.html)，
+那份同時整合了源起、功能清單、按人員分類的 API、系統架構、MVC 流程與 LLM 架構。
 
 ---
 
