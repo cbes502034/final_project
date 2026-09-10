@@ -180,34 +180,195 @@
   /* ============================================================
      02 記帳（自然語言輸入）
      ============================================================ */
-  function vEntry() {
-    head('記帳', '用一句話記帳 —— 這是本系統 LLM 的主要用途');
-    var h = '<div class="page">';
-    h += '<div class="card rise nlp">' +
-      '<div class="card__h"><span class="card__t">用一句話記帳</span>' +
-      '<span class="card__s">模型解析後由你確認才寫入</span></div>' +
-      '<div class="nlp__in">' +
-        '<input id="nlpText" type="text" placeholder="例如：今天午餐吃了120" autocomplete="off">' +
-        '<button class="btn btn--go" id="nlpGo">解析</button>' +
-      '</div>' +
-      '<div class="nlp__ex">試試看：' +
-        ['今天午餐吃了120', '全家買飲料跟麵包165', '昨天加油1150悠遊卡付的', '媽媽給我兩千']
-          .map(function (x) { return '<button class="chip" data-ex="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') +
-      '</div>' +
-      '<div id="nlpOut"></div></div>';
+  var MODE = 'para';          // 'para' 段落批次 ｜ 'single' 單筆手動。兩者互斥
+  var batch = null;           // 段落解析結果，尚未寫入
 
-    h += '<div class="note"><div class="note__k">為什麼這件事需要語言模型</div><p>' +
-      '記帳 App 最大的失敗原因是<b>懶得輸入</b> —— 要選分類、填金額、挑日期，摩擦一高就放棄。<br>' +
-      '一句話記帳把摩擦降到最低，但它必須處理：<b>相對日期</b>（今天／昨天）、' +
-      '<b>中文數字</b>（兩千）、<b>店名歧義</b>（「全家」是店不是家人）、' +
-      '<b>收支方向</b>（「媽媽給我」是收入）、以及<b>語意分類</b>（便利商店算餐飲還是日用品）。<br>' +
-      '<b>這些用規則寫不完</b>，每個人的講法都不一樣 —— 這就是 LLM 在本系統的核心位置。</p></div>';
+  function vEntry() {
+    head('記帳', '兩種寫入方式，一次只能用一種');
+    var h = '<div class="page">';
+
+    /* ---- 模式切換：選一種，另一種停用 ---- */
+    h += '<div class="modes">' +
+      modeCard('para', '段落記帳',
+        '一次寫一整段，系統自動切成好幾筆',
+        '「早上買早餐55，中午吃飯320，今天打工賺了1500」') +
+      modeCard('single', '單筆手動',
+        '一次填一筆，欄位自己選',
+        '傳統表單，不經過模型') +
+      '</div>';
+
+    h += '<div class="note note--warn"><div class="note__k">為什麼一次只能用一種</div><p>' +
+      '兩種方式同時開著，使用者會不知道自己送出的是哪一份資料，也容易把同一筆重複記兩次。' +
+      '<b>選定一種之後，另一種會停用</b>，想換隨時可以切回來，未送出的內容會清掉。</p></div>';
+
+    h += '<div id="entryBox"></div>';
 
     h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
       '<span class="sec__n">TRANSACTIONS</span></div>';
     h += filterBar() + '<div id="txList">' + skeleton(6) + '</div></div>';
     $view.innerHTML = h;
+    renderMode();
     loadTx();
+  }
+
+  function modeCard(id, title, desc, eg) {
+    var on = MODE === id;
+    return '<button class="mode' + (on ? ' on' : '') + '" data-mode="' + id + '">' +
+      '<span class="mode__r"><i></i></span>' +
+      '<span class="mode__m"><span class="mode__t">' + esc(title) + '</span>' +
+      '<span class="mode__d">' + esc(desc) + '</span>' +
+      '<span class="mode__e">' + esc(eg) + '</span></span>' +
+      (on ? '<span class="tag tag--info">使用中</span>'
+          : '<span class="tag tag--na">已停用</span>') + '</button>';
+  }
+
+  function renderMode() {
+    var box = document.getElementById('entryBox');
+    if (!box) return;
+    box.innerHTML = MODE === 'para' ? paraHTML() : singleHTML();
+  }
+
+  /* ============================================================
+     段落記帳
+     ============================================================ */
+  function paraHTML() {
+    return '<div class="card nlp">' +
+      '<div class="card__h"><span class="card__t">寫一段話，系統幫你拆成好幾筆</span>' +
+      '<span class="card__s">解析後由你確認才寫入</span></div>' +
+      '<textarea id="paraText" class="nlp__ta" rows="3" ' +
+      'placeholder="例如：早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500"></textarea>' +
+      '<div class="nlp__row">' +
+        '<button class="btn btn--go" id="paraGo">解析這段話</button>' +
+        '<button class="chip" id="paraEx">用示範段落試試</button>' +
+      '</div>' +
+      '<div id="paraOut"></div></div>';
+  }
+
+  function renderBatch(r) {
+    var out = document.getElementById('paraOut');
+    if (!out) return;
+    batch = r.items.map(function (x) { return Object.assign({}, x); });
+
+    var miss = batch.filter(function (x) { return x.missing && x.missing.length; }).length;
+    var h = '<div class="prs">';
+    h += '<div class="prs__h">這段話被切成 <b>' + batch.length + ' 筆</b>' +
+      (miss ? '，其中 <b style="color:var(--warn)">' + miss + ' 筆有欄位缺漏</b>，補齊才能送出' : '') +
+      '</div>';
+
+    h += '<div class="btbl"><div class="btbl__hd">' +
+      '<span></span><span>原句</span><span>日期</span><span>金額</span>' +
+      '<span>收支</span><span>分類</span><span>店家</span><span></span></div>';
+    h += batch.map(function (it, i) { return batchRow(it, i); }).join('');
+    h += '</div>';
+
+    if (r.note) h += '<div class="prs__n">' + esc(r.note) + '</div>';
+
+    h += '<div class="prs__a">' +
+      '<button class="btn btn--go" id="paraSave"><span id="paraLbl">確認並寫入</span>' +
+      ' <b id="paraN">' + batch.length + '</b> 筆</button>' +
+      '<button class="btn" id="paraCancel">全部捨棄</button></div></div>';
+    out.innerHTML = h;
+    syncSaveState();
+  }
+
+  function batchRow(it, i) {
+    var cats = global.DATA.categories.filter(function (c) { return c.kind === it.kind; });
+    function miss(f) { return it.missing && it.missing.indexOf(f) >= 0; }
+    function cell(field, inner, conf) {
+      var low = conf !== undefined && conf > 0 && conf < 0.85;
+      return '<span class="bcell' + (miss(field) ? ' is-miss' : (low ? ' is-low' : '')) + '">' +
+        inner +
+        (miss(field) ? '<em class="bcell__x">必填</em>'
+                     : (low ? '<em class="bcell__c">' + pct(conf) + '</em>' : '')) +
+        '</span>';
+    }
+    return '<div class="btbl__r' + (it.missing && it.missing.length ? ' has-miss' : '') +
+      '" data-bi="' + i + '" style="animation-delay:' + (i * 50) + 'ms">' +
+      '<span class="btbl__n">' + it.seq + '</span>' +
+      '<span class="btbl__span">' + esc('「' + it.span + '」') +
+        (it.hint ? '<em class="btbl__hint">' + esc(it.hint) + '</em>' : '') + '</span>' +
+      cell('date', '<input data-b="date" type="date" value="' + esc(it.date || '') + '">', it.conf.date) +
+      cell('amount', '<input data-b="amount" type="number" placeholder="缺" value="' +
+           (it.amount === null || it.amount === undefined ? '' : it.amount) + '">', it.conf.amount) +
+      cell('kind', '<select data-b="kind">' +
+           '<option value="expense"' + (it.kind === 'expense' ? ' selected' : '') + '>支出</option>' +
+           '<option value="income"' + (it.kind === 'income' ? ' selected' : '') + '>收入</option>' +
+           '</select>', it.conf.kind) +
+      cell('cat', '<select data-b="cat">' + cats.map(function (c) {
+             return '<option value="' + c.id + '"' + (c.id === it.cat ? ' selected' : '') +
+               '>' + esc(c.name) + '</option>';
+           }).join('') + '</select>', it.conf.cat) +
+      cell('merchant', '<input data-b="merchant" type="text" placeholder="選填" value="' +
+           esc(it.merchant || '') + '">') +
+      '<button class="btbl__del" data-bdel="' + i + '" title="移除這一筆">&#10005;</button>' +
+      '</div>';
+  }
+
+  /* 把畫面上的值收回 batch，並重算缺漏狀態 */
+  function syncBatch() {
+    if (!batch) return;
+    Array.prototype.forEach.call(document.querySelectorAll('.btbl__r'), function (row) {
+      var i = Number(row.dataset.bi);
+      if (!batch[i]) return;
+      Array.prototype.forEach.call(row.querySelectorAll('[data-b]'), function (inp) {
+        var f = inp.dataset.b;
+        batch[i][f] = f === 'amount'
+          ? (inp.value === '' ? null : Number(inp.value))
+          : inp.value;
+      });
+      var m = [];
+      if (batch[i].amount === null || batch[i].amount === '' || isNaN(batch[i].amount)) m.push('amount');
+      if (!batch[i].date) m.push('date');
+      batch[i].missing = m;
+      row.classList.toggle('has-miss', m.length > 0);
+
+      ['amount', 'date'].forEach(function (f) {
+        var inp = row.querySelector('[data-b="' + f + '"]');
+        if (!inp) return;
+        var wrap = inp.parentElement;
+        var need = m.indexOf(f) >= 0;
+        wrap.classList.toggle('is-miss', need);
+        var mark = wrap.querySelector('.bcell__x');
+        if (need && !mark) wrap.insertAdjacentHTML('beforeend', '<em class="bcell__x">必填</em>');
+        if (!need && mark) mark.remove();
+      });
+    });
+    syncSaveState();
+  }
+
+  function syncSaveState() {
+    var btn = document.getElementById('paraSave');
+    if (!btn || !batch) return;
+    var bad = batch.filter(function (x) { return x.missing && x.missing.length; }).length;
+    var n = document.getElementById('paraN');
+    var lbl = document.getElementById('paraLbl');
+    if (n) n.textContent = batch.length;
+    if (lbl) lbl.textContent = bad > 0 ? ('還有 ' + bad + ' 筆缺欄位，共') : '確認並寫入';
+    btn.disabled = bad > 0 || batch.length === 0;
+  }
+
+  /* ============================================================
+     單筆手動
+     ============================================================ */
+  function singleHTML() {
+    var cats = global.DATA.categories.filter(function (c) { return c.kind === 'expense'; });
+    var today = global.DATA.meta.period + '-10';
+    return '<div class="card">' +
+      '<div class="card__h"><span class="card__t">單筆手動輸入</span>' +
+      '<span class="card__s">不經過模型，欄位自己填</span></div>' +
+      '<div class="prs__g">' +
+        '<div class="prs__f"><label>日期</label><input data-s="date" type="date" value="' + today + '"></div>' +
+        '<div class="prs__f"><label>金額</label><input data-s="amount" type="number" placeholder="必填"></div>' +
+        '<div class="prs__f"><label>收支</label><select data-s="kind">' +
+          '<option value="expense">支出</option><option value="income">收入</option></select></div>' +
+        '<div class="prs__f"><label>分類</label><select data-s="cat">' +
+          cats.map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('') +
+          '</select></div>' +
+        '<div class="prs__f"><label>店家</label><input data-s="merchant" type="text" placeholder="選填"></div>' +
+        '<div class="prs__f"><label>備註</label><input data-s="note" type="text" placeholder="選填"></div>' +
+      '</div>' +
+      '<div class="prs__a"><button class="btn btn--go" id="singleSave">寫入這一筆</button>' +
+      '<button class="btn" id="singleClear">清空</button></div></div>';
   }
 
   function filterBar() {
@@ -232,42 +393,6 @@
         ? d.transactions.map(txRow).join('')
         : emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。');
     }).catch(function (e) { box.innerHTML = errState(e); });
-  }
-
-  function renderParse(r) {
-    var out = document.getElementById('nlpOut');
-    if (!out) return;
-    draft = Object.assign({}, r.out, { raw: r.raw });
-    var cats = global.DATA.categories.filter(function (c) { return c.kind === r.out.kind; });
-    var lowCat = r.out.catConf < 0.85;
-    out.innerHTML = '<div class="prs">' +
-      '<div class="prs__h">解析結果 —— <b>請確認後再寫入</b></div>' +
-      '<div class="prs__g">' +
-        pf('日期', '<input data-p="date" type="date" value="' + esc(r.out.date) + '">', r.out.conf) +
-        pf('金額', '<input data-p="amount" type="number" value="' + r.out.amount + '">', r.out.conf) +
-        pf('方向', '<select data-p="kind"><option value="expense"' +
-          (r.out.kind === 'expense' ? ' selected' : '') + '>支出</option>' +
-          '<option value="income"' + (r.out.kind === 'income' ? ' selected' : '') +
-          '>收入</option></select>', r.out.conf) +
-        pf('分類', '<select data-p="cat">' + cats.map(function (c) {
-          return '<option value="' + c.id + '"' + (c.id === r.out.cat ? ' selected' : '') +
-            '>' + esc(c.name) + '</option>';
-        }).join('') + '</select>', r.out.catConf) +
-        pf('店家', '<input data-p="merchant" type="text" value="' + esc(r.out.merchant || '') +
-          '" placeholder="選填">', null) +
-      '</div>' +
-      (lowCat ? '<div class="prs__w">分類信心只有 ' + pct(r.out.catConf) +
-        '，<b>請特別確認這一欄</b>。' + esc(r.note || '') + '</div>'
-              : (r.note ? '<div class="prs__n">' + esc(r.note) + '</div>' : '')) +
-      '<div class="prs__a"><button class="btn btn--go" id="nlpSave">確認並寫入</button>' +
-      '<button class="btn" id="nlpCancel">取消</button></div></div>';
-  }
-
-  function pf(k, input, conf) {
-    var low = conf !== null && conf < 0.85;
-    return '<div class="prs__f' + (low ? ' is-low' : '') + '">' +
-      '<label>' + esc(k) + (conf !== null ? ' <span>' + pct(conf) + '</span>' : '') + '</label>' +
-      input + '</div>';
   }
 
   /* ============================================================
@@ -683,49 +808,100 @@
     var nav = t.closest('[data-nav]');
     if (nav) { location.hash = '#/' + nav.dataset.nav; return; }
 
-    var ex = t.closest('[data-ex]');
-    if (ex) {
-      document.getElementById('nlpText').value = ex.dataset.ex;
-      document.getElementById('nlpGo').click();
+    /* ---- 模式切換：兩者互斥 ---- */
+    var md = t.closest('[data-mode]');
+    if (md) {
+      if (MODE === md.dataset.mode) return;
+      MODE = md.dataset.mode;
+      batch = null;
+      Array.prototype.forEach.call(document.querySelectorAll('.mode'), function (x) {
+        var on = x.dataset.mode === MODE;
+        x.classList.toggle('on', on);
+        var tag = x.querySelector('.tag');
+        tag.className = 'tag tag--' + (on ? 'info' : 'na');
+        tag.textContent = on ? '使用中' : '已停用';
+      });
+      renderMode();
+      toast(MODE === 'para' ? '已切換到段落記帳' : '已切換到單筆手動', 'ok');
       return;
     }
 
-    if (t.closest('#nlpGo')) {
-      var txt = document.getElementById('nlpText').value.trim();
-      if (!txt) { toast('請先輸入一句話', 'err'); return; }
-      var btn = t.closest('#nlpGo');
-      btn.disabled = true; btn.innerHTML = '<span class="btn__sp"></span>解析中';
-      API.nlpParse(txt).then(function (r) {
-        btn.disabled = false; btn.textContent = '解析';
-        renderParse(r);
+    /* ---- 段落記帳 ---- */
+    if (t.closest('#paraEx')) {
+      document.getElementById('paraText').value =
+        '早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500';
+      document.getElementById('paraGo').click();
+      return;
+    }
+
+    var pgo = t.closest('#paraGo');
+    if (pgo) {
+      var txt = document.getElementById('paraText').value.trim();
+      if (!txt) { toast('請先寫一段話', 'err'); return; }
+      pgo.disabled = true;
+      pgo.innerHTML = '<span class="btn__sp"></span>解析中';
+      API.nlpParseBatch(txt).then(function (r) {
+        pgo.disabled = false; pgo.textContent = '解析這段話';
+        renderBatch(r);
       }).catch(function (err) {
-        btn.disabled = false; btn.textContent = '解析';
+        pgo.disabled = false; pgo.textContent = '解析這段話';
         toast('解析失敗：' + err.message, 'err');
       });
       return;
     }
 
-    if (t.closest('#nlpSave')) {
-      if (!draft) return;
-      var out = document.getElementById('nlpOut');
-      Array.prototype.forEach.call(out.querySelectorAll('[data-p]'), function (i) {
-        draft[i.dataset.p] = i.value;
-      });
-      API.nlpConfirm(draft).then(function () {
-        out.innerHTML = '';
-        document.getElementById('nlpText').value = '';
-        draft = null;
+    var bdel = t.closest('[data-bdel]');
+    if (bdel) {
+      var bi = Number(bdel.dataset.bdel);
+      batch.splice(bi, 1);
+      if (!batch.length) {
+        document.getElementById('paraOut').innerHTML = '';
+        toast('已全部移除', 'ok');
+        return;
+      }
+      renderBatch({ items: batch, note: '' });
+      return;
+    }
+
+    if (t.closest('#paraSave')) {
+      syncBatch();
+      var bad = batch.filter(function (x) { return x.missing && x.missing.length; }).length;
+      if (bad) { toast('還有 ' + bad + ' 筆缺欄位', 'err'); return; }
+      var n = batch.length;
+      API.nlpConfirmBatch(batch).then(function () {
+        document.getElementById('paraOut').innerHTML = '';
+        document.getElementById('paraText').value = '';
+        batch = null;
         loadTx();
-        toast('已寫入一筆紀錄', 'ok');
+        toast('已一次寫入 ' + n + ' 筆', 'ok');
       }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); });
       return;
     }
 
-    if (t.closest('#nlpCancel')) {
-      document.getElementById('nlpOut').innerHTML = '';
-      draft = null;
+    if (t.closest('#paraCancel')) {
+      document.getElementById('paraOut').innerHTML = '';
+      batch = null;
       return;
     }
+
+    /* ---- 單筆手動 ---- */
+    if (t.closest('#singleSave')) {
+      var box = document.getElementById('entryBox');
+      var v = {};
+      Array.prototype.forEach.call(box.querySelectorAll('[data-s]'), function (i) {
+        v[i.dataset.s] = i.value;
+      });
+      if (!v.amount) { toast('金額是必填的', 'err'); return; }
+      API.nlpConfirm({
+        date: v.date, amount: Number(v.amount), kind: v.kind, cat: v.cat,
+        merchant: v.merchant, note: v.note, raw: '', conf: 1, catConf: 1
+      }).then(function () {
+        renderMode(); loadTx(); toast('已寫入一筆', 'ok');
+      }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); });
+      return;
+    }
+
+    if (t.closest('#singleClear')) { renderMode(); return; }
 
     var del = t.closest('[data-del]');
     if (del) {
@@ -766,12 +942,22 @@
   document.addEventListener('change', function (e) {
     var s = e.target.closest ? e.target.closest('select[data-f]') : null;
     if (s) { F[s.dataset.f] = s.value; loadTx(); }
+    if (e.target.closest && e.target.closest('[data-b]')) {
+      // 收支方向改了，分類選項要跟著換
+      if (e.target.dataset.b === 'kind') { syncBatch(); renderBatch({ items: batch, note: '' }); }
+      else syncBatch();
+    }
+  });
+
+  document.addEventListener('input', function (e) {
+    if (e.target.closest && e.target.closest('[data-b]')) syncBatch();
   });
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target.id === 'nlpText') {
+    // 段落是多行輸入，用 Ctrl/Cmd + Enter 送出，直接按 Enter 是換行
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.id === 'paraText') {
       e.preventDefault();
-      document.getElementById('nlpGo').click();
+      document.getElementById('paraGo').click();
     }
   });
 

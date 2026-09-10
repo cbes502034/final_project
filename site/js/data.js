@@ -119,6 +119,41 @@ window.DATA = {
       note: '「共」表示合計；訂閱歸娛樂還是其他，需要標註準則定義' }
   ],
 
+  /* ---------- 段落批次記帳的示範 ----------
+     一段話裡可能有好幾筆。模型要先「切分」再逐筆抽欄位，
+     切錯比抽錯更難發現，所以切分結果也要讓使用者確認。 */
+  paragraphDemo: {
+    raw: '早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500',
+    items: [
+      { seq: 1, span: '早上買早餐55',
+        date: '2026-09-10', amount: 55, kind: 'expense', cat: 'C01',
+        merchant: '', note: '早餐',
+        conf: { date: .92, amount: .98, kind: .97, cat: .95 }, missing: [] },
+      { seq: 2, span: '中午跟同事吃飯320',
+        date: '2026-09-10', amount: 320, kind: 'expense', cat: 'C01',
+        merchant: '', note: '與同事聚餐',
+        conf: { date: .92, amount: .98, kind: .97, cat: .93 }, missing: [] },
+      { seq: 3, span: '下午在全家買咖啡',
+        date: '2026-09-10', amount: null, kind: 'expense', cat: 'C01',
+        merchant: '全家便利商店', note: '咖啡',
+        conf: { date: .92, amount: 0, kind: .94, cat: .68 },
+        missing: ['amount'],
+        hint: '這一句沒有寫金額。「全家」判定為店名而非家人；便利商店的分類信心較低，可能是餐飲也可能是日用品。' },
+      { seq: 4, span: '晚上加油1200',
+        date: '2026-09-10', amount: 1200, kind: 'expense', cat: 'C02',
+        merchant: '加油站', note: '',
+        conf: { date: .92, amount: .98, kind: .97, cat: .96 }, missing: [] },
+      { seq: 5, span: '今天打工賺了1500',
+        date: '2026-09-10', amount: 1500, kind: 'income', cat: 'I03',
+        merchant: '', note: '打工',
+        conf: { date: .96, amount: .97, kind: .95, cat: .82 },
+        missing: [],
+        hint: '「賺了」判定為收入。零用金與其他收入的界線需要由分類準則定義。' }
+    ],
+    note: '這段話被切成 5 筆。切分本身也是模型的判斷 —— 若切錯（例如把兩筆合成一筆），' +
+          '欄位再準也沒用，所以切分結果同樣要讓使用者確認。'
+  },
+
   /* ---------- 預算（月／年兩個時間基準） ---------- */
   budgets: [
     { user: 'U1', period: 'month', cat: 'C01', limit: 8000, used: 6420 },

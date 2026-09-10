@@ -28,8 +28,10 @@
    POST   /api/transactions           新增
    PATCH  /api/transactions/{id}      修改
    DELETE /api/transactions/{id}      刪除
-   POST   /api/nlp/parse              ★ 自然語言記帳：文字 → 結構化欄位（不寫入）
-   POST   /api/nlp/confirm            使用者確認／修正後才寫入，並記錄修正供評測
+   POST   /api/nlp/parse              ★ 單句記帳：一句話 → 一筆（不寫入）
+   POST   /api/nlp/parse-batch        ★ 段落記帳：一段話 → 切分成 N 筆（不寫入）
+   POST   /api/nlp/confirm            單筆確認後寫入，並記錄修正供評測
+   POST   /api/nlp/confirm-batch      批次確認後一次寫入 N 筆
 
    統計與預算
    GET    /api/summary                個人／家庭摘要（帶 scope=me|family, period）
@@ -213,6 +215,58 @@
       });
     },
 
+    /* ★ 段落解析：一段話可能有好幾筆，模型要先切分再逐筆抽欄位 */
+    nlpParseBatch: function (text) {
+      var D = global.DATA;
+      return sleep(1500).then(function () {
+        var demo = D.paragraphDemo;
+        if (String(text).trim() === demo.raw) {
+          return { raw: text, matched: true, items: clone(demo.items), note: demo.note };
+        }
+        // 沒對到示範段落時做陽春切分（真後端由模型負責）
+        var parts = String(text).split(/[，,。；;\n]+/).map(function (x) { return x.trim(); })
+                     .filter(function (x) { return x.length > 1; });
+        var items = parts.map(function (p, i) {
+          var m = p.match(/(\d+)/);
+          var amt = m ? Number(m[1]) : null;
+          var income = /賺|收入|薪|給我|入帳/.test(p);
+          return {
+            seq: i + 1, span: p,
+            date: D.meta.period + '-10',
+            amount: amt,
+            kind: income ? 'income' : 'expense',
+            cat: income ? 'I04' : 'C08',
+            merchant: '', note: '',
+            conf: { date: .5, amount: amt ? .6 : 0, kind: .55, cat: .3 },
+            missing: amt === null ? ['amount'] : [],
+            hint: amt === null ? '這一句抓不到金額。' : ''
+          };
+        });
+        return {
+          raw: text, matched: false, items: items,
+          note: 'mock 模式只做陽春切分。真後端由模型負責切分與抽欄位，並回傳每一欄的信心度。'
+        };
+      });
+    },
+
+    nlpConfirmBatch: function (items) {
+      var s = load();
+      return sleep(420).then(function () {
+        var made = items.map(function (p, i) {
+          return {
+            id: 'N' + (Date.now() + i), user: s.me, date: p.date,
+            amount: Number(p.amount), kind: p.kind, cat: p.cat,
+            merchant: p.merchant || '', note: p.note || '',
+            source: 'nlp', raw: p.span || '',
+            parsed: { conf: (p.conf && p.conf.amount) || 0, catConf: (p.conf && p.conf.cat) || 0 }
+          };
+        });
+        made.slice().reverse().forEach(function (t) { s.transactions.unshift(t); });
+        save();
+        return { created: made.length };
+      });
+    },
+
     nlpConfirm: function (parsed) {
       var s = load();
       return sleep(260).then(function () {
@@ -342,7 +396,9 @@
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
     transactions:      function (f)     { return req('/api/transactions' + qs(f)); },
     nlpParse:          function (t)     { return req('/api/nlp/parse', { method: 'POST', body: { text: t } }); },
+    nlpParseBatch:     function (t)     { return req('/api/nlp/parse-batch', { method: 'POST', body: { text: t } }); },
     nlpConfirm:        function (p)     { return req('/api/nlp/confirm', { method: 'POST', body: p }); },
+    nlpConfirmBatch:   function (i)     { return req('/api/nlp/confirm-batch', { method: 'POST', body: { items: i } }); },
     deleteTransaction: function (id)    { return req('/api/transactions/' + encodeURIComponent(id), { method: 'DELETE' }); },
     budgets:           function ()      { return req('/api/budgets'); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
@@ -362,7 +418,9 @@
     summary:           function (f)    { return impl.summary(f); },
     transactions:      function (f)    { return impl.transactions(f); },
     nlpParse:          function (t)    { return impl.nlpParse(t); },
+    nlpParseBatch:     function (t)    { return impl.nlpParseBatch(t); },
     nlpConfirm:        function (p)    { return impl.nlpConfirm(p); },
+    nlpConfirmBatch:   function (i)    { return impl.nlpConfirmBatch(i); },
     deleteTransaction: function (i)    { return impl.deleteTransaction(i); },
     budgets:           function ()     { return impl.budgets(); },
     advices:           function (f)    { return impl.advices(f); },
