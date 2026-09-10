@@ -125,9 +125,7 @@
         if (m.guardedBy && m.guardedBy.length) {
           h += '<div class="note note--warn"><div class="note__k">誰看得到你的紀錄</div><p>' +
             m.guardedBy.map(function (g) { return '<b>' + esc(g.name) + '</b>'; }).join('、') +
-            ' 可以看到你的完整收支明細。<br>' +
-            '<b>這是家庭監管設定，系統一律讓被監管者自己也看得到這件事</b>，' +
-            '不會有「被偷偷監看」的情況。</p></div>';
+            ' 可以看到你的完整收支明細。</p></div>';
         }
 
         var mine = b.budgets.filter(function (x) { return x.user === m.user.id; });
@@ -245,9 +243,6 @@
         '傳統表單，不經過模型') +
       '</div>';
 
-    h += '<div class="note note--warn"><div class="note__k">為什麼一次只能用一種</div><p>' +
-      '兩種方式同時開著，使用者會不知道自己送出的是哪一份資料，也容易把同一筆重複記兩次。' +
-      '<b>選定一種之後，另一種會停用</b>，想換隨時可以切回來，未送出的內容會清掉。</p></div>';
 
     h += '<div id="entryBox"></div>';
 
@@ -308,8 +303,6 @@
       '<span>收支</span><span>分類</span><span>店家</span><span></span></div>';
     h += batch.map(function (it, i) { return batchRow(it, i); }).join('');
     h += '</div>';
-
-    if (r.note) h += '<div class="prs__n">' + esc(r.note) + '</div>';
 
     h += '<div class="prs__a">' +
       '<button class="btn btn--go" id="paraSave"><span id="paraLbl">確認並寫入</span>' +
@@ -477,8 +470,7 @@
             '實際上有 <b>' + overs.length + ' 位成員存不到自己的目標</b>：' +
             overs.map(function (u) {
               return '<b>' + esc(u.name) + '</b>（短少 ' + money(u.shortfall) + '）';
-            }).join('、') + '。<br>' +
-            '<b>看家庭總數會漏掉個人的問題</b>，所以每個人的狀態要分開看。</p></div>';
+            }).join('、') + '。</p></div>';
         }
 
         h += '<div class="sec"><h2 class="sec__t">各成員本月狀況</h2></div>';
@@ -564,8 +556,7 @@
 
       if (STAT.period === 'year') {
         h += '<div class="note note--warn"><div class="note__k">2026 年尚未結束</div><p>' +
-          '年度統計在當年度會標示「未完整」。<b>不要拿未完整年度直接跟完整年度比較</b> —— ' +
-          '系統在畫面上明確標出來，避免使用者誤判「今年支出變少了」。</p></div>';
+          '年度統計在當年度會標示「未完整」，<b>不要直接跟完整年度比較</b>。</p></div>';
       }
 
       h += '<div class="charts" style="margin-top:12px"><div class="card rise">' +
@@ -611,12 +602,7 @@
           return '<tr><td><b>' + esc(r.rule) + '</b></td><td>' + esc(r.why) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
 
-      h += '<div class="note note--crit"><div class="note__k">最重要的一條：數字不由模型生成</div><p>' +
-        '所有金額、百分比、成長率<b>一律由後端從資料庫算好，再連同結果一起餵給模型</b>，' +
-        '模型只負責把數字組織成人看得懂的敘述。<br>' +
-        '理由很直接：<b>財務數字算錯會讓使用者做出錯誤決定</b>，' +
-        '而語言模型本來就不擅長算術。這條規則跟畫面上「依據」欄位是同一件事的兩面 —— ' +
-        '使用者要能自己驗算。</p></div></div>';
+      h += '</div>';
       $view.innerHTML = h;
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -658,16 +644,7 @@
           '</div></article>';
       }).join('') + '</div>';
 
-      h += '<div class="note"><div class="note__k">每月存款目標是註冊時就要填的</div><p>' +
-        '註冊流程會請使用者設定「每月想存多少」。系統據此算出<b>可支配上限＝收入 − 存款目標</b>，' +
-        '支出超過上限就代表這個月存不到原本設定的金額，總覽頁會直接跳警告。<br>' +
-        '目標改動<b>保留歷史不覆蓋</b>（資料表 <code>savings_goals</code> 帶 period_key），' +
-        '否則之後回頭看會不知道當時的目標是多少。</p></div>';
 
-      h += '<div class="note"><div class="note__k">監管是雙向可見的</div><p>' +
-        '被監管者在自己的總覽頁會看到「誰看得到你的紀錄」。' +
-        '<b>系統不提供「隱藏監管」的選項</b> —— 偷偷監看家人的消費會破壞信任，' +
-        '而信任正是家庭記帳能持續下去的前提。</p></div>';
 
       h += '<div class="sec"><h2 class="sec__t">角色</h2></div>';
       h += '<div class="tbl"><table><thead><tr><th>角色</th><th>說明</th></tr></thead><tbody>' +
@@ -710,10 +687,6 @@
               '<span class="tag tag--CRITICAL">未達</span>') + '</td></tr>';
         }).join('') + '</tbody></table></div>';
 
-      h += '<div class="note"><div class="note__k">最重要的是最後一列</div><p>' +
-        '<b>一次輸入完全正確率</b>（日期、金額、方向、分類全部都對）從 0.42 提升到 0.79。' +
-        '單看個別欄位的分數會高估實際體驗 —— 使用者在意的是「我寫一句話，它有沒有一次記對」，' +
-        '只要有一欄錯就要動手改，摩擦就回來了。</p></div>';
 
       h += '<div class="sec"><h2 class="sec__t">解析範例與難點</h2></div>';
       h += '<div class="tbl"><table><thead><tr><th>使用者說</th><th>解析成</th><th>難在哪</th>' +
@@ -726,10 +699,7 @@
             '<td>' + esc(x.note) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
 
-      h += '<div class="note note--warn"><div class="note__k">評測資料哪裡來</div><p>' +
-        '資料表 <code>nlp_parses</code> 會記下每一次的<b>原始輸入、模型輸出、以及使用者修正後的值</b>。' +
-        '使用者每改一次，就等於免費標了一筆資料。<br>' +
-        '<b>這是本系統的資料飛輪</b>：用得越久，訓練資料越多，模型越準，摩擦越低。</p></div></div>';
+      h += '</div>';
       $view.innerHTML = h;
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -738,7 +708,7 @@
      08 資料庫架構
      ============================================================ */
   function vSchema() {
-    head('資料庫架構', '12 張表與關聯，後端照這個建表');
+    head('資料庫架構', '13 張表與關聯，後端照這個建表');
     $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
     API.schema().then(function (d) {
       var h = '<div class="page"><div class="card rise">' +
@@ -763,21 +733,7 @@
           }).join('') + '</tbody></table></div></div></details>';
       }).join('');
 
-      h += '<div class="note"><div class="note__k">四個設計重點</div><p>' +
-        '<b>1. 帳號與家庭角色分開。</b> `users` 是登入身分，`family_members` 才是角色 —— ' +
-        '一個人可以同時是甲家的管理者、乙家的成員。<br>' +
-        '<b>2. 監管關係獨立成表。</b> `guardianships` 有起訖時間，' +
-        '解除監管是設 `ended_at` 而不是刪除，因為稽核需要看得到歷史。<br>' +
-        '<b>3. `nlp_parses` 是資料飛輪的核心。</b> 記下原始輸入、模型輸出、使用者修正值，' +
-        '既是評測來源也是下一輪訓練資料。<br>' +
-        '<b>4. `advices.basis_json` 存的是後端算好的數字</b>，不是模型生成的 —— ' +
-        '這樣使用者才驗算得了。</p></div>';
-
-      h += '<div class="note note--warn"><div class="note__k">安全與隱私</div><p>' +
-        '`password_hash` 用 bcrypt 或 argon2，<b>絕不存明碼</b>。' +
-        '`sessions` 只存 refresh token 的雜湊，登出就是設 `revoked_at`。<br>' +
-        '`audit_logs` 記錄「誰看了誰的資料」—— 監管功能一旦存在，' +
-        '就必須有紀錄可查，否則權限會變成沒人管的黑箱。</p></div></div>';
+      h += '</div>';
       $view.innerHTML = h;
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }

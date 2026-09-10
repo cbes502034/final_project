@@ -28,14 +28,14 @@
 .brand__n { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
 .brand__v { font-family: var(--mono); font-size: 9px; color: var(--ink-dim); margin-left: auto; }
 
-.nav { padding: 12px 10px; flex: 1; overflow-y: auto; }
+.nav { padding: 8px 10px; flex: 1; overflow-y: auto; }
 .nav__lb {
   font-size: 10.5px; letter-spacing: .14em; color: var(--ink-dim);
-  padding: 12px 10px 7px; text-transform: uppercase;
+  padding: 9px 10px 5px; text-transform: uppercase;
 }
 .nav__i {
   display: flex; align-items: center; gap: 11px; width: 100%;
-  padding: 10px 12px; color: var(--ink-soft); border-radius: var(--r-input);
+  padding: 8px 12px; color: var(--ink-soft); border-radius: var(--r-input);
   transition: color .18s var(--ease), background .18s var(--ease);
 }
 .nav__ic { width: 17px; height: 17px; flex: 0 0 17px; opacity: .75; }
@@ -54,6 +54,29 @@
 .nav__i.on .nav__ic { opacity: 1; color: var(--accent-hi); }
 .nav__i.on .nav__b { background: var(--accent); color: #fff; }
 .nav__b--hot { background: var(--down); color: #fff; }
+
+/* 專題說明文件：站外連結，釘在側欄底部不跟著捲動 */
+.doclink {
+  display: flex; align-items: center; gap: 11px;
+  margin: 0 10px 9px; padding: 10px 12px;
+  border-radius: var(--r-input); text-decoration: none;
+  border: 1px solid rgba(108, 159, 251, .28);
+  background: linear-gradient(120deg, var(--accent-wash), rgba(139, 124, 240, .1));
+  transition: border-color .18s var(--ease), background .18s var(--ease);
+}
+.doclink:hover {
+  border-color: rgba(108, 159, 251, .55);
+  background: linear-gradient(120deg, rgba(108, 159, 251, .22), rgba(139, 124, 240, .16));
+}
+.doclink__ic { width: 17px; height: 17px; flex: 0 0 17px; color: var(--accent-hi); }
+.doclink__m { display: flex; flex-direction: column; min-width: 0; }
+.doclink__t { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
+.doclink__s { font-size: 10.5px; color: var(--ink-faint); line-height: 1.4; }
+.doclink__go {
+  width: 12px; height: 12px; flex: 0 0 12px; margin-left: auto; color: var(--accent-hi);
+  opacity: .6; transition: opacity .18s var(--ease), transform .18s var(--ease);
+}
+.doclink:hover .doclink__go { opacity: 1; transform: translate(1px, -1px); }
 
 .rail__f { padding: 15px 18px 17px; border-top: 1px solid var(--line); }
 

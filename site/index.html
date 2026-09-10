@@ -19,8 +19,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/tokens.css?v=6">
-<link rel="stylesheet" href="css/app.css?v=6">
+<link rel="stylesheet" href="css/tokens.css?v=8">
+<link rel="stylesheet" href="css/app.css?v=8">
 </head>
 <body>
 
@@ -75,6 +75,15 @@
       </button>
     </div>
 
+    <a class="doclink" href="https://claude.ai/code/artifact/8b50ecab-27e7-43b5-8c62-cdc8e79b9fe3" target="_blank" rel="noopener">
+      <svg class="doclink__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>
+      <span class="doclink__m">
+        <span class="doclink__t">專題說明文件</span>
+        <span class="doclink__s">源起 · 功能 · 架構 · 分工</span>
+      </span>
+      <svg class="doclink__go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 5h11v11"/><path d="M19 5 6 18"/></svg>
+    </a>
+
     <div class="rail__f">
       <div class="quota__k" style="margin-bottom:8px">目前登入</div>
       <div class="who" id="who"></div>
@@ -94,24 +103,19 @@
       <button class="btn btn--go" data-nav="entry">＋ 記一筆</button>
     </header>
 
-    <div class="mock">
-      <b>前端原型</b>
-      <span>沒有後端。人名、金額、店家皆為虛構示範樣本。可在「成員與權限」頁切換身分，體驗不同角色看到的畫面。接後端只要填 <code>&lt;meta name="api-base"&gt;</code>。</span>
-    </div>
-
     <div id="view"></div>
 
     <footer style="padding:24px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-dim);line-height:1.8">
-      四人一個月專題原型｜家庭記帳與財務控管系統。示範資料為虛構樣本。
+      家庭記帳與財務控管系統｜示範資料為虛構樣本。
     </footer>
   </main>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=6"></script>
-<script src="js/data.js?v=6"></script>
-<script src="js/api.js?v=6"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/stars.js?v=8"></script>
+<script src="js/data.js?v=8"></script>
+<script src="js/api.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
 </body>
 </html>
