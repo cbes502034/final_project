@@ -1,7 +1,6 @@
 /* p03 — RANK 3 / C02 */
 (window.PROJECTS = window.PROJECTS || []).push({
   id: 'p03', rank: 3, code: 'C02', score: 91,
-  chosen: true, proto: 'proto/',
   domain: '資訊安全',
   title: '使用者回報釣魚郵件自動分流與話術辨識平台',
   subtitle: '一次釣魚活動打 300 人就產生 300 份回報，其中 80–85% 根本不是威脅。系統把回報佇列自動收斂成「同一波 campaign」，並用微調模型辨識中文詐騙話術，讓分析師只看真的需要看的。',

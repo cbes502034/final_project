@@ -1,350 +1,333 @@
 /* ============================================================
    data.js — 前端原型的模擬資料集
    ------------------------------------------------------------
-   第 3 題：使用者回報釣魚郵件自動分流與話術辨識平台
+   家庭記帳與財務控管系統
 
-   全部為模擬資料。郵件內容、寄件人、網域都是虛構的示範樣本，
-   不含任何真實郵件或個資。話術句式參考公開報導中的常見手法改寫。
-
-   欄位結構即為之後後端 API 與資料表的契約草案。
+   全部為模擬資料。人名、金額、店家皆為虛構示範樣本。
+   欄位結構即為後端 API 與資料表的契約草案。
    ============================================================ */
 window.DATA = {
 
   meta: {
-    org: '示範組織',
-    shift: '2026-09-09 早班（08:00–16:00）',
-    synced: '2026-09-09 15:42',
-    source: '模擬資料。郵件內容為虛構示範樣本，不含真實郵件或個資。'
+    family: '林家',
+    period: '2026-09',
+    updated: '2026-09-10 14:20',
+    currency: 'TWD'
   },
 
-  /* 六類話術體系 —— 由囷洧定義，技術指標抓不到的用 ✕ 標記 */
-  tactics: [
-    { id: 'T1', code: 'urgency', name: '急迫性',
-      desc: '製造時間壓力，讓人來不及查證',
-      example: '「24 小時內未處理將停用帳號」',
-      techDetectable: false, loss: '中' },
-    { id: 'T2', code: 'authority', name: '權威冒充',
-      desc: '假冒銀行、政府、公司內部單位',
-      example: '「本行資安部門通知」',
-      techDetectable: 'partial', loss: '中高' },
-    { id: 'T3', code: 'reward', name: '獎勵誘餌',
-      desc: '以中獎、回饋、補助誘使點擊',
-      example: '「您已獲得 3,000 元回饋金」',
-      techDetectable: false, loss: '低' },
-    { id: 'T4', code: 'threat', name: '恐嚇威脅',
-      desc: '宣稱掌握隱私或違法紀錄',
-      example: '「已掌握您的瀏覽紀錄」',
-      techDetectable: false, loss: '中' },
-    { id: 'T5', code: 'process_hijack', name: '流程劫持（BEC）',
-      desc: '冒充內部或供應商要求變更匯款流程',
-      example: '「本次請改匯至新帳戶」',
-      techDetectable: false, loss: '最高' },
-    { id: 'T6', code: 'tech_support', name: '技術支援詐騙',
-      desc: '謊稱裝置中毒，誘導安裝工具',
-      example: '「您的電腦已中毒，請安裝此工具」',
-      techDetectable: 'partial', loss: '中' }
+  /* ---------- 家庭成員與角色 ---------- */
+  roles: [
+    { id: 'master', name: '管理者', desc: '家庭最高權限：看全家、管成員、設預算、指派監管關係' },
+    { id: 'parent', name: '家長', desc: '看自己 + 被指派監管的成員' },
+    { id: 'member', name: '成員', desc: '只看自己。被監管時會明確顯示「誰看得到你」' }
   ],
 
-  /* 三層收斂：由便宜到貴，LLM 只在最後對群組跑一次 */
-  dedup: [
-    { level: 'L1', name: '精確比對',
-      how: 'Message-ID／主旨雜湊／附件雜湊完全相同',
-      cost: '幾乎為零', collapsed: 118, ms: 40 },
-    { level: 'L2', name: '特徵比對',
-      how: '寄件網域＋連結網域＋主旨模板相似度',
-      cost: '低（字串運算）', collapsed: 104, ms: 310 },
-    { level: 'L3', name: '語意分群',
-      how: 'Sentence embedding ＋ 階層式分群',
-      cost: '中（一次向量化）', collapsed: 76, ms: 2840 },
-    { level: 'LLM', name: '群組命名與說明',
-      how: '每個群組跑一次生成，不是每封信',
-      cost: '高，但只跑 14 次', collapsed: 0, ms: 9600 }
+  members: [
+    { id: 'U1', name: '林建國', role: 'master', avatar: '國', age: 52,
+      joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000 },
+    { id: 'U2', name: '陳淑芬', role: 'parent', avatar: '芬', age: 49,
+      joined: '2026-01-05', income: 52000, expense: 38900, budget: 40000 },
+    { id: 'U3', name: '林宇涵', role: 'member', avatar: '涵', age: 19,
+      joined: '2026-02-11', income: 8000, expense: 11450, budget: 10000 },
+    { id: 'U4', name: '林宇軒', role: 'member', avatar: '軒', age: 16,
+      joined: '2026-02-11', income: 3000, expense: 4820, budget: 4000 }
   ],
 
-  /* 收斂後的 campaign —— 一個 campaign 一張卡片 */
-  campaigns: [
-    { id: 'C03', name: '冒充財務主管要求變更匯款帳戶', verdict: 'phishing',
-      tactics: ['T5', 'T2'], reports: 3, confidence: 0.94, level: 'L3',
-      first: '09-09 09:14', last: '09-09 11:02', status: 'open', priority: 1,
-      from: 'cfo-lin@company-tw<span>.</span>net', fromReal: 'company-tw.net',
-      spoof: '顯示名稱寫「林財務長」，實際網域與公司網域差一個字',
-      subject: '【急】本月供應商匯款帳戶變更',
-      snippet: '因原帳戶審計凍結，本月款項請改匯下列新帳戶，請於今日下班前完成並回覆確認。',
-      why: '寄件網域 company-tw.net 與公司網域 companytw.com.tw 僅差一個連字號，' +
-           '網域註冊僅 6 天。內容要求變更既有匯款流程且施加時間壓力，符合 BEC 特徵。',
-      indicators: { spf: 'fail', dkim: 'none', dmarc: 'fail', domainAge: 6, urls: 0, mismatch: false },
-      action: '立即通知財務部門暫停匯款，封鎖寄件網域' },
-
-    { id: 'C01', name: '假冒銀行 OTP 驗證頁面', verdict: 'phishing',
-      tactics: ['T1', 'T2'], reports: 31, confidence: 0.97, level: 'L2',
-      first: '09-09 08:22', last: '09-09 14:51', status: 'open', priority: 2,
-      from: 'service@bank-secure-tw<span>.</span>com', fromReal: 'bank-secure-tw.com',
-      spoof: '冒用銀行標誌與版型，連結文字寫官網網址但實際指向其他網域',
-      subject: '您的網路銀行帳號將於今日停用',
-      snippet: '偵測到異常登入，請於 24 小時內完成身分驗證，逾期將暫停所有交易功能。',
-      why: '連結顯示文字為銀行官網，實際指向 bank-secure-tw.com，網域註冊 11 天。' +
-           '內容同時具備時間壓力與權威冒充。31 封信主旨模板相同僅收件人不同。',
-      indicators: { spf: 'fail', dkim: 'fail', dmarc: 'fail', domainAge: 11, urls: 2, mismatch: true },
-      action: '封鎖網域，發送全員提醒，比對是否有人已點擊' },
-
-    { id: 'C04', name: '假冒資訊部門通知密碼到期', verdict: 'phishing',
-      tactics: ['T2', 'T1'], reports: 8, confidence: 0.91, level: 'L2',
-      first: '09-09 10:03', last: '09-09 13:20', status: 'open', priority: 3,
-      from: 'it-helpdesk@mail-service<span>.</span>info', fromReal: 'mail-service.info',
-      spoof: '冒充內部 IT 服務台，登入頁面仿造公司單一登入畫面',
-      subject: '[IT 通知] 您的密碼將於 48 小時後到期',
-      snippet: '請點擊下方連結完成密碼更新，未更新者將無法存取公司系統。',
-      why: '冒充內部單位但寄件網域為外部 .info。連結指向仿造的登入頁面。',
-      indicators: { spf: 'fail', dkim: 'none', dmarc: 'none', domainAge: 23, urls: 1, mismatch: true },
-      action: '封鎖網域，提醒同仁 IT 不會以郵件要求輸入密碼' },
-
-    { id: 'C05', name: '恐嚇信：宣稱掌握瀏覽紀錄', verdict: 'phishing',
-      tactics: ['T4'], reports: 2, confidence: 0.88, level: 'L1',
-      first: '09-09 11:47', last: '09-09 12:05', status: 'open', priority: 4,
-      from: 'noreply@tempmail-x<span>.</span>xyz', fromReal: 'tempmail-x.xyz',
-      spoof: '偽造成受害者自己的信箱寄出（From 偽造）',
-      subject: '我已經取得您的裝置存取權',
-      snippet: '我已錄下您的畫面與攝影機影像，請於 48 小時內以加密貨幣支付，否則將公開。',
-      why: 'From 偽造為收件人本人信箱，但 SPF 檢查失敗。內容為典型勒索話術，' +
-           '無實際攻擊證據，屬大量群發型恐嚇。',
-      indicators: { spf: 'fail', dkim: 'none', dmarc: 'fail', domainAge: 3, urls: 0, mismatch: false },
-      action: '告知同仁不必理會、不要付款，封鎖寄件網域' },
-
-    { id: 'C02', name: '假冒人資年度調薪通知', verdict: 'phishing',
-      tactics: ['T2', 'T3'], reports: 14, confidence: 0.93, level: 'L1',
-      first: '09-09 08:55', last: '09-09 10:31', status: 'open', priority: 5,
-      from: 'hr-notice@companytw-hr<span>.</span>com', fromReal: 'companytw-hr.com',
-      spoof: '冒充人資部門，附件為含巨集的試算表',
-      subject: '2026 年度調薪作業通知（請查收附件）',
-      snippet: '請下載附件確認個人調薪幅度，並於 9/12 前回覆確認。',
-      why: '附件為 .xlsm 含巨集。寄件網域非公司網域，註冊 18 天。' +
-           '以調薪為誘餌提高開啟意願。',
-      indicators: { spf: 'fail', dkim: 'fail', dmarc: 'fail', domainAge: 18, urls: 0, mismatch: false, attach: '.xlsm（含巨集）' },
-      action: '封鎖網域與附件雜湊，檢查是否有人已開啟附件' },
-
-    { id: 'C06', name: '電商促銷群發廣告', verdict: 'spam',
-      tactics: ['T3'], reports: 47, confidence: 0.96, level: 'L1',
-      first: '09-09 08:01', last: '09-09 15:12', status: 'closed', priority: 6,
-      from: 'promo@shop-newsletter<span>.</span>com', fromReal: 'shop-newsletter.com',
-      spoof: '', subject: '限時 5 折｜今日最後一天',
-      snippet: '全館服飾五折起，輸入折扣碼再折 100 元。',
-      why: 'SPF/DKIM 通過，為合法商業電子郵件。含正常退訂連結。非威脅，' +
-           '但同仁誤以為是釣魚而大量回報。',
-      indicators: { spf: 'pass', dkim: 'pass', dmarc: 'pass', domainAge: 1420, urls: 6, mismatch: false },
-      action: '加入廣告白名單，不需處置' },
-
-    { id: 'C07', name: '保險業務開發信', verdict: 'spam',
-      tactics: [], reports: 38, confidence: 0.94, level: 'L2',
-      first: '09-09 09:30', last: '09-09 14:02', status: 'closed', priority: 7,
-      from: 'agent@insurance-plan<span>.</span>tw', fromReal: 'insurance-plan.tw',
-      spoof: '', subject: '為您規劃退休保障方案',
-      snippet: '想與您約時間說明適合的保障規劃，方便的話請回覆。',
-      why: 'SPF 通過，網域註冊 3 年以上，內容無惡意連結或附件。屬未經同意的行銷信。',
-      indicators: { spf: 'pass', dkim: 'pass', dmarc: 'none', domainAge: 1180, urls: 1, mismatch: false },
-      action: '加入垃圾規則，不需人工處理' },
-
-    { id: 'C08', name: '海外代購廣告', verdict: 'spam',
-      tactics: ['T3'], reports: 21, confidence: 0.92, level: 'L1',
-      first: '09-09 10:15', last: '09-09 13:44', status: 'closed', priority: 8,
-      from: 'buy@daigou-shop<span>.</span>net', fromReal: 'daigou-shop.net',
-      spoof: '', subject: '日本藥妝代購 現貨供應',
-      snippet: '本週開團，滿三千免運。',
-      why: '無惡意指標，屬一般垃圾廣告。',
-      indicators: { spf: 'pass', dkim: 'none', dmarc: 'none', domainAge: 640, urls: 3, mismatch: false },
-      action: '加入垃圾規則' },
-
-    { id: 'C09', name: '研討會邀請（多人轉寄）', verdict: 'spam',
-      tactics: [], reports: 15, confidence: 0.89, level: 'L2',
-      first: '09-09 09:05', last: '09-09 11:38', status: 'closed', priority: 9,
-      from: 'event@conf-invite<span>.</span>org', fromReal: 'conf-invite.org',
-      spoof: '', subject: '誠摯邀請您參加 2026 數位轉型論壇',
-      snippet: '本論壇免費參加，名額有限，敬請把握。',
-      why: '合法主辦單位發出的邀請信，被多位同仁轉寄回報。非威脅。',
-      indicators: { spf: 'pass', dkim: 'pass', dmarc: 'pass', domainAge: 2100, urls: 2, mismatch: false },
-      action: '不需處置' },
-
-    { id: 'C10', name: '內部公告被大量轉寄回報', verdict: 'benign',
-      tactics: [], reports: 52, confidence: 0.99, level: 'L1',
-      first: '09-09 08:10', last: '09-09 09:02', status: 'closed', priority: 10,
-      from: 'announce@companytw.com<span>.</span>tw', fromReal: 'companytw.com.tw',
-      spoof: '', subject: '【全體同仁】颱風假出勤規定說明',
-      snippet: '依人事行政總處公告，本週五停止上班上課。',
-      why: '**公司自己發的內部公告**，寄件網域為公司網域且 SPF/DKIM/DMARC 全數通過。' +
-           '因主旨含「【全體同仁】」被誤認為釣魚。',
-      indicators: { spf: 'pass', dkim: 'pass', dmarc: 'pass', domainAge: 4200, urls: 1, mismatch: false },
-      action: '不需處置。建議加強同仁對內部公告格式的認識' },
-
-    { id: 'C11', name: '客戶正常詢價信', verdict: 'benign',
-      tactics: [], reports: 31, confidence: 0.95, level: 'L3',
-      first: '09-09 08:44', last: '09-09 15:20', status: 'closed', priority: 11,
-      from: '多個客戶網域', fromReal: '多來源',
-      spoof: '', subject: '（各式詢價主旨）',
-      snippet: '想詢問貴公司產品報價與交期。',
-      why: '31 封來自不同客戶的正常詢價信，因含附件與外部連結被回報。' +
-           '語意分群後歸為同一類，全部為正常商務往來。',
-      indicators: { spf: 'pass', dkim: 'pass', dmarc: 'pass', domainAge: null, urls: 1, mismatch: false },
-      action: '不需處置' },
-
-    { id: 'C12', name: '系統自動通知（備份完成）', verdict: 'benign',
-      tactics: [], reports: 24, confidence: 0.99, level: 'L1',
-      first: '09-09 08:00', last: '09-09 08:00', status: 'closed', priority: 12,
-      from: 'backup@companytw.com<span>.</span>tw', fromReal: 'companytw.com.tw',
-      spoof: '', subject: '[AUTO] Nightly backup completed',
-      snippet: 'Backup job finished successfully. 0 errors.',
-      why: '內部系統自動信，英文主旨被誤認為國外釣魚。',
-      indicators: { spf: 'pass', dkim: 'pass', dmarc: 'pass', domainAge: 4200, urls: 0, mismatch: false },
-      action: '不需處置。建議把自動信加入回報白名單' },
-
-    { id: 'C13', name: '供應商發票（正常）', verdict: 'benign',
-      tactics: [], reports: 15, confidence: 0.9, level: 'L2',
-      first: '09-09 09:22', last: '09-09 14:35', status: 'closed', priority: 13,
-      from: 'billing@supplier-co<span>.</span>tw', fromReal: 'supplier-co.tw',
-      spoof: '', subject: '9 月份請款單',
-      snippet: '附件為本月請款明細，如有問題請聯繫。',
-      why: '長期往來供應商，網域與過往一致，附件為 PDF 無巨集。' +
-           '**注意：這類信與 BEC（C03）外觀相近，是最需要謹慎判斷的一類。**',
-      indicators: { spf: 'pass', dkim: 'pass', dmarc: 'pass', domainAge: 2900, urls: 0, mismatch: false, attach: '.pdf' },
-      action: '不需處置，但保留紀錄供 BEC 比對' },
-
-    { id: 'C14', name: '求職應徵信', verdict: 'benign',
-      tactics: [], reports: 11, confidence: 0.93, level: 'L2',
-      first: '09-09 10:40', last: '09-09 15:05', status: 'closed', priority: 14,
-      from: '多個個人信箱', fromReal: '多來源',
-      spoof: '', subject: '應徵貴公司職缺',
-      snippet: '附上履歷，期待有機會面談。',
-      why: '正常求職信，因含附件被回報。',
-      indicators: { spf: 'pass', dkim: 'none', dmarc: 'none', domainAge: null, urls: 0, mismatch: false, attach: '.pdf' },
-      action: '轉交人資，不需資安處置' }
+  /* 監管關係：誰看得到誰。刻意雙向透明——被監管者自己也看得到這張表 */
+  guardianships: [
+    { guardian: 'U1', ward: 'U3', since: '2026-02-11', scope: '全部明細' },
+    { guardian: 'U1', ward: 'U4', since: '2026-02-11', scope: '全部明細' },
+    { guardian: 'U2', ward: 'U4', since: '2026-02-11', scope: '全部明細' }
   ],
 
-  /* 本班次統計 */
-  shift: {
-    reports: 312,
-    cards: 14,
-    ratio: 22.3,
-    phishing: 58,
-    spam: 121,
-    benign: 133,
-    reporters: 87,
-    llmCalls: 14,
-    llmCallsIfNoDedup: 312,
-    analystMinutesBefore: 260,
-    analystMinutesAfter: 35
-  },
-
-  /* 近 8 個班次的回報量與收斂後卡片數 */
-  trend: [
-    { d: '09-02', reports: 188, cards: 11 },
-    { d: '09-03', reports: 143, cards: 9 },
-    { d: '09-04', reports: 291, cards: 13 },
-    { d: '09-05', reports: 96, cards: 7 },
-    { d: '09-06', reports: 41, cards: 4 },
-    { d: '09-07', reports: 38, cards: 4 },
-    { d: '09-08', reports: 167, cards: 10 },
-    { d: '09-09', reports: 312, cards: 14 }
+  /* ---------- 分類體系 ---------- */
+  categories: [
+    { id: 'C01', name: '餐飲', kind: 'expense', color: '#FF8A3D', icon: '食' },
+    { id: 'C02', name: '交通', kind: 'expense', color: '#4DA6FF', icon: '行' },
+    { id: 'C03', name: '居住', kind: 'expense', color: '#A78BFA', icon: '住' },
+    { id: 'C04', name: '日用品', kind: 'expense', color: '#2FD98A', icon: '用' },
+    { id: 'C05', name: '娛樂', kind: 'expense', color: '#FF4757', icon: '樂' },
+    { id: 'C06', name: '教育', kind: 'expense', color: '#FFC93C', icon: '學' },
+    { id: 'C07', name: '醫療', kind: 'expense', color: '#5EEAD4', icon: '醫' },
+    { id: 'C08', name: '其他', kind: 'expense', color: '#5B7085', icon: '他' },
+    { id: 'I01', name: '薪資', kind: 'income', color: '#2FD98A', icon: '薪' },
+    { id: 'I02', name: '獎金', kind: 'income', color: '#00D9C0', icon: '獎' },
+    { id: 'I03', name: '零用金', kind: 'income', color: '#4DA6FF', icon: '零' },
+    { id: 'I04', name: '其他收入', kind: 'income', color: '#5B7085', icon: '收' }
   ],
 
-  /* 標註進度（囷洧的工作） */
-  annotation: {
-    target: 1000, done: 340,
-    agreement: 0.87, agreementTarget: 0.85,
-    byTactic: [
-      { id: 'T1', n: 96 }, { id: 'T2', n: 88 }, { id: 'T3', n: 54 },
-      { id: 'T4', n: 31 }, { id: 'T5', n: 12 }, { id: 'T6', n: 27 }
-    ]
-  },
-
-  /* 模型評測（明樺的工作）—— base 對照 fine-tuned */
-  eval: [
-    { task: '釣魚二分類', metric: 'F1', base: 0.76, ft: 0.93, target: 0.92 },
-    { task: '釣魚二分類', metric: 'Recall', base: 0.71, ft: 0.96, target: 0.95 },
-    { task: '話術多標籤', metric: 'Macro-F1', base: 0.52, ft: 0.79, target: 0.78 },
-    { task: 'Campaign 聚類', metric: 'Purity', base: null, ft: 0.92, target: 0.90 },
-    { task: '收斂率', metric: '倍', base: 1.0, ft: 22.3, target: 8.0 },
-    { task: '理由品質', metric: '人工評分', base: null, ft: 4.2, target: 4.0 }
+  /* ---------- 交易明細（核心表） ---------- */
+  transactions: [
+    { id: 'T1041', user: 'U3', date: '2026-09-10', amount: 1280, kind: 'expense',
+      cat: 'C05', merchant: '遊戲點數儲值', note: '', source: 'nlp',
+      raw: '剛剛儲值遊戲1280', parsed: { conf: 0.93, catConf: 0.88 } },
+    { id: 'T1040', user: 'U1', date: '2026-09-10', amount: 320, kind: 'expense',
+      cat: 'C01', merchant: '公司附近自助餐', note: '午餐', source: 'nlp',
+      raw: '中午自助餐320', parsed: { conf: 0.97, catConf: 0.95 } },
+    { id: 'T1039', user: 'U4', date: '2026-09-09', amount: 165, kind: 'expense',
+      cat: 'C01', merchant: '全家便利商店', note: '', source: 'nlp',
+      raw: '全家買了飲料跟麵包165', parsed: { conf: 0.96, catConf: 0.72 } },
+    { id: 'T1038', user: 'U2', date: '2026-09-09', amount: 2450, kind: 'expense',
+      cat: 'C04', merchant: '家樂福', note: '週採買', source: 'manual' },
+    { id: 'T1037', user: 'U3', date: '2026-09-08', amount: 890, kind: 'expense',
+      cat: 'C01', merchant: '燒烤店', note: '同學聚餐', source: 'manual' },
+    { id: 'T1036', user: 'U1', date: '2026-09-08', amount: 1150, kind: 'expense',
+      cat: 'C02', merchant: '加油站', note: '', source: 'nlp',
+      raw: '加油1150', parsed: { conf: 0.98, catConf: 0.96 } },
+    { id: 'T1035', user: 'U4', date: '2026-09-07', amount: 450, kind: 'expense',
+      cat: 'C06', merchant: '文具行', note: '參考書', source: 'manual' },
+    { id: 'T1034', user: 'U3', date: '2026-09-06', amount: 2200, kind: 'expense',
+      cat: 'C05', merchant: '演唱會票', note: '', source: 'manual' },
+    { id: 'T1033', user: 'U2', date: '2026-09-05', amount: 52000, kind: 'income',
+      cat: 'I01', merchant: '公司薪轉', note: '9月薪資', source: 'manual' },
+    { id: 'T1032', user: 'U1', date: '2026-09-05', amount: 68000, kind: 'income',
+      cat: 'I01', merchant: '公司薪轉', note: '9月薪資', source: 'manual' },
+    { id: 'T1031', user: 'U1', date: '2026-09-05', amount: 18500, kind: 'expense',
+      cat: 'C03', merchant: '房貸', note: '', source: 'manual' },
+    { id: 'T1030', user: 'U4', date: '2026-09-04', amount: 3000, kind: 'income',
+      cat: 'I03', merchant: '零用錢', note: '', source: 'manual' },
+    { id: 'T1029', user: 'U3', date: '2026-09-03', amount: 8000, kind: 'income',
+      cat: 'I03', merchant: '打工薪資', note: '', source: 'manual' },
+    { id: 'T1028', user: 'U3', date: '2026-09-02', amount: 3400, kind: 'expense',
+      cat: 'C05', merchant: '線上訂閱', note: '三個平台', source: 'nlp',
+      raw: '訂閱費三個平台3400', parsed: { conf: 0.91, catConf: 0.84 } },
+    { id: 'T1027', user: 'U2', date: '2026-09-02', amount: 6800, kind: 'expense',
+      cat: 'C07', merchant: '牙醫診所', note: '植牙分期', source: 'manual' }
   ],
 
-  /* 資料庫架構（同時給 ER 圖與後端建表用） */
+  /* ---------- 自然語言記帳的解析範例（給前端展示，也是評測資料來源） ---------- */
+  nlpDemo: [
+    { raw: '今天午餐吃了120',
+      out: { date: '2026-09-10', amount: 120, kind: 'expense', cat: 'C01',
+             merchant: '', conf: 0.96, catConf: 0.94 },
+      note: '「今天」要換算成實際日期；「午餐」→ 餐飲' },
+    { raw: '全家買飲料跟麵包165',
+      out: { date: '2026-09-10', amount: 165, kind: 'expense', cat: 'C01',
+             merchant: '全家便利商店', conf: 0.96, catConf: 0.72 },
+      note: '「全家」是店名不是家人。分類信心較低——便利商店可能是餐飲也可能是日用品' },
+    { raw: '昨天加油1150悠遊卡付的',
+      out: { date: '2026-09-09', amount: 1150, kind: 'expense', cat: 'C02',
+             merchant: '加油站', conf: 0.94, catConf: 0.96 },
+      note: '「昨天」相對日期；付款方式要另存到 account 欄位' },
+    { raw: '媽媽給我兩千',
+      out: { date: '2026-09-10', amount: 2000, kind: 'income', cat: 'I03',
+             merchant: '', conf: 0.88, catConf: 0.79 },
+      note: '「兩千」中文數字；收入而非支出；「媽媽給」→ 零用金' },
+    { raw: '三個平台訂閱費共3400',
+      out: { date: '2026-09-10', amount: 3400, kind: 'expense', cat: 'C05',
+             merchant: '線上訂閱', conf: 0.91, catConf: 0.84 },
+      note: '「共」表示合計；訂閱歸娛樂還是其他，需要標註準則定義' }
+  ],
+
+  /* ---------- 預算（月／年兩個時間基準） ---------- */
+  budgets: [
+    { user: 'U1', period: 'month', cat: 'C01', limit: 8000, used: 6420 },
+    { user: 'U1', period: 'month', cat: 'C02', limit: 4000, used: 3250 },
+    { user: 'U1', period: 'month', cat: 'C03', limit: 20000, used: 18500 },
+    { user: 'U3', period: 'month', cat: 'C05', limit: 3000, used: 6880 },
+    { user: 'U3', period: 'month', cat: 'C01', limit: 4000, used: 3120 },
+    { user: 'U4', period: 'month', cat: 'C01', limit: 2000, used: 2340 },
+    { user: 'U4', period: 'month', cat: 'C06', limit: 1500, used: 450 }
+  ],
+
+  /* ---------- 月度與年度統計 ---------- */
+  monthly: [
+    { m: '2026-04', income: 131000, expense: 92400 },
+    { m: '2026-05', income: 131000, expense: 88100 },
+    { m: '2026-06', income: 148000, expense: 104300 },
+    { m: '2026-07', income: 131000, expense: 118600 },
+    { m: '2026-08', income: 131000, expense: 97200 },
+    { m: '2026-09', income: 131000, expense: 96400 }
+  ],
+
+  yearly: [
+    { y: '2024', income: 1428000, expense: 1102000 },
+    { y: '2025', income: 1512000, expense: 1188000 },
+    { y: '2026', income: 1180000, expense: 897000, partial: true }
+  ],
+
+  /* ---------- LLM 產生的財務控管建議 ---------- */
+  advices: [
+    { id: 'A1', scope: 'family', period: '2026-09', level: 'warn',
+      title: '娛樂支出連續三個月成長，主要來自宇涵',
+      body: '本月家庭娛樂支出 7,480 元，較 6 月成長 62%。其中宇涵佔 6,880 元（92%），' +
+            '已超出其個人娛樂預算 3,000 元的 129%。',
+      basis: ['宇涵 2026-09 娛樂類支出 6,880 元（預算 3,000 元）',
+              '家庭娛樂類：7 月 4,610 → 8 月 5,900 → 9 月 7,480'],
+      suggest: ['與宇涵討論調整娛樂預算上限，或改為每季檢視一次',
+                '訂閱類支出 3,400 元佔娛樂支出 45%，可檢視是否有重複或閒置的訂閱'],
+      conf: 0.92 },
+
+    { id: 'A2', scope: 'family', period: '2026-09', level: 'info',
+      title: '居住支出佔比穩定，房貸為最大單一項目',
+      body: '本月居住類 18,500 元，佔家庭總支出 19%，與前六個月平均 19.2% 一致。',
+      basis: ['2026-09 居住類 18,500 元 ÷ 總支出 96,400 元 = 19.2%'],
+      suggest: ['此項為固定支出，短期無調整空間，建議維持現狀觀察'],
+      conf: 0.97 },
+
+    { id: 'A3', scope: 'user', user: 'U4', period: '2026-09', level: 'warn',
+      title: '宇軒的餐飲支出已超出預算',
+      body: '本月餐飲 2,340 元，超出預算 2,000 元的 17%。目前為 9 月 10 日，' +
+            '若維持相同速度，月底預估將達 7,020 元。',
+      basis: ['宇軒 2026-09 餐飲類支出 2,340 元（預算 2,000 元）',
+              '前 10 天平均每日 234 元 × 30 天 = 7,020 元'],
+      suggest: ['與宇軒確認是否有特殊支出，或調整預算至合理水準'],
+      conf: 0.89 },
+
+    { id: 'A4', scope: 'family', period: '2026-09', level: 'ok',
+      title: '本月結餘為正，儲蓄率 26.9%',
+      body: '收入 131,000 元、支出 96,400 元，結餘 34,600 元。',
+      basis: ['2026-09 收入 131,000 元 − 支出 96,400 元 = 34,600 元',
+              '34,600 ÷ 131,000 = 26.4%'],
+      suggest: ['近六個月結餘率介於 9.5%–32.8%，本月屬中上水準'],
+      conf: 0.99 }
+  ],
+
+  /* 系統對建議的邊界規則（畫面上會顯示，也是設計上的硬約束） */
+  adviceRules: [
+    { rule: '金額一律由資料庫計算', why: '模型只負責敘述與歸納，任何數字都不得由模型生成' },
+    { rule: '每一條建議都要附「依據」', why: '使用者要能自己驗算，不能是黑盒子結論' },
+    { rule: '不提供投資、保險、稅務建議', why: '這些屬於受規範的專業意見，超出本系統範圍' },
+    { rule: '不對個人做價值判斷', why: '只描述數字與趨勢，不說「你太浪費」這類評價' },
+    { rule: '未成年成員的建議同時送給監管者', why: '監管是本系統的設計目的，但必須雙方都看得到' }
+  ],
+
+  /* ---------- 自然語言記帳的評測（明樺的工作） ---------- */
+  nlpEval: [
+    { task: '金額抽取', metric: 'Exact Match', base: 0.91, ft: 0.98, target: 0.97 },
+    { task: '日期解析（含相對日期）', metric: 'Exact Match', base: 0.74, ft: 0.94, target: 0.92 },
+    { task: '收支方向判定', metric: 'Accuracy', base: 0.88, ft: 0.97, target: 0.95 },
+    { task: '分類指派', metric: 'Macro-F1', base: 0.61, ft: 0.86, target: 0.85 },
+    { task: '店家名稱抽取', metric: 'F1', base: 0.55, ft: 0.81, target: 0.78 },
+    { task: '一次輸入完全正確率', metric: '全欄位皆對', base: 0.42, ft: 0.79, target: 0.75 }
+  ],
+
+  /* ---------- 資料庫架構 ---------- */
   schema: [
-    { t: 'reports', label: '回報', note: '誰在什麼時候回報了哪封信',
-      cols: [['id', 'BIGSERIAL', 'PK'], ['message_id', 'BIGINT', 'FK → messages'],
-             ['reporter_hash', 'TEXT', '回報者（去識別化）'], ['reported_at', 'TIMESTAMPTZ', ''],
-             ['source', 'TEXT', "'button' / 'forward' / 'upload'"]] },
+    { t: 'users', label: '使用者帳號', note: '登入身分，與家庭角色分開',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['email', 'TEXT', 'UNIQUE'],
+             ['password_hash', 'TEXT', 'bcrypt / argon2，絕不存明碼'],
+             ['display_name', 'TEXT', ''], ['birth_year', 'INT', '判斷是否未成年'],
+             ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', '']] },
 
-    { t: 'messages', label: '郵件本體', note: '去識別化後的郵件，一封一列',
-      cols: [['id', 'BIGSERIAL', 'PK'], ['message_id_hdr', 'TEXT', 'UNIQUE，L1 精確比對用'],
-             ['subject', 'TEXT', ''], ['subject_hash', 'TEXT', 'L1 比對用'],
-             ['from_display', 'TEXT', '顯示名稱'], ['from_addr', 'TEXT', ''],
-             ['from_domain', 'TEXT', 'INDEX，L2 特徵比對用'],
-             ['reply_to', 'TEXT', ''], ['received_at', 'TIMESTAMPTZ', ''],
-             ['body_redacted', 'TEXT', '已去識別化的內文'],
-             ['attach_hash', 'TEXT', 'L1 比對用'], ['raw_hash', 'TEXT', '']] },
+    { t: 'sessions', label: '登入工作階段', note: '支援登出與強制下線',
+      cols: [['id', 'UUID', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['refresh_token_hash', 'TEXT', '只存雜湊'],
+             ['user_agent', 'TEXT', ''], ['ip_hash', 'TEXT', ''],
+             ['issued_at', 'TIMESTAMPTZ', ''], ['expires_at', 'TIMESTAMPTZ', ''],
+             ['revoked_at', 'TIMESTAMPTZ', 'NULL = 仍有效']] },
 
-    { t: 'indicators', label: '技術指標', note: '程式判斷的部分，一封信一列',
-      cols: [['message_id', 'BIGINT', 'PK, FK → messages'],
-             ['spf', 'TEXT', "'pass' / 'fail' / 'none'"], ['dkim', 'TEXT', ''],
-             ['dmarc', 'TEXT', ''], ['domain_age_days', 'INT', '網域註冊天數'],
-             ['url_count', 'INT', ''], ['url_mismatch', 'BOOLEAN', '顯示文字與實際網址不符'],
-             ['punycode', 'BOOLEAN', ''], ['attach_type', 'TEXT', '']] },
+    { t: 'families', label: '家庭', note: '一個家庭一列',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['name', 'TEXT', '例如「林家」'],
+             ['master_id', 'BIGINT', 'FK → users，最高權限'],
+             ['currency', 'TEXT', "預設 'TWD'"],
+             ['invite_code', 'TEXT', '邀請碼，可重新產生'],
+             ['created_at', 'TIMESTAMPTZ', '']] },
 
-    { t: 'urls', label: '信中連結', note: '一封信可能多個連結',
-      cols: [['id', 'BIGSERIAL', 'PK'], ['message_id', 'BIGINT', 'FK → messages'],
-             ['url_redacted', 'TEXT', ''], ['display_text', 'TEXT', ''],
-             ['real_domain', 'TEXT', ''], ['is_mismatch', 'BOOLEAN', '']] },
+    { t: 'family_members', label: '家庭成員與角色', note: '一人可屬於多個家庭',
+      cols: [['family_id', 'BIGINT', 'PK, FK → families'],
+             ['user_id', 'BIGINT', 'PK, FK → users'],
+             ['role', 'TEXT', "'master' / 'parent' / 'member'"],
+             ['joined_at', 'TIMESTAMPTZ', ''],
+             ['status', 'TEXT', "'active' / 'invited' / 'removed'"]] },
 
-    { t: 'campaigns', label: '收斂後群組', note: '一個 campaign 一張卡片，這是系統的產出',
-      cols: [['id', 'BIGSERIAL', 'PK'], ['name', 'TEXT', 'LLM 生成的群組名稱'],
-             ['verdict', 'TEXT', "'phishing' / 'spam' / 'benign' / 'unknown'"],
-             ['confidence', 'NUMERIC', ''], ['dedup_level', 'TEXT', "'L1' / 'L2' / 'L3'"],
-             ['summary', 'TEXT', 'LLM 生成的判定理由'],
-             ['first_seen', 'TIMESTAMPTZ', ''], ['last_seen', 'TIMESTAMPTZ', ''],
-             ['status', 'TEXT', "'open' / 'closed'"]] },
+    { t: 'guardianships', label: '監管關係', note: '誰看得到誰的明細。雙方都看得到這張表',
+      cols: [['id', 'BIGSERIAL', 'PK'],
+             ['guardian_id', 'BIGINT', 'FK → users'],
+             ['ward_id', 'BIGINT', 'FK → users'],
+             ['scope', 'TEXT', "'all' / 'summary_only'"],
+             ['created_by', 'BIGINT', 'FK → users，只有 master 能建立'],
+             ['since', 'TIMESTAMPTZ', ''], ['ended_at', 'TIMESTAMPTZ', '']] },
 
-    { t: 'campaign_members', label: '群組成員', note: '哪些信屬於哪個群組，多對多',
-      cols: [['campaign_id', 'BIGINT', 'PK, FK → campaigns'],
-             ['message_id', 'BIGINT', 'PK, FK → messages'],
-             ['similarity', 'NUMERIC', ''], ['joined_by', 'TEXT', "'L1' / 'L2' / 'L3'"]] },
+    { t: 'accounts', label: '帳戶／錢包', note: '現金、銀行、悠遊卡、信用卡',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['name', 'TEXT', ''], ['kind', 'TEXT', "'cash' / 'bank' / 'card' / 'ecard'"],
+             ['balance', 'NUMERIC(14,2)', ''], ['is_active', 'BOOLEAN', '']] },
 
-    { t: 'tactics', label: '話術體系', note: '囷洧定義的六類，固定資料表',
-      cols: [['id', 'TEXT', 'PK，例如 T5'], ['code', 'TEXT', ''],
-             ['name_zh', 'TEXT', ''], ['description', 'TEXT', ''],
-             ['example', 'TEXT', ''], ['tech_detectable', 'TEXT', "'yes'/'partial'/'no'"]] },
+    { t: 'categories', label: '分類', note: '系統預設 + 家庭自訂',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['family_id', 'BIGINT', 'NULL = 系統預設'],
+             ['name', 'TEXT', ''], ['kind', 'TEXT', "'income' / 'expense'"],
+             ['parent_id', 'BIGINT', '支援兩層分類'],
+             ['color', 'TEXT', ''], ['sort_order', 'INT', '']] },
 
-    { t: 'message_tactics', label: '話術標籤', note: '多標籤：一封信可能同時有多種話術',
-      cols: [['message_id', 'BIGINT', 'PK, FK → messages'],
-             ['tactic_id', 'TEXT', 'PK, FK → tactics'],
-             ['score', 'NUMERIC', '模型信心'],
-             ['source', 'TEXT', "'model' / 'human'"]] },
+    { t: 'transactions', label: '收支明細', note: '核心表。所有統計都從這裡算',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['family_id', 'BIGINT', 'FK → families，INDEX'],
+             ['account_id', 'BIGINT', 'FK → accounts'],
+             ['category_id', 'BIGINT', 'FK → categories'],
+             ['kind', 'TEXT', "'income' / 'expense'"],
+             ['amount', 'NUMERIC(14,2)', '一律正數，方向看 kind'],
+             ['occurred_on', 'DATE', 'INDEX，統計用'],
+             ['merchant', 'TEXT', ''], ['note', 'TEXT', ''],
+             ['source', 'TEXT', "'manual' / 'nlp' / 'import'"],
+             ['created_at', 'TIMESTAMPTZ', ''], ['updated_at', 'TIMESTAMPTZ', '']] },
 
-    { t: 'embeddings', label: '語意向量', note: 'L3 分群用，需 pgvector 擴充',
-      cols: [['message_id', 'BIGINT', 'PK, FK → messages'],
-             ['vector', 'VECTOR(768)', 'pgvector'],
-             ['model_ver', 'TEXT', '換模型要重算，所以記版本']] },
+    { t: 'nlp_parses', label: '自然語言記帳解析紀錄', note: '★ 這是 LLM 評測的資料來源',
+      cols: [['id', 'BIGSERIAL', 'PK'],
+             ['transaction_id', 'BIGINT', 'FK → transactions，NULL = 使用者放棄'],
+             ['user_id', 'BIGINT', 'FK → users'],
+             ['raw_text', 'TEXT', '使用者原始輸入'],
+             ['parsed_json', 'JSONB', '模型輸出的結構化結果'],
+             ['confidence', 'NUMERIC', ''], ['cat_confidence', 'NUMERIC', ''],
+             ['user_corrected', 'JSONB', '使用者修正後的值，NULL = 未修正'],
+             ['model_ver', 'TEXT', '換模型要能分開比較'],
+             ['created_at', 'TIMESTAMPTZ', '']] },
 
-    { t: 'annotations', label: '人工標註', note: '囷洧的產出，訓練資料來源',
-      cols: [['id', 'BIGSERIAL', 'PK'], ['message_id', 'BIGINT', 'FK → messages'],
-             ['annotator', 'TEXT', ''], ['is_phishing', 'BOOLEAN', ''],
-             ['tactic_ids', 'TEXT[]', ''], ['note', 'TEXT', ''],
-             ['annotated_at', 'TIMESTAMPTZ', '']] },
+    { t: 'budgets', label: '預算', note: '月與年兩種週期',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'NULL = 家庭總預算'],
+             ['family_id', 'BIGINT', 'FK → families'],
+             ['category_id', 'BIGINT', 'NULL = 總額預算'],
+             ['period_type', 'TEXT', "'month' / 'year'"],
+             ['period_key', 'TEXT', "'2026-09' 或 '2026'"],
+             ['limit_amount', 'NUMERIC(14,2)', ''],
+             ['created_by', 'BIGINT', 'FK → users']] },
 
-    { t: 'actions', label: '處置紀錄', note: '分析師做了什麼，稽核用',
-      cols: [['id', 'BIGSERIAL', 'PK'], ['campaign_id', 'BIGINT', 'FK → campaigns'],
-             ['analyst', 'TEXT', ''],
-             ['action', 'TEXT', "'block' / 'ignore' / 'escalate' / 'notify'"],
-             ['note', 'TEXT', ''], ['acted_at', 'TIMESTAMPTZ', '']] }
+    { t: 'advices', label: 'LLM 財務建議', note: '每月結算後產生，附依據',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['family_id', 'BIGINT', 'FK → families'],
+             ['user_id', 'BIGINT', 'NULL = 家庭層級建議'],
+             ['period_type', 'TEXT', "'month' / 'year'"],
+             ['period_key', 'TEXT', ''],
+             ['level', 'TEXT', "'ok' / 'info' / 'warn'"],
+             ['title', 'TEXT', 'LLM 生成'], ['body', 'TEXT', 'LLM 生成'],
+             ['basis_json', 'JSONB', '★ 依據的數字，由後端計算後餵給模型'],
+             ['suggestions_json', 'JSONB', 'LLM 生成'],
+             ['model_ver', 'TEXT', ''], ['generated_at', 'TIMESTAMPTZ', '']] },
+
+    { t: 'audit_logs', label: '稽核紀錄', note: '誰看了誰的資料、誰改了權限',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['actor_id', 'BIGINT', 'FK → users'],
+             ['action', 'TEXT', "'view_ward' / 'grant_guardianship' / 'change_role' …"],
+             ['target_type', 'TEXT', ''], ['target_id', 'BIGINT', ''],
+             ['meta_json', 'JSONB', ''], ['created_at', 'TIMESTAMPTZ', '']] }
   ],
 
-  /* ER 圖的關聯線 */
   relations: [
-    ['reports', 'messages', 'N:1', '一封信可能被多人回報'],
-    ['indicators', 'messages', '1:1', '技術指標'],
-    ['urls', 'messages', 'N:1', '信中連結'],
-    ['embeddings', 'messages', '1:1', '語意向量'],
-    ['annotations', 'messages', 'N:1', '人工標註'],
-    ['campaign_members', 'messages', 'N:1', ''],
-    ['campaign_members', 'campaigns', 'N:1', '收斂結果'],
-    ['message_tactics', 'messages', 'N:1', ''],
-    ['message_tactics', 'tactics', 'N:1', '多標籤'],
-    ['actions', 'campaigns', 'N:1', '處置紀錄']
+    ['sessions', 'users', 'N:1', ''],
+    ['family_members', 'users', 'N:1', ''],
+    ['family_members', 'families', 'N:1', ''],
+    ['guardianships', 'users', 'N:1', '監管'],
+    ['accounts', 'users', 'N:1', ''],
+    ['transactions', 'users', 'N:1', ''],
+    ['transactions', 'families', 'N:1', ''],
+    ['transactions', 'accounts', 'N:1', ''],
+    ['transactions', 'categories', 'N:1', ''],
+    ['nlp_parses', 'transactions', '1:1', '★評測'],
+    ['budgets', 'families', 'N:1', ''],
+    ['budgets', 'categories', 'N:1', ''],
+    ['advices', 'families', 'N:1', ''],
+    ['audit_logs', 'users', 'N:1', '']
+  ],
+
+  /* ---------- 權限矩陣 ---------- */
+  permissions: [
+    { action: '記錄自己的收支', master: 'Y', parent: 'Y', member: 'Y' },
+    { action: '查看自己的統計', master: 'Y', parent: 'Y', member: 'Y' },
+    { action: '設定自己的預算', master: 'Y', parent: 'Y', member: '需管理者核准' },
+    { action: '查看被監管者的明細', master: 'Y（全家）', parent: 'Y（被指派的）', member: 'N' },
+    { action: '查看家庭總覽', master: 'Y', parent: '僅摘要', member: 'N' },
+    { action: '設定家庭預算', master: 'Y', parent: 'N', member: 'N' },
+    { action: '邀請／移除成員', master: 'Y', parent: 'N', member: 'N' },
+    { action: '建立監管關係', master: 'Y', parent: 'N', member: 'N' },
+    { action: '查看「誰看得到我」', master: 'Y', parent: 'Y', member: 'Y（強制可見）' },
+    { action: '匯出全家資料', master: 'Y', parent: 'N', member: 'N' }
   ]
 };
