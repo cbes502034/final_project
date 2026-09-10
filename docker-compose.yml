@@ -1,0 +1,36 @@
+# 本機一鍵起整套：docker compose up
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fambudget
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: fambudget
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fambudget"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql+psycopg://fambudget:devpassword@db:5432/fambudget
+      JWT_SECRET: dev-only-secret-change-in-production
+      ALLOWED_ORIGINS: http://localhost:5174
+    ports: ["8000:8000"]
+    volumes: ["./api:/app"]
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  web:
+    image: python:3.12-alpine
+    working_dir: /site
+    volumes: ["./site:/site"]
+    ports: ["5174:5174"]
+    command: python -m http.server 5174
+
+volumes:
+  pgdata:

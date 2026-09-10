@@ -3,53 +3,115 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0A0D0F">
-<meta name="vote-api" content="https://llm-capstone-votes.onrender.com">
-<meta name="description" content="LLM × 全端 × Docker 一個月專題：從需求分析與現實問題出發，經十四階段研究流程篩選出的 Top 10 專題提案，每題含不使用 / 使用 Function Calling 兩種版本的完整分析。">
-<title>LLM 專題可行性研究 · TOP 10</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230A0D0F'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%230ABAB5' stroke-width='1.4'/%3E%3Crect x='6.5' y='6.5' width='3' height='3' fill='%230ABAB5'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/base.css?v=20260910a">
-<link rel="stylesheet" href="css/layout.css?v=20260910a">
-<link rel="stylesheet" href="css/detail.css?v=20260910a">
-<link rel="stylesheet" href="css/float.css?v=20260910a">
+<meta name="theme-color" content="#05060A">
+<meta name="description" content="家庭記帳與財務控管系統 — 一句話記帳、家庭階層權限、子女消費監管、月年統計、LLM 財務建議。">
+
+<!-- ============================================================
+     後端接口：留空 = 用 js/data.js 的模擬資料（mock 模式）
+     後端做好後填上網址即可切換，畫面程式碼不用改，例如：
+         <meta name="api-base" content="http://localhost:8000">
+     完整的路由契約寫在 js/api.js 最上面。
+     ============================================================ -->
+<meta name="api-base" content="">
+
+<title>家庭記帳與財務控管系統</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2305060A'/%3E%3Crect x='2.5' y='3.5' width='11' height='9' fill='none' stroke='%236C9FFB' stroke-width='1.3'/%3E%3Cpath d='M5 7h6M5 9.5h4' stroke='%236C9FFB' stroke-width='1.2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="css/tokens.css?v=2">
+<link rel="stylesheet" href="css/app.css?v=2">
 </head>
 <body>
 
-<div id="circuitry" aria-hidden="true"></div>
+<canvas id="stars" aria-hidden="true"></canvas>
 
-<header class="hdr">
-  <div class="hdr__mark">
-    <span class="hdr__chip" aria-hidden="true"></span>
-    <b>LLM-CAPSTONE</b><span class="hdr__long">&nbsp;/ FEASIBILITY STUDY &amp; TOP-10</span>
-  </div>
-  <div class="hdr__spacer"></div>
-  <button class="hdr__home" type="button" data-go="home" title="回到主頁">INDEX</button>
-  <button class="hdr__home hdr__home--doc" type="button" data-go="about">專案說明</button>
-  <nav class="secnav" id="secnav" aria-label="章節導覽"></nav>
-</header>
+<div class="app">
 
-<main id="root"></main>
+  <nav class="rail">
+    <div class="brand">
+      <span class="brand__m" aria-hidden="true">帳</span>
+      <span class="brand__n">家庭記帳</span>
+      <span class="brand__v" id="mode"></span>
+    </div>
 
-<!-- 引擎 -->
-<script src="js/diagram.js?v=20260910a"></script>
-<script src="js/render.js?v=20260910a"></script>
-<script src="js/ui.js?v=20260910a"></script>
+    <div class="nav">
+      <div class="nav__lb">個人</div>
+      <button class="nav__i" data-nav="">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+        <span class="nav__t">我的總覽</span>
+      </button>
+      <button class="nav__i" data-nav="entry">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="nav__t">記帳</span>
+      </button>
 
-<!-- 全域資料 -->
-<script src="data/meta.js?v=20260910a"></script>
+      <div class="nav__lb">家庭</div>
+      <button class="nav__i" data-nav="family">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2"/></svg>
+        <span class="nav__t">家庭總覽</span>
+      </button>
+      <button class="nav__i" data-nav="stats">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>
+        <span class="nav__t">統計</span>
+      </button>
+      <button class="nav__i" data-nav="advice">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3a6 6 0 0 0-3 11v3h6v-3a6 6 0 0 0-3-11z"/><path d="M10 20h4"/></svg>
+        <span class="nav__t">財務建議</span>
+      </button>
+      <button class="nav__i" data-nav="members">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <span class="nav__t">成員與權限</span>
+      </button>
 
-<!-- 專題資料（Top 10，依排名） -->
-<script src="data/projects/p01.js?v=20260910a"></script>
-<script src="data/projects/p02.js?v=20260910a"></script>
-<script src="data/projects/p03.js?v=20260910a"></script>
-<script src="data/projects/p04.js?v=20260910a"></script>
-<script src="data/projects/p05.js?v=20260910a"></script>
-<script src="data/projects/p06.js?v=20260910a"></script>
-<script src="data/projects/p07.js?v=20260910a"></script>
-<script src="data/projects/p08.js?v=20260910a"></script>
-<script src="data/projects/p09.js?v=20260910a"></script>
-<script src="data/projects/p10.js?v=20260910a"></script>
+      <div class="nav__lb">技術</div>
+      <button class="nav__i" data-nav="eval">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13h5l2 6 4-14 2 8h5"/></svg>
+        <span class="nav__t">模型評測</span>
+      </button>
+      <button class="nav__i" data-nav="schema">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+        <span class="nav__t">資料庫架構</span>
+      </button>
+    </div>
 
-<script src="js/app.js?v=20260910a"></script>
+    <div class="rail__f">
+      <div class="quota__k" style="margin-bottom:8px">目前登入</div>
+      <div class="who" id="who"></div>
+      <div class="rail__sync" id="famName"></div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <header class="top">
+      <div><div class="top__t" id="ptitle">我的總覽</div></div>
+      <div class="top__s" id="psub"></div>
+      <span class="top__sp"></span>
+      <div class="search">
+        <svg class="search__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="search" type="search" placeholder="搜尋店家、備註…" autocomplete="off">
+      </div>
+      <button class="btn btn--go" data-nav="entry">＋ 記一筆</button>
+    </header>
+
+    <div class="mock">
+      <b>前端原型</b>
+      <span>沒有後端。人名、金額、店家皆為虛構示範樣本。可在「成員與權限」頁切換身分，體驗不同角色看到的畫面。接後端只要填 <code>&lt;meta name="api-base"&gt;</code>。</span>
+    </div>
+
+    <div id="view"></div>
+
+    <footer style="padding:24px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-dim);line-height:1.8">
+      四人一個月專題原型｜家庭記帳與財務控管系統。示範資料為虛構樣本。
+    </footer>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="js/stars.js?v=2"></script>
+<script src="js/data.js?v=2"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
 </body>
 </html>

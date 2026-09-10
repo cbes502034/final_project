@@ -1,22 +1,28 @@
+# ============================================================
+# Render 部署設定
+# ------------------------------------------------------------
+# 兩個服務 + 一個資料庫：
+#   web  靜態前端（走 CDN，即時載入）
+#   api  FastAPI 後端
+#   db   PostgreSQL
+# ============================================================
+
 databases:
-  - name: capstone-picks-db
+  - name: fambudget-db
     plan: free
-    databaseName: capstone_picks
-    user: capstone
+    databaseName: fambudget
+    user: fambudget
 
 services:
-  # 報告站台：純靜態，走 CDN，載入即時
+  # ---------- 前端：純靜態 ----------
   - type: web
     name: llm-capstone-top20
     runtime: static
-    # 第 5 題的前端原型原始碼放在 working_space/，建置時複製到 /proto 一起發布
-    buildCommand: rm -rf site/proto && cp -r working_space site/proto
+    buildCommand: ""
     staticPublishPath: ./site
     pullRequestPreviewsEnabled: false
     routes:
-      - type: rewrite
-        source: /proto/*
-        destination: /proto/index.html
+      # 前端走 hash 路由，任何路徑都回 index.html
       - type: rewrite
         source: /*
         destination: /index.html
@@ -27,22 +33,30 @@ services:
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
 
-  # 選題投票：只服務投票 API，報告本身不依賴它
+  # ---------- 後端：FastAPI ----------
   - type: web
-    name: llm-capstone-votes
+    name: fambudget-api
     runtime: python
     plan: free
-    rootDir: votes
+    rootDir: api
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"
-      - key: ALLOWED_ORIGINS
-        value: https://llm-capstone-top20.onrender.com,http://localhost:5173
       - key: DATABASE_URL
         fromDatabase:
-          name: capstone-picks-db
+          name: fambudget-db
           property: connectionString
+      - key: ALLOWED_ORIGINS
+        value: https://llm-capstone-top20.onrender.com,http://localhost:5174
+      # 下面兩個要在 Render 後台自行填入，不要寫進 repo
+      - key: JWT_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

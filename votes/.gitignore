@@ -1,5 +1,0 @@
-# 本機開發的投票資料與日誌，不進版控
-picks.json
-server.log
-__pycache__/
-picks.local.json

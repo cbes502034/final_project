@@ -1,479 +1,795 @@
 /* ============================================================
-   app.js — 路由、主頁（Top 10）、詳細頁、版本切換、連續瀏覽
+   app.js — 家庭記帳與財務控管系統 前端
+   ------------------------------------------------------------
+   資料一律走 API.*（見 js/api.js），不直接讀 window.DATA。
    ============================================================ */
 (function (global) {
   'use strict';
 
-  var root = document.getElementById('root');
-  var R = window.Render, D = window.Diagram;
-  var PJ = window.PROJECTS || [];
-  var META = window.META || {};
+  var API = global.API;
+  var $view = document.getElementById('view');
+  var $title = document.getElementById('ptitle');
+  var $sub = document.getElementById('psub');
+  var $search = document.getElementById('search');
+  var $toasts = document.getElementById('toasts');
 
-  PJ.sort(function (a, b) { return a.rank - b.rank; });
-  var byId = {};
-  PJ.forEach(function (p) { byId[p.id] = p; });
+  var ME = null;
+  var F = { user: 'all', kind: 'all', source: 'all', q: '' };
+  var STAT = { period: 'month' };
+  var draft = null;                       // 自然語言解析後、尚未確認的暫存
 
-  /* ---------- 背景電路裝飾 ---------- */
-  var cir = document.getElementById('circuitry');
-  if (cir) cir.innerHTML = D.circuitry();
-
-  /* ---------- 工具 ---------- */
-  function esc(s) { return R.esc(s); }
-
-  function piTag(p) {
-    var m = { '核心': 'pi-core', '選配': 'pi-opt', '不需要': 'pi-no' };
-    return '<span class="tag tag--' + (m[p.pi.k] || 'pi-no') + '">RPi:' + esc(p.pi.k) + '</span>';
+  /* ---------- 小工具 ---------- */
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-  function fcTag(p) {
-    var m = { '必要': 'fc-must', '加分': 'fc-good', '有限': 'fc-low' };
-    return '<span class="tag tag--' + (m[p.fc.k] || 'fc-low') + '">FC:' + esc(p.fc.k) + '</span>';
+  function el(h) { var d = document.createElement('div'); d.innerHTML = h.trim(); return d.firstChild; }
+  function money(n) { return 'NT$ ' + Number(n || 0).toLocaleString('en-US'); }
+  function pct(x) { return Math.round((x || 0) * 100) + '%'; }
+
+  var ROLE_TW = { master: '管理者', parent: '家長', member: '成員' };
+
+  function toast(msg, kind, undo) {
+    var t = el('<div class="toast' + (kind ? ' toast--' + kind : '') + '">' +
+      '<span class="toast__t">' + esc(msg) + '</span>' +
+      (undo ? '<button class="toast__u">復原</button>' : '') + '</div>');
+    if (undo) t.querySelector('.toast__u').addEventListener('click', function () { t.remove(); undo(); });
+    $toasts.appendChild(t);
+    setTimeout(function () {
+      t.style.transition = 'opacity .25s, transform .25s';
+      t.style.opacity = '0'; t.style.transform = 'translateX(16px)';
+      setTimeout(function () { t.remove(); }, 260);
+    }, undo ? 6000 : 3200);
   }
 
-  /* ============================================================
-     主頁
-     ============================================================ */
-  function homeHTML() {
-    var h = '';
-
-    /* -- Hero -- */
-    h += '<section class="wrap hero" id="sec-intro">';
-    h += '<div class="hero__kicker">' + esc(META.kicker) + '</div>';
-    h += '<h1 class="hero__title">' + META.title + '</h1>';
-    h += '<p class="hero__lede">' + R.inline(META.lede) + '</p>';
-    h += '<div class="spec">' + META.spec.map(function (s) {
-      return '<div class="spec__cell"><div class="spec__k">' + esc(s[0]) + '</div><div class="spec__v">' + R.inline(s[1]) +
-        (s[2] ? '<br><small>' + esc(s[2]) + '</small>' : '') + '</div></div>';
-    }).join('') + '</div>';
-    h += '</section>';
-
-    /* -- Function Calling 說明（卡片上到處是 FC 標記，先講清楚） -- */
-    var F = META.fcHome || {};
-    h += '<section class="wrap fcn">';
-    h += '<div class="fcn__k">FUNCTION CALLING</div>';
-    h += '<p class="fcn__lede">' + R.inline(F.lede || '') + '</p>';
-    h += '<div class="fcn__cols">' + (F.cols || []).map(function (c) {
-      return '<div class="fcn__c"><div class="fcn__ct"><b>' + esc(c[0]) + '</b>' +
-             '<span>' + esc(c[1]) + '</span></div>' +
-             '<p>' + R.inline(c[2]) + '</p></div>';
-    }).join('') + '</div>';
-    h += '<p class="fcn__tail">' + R.inline(F.tail || '') + '</p>';
-    h += '</section>';
-
-    /* -- Top 10 -- */
-    h += '<section class="wrap section" id="top20">';
-    h += '<button class="docs-cta" data-go="about">' +
-         '<span class="docs-cta__k">專案說明文件</span>' +
-         '<span class="docs-cta__t">題目怎麼來的、依據什麼限制篩選、每一項分數怎麼給、所有數字的出處</span>' +
-         '<span class="docs-cta__go">開啟</span></button>';
-    h += secHead('', 'Top 10 專題排名', 'SCORED / EVIDENCE-BASED');
-    h += '<div class="filters" id="filters">';
-    h += '<button data-f="all" class="is-on">ALL · ' + PJ.length + '</button>';
-    META.domains.forEach(function (d) {
-      var n = PJ.filter(function (p) { return p.domain === d; }).length;
-      h += '<button data-f="' + esc(d) + '">' + esc(d) + ' · ' + n + '</button>';
-    });
-    h += '</div>';
-    h += '<div class="picks" id="picks"></div>';
-    h += '<div class="grid" id="list">' + PJ.map(cardHTML).join('') + '</div>';
-    h += '</section>';
-
-    /* -- 頁尾：只留一句話與專案說明入口 -- */
-    h += '<footer class="wrap foot">';
-    h += '<div class="foot__note">' + R.inline(META.footNote) + '</div>';
-    h += '</footer>';
-
-    return h;
+  function skeleton(n, cls) {
+    var s = '<div class="skel">';
+    for (var i = 0; i < (n || 5); i++) s += '<div class="skel__r' + (cls ? ' ' + cls : '') + '"></div>';
+    return s + '</div>';
+  }
+  function emptyState(t, s) {
+    return '<div class="empty"><svg class="empty__ic" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.4"><path d="M3 3h18v18H3z"/><path d="M8 12h8"/></svg>' +
+      '<div class="empty__t">' + esc(t) + '</div><div class="empty__s">' + esc(s) + '</div></div>';
+  }
+  function errState(e) {
+    return '<div class="err"><div class="err__t">讀取失敗</div><div class="err__s">' +
+      esc(e && e.message ? e.message : String(e)) + '<br>目前模式：<b>' + API.mode + '</b></div></div>';
   }
 
   /* ============================================================
-     專案說明文件（獨立頁，抽屜式，預設全部收合）
+     01 我的總覽
      ============================================================ */
-  function aboutHTML() {
-    var h = '<div class="wrap ab">';
-    h += '<div class="ab-head">';
-    h += '<div class="dt-head__crumb"><a href="#/">TOP 10</a><span>/</span>專案說明</div>';
-    h += '<h1 class="ab-head__t">專案說明文件</h1>';
-    h += '<p class="ab-head__lede">' + R.inline(META.aboutLede) + '</p>';
-    h += '<div class="ab-head__act">';
-    h += '<button class="ab-tog" data-acc="open">全部展開</button>';
-    h += '<button class="ab-tog" data-acc="close">全部收合</button>';
-    h += '</div></div>';
+  function vHome() {
+    head('我的總覽', '本月收支、預算使用狀況、最近幾筆');
+    $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
 
-    (META.about || []).forEach(function (d, i) {
-      h += '<details class="acc" id="' + esc(d.id) + '" data-sec="' + esc(d.t.split('：')[0].split('（')[0]) + '">';
-      h += '<summary class="acc__h">';
-      h += '<span class="acc__n">' + String(i + 1).padStart(2, '0') + '</span>';
-      h += '<span class="acc__t">' + esc(d.t) + '</span>';
-      h += '<span class="acc__en">' + esc(d.en) + '</span>';
-      h += '<span class="acc__ic" aria-hidden="true"><i></i><i></i></span>';
-      h += '</summary>';
-      h += '<div class="acc__b">' + aboutBody(d.use) + '</div>';
-      h += '</details>';
-    });
+    Promise.all([API.summary({ scope: 'me' }), API.budgets(), API.me()])
+      .then(function (r) {
+        var d = r[0], b = r[1], m = r[2];
+        var h = '<div class="page"><div class="kpis">';
+        h += kpi('本月收入', d.income, '', d.period, 'ok', 0);
+        h += kpi('本月支出', d.expense, '', d.count + ' 筆紀錄', 'warn', 1);
+        h += kpi('結餘', d.net, '', '儲蓄率 ' + pct(d.rate), d.net >= 0 ? 'a' : 'crit', 2);
+        h += kpi('筆數', d.count, '筆', '本月已記錄', 'a', 3, true);
+        h += '</div>';
 
-    h += '<div class="pager"><button class="pager__b pager__b--home" data-go="home">' +
-         '<span class="pager__k">INDEX</span><span class="pager__t">返回 Top 10</span></button></div>';
-    h += '</div>';
-    return h;
+        if (m.guardedBy && m.guardedBy.length) {
+          h += '<div class="note note--warn"><div class="note__k">誰看得到你的紀錄</div><p>' +
+            m.guardedBy.map(function (g) { return '<b>' + esc(g.name) + '</b>'; }).join('、') +
+            ' 可以看到你的完整收支明細。<br>' +
+            '<b>這是家庭監管設定，系統一律讓被監管者自己也看得到這件事</b>，' +
+            '不會有「被偷偷監看」的情況。</p></div>';
+        }
+
+        var mine = b.budgets.filter(function (x) { return x.user === m.user.id; });
+        if (mine.length) {
+          h += '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
+               '<span class="sec__n">MONTHLY BUDGET</span></div><div class="card rise">';
+          h += mine.map(function (x) {
+            return '<div class="bgt"><div class="bgt__k">' +
+              '<span class="dot" style="background:' + x.catColor + '"></span>' + esc(x.catName) + '</div>' +
+              '<div class="bgt__t"><i style="width:' + Math.min(100, x.pct * 100) +
+              '%;background:' + (x.over ? 'var(--down)' : x.catColor) + '"></i></div>' +
+              '<div class="bgt__v' + (x.over ? ' is-over' : '') + '">' +
+              money(x.used) + ' / ' + money(x.limit) + '</div></div>';
+          }).join('') + '</div>';
+        }
+
+        h += '<div class="sec"><h2 class="sec__t">支出分類</h2></div>';
+        h += '<div class="charts"><div class="card rise">' + donut(d.byCat, d.expense) + '</div>' +
+          '<div class="card rise" style="animation-delay:80ms">' +
+          '<div class="card__h"><span class="card__t">近 6 個月</span></div>' +
+          barChart(d.monthly) + '</div></div>';
+
+        h += '<div class="sec"><h2 class="sec__t">最近的紀錄</h2>' +
+             '<button class="btn btn--sm" data-nav="entry" style="margin-left:auto">去記帳 ▸</button></div>' +
+             '<div id="recent">' + skeleton(4) + '</div></div>';
+        $view.innerHTML = h;
+        animate();
+        return API.transactions({});
+      }).then(function (d) {
+        var box = document.getElementById('recent');
+        if (!box || !d) return;
+        box.innerHTML = d.transactions.slice(0, 6).map(txRow).join('') ||
+          emptyState('還沒有紀錄', '到「記帳」頁用一句話記下第一筆。');
+      }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
-  function aboutBody(use) {
-    if (use === 'pipeline') {
-      return '<p class="ab-lede">' + R.inline(META.methodLede) + '</p>' +
-        '<div class="pipe">' + META.pipeline.map(function (x, i) {
-          return '<div class="pipe__step"><div class="pipe__n">' + String(i + 1).padStart(2, '0') +
-                 '</div><div class="pipe__t">' + esc(x) + '</div></div>';
-        }).join('') + '</div>';
-    }
-    if (use === 'scoring') {
-      var rows = (META.scoreItems || []).map(function (it) {
-        return [it[0], String(it[1]), it[2]];
-      });
-      return '<div class="body">' + R.blocks([
-        { t: 'table', head: ['評分項目', '配分', '判斷依據'], rows: rows },
-        { t: 'note', k: '未來延展性', kind: 'info',
-          x: '刻意不計分，只在分數接近時作為參考。理由是延展性人人都能講，' +
-             '一旦計分就會變成比誰想像力好，而不是比誰的證據紮實。' }
-      ]) + '</div>';
-    }
-    if (use === 'sources') {
-      return '<div class="foot__grid">' + (META.foot || []).map(function (c) {
-        return '<div><div class="foot__t">' + esc(c.t) + '</div><ul>' +
-          c.items.map(function (i) { return '<li>' + R.inline(i) + '</li>'; }).join('') +
-          '</ul></div>';
-      }).join('') + '</div>';
-    }
-    return '<div class="body">' + R.blocks(META[use] || []) + '</div>';
+  function kpi(k, v, unit, sub, mod, i, plain) {
+    return '<div class="kpi kpi--' + mod + '" style="animation-delay:' + (i * 60) + 'ms">' +
+      '<div class="kpi__k">' + esc(k) + '</div>' +
+      '<div class="kpi__v" style="font-size:' + (plain ? '36' : '25') + 'px">' +
+      (plain ? '<span data-count="' + v + '">0</span>' : money(v)) +
+      '<small>' + esc(unit) + '</small></div>' +
+      '<div class="kpi__s">' + esc(sub) + '</div></div>';
   }
 
-  function secHead(no, t, sub) {
-    return '<div class="sec-head">' +
-      (no ? '<span class="sec-head__no">' + no + '</span>' : '') +
-      '<h2 class="sec-head__t">' + esc(t) + '</h2>' +
-      '<span class="sec-head__sub">' + esc(sub) + '</span></div>';
-  }
-
-  var HW_CLS = { '核心': 'chip-c--hwcore', '選配': 'chip-c--hwopt', '不需要': 'chip-c--sw' };
-  var HW_TXT = { '核心': '樹莓派為核心', '選配': '含樹莓派（選配）', '不需要': '純軟體' };
-
-  function cardHTML(p) {
-    var hw = HW_CLS[p.pi.k] || 'chip-c--sw';
-    // 已選定要做的題目：整張卡片點下去直接進前端原型，
-    // 完整分析改由卡片底部的次要連結進入
-    var nav = p.proto ? 'data-proto="' + esc(p.proto) + '"' : 'data-go="' + p.id + '"';
-    return '<article class="chip-c ' + hw + (p.chosen ? ' chip-c--chosen' : '') + '" ' + nav +
-      ' data-dom="' + esc(p.domain) + '" data-hw="' + esc(p.pi.k) + '" role="link" tabindex="0" aria-label="' + esc(p.title) + '">' +
-      (p.chosen ? '<div class="chosen-tab">已選定 · 點此開啟前端原型</div>' : '') +
-      '<div class="chip-c__top"><i class="chip-c__pin1"></i>' +
-        '<span class="chip-c__hw">' + esc(HW_TXT[p.pi.k] || '純軟體') + '</span>' +
-        '<span class="chip-c__code">' + esc(p.code) + '</span></div>' +
-      '<div class="chip-c__rank">' + String(p.rank).padStart(2, '0') + '</div>' +
-      '<div class="chip-c__hr"></div>' +
-      '<h3 class="chip-c__t">' + esc(p.title) + '</h3>' +
-      '<p class="chip-c__s">' + R.inline(p.summary) + '</p>' +
-      '<div class="chip-c__meta">' +
-        '<span class="tag tag--dom">' + esc(p.domain) + '</span>' + piTag(p) + fcTag(p) +
-      '</div>' +
-      '<div class="chip-c__score">' +
-        '<div class="chip-c__bar"><i style="width:' + p.score + '%"></i></div>' +
-        '<div class="chip-c__num">' + p.score + '<span>/100</span></div>' +
-      '</div>' +
-      '<div class="chip-c__votes" data-votes="' + p.id + '"></div>' +
-      (p.chosen ? '<button class="chosen-alt" type="button" data-go="' + p.id + '">看完整分析與分工 &#9656;</button>' : '') +
-      '</article>';
-  }
-
-  /* ============================================================
-     詳細頁
-     ============================================================ */
-  function detailHTML(p, ver) {
-    var h = '';
-    var prev = PJ[p.rank - 2], next = PJ[p.rank];
-
-    /* -- 標頭 -- */
-    h += '<section class="wrap dt-head">';
-    h += '<div class="dt-head__crumb"><a href="#/">MAIN</a><span>/</span>TOP 10<span>/</span>' +
-         esc(p.code) + ' &nbsp;RANK ' + String(p.rank).padStart(2, '0') + '</div>';
-    h += '<div class="progress">' + PJ.map(function (q) {
-      return '<i class="' + (q.rank <= p.rank ? 'on' : '') + '"></i>';
-    }).join('') + '</div>';
-    h += '<div class="dt-head__top">';
-    h += '<div class="dt-head__rank">' + String(p.rank).padStart(2, '0') + '<sup>SCORE ' + p.score + '</sup></div>';
-    h += '<div class="dt-head__tt"><h1 class="dt-head__t">' + esc(p.title) + '</h1>' +
-         '<p class="dt-head__sub">' + R.inline(p.subtitle) + '</p>' +
-         '<div class="tagline" style="margin-top:10px">' +
-           '<span class="tag tag--dom">' + esc(p.domain) + '</span>' + piTag(p) + fcTag(p) +
-           p.tags.map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') +
-         '</div>' +
-         '<div class="dt-head__votes" data-detail-votes="' + p.id + '"></div></div>';
-    h += '</div>';
-    h += '<div class="kpi">' + p.kpi.map(function (k) {
-      return '<div class="kpi__c"><div class="kpi__k">' + esc(k[0]) + '</div><div class="kpi__v">' + R.inline(k[1]) + '</div></div>';
-    }).join('') + '</div>';
-    h += '</section>';
-
-    h += '<div class="wrap">';
-
-    /* -- 評估面板 -- */
-    h += evalPanel(p);
-
-    /* -- 1 源起 / 2 前提摘要（兩版共用） -- */
-    h += block('01', '源起', 'ORIGIN', p.origin);
-    h += block('02', '前提摘要', 'PREMISE', p.premise);
-
-    /* -- 版本切換 -- */
-    h += '<div class="vswitch" id="vswitch">';
-    h += '<div class="vswitch__lbl">VERSION</div>';
-    h += '<button class="vswitch__b' + (ver === 'nofc' ? ' is-on' : '') + '" data-v="nofc">' +
-         '<b>不使用 Function Calling</b><small>BASELINE / STATIC CONTEXT</small></button>';
-    h += '<button class="vswitch__b' + (ver === 'fc' ? ' is-on' : '') + '" data-v="fc">' +
-         '<b>使用 Function Calling</b><small>TOOL-AUGMENTED / LIVE LOOKUP</small></button>';
-    h += '</div>';
-
-    /* -- 版本切換就地說明（預設收合，第一次看的人才需要） -- */
-    h += '<details class="fcx">';
-    h += '<summary class="fcx__h"><span class="fcx__ic" aria-hidden="true"><i></i><i></i></span>' +
-         '這兩個版本差在哪？什麼是 Function Calling</summary>';
-    h += '<div class="fcx__b"><div class="body">' + R.blocks(META.fcPrimer || []) + '</div></div>';
-    h += '</details>';
-
-    /* -- 3/4/5（依版本切換） -- */
-    h += '<div id="vbody">' + versionHTML(p, ver) + '</div>';
-
-    /* -- 6 結語（共用 + 版本判定） -- */
-    h += block('06', '結語', 'CONCLUSION', p.conclusion);
-
-    /* -- 底部導覽 -- */
-    h += '<div class="pager">';
-    h += prev
-      ? '<button class="pager__b" data-go="' + prev.id + '"><span class="pager__k">&#9666; PREV · ' + String(prev.rank).padStart(2, '0') + '</span><span class="pager__t">' + esc(prev.title) + '</span></button>'
-      : '<button class="pager__b" disabled><span class="pager__k">&#9666; PREV</span><span class="pager__t">已是第一個專題</span></button>';
-    h += '<button class="pager__b pager__b--home" data-go="home"><span class="pager__k">INDEX</span><span class="pager__t">返回主頁</span></button>';
-    h += next
-      ? '<button class="pager__b pager__b--next" data-go="' + next.id + '"><span class="pager__k">NEXT · ' + String(next.rank).padStart(2, '0') + ' &#9656;</span><span class="pager__t">' + esc(next.title) + '</span></button>'
-      : '<button class="pager__b pager__b--next" disabled><span class="pager__k">NEXT &#9656;</span><span class="pager__t">已是最後一個專題</span></button>';
-    h += '</div>';
-
-    h += '</div>';
-    return h;
-  }
-
-  function landClass(lv) {
-    if (lv === '極低' || lv === '低') return 'ok';
-    if (lv === '中') return 'mid';
-    return 'hi';
-  }
-
-  function evalPanel(p) {
-    var items = META.scoreItems || [];
-    var rows = items.map(function (it, i) {
-      var v = (p.scores && p.scores[i]) || 0, mx = it[1];
-      var pct = Math.round(v / mx * 100);
-      var lvl = pct >= 90 ? ' is-hi' : (pct >= 70 ? '' : ' is-lo');
-      return '<div class="ev__row' + lvl + '" title="' + esc(it[2]) + '">' +
-        '<div class="ev__lbl">' + R.inline(it[0]) + '</div>' +
-        '<div class="ev__bar"><i style="width:' + pct + '%"></i></div>' +
-        '<div class="ev__val">' + v + '<span>/' + mx + '</span></div>' +
-      '</div>';
+  /* 圓環圖：純 SVG */
+  function donut(byCat, total) {
+    var R = 62, C = 2 * Math.PI * R, off = 0;
+    var arcs = byCat.map(function (c) {
+      var frac = total ? c.amount / total : 0;
+      var seg = '<circle cx="80" cy="80" r="' + R + '" fill="none" stroke="' + c.color +
+        '" stroke-width="24" stroke-dasharray="' + (frac * C).toFixed(1) + ' ' + C.toFixed(1) +
+        '" stroke-dashoffset="' + (-off * C).toFixed(1) + '" transform="rotate(-90 80 80)"/>';
+      off += frac;
+      return seg;
     }).join('');
-
-    return '<section class="blk" id="blk-00" data-sec="評估明細"><div class="blk__h">' +
-      '<span class="blk__n">00</span><h2 class="blk__t">評估明細</h2>' +
-      '<span class="sec-head__sub">SCORING</span></div>' +
-      '<div class="ev">' +
-        '<div class="ev__grid">' + rows + '</div>' +
-        '<div class="ev__side">' +
-          '<div class="ev__card ev__card--total"><div class="ev__k">總分</div>' +
-            '<div class="ev__v ev__v--big">' + p.score + '<span>/100</span></div>' +
-            '<p class="ev__n">十題中排名第 ' + p.rank + '</p></div>' +
-          '<div class="ev__card"><div class="ev__k">樹莓派角色</div>' +
-            '<div class="ev__v">' + esc(p.pi.k) + '</div>' +
-            '<p class="ev__n">' + R.inline(p.pi.note) + '</p></div>' +
-          '<div class="ev__card"><div class="ev__k">Function Calling 價值</div>' +
-            '<div class="ev__v">' + esc(p.fc.k) + '</div>' +
-            '<p class="ev__n">' + R.inline(p.fc.note) + '</p></div>' +
-        '</div>' +
-      '</div>' +
-      (p.landing ? '<div class="ev__extra">' +
-        '<div class="ev__x ev__x--' + landClass(p.landing.lv) + '">' +
-          '<div class="ev__k">實務落地障礙<b>' + esc(p.landing.lv) + '</b></div>' +
-          '<p class="ev__n">' + R.inline(p.landing.x) + '</p></div>' +
-        (p.future ? '<div class="ev__x ev__x--future">' +
-          '<div class="ev__k">未來延展性<b>不計分</b></div>' +
-          '<p class="ev__n">' + R.inline(p.future) + '</p></div>' : '') +
-      '</div>' : '') +
-      '</section>';
+    return '<div class="dnt"><svg width="160" height="160" viewBox="0 0 160 160">' + arcs +
+      '<text x="80" y="76" text-anchor="middle" font-size="10" fill="var(--ink-faint)" ' +
+      'font-family="var(--mono)">本月支出</text>' +
+      '<text x="80" y="95" text-anchor="middle" font-size="15" fill="var(--ink)" ' +
+      'font-weight="700" font-family="var(--mono)">' + Number(total).toLocaleString('en-US') + '</text>' +
+      '</svg><div class="dnt__l">' + byCat.map(function (c) {
+        return '<div class="dnt__i"><span class="dot" style="background:' + c.color + '"></span>' +
+          '<span class="dnt__n">' + esc(c.name) + '</span>' +
+          '<span class="dnt__v">' + money(c.amount) + '</span>' +
+          '<span class="dnt__p">' + pct(total ? c.amount / total : 0) + '</span></div>';
+      }).join('') + '</div></div>';
   }
 
-  function versionHTML(p, ver) {
-    var v = p.versions[ver];
-    var badge = ver === 'fc'
-      ? '<span class="tag tag--fc-must">WITH FUNCTION CALLING</span>'
-      : '<span class="tag">WITHOUT FUNCTION CALLING</span>';
-    return block('03', '專案說明及分析', 'ANALYSIS', v.analysis, badge) +
-           block('04', '分工', 'WORK BREAKDOWN', v.division, badge) +
-           block('05', '時間規劃安排', 'SCHEDULE', v.schedule, badge);
+  function barChart(rows) {
+    var max = Math.max.apply(null, rows.map(function (r) { return Math.max(r.income, r.expense); })) || 1;
+    return '<div class="bars">' + rows.map(function (r, i) {
+      return '<div class="bars__g">' +
+        '<div class="bars__p">' +
+          '<i style="height:' + (r.income / max * 100) + '%;background:var(--up);animation-delay:' + (i * 60) + 'ms"></i>' +
+          '<i style="height:' + (r.expense / max * 100) + '%;background:var(--warn);animation-delay:' + (i * 60 + 30) + 'ms"></i>' +
+        '</div><div class="bars__k">' + esc(r.m.slice(5)) + '</div></div>';
+    }).join('') + '</div>' +
+      '<div class="lgd"><span><i style="background:var(--up)"></i>收入</span>' +
+      '<span><i style="background:var(--warn)"></i>支出</span></div>';
   }
 
-  function block(no, title, en, body, badge) {
-    return '<section class="blk" id="blk-' + no + '" data-sec="' + esc(title) + '"><div class="blk__h">' +
-      '<span class="blk__n">' + no + '</span>' +
-      '<h2 class="blk__t">' + esc(title) + '</h2>' +
-      '<span class="sec-head__sub">' + esc(en) + '</span>' +
-      (badge ? '<span class="blk__tag">' + badge + '</span>' : '') +
-      '</div><div class="body">' + R.blocks(body) + '</div></section>';
+  function txRow(t) {
+    return '<div class="tx">' +
+      '<div class="tx__c" style="background:' + t.catColor + '22;color:' + t.catColor +
+        ';border-color:' + t.catColor + '55">' + esc(t.catName.slice(0, 2)) + '</div>' +
+      '<div class="tx__m"><div class="tx__t">' + esc(t.merchant || t.catName) +
+        (t.source === 'nlp' ? ' <span class="tag tag--soft">語音記帳</span>' : '') + '</div>' +
+        '<div class="tx__s">' + esc(t.date) + '　' + esc(t.userName) +
+        (t.note ? '　' + esc(t.note) : '') +
+        (t.raw ? '<br><span class="tx__raw">原話「' + esc(t.raw) + '」</span>' : '') + '</div></div>' +
+      '<div class="tx__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
+        (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</div>' +
+      '<button class="btn btn--sm" data-del="' + esc(t.id) + '">刪除</button>' +
+      '</div>';
   }
 
   /* ============================================================
-     路由
+     02 記帳（自然語言輸入）
      ============================================================ */
-  function parse() {
-    var raw = (location.hash || '#/').replace(/^#\/?/, '');
-    var seg = raw.split('/').filter(Boolean);
-    return { id: seg[0] || null, ver: (seg[1] === 'fc' ? 'fc' : 'nofc') };
+  function vEntry() {
+    head('記帳', '用一句話記帳 —— 這是本系統 LLM 的主要用途');
+    var h = '<div class="page">';
+    h += '<div class="card rise nlp">' +
+      '<div class="card__h"><span class="card__t">用一句話記帳</span>' +
+      '<span class="card__s">模型解析後由你確認才寫入</span></div>' +
+      '<div class="nlp__in">' +
+        '<input id="nlpText" type="text" placeholder="例如：今天午餐吃了120" autocomplete="off">' +
+        '<button class="btn btn--go" id="nlpGo">解析</button>' +
+      '</div>' +
+      '<div class="nlp__ex">試試看：' +
+        ['今天午餐吃了120', '全家買飲料跟麵包165', '昨天加油1150悠遊卡付的', '媽媽給我兩千']
+          .map(function (x) { return '<button class="chip" data-ex="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') +
+      '</div>' +
+      '<div id="nlpOut"></div></div>';
+
+    h += '<div class="note"><div class="note__k">為什麼這件事需要語言模型</div><p>' +
+      '記帳 App 最大的失敗原因是<b>懶得輸入</b> —— 要選分類、填金額、挑日期，摩擦一高就放棄。<br>' +
+      '一句話記帳把摩擦降到最低，但它必須處理：<b>相對日期</b>（今天／昨天）、' +
+      '<b>中文數字</b>（兩千）、<b>店名歧義</b>（「全家」是店不是家人）、' +
+      '<b>收支方向</b>（「媽媽給我」是收入）、以及<b>語意分類</b>（便利商店算餐飲還是日用品）。<br>' +
+      '<b>這些用規則寫不完</b>，每個人的講法都不一樣 —— 這就是 LLM 在本系統的核心位置。</p></div>';
+
+    h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
+      '<span class="sec__n">TRANSACTIONS</span></div>';
+    h += filterBar() + '<div id="txList">' + skeleton(6) + '</div></div>';
+    $view.innerHTML = h;
+    loadTx();
   }
 
-  var current = { id: null, ver: 'nofc' };
-
-  function paint(keepScroll) {
-    var r = parse();
-    var p = r.id ? byId[r.id] : null;
-
-    // 只有版本變動 → 局部更新，不重畫整頁、不重新載入
-    if (p && current.id === r.id && current.ver !== r.ver) {
-      current.ver = r.ver;
-      document.getElementById('vbody').innerHTML = versionHTML(p, r.ver);
-      Array.prototype.forEach.call(document.querySelectorAll('.vswitch__b'), function (b) {
-        b.classList.toggle('is-on', b.dataset.v === r.ver);
-      });
-      mountFloating(p);
-      return;
-    }
-
-    current = { id: r.id, ver: r.ver };
-    root.innerHTML = p ? detailHTML(p, r.ver)
-                   : (r.id === 'about' ? aboutHTML() : homeHTML());
-    if (!keepScroll) window.scrollTo(0, 0);
-    mountFloating(p);
+  function filterBar() {
+    var ks = [['all', '全部'], ['expense', '支出'], ['income', '收入']];
+    var ss = [['all', '不分來源'], ['nlp', '語音記帳'], ['manual', '手動輸入']];
+    return '<div class="bar"><div class="chips">' + ks.map(function (k) {
+        return '<button class="chip' + (F.kind === k[0] ? ' on' : '') +
+          '" data-f="kind" data-v="' + k[0] + '">' + k[1] + '</button>';
+      }).join('') + '</div>' +
+      '<select class="sel" data-f="source">' + ss.map(function (s) {
+        return '<option value="' + s[0] + '"' + (F.source === s[0] ? ' selected' : '') + '>' + s[1] + '</option>';
+      }).join('') + '</select>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn btn--sm" id="reset">重置示範資料</button></div>';
   }
 
-  /* 浮動章節導覽 + 選題投票（主頁與詳細頁都有） */
-  function mountFloating(p) {
-    if (!global.UI) return;
-    global.UI.mountSectionNav();
-    global.UI.mountVote(p ? { id: p.id, title: p.title } : { id: null, title: '' });
-    paintVotes(global.UI.getPicks());
+  function loadTx() {
+    var box = document.getElementById('txList');
+    if (!box) return;
+    API.transactions(Object.assign({}, F)).then(function (d) {
+      box.innerHTML = d.transactions.length
+        ? d.transactions.map(txRow).join('')
+        : emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。');
+    }).catch(function (e) { box.innerHTML = errState(e); });
   }
 
-  /* 把「誰選了這一題」標到卡片與詳細頁標頭 */
-  function paintVotes(picks) {
-    var byProj = {};
-    (picks || []).forEach(function (v) { (byProj[v.project] = byProj[v.project] || []).push(v.member); });
+  function renderParse(r) {
+    var out = document.getElementById('nlpOut');
+    if (!out) return;
+    draft = Object.assign({}, r.out, { raw: r.raw });
+    var cats = global.DATA.categories.filter(function (c) { return c.kind === r.out.kind; });
+    var lowCat = r.out.catConf < 0.85;
+    out.innerHTML = '<div class="prs">' +
+      '<div class="prs__h">解析結果 —— <b>請確認後再寫入</b></div>' +
+      '<div class="prs__g">' +
+        pf('日期', '<input data-p="date" type="date" value="' + esc(r.out.date) + '">', r.out.conf) +
+        pf('金額', '<input data-p="amount" type="number" value="' + r.out.amount + '">', r.out.conf) +
+        pf('方向', '<select data-p="kind"><option value="expense"' +
+          (r.out.kind === 'expense' ? ' selected' : '') + '>支出</option>' +
+          '<option value="income"' + (r.out.kind === 'income' ? ' selected' : '') +
+          '>收入</option></select>', r.out.conf) +
+        pf('分類', '<select data-p="cat">' + cats.map(function (c) {
+          return '<option value="' + c.id + '"' + (c.id === r.out.cat ? ' selected' : '') +
+            '>' + esc(c.name) + '</option>';
+        }).join('') + '</select>', r.out.catConf) +
+        pf('店家', '<input data-p="merchant" type="text" value="' + esc(r.out.merchant || '') +
+          '" placeholder="選填">', null) +
+      '</div>' +
+      (lowCat ? '<div class="prs__w">分類信心只有 ' + pct(r.out.catConf) +
+        '，<b>請特別確認這一欄</b>。' + esc(r.note || '') + '</div>'
+              : (r.note ? '<div class="prs__n">' + esc(r.note) + '</div>' : '')) +
+      '<div class="prs__a"><button class="btn btn--go" id="nlpSave">確認並寫入</button>' +
+      '<button class="btn" id="nlpCancel">取消</button></div></div>';
+  }
 
-    Array.prototype.forEach.call(document.querySelectorAll('[data-votes]'), function (n) {
-      var who = byProj[n.dataset.votes];
-      n.innerHTML = who ? who.map(function (m) {
-        return '<span class="vtag">' + esc(m) + ' 選了這題</span>';
-      }).join('') : '';
-      var card = n.closest('.chip-c');
-      if (card) card.classList.toggle('is-picked', !!who);
+  function pf(k, input, conf) {
+    var low = conf !== null && conf < 0.85;
+    return '<div class="prs__f' + (low ? ' is-low' : '') + '">' +
+      '<label>' + esc(k) + (conf !== null ? ' <span>' + pct(conf) + '</span>' : '') + '</label>' +
+      input + '</div>';
+  }
+
+  /* ============================================================
+     03 家庭總覽
+     ============================================================ */
+  function vFamily() {
+    head('家庭總覽', '管理者看得到全家；家長看得到被指派監管的成員');
+    $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
+    Promise.all([API.summary({ scope: 'family' }), API.me(), API.budgets()])
+      .then(function (r) {
+        var d = r[0], m = r[1], b = r[2];
+        var h = '<div class="page">';
+        if (m.user.role === 'member') {
+          h += '<div class="note note--warn"><div class="note__k">權限不足</div><p>' +
+            '你目前的角色是<b>成員</b>，只看得到自己的紀錄。' +
+            '若要檢視家庭總覽，需要管理者調整角色。<br>' +
+            '（可以用右上角切換身分，體驗不同角色看到的畫面。）</p></div></div>';
+          $view.innerHTML = h;
+          return;
+        }
+        h += '<div class="kpis">';
+        h += kpi('家庭收入', d.income, '', d.period, 'ok', 0);
+        h += kpi('家庭支出', d.expense, '', d.members.length + ' 位成員', 'warn', 1);
+        h += kpi('結餘', d.net, '', '儲蓄率 ' + pct(d.rate), 'a', 2);
+        h += kpi('可檢視成員', d.members.length, '人', ROLE_TW[m.user.role] + '權限', 'a', 3, true);
+        h += '</div>';
+
+        h += '<div class="sec"><h2 class="sec__t">各成員本月狀況</h2></div>';
+        h += '<div class="rows">' + d.members.map(function (u, i) {
+          var over = u.expense > u.budget;
+          var bs = b.budgets.filter(function (x) { return x.user === u.id && x.over; });
+          return '<article class="row" style="animation-delay:' + (i * 50) + 'ms;' +
+            'grid-template-columns:44px 1fr 150px 110px">' +
+            '<div class="ava">' + esc(u.avatar) + '</div>' +
+            '<div class="row__m"><div class="row__top">' +
+              '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
+              '<span class="tag tag--' + (u.role === 'master' ? 'done' : 'soft') + '">' +
+              ROLE_TW[u.role] + '</span>' +
+              (over ? '<span class="tag tag--CRITICAL">超出預算</span>' : '') +
+              (bs.length ? '<span class="tag tag--MEDIUM">' + bs.length + ' 項分類超支</span>' : '') +
+            '</div><div class="row__sub">收入 ' + money(u.income) + '　支出 ' + money(u.expense) +
+            '　預算 ' + money(u.budget) + '</div></div>' +
+            '<div class="sla"><div class="sla__v"' + (over ? ' style="color:var(--down)"' : '') + '>' +
+              pct(u.expense / u.budget) + '</div>' +
+              '<div class="sla__b"><i style="width:' + Math.min(100, u.expense / u.budget * 100) +
+              '%;background:' + (over ? 'var(--down)' : 'var(--up)') + '"></i></div></div>' +
+            '<div class="row__do"><b class="num" style="color:' +
+              (u.income - u.expense >= 0 ? 'var(--up)' : 'var(--down)') + '">' +
+              (u.income - u.expense >= 0 ? '+' : '') +
+              Number(u.income - u.expense).toLocaleString('en-US') + '</b></div>' +
+            '</article>';
+        }).join('') + '</div>';
+
+        h += '<div class="sec"><h2 class="sec__t">超出預算的項目</h2></div>';
+        var over = b.budgets.filter(function (x) { return x.over; });
+        h += over.length ? '<div class="card">' + over.map(function (x) {
+          return '<div class="bgt"><div class="bgt__k"><span class="dot" style="background:' +
+            x.catColor + '"></span>' + esc(x.userName) + '　' + esc(x.catName) + '</div>' +
+            '<div class="bgt__t"><i style="width:100%;background:var(--down)"></i></div>' +
+            '<div class="bgt__v is-over">' + money(x.used) + ' / ' + money(x.limit) +
+            '（' + pct(x.pct) + '）</div></div>';
+        }).join('') + '</div>' : emptyState('沒有超支項目', '本月所有分類都在預算內。');
+        h += '</div>';
+        $view.innerHTML = h;
+        animate();
+      }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  /* ============================================================
+     04 統計（月／年）
+     ============================================================ */
+  function vStats() {
+    head('統計', '月與年兩個時間基準');
+    $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
+    API.summary({ scope: 'family' }).then(function (d) {
+      var h = '<div class="page"><div class="bar"><div class="chips">' +
+        [['month', '按月'], ['year', '按年']].map(function (p) {
+          return '<button class="chip' + (STAT.period === p[0] ? ' on' : '') +
+            '" data-sp="' + p[0] + '">' + p[1] + '</button>';
+        }).join('') + '</div></div>';
+
+      var rows = STAT.period === 'month'
+        ? d.monthly.map(function (r) { return { k: r.m, income: r.income, expense: r.expense }; })
+        : d.yearly.map(function (r) { return { k: r.y, income: r.income, expense: r.expense, partial: r.partial }; });
+
+      h += '<div class="card rise"><div class="card__h"><span class="card__t">' +
+        (STAT.period === 'month' ? '近 6 個月' : '近 3 年') + '收支對照</span></div>' +
+        '<div class="tbl" style="border:0"><table><thead><tr>' +
+        '<th>' + (STAT.period === 'month' ? '月份' : '年度') + '</th><th>收入</th><th>支出</th>' +
+        '<th>結餘</th><th>儲蓄率</th><th></th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          var net = r.income - r.expense, rate = r.income ? net / r.income : 0;
+          return '<tr><td><b>' + esc(r.k) + '</b>' +
+            (r.partial ? ' <span class="tag tag--soft">未完整</span>' : '') + '</td>' +
+            '<td class="mono">' + money(r.income) + '</td>' +
+            '<td class="mono">' + money(r.expense) + '</td>' +
+            '<td class="mono"><b style="color:' + (net >= 0 ? 'var(--up)' : 'var(--down)') +
+            '">' + money(net) + '</b></td>' +
+            '<td class="mono">' + pct(rate) + '</td>' +
+            '<td style="width:140px"><div class="sla__b"><i style="width:' +
+            Math.max(0, Math.min(100, rate * 200)) + '%;background:' +
+            (rate >= 0.2 ? 'var(--up)' : (rate >= 0 ? 'var(--warn)' : 'var(--down)')) +
+            '"></i></div></td></tr>';
+        }).join('') + '</tbody></table></div></div>';
+
+      if (STAT.period === 'year') {
+        h += '<div class="note note--warn"><div class="note__k">2026 年尚未結束</div><p>' +
+          '年度統計在當年度會標示「未完整」。<b>不要拿未完整年度直接跟完整年度比較</b> —— ' +
+          '系統在畫面上明確標出來，避免使用者誤判「今年支出變少了」。</p></div>';
+      }
+
+      h += '<div class="charts" style="margin-top:12px"><div class="card rise">' +
+        '<div class="card__h"><span class="card__t">支出分類佔比</span></div>' +
+        donut(d.byCat, d.expense) + '</div>' +
+        '<div class="card rise" style="animation-delay:80ms">' +
+        '<div class="card__h"><span class="card__t">近 6 個月趨勢</span></div>' +
+        barChart(d.monthly) + '</div></div></div>';
+      $view.innerHTML = h;
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  /* ============================================================
+     05 AI 財務建議
+     ============================================================ */
+  function vAdvice() {
+    head('財務建議', '每月結算後由模型產生，每一條都附可驗算的依據');
+    $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
+    API.advices().then(function (d) {
+      var h = '<div class="page">';
+      h += d.advices.map(function (a, i) {
+        var cls = a.level === 'warn' ? 'crit' : (a.level === 'ok' ? '' : 'warn');
+        return '<div class="adv adv--' + a.level + '" style="animation-delay:' + (i * 70) + 'ms">' +
+          '<div class="adv__h">' +
+            '<span class="tag tag--' + (a.level === 'warn' ? 'CRITICAL' :
+              (a.level === 'ok' ? 'done' : 'MEDIUM')) + '">' +
+            (a.level === 'warn' ? '需注意' : (a.level === 'ok' ? '良好' : '參考')) + '</span>' +
+            '<span class="adv__t">' + esc(a.title) + '</span>' +
+            '<span class="adv__m">' + esc(a.scope === 'family' ? '家庭' : a.userName) +
+            '　' + esc(a.period) + '</span></div>' +
+          '<p class="adv__b">' + esc(a.body) + '</p>' +
+          '<div class="adv__basis"><div class="adv__bk">依據（可自行驗算）</div><ul>' +
+            a.basis.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></div>' +
+          '<div class="adv__sug"><div class="adv__bk">建議</div><ul>' +
+            a.suggest.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></div>' +
+          '</div>';
+      }).join('');
+
+      h += '<div class="sec"><h2 class="sec__t">建議的邊界規則</h2>' +
+        '<span class="sec__n">GUARDRAILS</span></div>';
+      h += '<div class="tbl"><table><thead><tr><th>規則</th><th>為什麼</th></tr></thead><tbody>' +
+        d.rules.map(function (r) {
+          return '<tr><td><b>' + esc(r.rule) + '</b></td><td>' + esc(r.why) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+
+      h += '<div class="note note--crit"><div class="note__k">最重要的一條：數字不由模型生成</div><p>' +
+        '所有金額、百分比、成長率<b>一律由後端從資料庫算好，再連同結果一起餵給模型</b>，' +
+        '模型只負責把數字組織成人看得懂的敘述。<br>' +
+        '理由很直接：<b>財務數字算錯會讓使用者做出錯誤決定</b>，' +
+        '而語言模型本來就不擅長算術。這條規則跟畫面上「依據」欄位是同一件事的兩面 —— ' +
+        '使用者要能自己驗算。</p></div></div>';
+      $view.innerHTML = h;
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  /* ============================================================
+     06 成員與權限
+     ============================================================ */
+  function vMembers() {
+    head('成員與權限', '角色、監管關係、以及每個角色看得到什麼');
+    $view.innerHTML = '<div class="page">' + skeleton(5) + '</div>';
+    API.members().then(function (d) {
+      var h = '<div class="page"><div class="sec"><h2 class="sec__t">家庭成員</h2>' +
+        '<span class="sec__n">' + d.members.length + ' 人</span></div>';
+      h += '<div class="rows">' + d.members.map(function (u, i) {
+        var wards = d.guardianships.filter(function (g) { return g.guardian === u.id; });
+        var by = d.guardianships.filter(function (g) { return g.ward === u.id; });
+        return '<article class="row" style="animation-delay:' + (i * 50) +
+          'ms;grid-template-columns:44px 1fr 200px">' +
+          '<div class="ava">' + esc(u.avatar) + '</div>' +
+          '<div class="row__m"><div class="row__top">' +
+            '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
+            '<span class="tag tag--' + (u.role === 'master' ? 'done' :
+              (u.role === 'parent' ? 'MEDIUM' : 'soft')) + '">' + ROLE_TW[u.role] + '</span>' +
+            (u.id === d.me ? '<span class="tag tag--na">目前登入</span>' : '') +
+          '</div><div class="row__sub">' +
+            (wards.length ? '監管：' + wards.map(function (g) { return esc(g.wardName); }).join('、') : '') +
+            (wards.length && by.length ? '　｜　' : '') +
+            (by.length ? '<b style="color:var(--warn)">被 ' +
+              by.map(function (g) { return esc(g.guardianName); }).join('、') + ' 監管</b>' : '') +
+            (!wards.length && !by.length ? '無監管關係' : '') +
+          '</div></div>' +
+          '<div class="row__do">' + (u.id === d.me ? '' :
+            '<button class="btn btn--sm" data-switch="' + esc(u.id) + '">切換成這個身分</button>') +
+          '</div></article>';
+      }).join('') + '</div>';
+
+      h += '<div class="note"><div class="note__k">監管是雙向可見的</div><p>' +
+        '被監管者在自己的總覽頁會看到「誰看得到你的紀錄」。' +
+        '<b>系統不提供「隱藏監管」的選項</b> —— 偷偷監看家人的消費會破壞信任，' +
+        '而信任正是家庭記帳能持續下去的前提。</p></div>';
+
+      h += '<div class="sec"><h2 class="sec__t">角色</h2></div>';
+      h += '<div class="tbl"><table><thead><tr><th>角色</th><th>說明</th></tr></thead><tbody>' +
+        d.roles.map(function (r) {
+          return '<tr><td><b>' + esc(r.name) + '</b><br><span class="mono" style="color:var(--ink-dim)">' +
+            esc(r.id) + '</span></td><td>' + esc(r.desc) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+
+      h += '<div class="sec"><h2 class="sec__t">權限矩陣</h2>' +
+        '<span class="sec__n">PERMISSIONS</span></div>';
+      h += '<div class="tbl"><table><thead><tr><th>動作</th><th>管理者</th><th>家長</th><th>成員</th>' +
+        '</tr></thead><tbody>' + d.permissions.map(function (p) {
+          function cell(v) {
+            if (v === 'Y') return '<span class="tag tag--done">可</span>';
+            if (v === 'N') return '<span class="tag tag--na">不可</span>';
+            return '<span class="tag tag--MEDIUM">' + esc(v) + '</span>';
+          }
+          return '<tr><td><b>' + esc(p.action) + '</b></td><td>' + cell(p.master) +
+            '</td><td>' + cell(p.parent) + '</td><td>' + cell(p.member) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>';
+      $view.innerHTML = h;
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  /* ============================================================
+     07 模型評測
+     ============================================================ */
+  function vEval() {
+    head('模型評測', '自然語言記帳的抽取準確率 —— 這是本專題的量化成果');
+    $view.innerHTML = '<div class="page">' + skeleton(5) + '</div>';
+    API.nlpEval().then(function (d) {
+      var h = '<div class="page"><div class="tbl"><table><thead><tr>' +
+        '<th>任務</th><th>指標</th><th>未微調</th><th>微調後</th><th>目標</th><th>達標</th>' +
+        '</tr></thead><tbody>' + d.eval.map(function (e) {
+          return '<tr><td><b>' + esc(e.task) + '</b></td><td>' + esc(e.metric) + '</td>' +
+            '<td class="mono">' + e.base + '</td>' +
+            '<td class="mono"><b style="color:var(--ink)">' + e.ft + '</b></td>' +
+            '<td class="mono">' + e.target + '</td>' +
+            '<td>' + (e.ft >= e.target ? '<span class="tag tag--done">達標</span>' :
+              '<span class="tag tag--CRITICAL">未達</span>') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+
+      h += '<div class="note"><div class="note__k">最重要的是最後一列</div><p>' +
+        '<b>一次輸入完全正確率</b>（日期、金額、方向、分類全部都對）從 0.42 提升到 0.79。' +
+        '單看個別欄位的分數會高估實際體驗 —— 使用者在意的是「我講一句話，它有沒有一次記對」，' +
+        '只要有一欄錯就要動手改，摩擦就回來了。</p></div>';
+
+      h += '<div class="sec"><h2 class="sec__t">解析範例與難點</h2></div>';
+      h += '<div class="tbl"><table><thead><tr><th>使用者說</th><th>解析成</th><th>難在哪</th>' +
+        '</tr></thead><tbody>' + d.demo.map(function (x) {
+          var c = global.DATA.categories.filter(function (y) { return y.id === x.out.cat; })[0];
+          return '<tr><td><b>「' + esc(x.raw) + '」</b></td>' +
+            '<td class="mono">' + esc(x.out.date) + '　' +
+            (x.out.kind === 'income' ? '+' : '−') + x.out.amount + '　' + esc(c.name) +
+            (x.out.merchant ? '　' + esc(x.out.merchant) : '') + '</td>' +
+            '<td>' + esc(x.note) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+
+      h += '<div class="note note--warn"><div class="note__k">評測資料哪裡來</div><p>' +
+        '資料表 <code>nlp_parses</code> 會記下每一次的<b>原始輸入、模型輸出、以及使用者修正後的值</b>。' +
+        '使用者每改一次，就等於免費標了一筆資料。<br>' +
+        '<b>這是本系統的資料飛輪</b>：用得越久，訓練資料越多，模型越準，摩擦越低。</p></div></div>';
+      $view.innerHTML = h;
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  /* ============================================================
+     08 資料庫架構
+     ============================================================ */
+  function vSchema() {
+    head('資料庫架構', '12 張表與關聯，後端照這個建表');
+    $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
+    API.schema().then(function (d) {
+      var h = '<div class="page"><div class="card rise">' +
+        '<div class="card__h"><span class="card__t">關聯圖</span>' +
+        '<span class="card__s">' + d.schema.length + ' 張表</span></div>' +
+        erDiagram(d.schema, d.relations) + '</div>';
+
+      h += '<div class="sec"><h2 class="sec__t">各表欄位</h2>' +
+        '<span class="sec__n">DDL DRAFT</span></div>';
+      h += d.schema.map(function (t, i) {
+        return '<details class="acc" style="margin-bottom:8px"' + (i === 0 ? ' open' : '') + '>' +
+          '<summary class="acc__h"><span class="acc__ic" aria-hidden="true"><i></i><i></i></span>' +
+          '<code class="acc__code">' + esc(t.t) + '</code>' +
+          '<span class="acc__t">' + esc(t.label) + '</span>' +
+          '<span class="acc__en">' + esc(t.note) + '</span></summary>' +
+          '<div class="acc__b"><div class="tbl" style="border:0"><table><thead><tr>' +
+          '<th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody>' +
+          t.cols.map(function (c) {
+            return '<tr><td class="mono"><b>' + esc(c[0]) + '</b></td>' +
+              '<td class="mono" style="color:var(--accent)">' + esc(c[1]) + '</td>' +
+              '<td>' + esc(c[2]) + '</td></tr>';
+          }).join('') + '</tbody></table></div></div></details>';
+      }).join('');
+
+      h += '<div class="note"><div class="note__k">四個設計重點</div><p>' +
+        '<b>1. 帳號與家庭角色分開。</b> `users` 是登入身分，`family_members` 才是角色 —— ' +
+        '一個人可以同時是甲家的管理者、乙家的成員。<br>' +
+        '<b>2. 監管關係獨立成表。</b> `guardianships` 有起訖時間，' +
+        '解除監管是設 `ended_at` 而不是刪除，因為稽核需要看得到歷史。<br>' +
+        '<b>3. `nlp_parses` 是資料飛輪的核心。</b> 記下原始輸入、模型輸出、使用者修正值，' +
+        '既是評測來源也是下一輪訓練資料。<br>' +
+        '<b>4. `advices.basis_json` 存的是後端算好的數字</b>，不是模型生成的 —— ' +
+        '這樣使用者才驗算得了。</p></div>';
+
+      h += '<div class="note note--warn"><div class="note__k">安全與隱私</div><p>' +
+        '`password_hash` 用 bcrypt 或 argon2，<b>絕不存明碼</b>。' +
+        '`sessions` 只存 refresh token 的雜湊，登出就是設 `revoked_at`。<br>' +
+        '`audit_logs` 記錄「誰看了誰的資料」—— 監管功能一旦存在，' +
+        '就必須有紀錄可查，否則權限會變成沒人管的黑箱。</p></div></div>';
+      $view.innerHTML = h;
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  function erDiagram(schema, rels) {
+    var W = 940, H = 580;
+    var pos = {
+      users:            [380, 40,  170, 62],
+      sessions:         [120, 40,  150, 46],
+      families:         [680, 40,  170, 50],
+      family_members:   [680, 130, 170, 50],
+      guardianships:    [680, 220, 170, 50],
+      accounts:         [120, 140, 150, 46],
+      categories:       [120, 320, 150, 46],
+      transactions:     [380, 250, 170, 66],
+      nlp_parses:       [380, 380, 170, 50],
+      budgets:          [680, 330, 170, 46],
+      advices:          [680, 420, 170, 46],
+      audit_logs:       [120, 420, 150, 46]
+    };
+    var meta = {};
+    schema.forEach(function (t) { meta[t.t] = t; });
+    var core = ['transactions', 'users'];
+    var star = ['nlp_parses'];
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">';
+
+    rels.forEach(function (r) {
+      var a = pos[r[0]], b = pos[r[1]];
+      if (!a || !b) return;
+      var ax = a[0] + a[2] / 2, ay = a[1] + a[3] / 2;
+      var bx = b[0] + b[2] / 2, by = b[1] + b[3] / 2;
+      s += '<path d="M' + ax + ' ' + ay + ' L' + bx + ' ' + ay + ' L' + bx + ' ' + by +
+        '" fill="none" stroke="var(--line-2)" stroke-width="1.1"/>';
     });
 
-    var board = document.getElementById('picks');
-    if (board) {
-      var members = (global.UI && global.UI.MEMBERS) || [];
-      var done = (picks || []).length;
-      board.innerHTML =
-        '<div class="picks__hd"><span class="picks__t">大家選了什麼</span>' +
-          '<span class="picks__n">' + done + ' / ' + members.length + ' 人已選</span></div>' +
-        '<div class="picks__row">' + members.map(function (m) {
-          var v = (picks || []).filter(function (x) { return x.member === m; })[0];
-          var pj = v && byId[v.project];
-          return '<div class="picks__c' + (v ? ' is-done' : '') + '">' +
-            '<div class="picks__m">' + esc(m) + '</div>' +
-            (pj
-              ? '<button class="picks__p" data-go="' + pj.id + '">' +
-                  '<b>' + String(pj.rank).padStart(2, '0') + '</b>' + esc(pj.title) + '</button>'
-              : '<span class="picks__none">尚未選擇</span>') +
-          '</div>';
-        }).join('') + '</div>';
-    }
-
-    var hd = document.querySelector('[data-detail-votes]');
-    if (hd) {
-      var who2 = byProj[hd.dataset.detailVotes];
-      hd.innerHTML = who2 ? who2.map(function (m) {
-        return '<span class="vtag vtag--lg">' + esc(m) + ' 選了這題</span>';
-      }).join('') : '';
-    }
+    Object.keys(pos).forEach(function (k) {
+      var p = pos[k], m = meta[k];
+      if (!m) return;
+      var isCore = core.indexOf(k) >= 0, isStar = star.indexOf(k) >= 0;
+      var stroke = isStar ? 'var(--warn)' : (isCore ? 'var(--accent)' : 'var(--line-3)');
+      s += '<rect x="' + p[0] + '" y="' + p[1] + '" width="' + p[2] + '" height="' + p[3] +
+        '" fill="' + (isCore || isStar ? 'var(--card-3)' : 'var(--card-2)') + '" stroke="' + stroke +
+        '" stroke-width="' + (isCore || isStar ? 2 : 1) + '"/>';
+      s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 19) + '" font-size="11.5" ' +
+        'font-weight="700" font-family="var(--mono)" fill="' +
+        (isStar ? 'var(--warn)' : (isCore ? 'var(--accent-hi)' : 'var(--ink)')) + '">' + esc(k) + '</text>';
+      s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 34) + '" font-size="9.5" ' +
+        'fill="var(--ink-faint)">' + esc(m.label) + '　' + m.cols.length + ' 欄</text>';
+      if (p[3] > 58) {
+        s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 51) + '" font-size="9" ' +
+          'fill="var(--ink-dim)">' + (isStar ? '★ 評測與訓練資料來源' : '核心表') + '</text>';
+      }
+    });
+    s += '</svg>';
+    return '<div style="overflow-x:auto">' + s + '</div>';
   }
 
-  global.App = { onPicks: paintVotes };
+  /* ---------- 共用 ---------- */
+  function head(t, s) { $title.textContent = t; $sub.textContent = s; }
 
+  function animate() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-count]'), function (n) {
+      var to = Number(n.dataset.count), t0 = performance.now(), dur = 700;
+      (function step(now) {
+        var p = Math.min(1, (now - t0) / dur);
+        n.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(step);
+      })(t0);
+    });
+  }
 
-  /* ---------- 事件委派 ---------- */
+  function paintWho() {
+    API.me().then(function (m) {
+      ME = m;
+      var w = document.getElementById('who');
+      if (w) {
+        w.innerHTML = '<span class="ava ava--sm">' + esc(m.user.avatar) + '</span>' +
+          '<span class="who__n">' + esc(m.user.name) + '</span>' +
+          '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>';
+      }
+      var f = document.getElementById('famName');
+      if (f) f.textContent = m.family.family + '　' + m.family.period;
+    });
+  }
+
+  /* ---------- 路由 ---------- */
+  var ROUTES = { '': vHome, entry: vEntry, family: vFamily, stats: vStats,
+                 advice: vAdvice, members: vMembers, eval: vEval, schema: vSchema };
+
+  function paint() {
+    var page = (location.hash || '#/').replace(/^#\/?/, '').split('/')[0];
+    (ROUTES[page] || vHome)();
+    Array.prototype.forEach.call(document.querySelectorAll('.nav__i'), function (b) {
+      b.classList.toggle('on', b.dataset.nav === page);
+    });
+  }
+
+  /* ---------- 事件 ---------- */
   document.addEventListener('click', function (e) {
-    var v = e.target.closest ? e.target.closest('[data-v]') : null;
-    if (v) {
-      var r = parse();
-      if (!r.id) return;
-      // 用 replace 避免版本切換塞爆瀏覽器歷史
-      location.replace('#/' + r.id + (v.dataset.v === 'fc' ? '/fc' : ''));
+    var t = e.target;
+    if (!t.closest) return;
+
+    var nav = t.closest('[data-nav]');
+    if (nav) { location.hash = '#/' + nav.dataset.nav; return; }
+
+    var ex = t.closest('[data-ex]');
+    if (ex) {
+      document.getElementById('nlpText').value = ex.dataset.ex;
+      document.getElementById('nlpGo').click();
       return;
     }
-    var g = e.target.closest ? e.target.closest('[data-go]') : null;
-    if (g) {
-      var to = g.dataset.go;
-      location.hash = (to === 'home') ? '#/' : '#/' + to;
+
+    if (t.closest('#nlpGo')) {
+      var txt = document.getElementById('nlpText').value.trim();
+      if (!txt) { toast('請先輸入一句話', 'err'); return; }
+      var btn = t.closest('#nlpGo');
+      btn.disabled = true; btn.innerHTML = '<span class="btn__sp"></span>解析中';
+      API.nlpParse(txt).then(function (r) {
+        btn.disabled = false; btn.textContent = '解析';
+        renderParse(r);
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = '解析';
+        toast('解析失敗：' + err.message, 'err');
+      });
       return;
     }
-    var pr = e.target.closest ? e.target.closest('[data-proto]') : null;
-    if (pr) location.href = pr.dataset.proto;
+
+    if (t.closest('#nlpSave')) {
+      if (!draft) return;
+      var out = document.getElementById('nlpOut');
+      Array.prototype.forEach.call(out.querySelectorAll('[data-p]'), function (i) {
+        draft[i.dataset.p] = i.value;
+      });
+      API.nlpConfirm(draft).then(function () {
+        out.innerHTML = '';
+        document.getElementById('nlpText').value = '';
+        draft = null;
+        loadTx();
+        toast('已寫入一筆紀錄', 'ok');
+      }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); });
+      return;
+    }
+
+    if (t.closest('#nlpCancel')) {
+      document.getElementById('nlpOut').innerHTML = '';
+      draft = null;
+      return;
+    }
+
+    var del = t.closest('[data-del]');
+    if (del) {
+      API.deleteTransaction(del.dataset.del).then(function () {
+        loadTx(); toast('已刪除', 'ok');
+      }).catch(function (err) { toast('刪除失敗：' + err.message, 'err'); });
+      return;
+    }
+
+    var sw = t.closest('[data-switch]');
+    if (sw) {
+      API.switchUser(sw.dataset.switch).then(function () {
+        paintWho(); paint(); toast('已切換身分', 'ok');
+      });
+      return;
+    }
+
+    var f = t.closest('[data-f]');
+    if (f && f.tagName === 'BUTTON') {
+      F[f.dataset.f] = f.dataset.v;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-f="' + f.dataset.f + '"]'),
+        function (x) { if (x.tagName === 'BUTTON') x.classList.toggle('on', x === f); });
+      loadTx();
+      return;
+    }
+
+    var sp = t.closest('[data-sp]');
+    if (sp) { STAT.period = sp.dataset.sp; vStats(); return; }
+
+    if (t.closest('#reset')) {
+      API.reset().then(function (r) {
+        if (r.reset === false) { toast(r.note || '此模式不支援重置', 'err'); return; }
+        paintWho(); paint(); toast('已還原成示範資料', 'ok');
+      });
+    }
+  });
+
+  document.addEventListener('change', function (e) {
+    var s = e.target.closest ? e.target.closest('select[data-f]') : null;
+    if (s) { F[s.dataset.f] = s.value; loadTx(); }
   });
 
   document.addEventListener('keydown', function (e) {
-    // 清單以鍵盤開啟
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('chip-c')) {
+    if (e.key === 'Enter' && e.target.id === 'nlpText') {
       e.preventDefault();
-      if (e.target.dataset.proto) location.href = e.target.dataset.proto;
-      else location.hash = '#/' + e.target.dataset.go;
-      return;
+      document.getElementById('nlpGo').click();
     }
-    // 詳細頁：左右鍵連續瀏覽
-    var r = parse();
-    if (!r.id || e.metaKey || e.ctrlKey || e.altKey) return;
-    var p = byId[r.id]; if (!p) return;
-    if (e.key === 'ArrowLeft' && PJ[p.rank - 2])  location.hash = '#/' + PJ[p.rank - 2].id;
-    if (e.key === 'ArrowRight' && PJ[p.rank])     location.hash = '#/' + PJ[p.rank].id;
   });
 
-  // 主頁領域篩選
-  document.addEventListener('click', function (e) {
-    var b = e.target.closest ? e.target.closest('#filters button') : null;
-    if (!b) return;
-    Array.prototype.forEach.call(document.querySelectorAll('#filters button'), function (x) {
-      x.classList.toggle('is-on', x === b);
-    });
-    var f = b.dataset.f;
-    Array.prototype.forEach.call(document.querySelectorAll('#list .chip-c'), function (row) {
-      row.style.display = (f === 'all' || row.dataset.dom === f) ? '' : 'none';
-    });
+  var timer = 0;
+  $search.addEventListener('input', function () {
+    clearTimeout(timer);
+    var v = $search.value.trim();
+    timer = setTimeout(function () {
+      F.q = v;
+      var page = (location.hash || '').replace(/^#\/?/, '').split('/')[0];
+      if (page === 'entry') loadTx(); else location.hash = '#/entry';
+    }, 260);
   });
 
-  document.addEventListener('click', function (e) {
-    var t = e.target.closest ? e.target.closest('[data-acc]') : null;
-    if (!t) return;
-    var open = t.dataset.acc === 'open';
-    Array.prototype.forEach.call(document.querySelectorAll('.acc'), function (d) { d.open = open; });
-  });
+  window.addEventListener('hashchange', paint);
 
-  window.addEventListener('hashchange', function () { paint(false); });
-
-  /* ---------- 啟動 ---------- */
-  if (!PJ.length) {
-    root.innerHTML = '<div class="wrap section"><div class="note note--risk"><div class="note__k">LOAD ERROR</div>' +
-      '<p>專題內容尚未載入完成，請重新整理頁面。</p></div></div>';
-  } else {
-    paint(false);
-  }
+  document.getElementById('mode').textContent =
+    API.mode === 'http' ? 'API ' + API.base : 'API mock';
+  paintWho();
+  paint();
 })(window);

@@ -1,0 +1,27 @@
+# ============================================================
+# 版本以 .python-version 鎖在 3.12，確保都有預編譯輪檔
+# ============================================================
+
+# --- Web 框架 ---
+fastapi>=0.115,<0.200
+uvicorn[standard]>=0.34,<0.40
+pydantic>=2.10,<3
+pydantic-settings>=2.6,<3
+
+# --- 資料庫 ---
+sqlalchemy>=2.0,<3
+alembic>=1.14,<2
+psycopg[binary]>=3.2,<4
+
+# --- 認證 ---
+pyjwt>=2.10,<3
+passlib[bcrypt]>=1.7,<2
+python-multipart>=0.0.20          # 表單登入用
+
+# --- LLM ---
+anthropic>=0.40,<1
+
+# --- 開發與測試 ---
+pytest>=8.3,<9
+pytest-asyncio>=0.25,<1
+httpx>=0.28,<1
