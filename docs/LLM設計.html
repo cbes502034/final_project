@@ -1,0 +1,958 @@
+<title>記帳模型設計</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+/* 權杖沿用專案的 tokens.css，跟手冊與產品同一套視覺 */
+:root {
+  --void:#05060A;
+  --card:rgba(11,14,24,.95);
+  --card-2:rgba(18,22,36,.92);
+  --card-3:rgba(26,31,50,.9);
+  --sunk:rgba(255,255,255,.035);
+  --line:rgba(255,255,255,.08);
+  --line-2:rgba(255,255,255,.14);
+  --ink:#ECEEF4;
+  --ink-soft:#A7ADBD;
+  --ink-faint:#767D91;
+  --ink-dim:#565D70;
+  --accent:#6C9FFB;
+  --accent-2:#8B7CF0;
+  --accent-hi:#9BC0FF;
+  --accent-wash:rgba(108,159,251,.14);
+  --up:#6EE7B7;
+  --down:#FB8A8F;
+  --warn:#FBBF6E;
+  --up-wash:rgba(110,231,183,.13);
+  --down-wash:rgba(251,138,143,.13);
+  --warn-wash:rgba(251,191,110,.13);
+  --r-card:16px;
+  --r-sm:10px;
+  --r-pill:999px;
+  --sans:"Noto Sans TC",-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;
+  --serif:"Noto Serif TC","Songti TC",PMingLiU,Georgia,serif;
+  --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --ease:cubic-bezier(.22,.8,.28,1);
+}
+
+* { box-sizing:border-box; }
+
+body {
+  margin:0;
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.78;
+  letter-spacing:.16px;
+  -webkit-font-smoothing:antialiased;
+  background-color:var(--void);
+  background-image:
+    linear-gradient(163deg,
+      rgba(0,0,0,0) 26%, rgba(86,122,208,.16) 40%, rgba(126,108,214,.20) 50%,
+      rgba(78,156,210,.15) 60%, rgba(0,0,0,0) 74%),
+    radial-gradient(832px 608px at 6% -4%,rgba(58,104,214,.55),rgba(0,0,0,0) 60%),
+    radial-gradient(704px 544px at 94% 2%,rgba(124,84,206,.45),rgba(0,0,0,0) 58%),
+    radial-gradient(576px 448px at 72% 34%,rgba(52,150,200,.30),rgba(0,0,0,0) 62%),
+    radial-gradient(1024px 672px at 46% 104%,rgba(44,92,186,.40),rgba(0,0,0,0) 62%);
+  background-attachment:fixed;
+}
+
+h1,h2,h3 { margin:0; font-family:var(--serif); font-weight:600; letter-spacing:-.02em; text-wrap:balance; }
+p { margin:0; }
+a { color:var(--accent-hi); }
+code { font-family:var(--mono); font-size:.88em; letter-spacing:0; color:var(--accent-hi); }
+:focus-visible { outline:2px solid var(--accent-hi); outline-offset:2px; border-radius:4px; }
+
+.wrap { max-width:940px; margin:0 auto; padding:0 24px 96px; }
+
+/* ---------- 開場 ---------- */
+.hero { padding:60px 0 30px; }
+.eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.22em;
+  color:var(--warn); text-transform:uppercase; margin-bottom:14px;
+}
+.hero h1 { font-size:clamp(28px,4vw,42px); line-height:1.26; font-weight:700; }
+.hero__lead { margin-top:16px; max-width:62ch; font-size:16.5px; color:var(--ink-soft); }
+
+.jump { display:flex; flex-wrap:wrap; gap:8px; margin:26px 0 0; padding-bottom:30px; border-bottom:1px solid var(--line); }
+.jump a {
+  padding:6px 14px; border-radius:var(--r-pill); text-decoration:none;
+  background:var(--card-2); border:1px solid var(--line); font-size:13px; color:var(--ink-soft);
+  transition:border-color .18s var(--ease), color .18s var(--ease);
+}
+.jump a:hover { color:var(--ink); border-color:var(--line-2); }
+
+/* ---------- 區塊 ---------- */
+.sec { padding:52px 0 0; }
+.sec__h { display:flex; align-items:baseline; gap:14px; margin-bottom:10px; }
+.sec__n { font-family:var(--mono); font-size:12px; color:var(--warn); letter-spacing:.1em; }
+.sec h2 { font-size:25px; }
+.sec__lead { margin:8px 0 24px; max-width:64ch; color:var(--ink-soft); }
+h3.sub { font-size:17px; margin:32px 0 12px; padding-left:11px; border-left:2px solid var(--warn); }
+
+/* ---------- 圖 ---------- */
+figure { margin:24px 0 0; }
+.figbox {
+  border:1px solid var(--line); border-radius:var(--r-card);
+  background:var(--card); padding:22px 20px 14px; overflow-x:auto;
+}
+.figbox svg { display:block; max-width:100%; height:auto; margin:0 auto; color:var(--ink-soft); }
+figcaption {
+  margin-top:12px; font-size:13px; color:var(--ink-faint);
+  max-width:66ch; padding-left:2px;
+}
+figcaption b { color:var(--ink-soft); font-weight:500; }
+
+/* ---------- 表 ---------- */
+.tw { overflow-x:auto; border-radius:var(--r-card); border:1px solid var(--line); margin-top:16px; }
+table { border-collapse:collapse; width:100%; min-width:560px; font-size:13.5px; }
+thead th {
+  text-align:left; padding:11px 14px; white-space:nowrap;
+  background:var(--card-3); color:var(--ink-soft);
+  font-weight:500; font-size:12px; letter-spacing:.06em;
+  border-bottom:1px solid var(--line-2);
+}
+tbody td { padding:10px 14px; vertical-align:top; border-bottom:1px solid var(--line); background:var(--card); }
+tbody tr:last-child td { border-bottom:none; }
+tbody tr:hover td { background:var(--card-2); }
+tbody tr.pick td { background:rgba(251,191,110,.07); }
+tbody tr.pick:hover td { background:rgba(251,191,110,.11); }
+td.mono, th.mono { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+td.tight { white-space:nowrap; }
+
+.tag {
+  display:inline-block; padding:1px 8px; border-radius:var(--r-pill);
+  font-size:11px; line-height:1.7; white-space:nowrap;
+  border:1px solid var(--line-2); color:var(--ink-soft); background:var(--sunk);
+}
+.tag--pick { color:var(--warn); border-color:rgba(251,191,110,.45); background:var(--warn-wash); }
+.tag--no { color:var(--down); border-color:rgba(251,138,143,.4); background:var(--down-wash); }
+.tag--alt { color:var(--accent-hi); border-color:rgba(108,159,251,.4); background:var(--accent-wash); }
+
+/* ---------- 卡片與提示 ---------- */
+.card { background:var(--card); border:1px solid var(--line); border-radius:var(--r-card); padding:20px 22px; }
+.grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); margin-top:16px; }
+.card h4 { margin:0 0 8px; font-family:var(--serif); font-size:15px; font-weight:600; }
+.card p { font-size:13px; color:var(--ink-soft); }
+
+.note {
+  margin-top:20px; padding:16px 20px; border-radius:var(--r-card);
+  border:1px solid var(--line-2); border-left:3px solid var(--accent); background:var(--card-2);
+}
+.note--warn { border-left-color:var(--warn); }
+.note--crit { border-left-color:var(--down); }
+.note__k { font-family:var(--serif); font-weight:600; font-size:14.5px; margin-bottom:6px; }
+.note p { color:var(--ink-soft); font-size:13.5px; }
+.note b { color:var(--ink); font-weight:500; }
+
+/* ---------- 工具清單 ---------- */
+.tools { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+.tool {
+  display:grid; grid-template-columns:210px 1fr; gap:16px;
+  padding:14px 18px; border-radius:var(--r-card);
+  background:var(--card); border:1px solid var(--line); border-left:3px solid var(--k);
+}
+.tool__n { font-family:var(--mono); font-size:12.5px; color:var(--k); word-break:break-all; }
+.tool__w { font-size:13px; color:var(--ink-soft); }
+.tool__w b { color:var(--ink); font-weight:500; }
+@media (max-width:640px) { .tool { grid-template-columns:1fr; gap:6px; } }
+
+/* ---------- 步驟 ---------- */
+.steps { display:flex; flex-direction:column; margin-top:16px; }
+.step { display:flex; gap:16px; position:relative; padding-bottom:18px; }
+.step:last-child { padding-bottom:0; }
+.step::before { content:""; position:absolute; left:15px; top:32px; bottom:0; width:1px; background:var(--line-2); }
+.step:last-child::before { display:none; }
+.step__n {
+  flex:0 0 32px; width:32px; height:32px; border-radius:50%;
+  display:grid; place-items:center; position:relative; z-index:1;
+  background:var(--card-3); border:1px solid var(--line-2);
+  font-family:var(--mono); font-size:12px; color:var(--warn);
+}
+.step__b { padding-top:3px; min-width:0; }
+.step__t { font-family:var(--serif); font-weight:600; font-size:15px; margin-bottom:3px; }
+.step__d { font-size:13.5px; color:var(--ink-soft); }
+
+pre {
+  margin:14px 0 0; padding:16px 18px; overflow-x:auto;
+  background:var(--card); border:1px solid var(--line); border-radius:var(--r-card);
+  font-family:var(--mono); font-size:12.5px; line-height:1.75; color:var(--ink-soft);
+}
+pre b { color:var(--warn); font-weight:500; }
+pre i { color:var(--ink-dim); font-style:normal; }
+
+.foot {
+  margin-top:60px; padding-top:24px; border-top:1px solid var(--line);
+  font-size:12.5px; color:var(--ink-dim);
+  display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between;
+}
+
+@media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">四人 × 一個月 · LLM 技術方案</div>
+  <h1>記帳模型設計</h1>
+  <p class="hero__lead">
+    自行微調 Hugging Face 開源模型，用 function calling 把「語意判斷」跟「事實計算」分開。
+    這份是給組內看的技術方案：<b>選哪顆模型、怎麼訓、怎麼接、目標打到多少</b>。
+  </p>
+  <nav class="jump">
+    <a href="#pick">① 模型篩選</a>
+    <a href="#why">② 為什麼挑最小的</a>
+    <a href="#arch">③ 系統位置</a>
+    <a href="#tools">④ 五個工具</a>
+    <a href="#flow">⑤ 兩輪流程</a>
+    <a href="#train">⑥ 訓練管線</a>
+    <a href="#serve">⑦ 怎麼上線</a>
+    <a href="#goal">⑧ 目標成效</a>
+    <a href="#risk">⑨ 風險與排程</a>
+  </nav>
+</header>
+
+<!-- ============ 前提 ============ -->
+<div class="note note--warn">
+  <div class="note__k">這份方案的三個前提</div>
+  <p>
+    <b>1. 不能用商業 API。</b> 模型必須是自己微調的開源權重，所以 Anthropic / OpenAI 那條路整條拿掉。<br>
+    <b>2. 必須有 function calling。</b> 不是為了交作業硬加，下面每一個工具都是「讓模型自己做會出錯」才存在的。<br>
+    <b>3. 沒有 GPU。</b> 只能靠 Colab 或 Kaggle 的免費 T4，這一條直接決定了模型大小的上限。
+  </p>
+</div>
+
+<!-- ============ ① 模型篩選 ============ -->
+<section class="sec" id="pick">
+  <div class="sec__h"><span class="sec__n">01</span><h2>模型篩選</h2></div>
+  <p class="sec__lead">四個篩選條件：繁中要能用、<b>要有原生的工具呼叫格式</b>、免費 T4 上 QLoRA 跑得動、授權乾淨。</p>
+
+  <div class="tw">
+    <table>
+      <thead>
+        <tr><th>模型</th><th class="tight">參數</th><th class="tight">繁中</th><th class="tight">原生工具呼叫</th><th class="tight">T4 微調</th><th>授權</th><th class="tight">判斷</th></tr>
+      </thead>
+      <tbody>
+        <tr class="pick">
+          <td><b>Qwen2.5-1.5B-Instruct</b></td>
+          <td class="mono tight">1.5B</td><td class="tight">可用</td><td class="tight">有</td>
+          <td class="mono tight">~40 分鐘</td><td>Apache-2.0</td>
+          <td><span class="tag tag--pick">主力</span></td>
+        </tr>
+        <tr>
+          <td><b>Qwen2.5-7B-Instruct</b></td>
+          <td class="mono tight">7B</td><td class="tight">最好</td><td class="tight">有</td>
+          <td class="mono tight">2–4 小時，吃緊</td><td>Apache-2.0</td>
+          <td><span class="tag tag--alt">對照組</span></td>
+        </tr>
+        <tr>
+          <td>Qwen2.5-3B-Instruct</td>
+          <td class="mono tight">3B</td><td class="tight">好</td><td class="tight">有</td>
+          <td class="mono tight">~1.5 小時</td><td>Qwen Research（非商用）</td>
+          <td><span class="tag">備案</span></td>
+        </tr>
+        <tr>
+          <td>Llama-3.1-8B-Instruct</td>
+          <td class="mono tight">8B</td><td class="tight">中等</td><td class="tight">有</td>
+          <td class="mono tight">吃緊</td><td>Llama 3.1 社群授權</td>
+          <td><span class="tag tag--no">不選</span></td>
+        </tr>
+        <tr>
+          <td>Breeze-7B-Instruct（聯發科）</td>
+          <td class="mono tight">7B</td><td class="tight">zh-TW 特化</td><td class="tight">無</td>
+          <td class="mono tight">吃緊</td><td>Apache-2.0</td>
+          <td><span class="tag tag--no">不選</span></td>
+        </tr>
+        <tr>
+          <td>TAIDE-LX-7B-Chat</td>
+          <td class="mono tight">7B</td><td class="tight">zh-TW 特化</td><td class="tight">無</td>
+          <td class="mono tight">吃緊</td><td>需申請</td>
+          <td><span class="tag tag--no">不選</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sub">被刷掉的三顆，理由</h3>
+  <div class="grid">
+    <div class="card">
+      <h4>Llama-3.1-8B</h4>
+      <p>工具呼叫沒問題，但<b>繁中明顯輸 Qwen</b>——「全家」「全聯」「悠遊卡」這種台灣語境它會歪。授權也有使用條款要讀。</p>
+    </div>
+    <div class="card">
+      <h4>Breeze-7B</h4>
+      <p>繁中是它的強項，但<b>沒有原生的工具呼叫 template</b>。等於要從零教模型什麼是 tool call，多一整層難度，一個月不划算。</p>
+    </div>
+    <div class="card">
+      <h4>TAIDE</h4>
+      <p>同樣沒有原生工具格式，而且<b>取得要走申請流程</b>，時程上多一個不受控的變數。</p>
+    </div>
+  </div>
+
+  <div class="note note--crit">
+    <div class="note__k">授權與規格請在動工前自己去 model card 確認一次</div>
+    <p>上表的授權、VRAM 與訓練時間是<b>我依規格推估的，不是實測值</b>。
+    Qwen2.5 系列大多是 Apache-2.0，但 <b>3B 那顆是 Qwen Research 授權（限非商用）</b>，
+    校內專題沒問題、之後想商用會卡住。開工第一件事就是去 Hugging Face 的 model card 對一次。</p>
+  </div>
+</section>
+
+<!-- ============ ② 為什麼挑最小的 ============ -->
+<section class="sec" id="why">
+  <div class="sec__h"><span class="sec__n">02</span><h2>為什麼主力挑最小的那顆</h2></div>
+  <p class="sec__lead">直覺會想選最大的。但在<b>一個月、四個人、沒有 GPU</b> 的條件下，1.5B 反而是更好的選擇，有三個理由。</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step__n">1</div>
+      <div class="step__b">
+        <div class="step__t">迭代速度決定你能試幾次</div>
+        <div class="step__d">微調不是跑一次就好——資料要改、超參要調、prompt 要換。
+        <b>40 分鐘一輪跟 3 小時一輪，一個月下來差的是能試 20 次還是 5 次。</b>
+        對三個沒有專案經驗的人來說，能多試幾次比模型大幾倍重要。</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step__n">2</div>
+      <div class="step__b">
+        <div class="step__t">小模型的微調增益最明顯，報告才有東西寫</div>
+        <div class="step__d">7B 這種任務本來就做得還可以，微調完提升有限，
+        數字擺出來反而像在說「其實不必微調」。<b>1.5B 沒微調前會很差，微調後會好——落差大，對照表才有說服力。</b>
+        微調是本專題的硬性要求，那就要挑一顆能把微調價值秀出來的模型。</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step__n">3</div>
+      <div class="step__b">
+        <div class="step__t">它是唯一 demo 得起來的</div>
+        <div class="step__d">1.5B 量化成 GGUF q4 大約 1GB，<b>CPU 上跑得動</b>。
+        7B 沒有 GPU 就沒辦法在展示當天穩定提供服務。
+        一個跑不起來的模型，評測分數再漂亮也沒用。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note note--warn">
+    <div class="note__k">可以立的核心主張</div>
+    <p><b>「微調後的 1.5B，在這個窄任務上打贏沒微調的 7B。」</b><br>
+    這句話如果成立，就同時回答了「為什麼要微調」跟「為什麼小模型夠用」。
+    所以 7B 不是備案，是<b>對照組</b>——它存在的目的就是被比較。</p>
+  </div>
+</section>
+
+<!-- ============ ③ 系統位置 ============ -->
+<section class="sec" id="arch">
+  <div class="sec__h"><span class="sec__n">03</span><h2>模型在系統裡的位置</h2></div>
+  <p class="sec__lead">
+    整個設計的骨架只有一句話：<b>模型負責語意判斷，工具負責事實與計算，兩者之間沒有捷徑。</b>
+  </p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 860 400" role="img" aria-label="三段架構：左邊前端、中間後端含自架推論服務、右邊資料庫。推論服務只能透過後端的工具取得事實，沒有任何路徑直接連到資料庫">
+        <defs>
+          <marker id="aB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#6C9FFB"/>
+          </marker>
+          <marker id="aV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#8B7CF0"/>
+          </marker>
+          <marker id="aP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#A87BE8"/>
+          </marker>
+          <marker id="aW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#FBBF6E"/>
+          </marker>
+        </defs>
+
+        <!-- ===== 三段底色：藍 → 藍紫 → 紫 ===== -->
+        <rect x="8" y="42" width="186" height="292" rx="14" fill="rgba(108,159,251,.06)" stroke="rgba(108,159,251,.32)" stroke-width="1.2"/>
+        <text x="101" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#6C9FFB" letter-spacing="2.4">前端</text>
+
+        <rect x="210" y="42" width="390" height="292" rx="14" fill="rgba(139,124,240,.06)" stroke="rgba(139,124,240,.32)" stroke-width="1.2"/>
+        <text x="405" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#8B7CF0" letter-spacing="2.4">後端</text>
+
+        <rect x="616" y="42" width="236" height="292" rx="14" fill="rgba(168,123,232,.06)" stroke="rgba(168,123,232,.32)" stroke-width="1.2"/>
+        <text x="734" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#A87BE8" letter-spacing="2.4">資料庫</text>
+
+        <!-- ===== 前端 ===== -->
+        <rect x="26" y="104" width="150" height="86" rx="11" fill="rgba(108,159,251,.12)" stroke="#6C9FFB" stroke-width="1.5"/>
+        <text x="101" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#9BC0FF">段落記帳畫面</text>
+        <text x="101" y="152" text-anchor="middle" font-size="10.5" fill="#9BC0FF" opacity=".8">site/ 純靜態</text>
+        <text x="101" y="170" text-anchor="middle" font-size="10.5" fill="#9BC0FF" opacity=".8">逐筆確認表格</text>
+
+        <!-- ===== 後端 ===== -->
+        <rect x="250" y="104" width="300" height="86" rx="11" fill="rgba(139,124,240,.12)" stroke="#8B7CF0" stroke-width="1.5"/>
+        <text x="400" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#B3A8F7">FastAPI 路由與服務</text>
+        <text x="400" y="152" text-anchor="middle" font-size="10.5" fill="#B3A8F7" opacity=".8">工具派發層 · Pydantic 驗證</text>
+        <text x="400" y="170" text-anchor="middle" font-size="10.5" fill="#B3A8F7" opacity=".8">所有金額都在這一層算完</text>
+
+        <!-- 推論服務：本文件的主角，用橘色標出來 -->
+        <rect x="250" y="234" width="300" height="80" rx="11" fill="rgba(251,191,110,.11)" stroke="#FBBF6E" stroke-width="1.7"/>
+        <text x="400" y="262" text-anchor="middle" font-size="13" font-weight="600" fill="#FBBF6E">自架推論服務</text>
+        <text x="400" y="282" text-anchor="middle" font-size="10.5" fill="#FBBF6E" opacity=".85">Qwen2.5-1.5B-Instruct（已微調）</text>
+        <text x="400" y="300" text-anchor="middle" font-size="10.5" fill="#FBBF6E" opacity=".85">只做語意判斷，不碰任何事實</text>
+
+        <!-- 後端 ↕ 模型 -->
+        <line x1="330" y1="190" x2="330" y2="230" stroke="#FBBF6E" stroke-width="1.6" marker-end="url(#aW)"/>
+        <text x="322" y="215" text-anchor="end" font-size="10.5" fill="#FBBF6E">prompt ＋ 工具定義</text>
+        <line x1="470" y1="230" x2="470" y2="190" stroke="#FBBF6E" stroke-width="1.6" marker-end="url(#aW)"/>
+        <text x="478" y="215" text-anchor="start" font-size="10.5" fill="#FBBF6E">tool_calls</text>
+
+        <!-- ===== 資料庫 ===== -->
+        <rect x="640" y="104" width="190" height="86" rx="11" fill="rgba(168,123,232,.12)" stroke="#A87BE8" stroke-width="1.5"/>
+        <text x="735" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#C4A3F0">PostgreSQL</text>
+        <text x="735" y="152" text-anchor="middle" font-size="10.5" fill="#C4A3F0" opacity=".8">分類體系 · 收支明細</text>
+        <text x="735" y="170" text-anchor="middle" font-size="10.5" fill="#C4A3F0" opacity=".8">預算 · 存款目標</text>
+
+        <!-- 前端 ↔ 後端 -->
+        <line x1="176" y1="128" x2="246" y2="128" stroke="#6C9FFB" stroke-width="1.6" marker-end="url(#aB)"/>
+        <text x="211" y="118" text-anchor="middle" font-size="10.5" fill="#9BC0FF">一段話</text>
+        <line x1="246" y1="166" x2="180" y2="166" stroke="#6C9FFB" stroke-width="1.6" marker-end="url(#aB)"/>
+        <text x="213" y="184" text-anchor="middle" font-size="10.5" fill="#9BC0FF">確認表格</text>
+
+        <!-- 後端 ↔ 資料庫 -->
+        <line x1="550" y1="128" x2="636" y2="128" stroke="#A87BE8" stroke-width="1.6" marker-end="url(#aP)"/>
+        <text x="593" y="118" text-anchor="middle" font-size="10.5" fill="#C4A3F0">查詢 / 計算</text>
+        <line x1="636" y1="166" x2="554" y2="166" stroke="#A87BE8" stroke-width="1.6" marker-end="url(#aP)"/>
+        <text x="595" y="184" text-anchor="middle" font-size="10.5" fill="#C4A3F0">事實</text>
+
+        <!-- 被禁止的那條路：模型 → 資料庫 -->
+        <path d="M 550 274 C 660 274, 735 260, 735 194" fill="none" stroke="#FB8A8F"
+              stroke-width="1.6" stroke-dasharray="7 6" opacity=".9"/>
+        <circle cx="648" cy="272" r="14" fill="#05060A" stroke="#FB8A8F" stroke-width="1.6"/>
+        <line x1="642" y1="266" x2="654" y2="278" stroke="#FB8A8F" stroke-width="2"/>
+        <line x1="654" y1="266" x2="642" y2="278" stroke="#FB8A8F" stroke-width="2"/>
+        <text x="700" y="318" text-anchor="middle" font-size="11.5" font-weight="600" fill="#FB8A8F">模型永遠沒有這條路</text>
+
+        <!-- 底部三段說明 -->
+        <text x="101" y="360" text-anchor="middle" font-size="10.5" fill="#6C9FFB" opacity=".75">只顯示與收輸入</text>
+        <text x="405" y="360" text-anchor="middle" font-size="10.5" fill="#8B7CF0" opacity=".75">驗證、權限、計算，以及呼叫模型</text>
+        <text x="734" y="360" text-anchor="middle" font-size="10.5" fill="#A87BE8" opacity=".75">唯一的事實來源</text>
+      </svg>
+    </div>
+    <figcaption>
+      三段之間<b>只有相鄰的兩段講話</b>：前端不碰資料庫，模型也不碰資料庫。
+      模型要的每一則事實——今天幾號、這間店屬於哪個分類、這個月花了多少——
+      都得透過後端的工具去拿，而那些工具是我們自己寫的 Python。
+      紅色虛線那條被劃掉的路徑，是整份設計刻意排除的東西。
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ============ ④ 五個工具 ============ -->
+<section class="sec" id="tools">
+  <div class="sec__h"><span class="sec__n">04</span><h2>五個工具，各自為什麼存在</h2></div>
+  <p class="sec__lead">
+    每一個工具都是因為<b>「讓模型自己做會出錯」</b>才被切出來的。
+    如果一個工具拿掉之後系統照樣正確，那它就不該存在。
+  </p>
+
+  <div class="tools">
+    <div class="tool" style="--k:var(--accent)">
+      <div class="tool__n">resolve_date(expr, today)</div>
+      <div class="tool__w"><b>取事實。</b>「今天」「昨天」「上禮拜三」換算成實際日期。
+      模型算日期會錯，而且<b>錯得很難發現</b>——差一天，使用者不會注意到，月統計卻已經跑掉。這是純函式，交給 Python。</div>
+    </div>
+    <div class="tool" style="--k:var(--accent)">
+      <div class="tool__n">lookup_category(text, merchant)</div>
+      <div class="tool__w"><b>取事實。</b>查這個家庭實際有哪些分類。
+      不查的話模型會<b>幻想出不存在的分類</b>（「便利商店」但系統裡只有「餐飲／日用品」）。
+      分類體系是成員3 定的契約，模型只能從裡面挑。</div>
+    </div>
+    <div class="tool" style="--k:var(--warn)">
+      <div class="tool__n">record_transactions(items[])</div>
+      <div class="tool__w"><b>交結果。</b>模型把解析好的 N 筆交出來——<b>但這不是寫入</b>。
+      後端收下、Pydantic 驗過、回前端讓使用者逐欄確認，確認了才真的進資料庫。
+      這支就是整個段落記帳的輸出口。</div>
+    </div>
+    <div class="tool" style="--k:var(--up)">
+      <div class="tool__n">get_month_summary(user_id, period)</div>
+      <div class="tool__w"><b>拿數字。</b>財務建議要用的收入、支出、各分類佔比。
+      <b>模型不准自己算</b>，只能問。問到什麼就講什麼。</div>
+    </div>
+    <div class="tool" style="--k:var(--up)">
+      <div class="tool__n">get_savings_status(user_id, period)</div>
+      <div class="tool__w"><b>拿數字。</b>存款目標、可支配上限、使用率、短少多少。
+      同上——這些數字錯了會讓使用者做出錯誤的財務決定。</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <div class="note__k">這樣分，function calling 就不是硬加的</div>
+    <p>兩個取事實、一個交結果、兩個拿數字。
+    <b>拿掉任何一個，系統就會開始產生錯誤的資料或錯誤的建議</b>——
+    這就是「為什麼需要 function calling」的答案，不必另外編理由。</p>
+  </div>
+</section>
+
+<!-- ============ ⑤ 兩輪流程 ============ -->
+<section class="sec" id="flow">
+  <div class="sec__h"><span class="sec__n">05</span><h2>兩輪工具呼叫的流程</h2></div>
+  <p class="sec__lead">
+    模型跑兩輪：<b>第一輪問事實，第二輪交結果</b>。中間那次「後端執行工具」是分界線。
+  </p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 820 470" role="img" aria-label="第一輪模型呼叫取事實的工具，後端執行後把結果回填，第二輪模型才交出結構化的記帳結果，經驗證後由使用者確認寫入">
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- 泳道標題 -->
+        <text x="14" y="26" font-size="11" font-weight="600" fill="#FBBF6E" letter-spacing="1.4">ROUND 1 · 問事實</text>
+        <line x1="14" y1="36" x2="806" y2="36" stroke="#FBBF6E" stroke-width="1" opacity=".35"/>
+
+        <!-- R1 使用者輸入 -->
+        <rect x="14" y="56" width="250" height="62" rx="10" fill="rgba(255,255,255,.04)" stroke="currentColor" stroke-width="1.3"/>
+        <text x="139" y="80" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">使用者寫一段話</text>
+        <text x="139" y="100" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">「早餐55，全家買咖啡」</text>
+
+        <line x1="264" y1="87" x2="330" y2="87" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+        <!-- R1 模型 -->
+        <rect x="334" y="56" width="190" height="62" rx="10" fill="rgba(251,191,110,.10)" stroke="#FBBF6E" stroke-width="1.5"/>
+        <text x="429" y="80" text-anchor="middle" font-size="12.5" font-weight="600" fill="#FBBF6E">模型</text>
+        <text x="429" y="100" text-anchor="middle" font-size="11" fill="#FBBF6E" opacity=".85">判斷需要哪些事實</text>
+
+        <line x1="524" y1="87" x2="590" y2="87" stroke="#FBBF6E" stroke-width="1.5" marker-end="url(#ar2)" color="#FBBF6E"/>
+        <text x="557" y="77" text-anchor="middle" font-size="10.5" fill="#FBBF6E">tool_calls</text>
+
+        <!-- R1 工具 -->
+        <rect x="594" y="48" width="212" height="78" rx="10" fill="rgba(255,255,255,.04)" stroke="currentColor" stroke-width="1.3"/>
+        <text x="700" y="70" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">後端執行工具</text>
+        <text x="700" y="90" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">resolve_date → 2026-09-10</text>
+        <text x="700" y="108" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">lookup_category → C01 餐飲</text>
+
+        <!-- 回填 -->
+        <path d="M 700 126 C 700 162, 429 162, 429 190" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+        <text x="565" y="156" text-anchor="middle" font-size="10.5" fill="currentColor">工具結果回填進對話</text>
+
+        <text x="14" y="216" font-size="11" font-weight="600" fill="#FBBF6E" letter-spacing="1.4">ROUND 2 · 交結果</text>
+        <line x1="14" y1="226" x2="806" y2="226" stroke="#FBBF6E" stroke-width="1" opacity=".35"/>
+
+        <!-- R2 模型 -->
+        <rect x="334" y="190" width="190" height="20" rx="6" fill="none" stroke="none"/>
+        <rect x="14" y="246" width="250" height="62" rx="10" fill="rgba(251,191,110,.10)" stroke="#FBBF6E" stroke-width="1.5"/>
+        <text x="139" y="270" text-anchor="middle" font-size="12.5" font-weight="600" fill="#FBBF6E">模型</text>
+        <text x="139" y="290" text-anchor="middle" font-size="11" fill="#FBBF6E" opacity=".85">帶著事實切分並抽欄位</text>
+
+        <line x1="264" y1="277" x2="330" y2="277" stroke="#FBBF6E" stroke-width="1.5" marker-end="url(#ar2)"/>
+        <text x="297" y="267" text-anchor="middle" font-size="10.5" fill="#FBBF6E">2 筆</text>
+
+        <!-- R2 record -->
+        <rect x="334" y="238" width="212" height="78" rx="10" fill="rgba(255,255,255,.04)" stroke="currentColor" stroke-width="1.3"/>
+        <text x="440" y="262" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">record_transactions</text>
+        <text x="440" y="282" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">Pydantic 驗證格式</text>
+        <text x="440" y="300" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">驗不過 → 帶錯誤重試一次</text>
+
+        <line x1="546" y1="277" x2="612" y2="277" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+        <!-- 前端確認 -->
+        <rect x="616" y="238" width="190" height="78" rx="10" fill="rgba(108,159,251,.10)" stroke="#6C9FFB" stroke-width="1.5"/>
+        <text x="711" y="262" text-anchor="middle" font-size="12" font-weight="600" fill="#9BC0FF">前端逐筆確認</text>
+        <text x="711" y="282" text-anchor="middle" font-size="10.5" fill="#9BC0FF" opacity=".82">缺欄位標紅、低信心標黃</text>
+        <text x="711" y="300" text-anchor="middle" font-size="10.5" fill="#9BC0FF" opacity=".82">補齊前送出鈕停用</text>
+
+        <!-- 寫入 -->
+        <path d="M 711 316 C 711 352, 440 352, 440 380" fill="none" stroke="#6C9FFB" stroke-width="1.5" marker-end="url(#ar2)" color="#6C9FFB"/>
+        <text x="576" y="346" text-anchor="middle" font-size="10.5" fill="#9BC0FF">使用者按下確認</text>
+
+        <rect x="248" y="380" width="384" height="62" rx="10" fill="rgba(110,231,183,.09)" stroke="#6EE7B7" stroke-width="1.4"/>
+        <text x="440" y="404" text-anchor="middle" font-size="12.5" font-weight="600" fill="#6EE7B7">寫入 transactions ＋ nlp_parses</text>
+        <text x="440" y="424" text-anchor="middle" font-size="10.5" fill="#6EE7B7" opacity=".82">模型解析值與使用者修正值一起存 → 下一輪訓練資料</text>
+      </svg>
+    </div>
+    <figcaption>
+      分成兩輪的原因：<b>模型必須先拿到事實，才有辦法做對的判斷</b>。
+      日期跟分類在第一輪就被後端釘死，第二輪模型只剩「切分」跟「抽欄位」這兩件真正需要語意理解的事。
+      而最後那一步——把模型原本的答案和使用者改成什麼<b>一起</b>存進 <code>nlp_parses</code>——就是資料飛輪的入口。
+    </figcaption>
+  </figure>
+
+  <h3 class="sub">第二輪模型實際吐出來的東西</h3>
+  <pre>{
+  "name": "<b>record_transactions</b>",
+  "arguments": {
+    "items": [
+      { <i>// 早上早餐55</i>
+        "span": "早上買早餐55",
+        "occurred_on": "2026-09-10",   <i>// 來自 resolve_date，不是模型算的</i>
+        "amount": 55, "kind": "expense",
+        "category_id": "C01",           <i>// 來自 lookup_category，不是模型編的</i>
+        "merchant": null,
+        "confidence": { "amount": 0.98, "kind": 0.97, "category": 0.88 }
+      },
+      { <i>// 中午全家買咖啡 —— 金額沒講，模型要留空而不是猜</i>
+        "span": "中午在全家買咖啡",
+        "occurred_on": "2026-09-10",
+        "amount": <b>null</b>, "kind": "expense",
+        "category_id": "C01",
+        "merchant": "全家便利商店",     <i>// 「全家」是店名不是家人，這是模型的價值所在</i>
+        "confidence": { "amount": 0.0, "kind": 0.95, "category": 0.65 }
+      }
+    ]
+  }
+}</pre>
+  <div class="note note--warn">
+    <div class="note__k">要教會模型的最重要一件事：不知道就留空</div>
+    <p>「中午在全家買咖啡」沒有金額。<b>模型猜一個 65 出來，比留 null 糟糕得多</b>——
+    留 null 前端會標紅要使用者補，猜一個數字就直接變成一筆錯帳。
+    訓練資料裡<b>必須刻意放進大量「欄位不全」的例子</b>，否則模型會學會硬掰。</p>
+  </div>
+</section>
+
+<!-- ============ ⑥ 訓練管線 ============ -->
+<section class="sec" id="train">
+  <div class="sec__h"><span class="sec__n">06</span><h2>訓練管線</h2></div>
+  <p class="sec__lead">資料從哪來、怎麼訓、怎麼確認有變好、怎麼上線。</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 820 300" role="img" aria-label="訓練資料由手寫種子與模板擴增而來，轉成工具呼叫格式後在免費T4上以QLoRA微調，通過評測門檻才匯出量化模型上線，線上的使用者修正再回流成為下一輪資料">
+        <defs>
+          <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+          <marker id="ar3g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#6EE7B7"/>
+          </marker>
+        </defs>
+
+        <!-- 上排：資料 -->
+        <rect x="14" y="30" width="150" height="58" rx="10" fill="rgba(255,255,255,.04)" stroke="currentColor" stroke-width="1.3"/>
+        <text x="89" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">手寫種子</text>
+        <text x="89" y="72" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">四人各 100 段 = 400</text>
+
+        <line x1="164" y1="59" x2="212" y2="59" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+        <rect x="216" y="30" width="150" height="58" rx="10" fill="rgba(255,255,255,.04)" stroke="currentColor" stroke-width="1.3"/>
+        <text x="291" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">模板擴增</text>
+        <text x="291" y="72" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">店家 × 金額 × 時間詞</text>
+
+        <line x1="366" y1="59" x2="414" y2="59" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+        <text x="390" y="49" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">3–5k</text>
+
+        <rect x="418" y="30" width="166" height="58" rx="10" fill="rgba(255,255,255,.04)" stroke="currentColor" stroke-width="1.3"/>
+        <text x="501" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">轉工具呼叫格式</text>
+        <text x="501" y="72" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">Qwen chat template</text>
+
+        <line x1="584" y1="59" x2="632" y2="59" stroke="#FBBF6E" stroke-width="1.6" marker-end="url(#ar3)" color="#FBBF6E"/>
+
+        <rect x="636" y="30" width="170" height="58" rx="10" fill="rgba(251,191,110,.10)" stroke="#FBBF6E" stroke-width="1.5"/>
+        <text x="721" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="#FBBF6E">QLoRA 微調</text>
+        <text x="721" y="72" text-anchor="middle" font-size="10.5" fill="#FBBF6E" opacity=".85">Colab 免費 T4 · ~40 分</text>
+
+        <!-- 下行 -->
+        <path d="M 721 88 C 721 118, 501 118, 501 146" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+        <!-- 評測 -->
+        <rect x="386" y="146" width="230" height="58" rx="10" fill="rgba(108,159,251,.10)" stroke="#6C9FFB" stroke-width="1.5"/>
+        <text x="501" y="169" text-anchor="middle" font-size="12" font-weight="600" fill="#9BC0FF">評測（200 段留出集）</text>
+        <text x="501" y="188" text-anchor="middle" font-size="10.5" fill="#9BC0FF" opacity=".82">沒過門檻就回去改資料，不上線</text>
+
+        <line x1="386" y1="175" x2="330" y2="175" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
+        <text x="358" y="165" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">過</text>
+
+        <!-- 匯出 -->
+        <rect x="150" y="146" width="176" height="58" rx="10" fill="rgba(255,255,255,.04)" stroke="currentColor" stroke-width="1.3"/>
+        <text x="238" y="169" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">合併 LoRA ＋ 量化</text>
+        <text x="238" y="188" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">GGUF q4_k_m ≈ 1GB</text>
+
+        <!-- 上線 -->
+        <path d="M 150 175 C 90 175, 60 175, 60 205" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <rect x="14" y="215" width="176" height="52" rx="10" fill="rgba(110,231,183,.09)" stroke="#6EE7B7" stroke-width="1.4"/>
+        <text x="102" y="238" text-anchor="middle" font-size="12" font-weight="600" fill="#6EE7B7">上線提供服務</text>
+        <text x="102" y="256" text-anchor="middle" font-size="10.5" fill="#6EE7B7" opacity=".82">見「怎麼上線」一節</text>
+
+        <!-- 飛輪回流 -->
+        <path d="M 190 241 C 420 241, 500 241, 600 241" fill="none" stroke="#6EE7B7" stroke-width="1.5"
+              stroke-dasharray="6 5" marker-end="url(#ar3g)"/>
+        <rect x="604" y="215" width="202" height="52" rx="10" fill="rgba(110,231,183,.06)" stroke="#6EE7B7" stroke-width="1.2" stroke-dasharray="4 4"/>
+        <text x="705" y="238" text-anchor="middle" font-size="11.5" font-weight="600" fill="#6EE7B7">nlp_parses 的使用者修正</text>
+        <text x="705" y="256" text-anchor="middle" font-size="10.5" fill="#6EE7B7" opacity=".8">回流成下一輪訓練資料</text>
+      </svg>
+    </div>
+    <figcaption>
+      實線是這個月一定會走完的路；<b>虛線那段（資料飛輪）在一個月內只做得到「機制建好、用種子修正示範一次」</b>，
+      不會有真實使用者的量。這點報告裡要講清楚，不要把設計講成已驗證的成果。
+      評測那一關是<b>硬門檻</b>——沒過就回去改資料，不要拿沒驗過的模型上線。
+    </figcaption>
+  </figure>
+
+  <h3 class="sub">訓練設定</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>項目</th><th>設定</th><th>為什麼</th></tr></thead>
+      <tbody>
+        <tr><td class="tight">框架</td><td class="mono">Unsloth ＋ TRL SFTTrainer</td><td>Unsloth 在 T4 上約快兩倍、省 VRAM，且支援 Turing 架構</td></tr>
+        <tr><td class="tight">量化</td><td class="mono">QLoRA 4-bit NF4</td><td>16GB T4 要塞下訓練，只能走 4-bit</td></tr>
+        <tr><td class="tight">LoRA</td><td class="mono">r=16, alpha=32, dropout=0</td><td>這個資料量不需要更大的 r，太大反而過擬合</td></tr>
+        <tr><td class="tight">目標層</td><td class="mono">q,k,v,o,gate,up,down</td><td>全掛。只掛 attention 對格式學習的幫助有限</td></tr>
+        <tr><td class="tight">精度</td><td class="mono">fp16</td><td><b>T4 是 Turing，沒有 bf16</b>，也用不了 flash-attention-2</td></tr>
+        <tr><td class="tight">序列長度</td><td class="mono">1024</td><td>一段記帳文字加工具定義綽綽有餘，開太長只是浪費 VRAM</td></tr>
+        <tr><td class="tight">批次</td><td class="mono">batch 1 × grad accum 8</td><td>等效 batch 8，配 gradient checkpointing</td></tr>
+        <tr><td class="tight">學習率</td><td class="mono">2e-4, cosine, warmup 5%</td><td>LoRA 的常用起點，先跑再說</td></tr>
+        <tr><td class="tight">輪數</td><td class="mono">2–3 epochs</td><td>資料量小，超過 3 輪很容易背起來</td></tr>
+        <tr><td class="tight">損失遮罩</td><td class="mono">只算 assistant 回合</td><td><b>關鍵。</b>prompt 要 mask 掉，否則模型在學怎麼寫問題而不是怎麼答</td></tr>
+        <tr><td class="tight">檢查點</td><td class="mono">每 50 步存 Google Drive</td><td>Colab 免費版會斷線，斷了要能接著跑</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sub">資料怎麼來</h3>
+  <div class="grid">
+    <div class="card">
+      <h4>種子：四人各手寫 100 段</h4>
+      <p>第 1 週就要開始，<b>不能等前後端做完</b>。每個人寫自己真實的記帳講法，四個人的語言習慣不一樣，這正是我們要的多樣性。</p>
+    </div>
+    <div class="card">
+      <h4>擴增：模板組合</h4>
+      <p>台灣店家清單 × 金額型態（含中文數字）× 時間詞 × 句型，程式化組出 3–5 千筆。
+      <b>難點要過取樣</b>：店名歧義、收支方向、合計語意、一段多筆。</p>
+    </div>
+    <div class="card">
+      <h4>留出集：200 段手工標註</h4>
+      <p><b>永遠不進訓練。</b>而且要由「沒寫那批種子的人」來標，避免標註習慣汙染評測。</p>
+    </div>
+  </div>
+
+  <div class="note note--crit">
+    <div class="note__k">一個要先討論的問題：能不能用商業 AI 幫忙標資料</div>
+    <p>用商業模型先產一版候選標註、再由人修正，會快非常多。
+    但題目要求是<b>「不直接使用商業 AI」</b>——這句話指的是<b>成品不能靠它</b>，
+    還是<b>連訓練流程都不能碰</b>？兩種解讀差很多。<br>
+    <b>這題要先問老師，不要自己決定。</b>如果不能用，就全部手寫加模板擴增——
+    做得到，但第 1 週的標註工作量會明顯變重。</p>
+  </div>
+</section>
+
+<!-- ============ ⑦ 怎麼上線 ============ -->
+<section class="sec" id="serve">
+  <div class="sec__h"><span class="sec__n">07</span><h2>怎麼上線</h2></div>
+  <p class="sec__lead">
+    <b>這是整份方案風險最高的地方。</b>Render 免費方案跑不動任何一顆模型，所以要準備三層退路。
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th class="tight">層級</th><th>做法</th><th>優點</th><th>缺點</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="tight"><span class="tag tag--pick">展示日</span></td>
+          <td>Colab T4 起推論服務 ＋ cloudflared 通道，FastAPI 打過去</td>
+          <td>免費、跑得動 GPU、速度可接受</td>
+          <td>Colab 一斷線就沒了，<b>不能當常駐服務</b></td>
+        </tr>
+        <tr>
+          <td class="tight"><span class="tag tag--alt">常駐</span></td>
+          <td>GGUF q4_k_m ＋ llama.cpp，放 Hugging Face Space 免費 CPU</td>
+          <td>一直在，不用顧</td>
+          <td>CPU 推論慢，一段話大概要等幾秒</td>
+        </tr>
+        <tr>
+          <td class="tight"><span class="tag">保底</span></td>
+          <td>前端 mock 模式（現在站上跑的就是這個）</td>
+          <td><b>模型全掛，網站還是完整可展示</b></td>
+          <td>不是真的模型輸出，要在畫面上標明</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sub">格式保證：微調之外還要加一層</h3>
+  <p style="color:var(--ink-soft);max-width:64ch">
+    微調讓模型<b>傾向</b>輸出正確格式，但不保證。商業 API 的 structured output 我們沒有了，
+    要自己補上 <b>constrained decoding</b>——用 XGrammar / outlines / lm-format-enforcer
+    把生成限制在工具呼叫的 JSON schema 上。
+  </p>
+  <div class="note">
+    <div class="note__k">兩層疊起來才夠</div>
+    <p><b>微調讓它「想對」，約束解碼讓它「寫對」。</b>
+    只有微調，小模型偶爾還是會吐出壞掉的 JSON；只有約束解碼，格式對了內容卻是亂猜的。
+    兩個都要。這也是為什麼<b>「工具呼叫格式合法率」要單獨列成一個指標</b>——它是最容易做到 99% 的一項，
+    也是最能看出這一層有沒有做的一項。</p>
+  </div>
+</section>
+
+<!-- ============ ⑧ 目標成效 ============ -->
+<section class="sec" id="goal">
+  <div class="sec__h"><span class="sec__n">08</span><h2>目標成效</h2></div>
+  <p class="sec__lead">
+    四個指標，一張對照表。<b>報告最後要交出來的就是這張表。</b>
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>指標</th>
+          <th class="tight">1.5B 未微調</th>
+          <th class="tight">1.5B 微調後</th>
+          <th class="tight">7B 未微調</th>
+          <th>這個指標在測什麼</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>工具呼叫格式合法率</b></td>
+          <td class="mono tight">待測</td>
+          <td class="mono tight" style="color:var(--warn)">&gt; 0.98</td>
+          <td class="mono tight">待測</td>
+          <td>吐出來的 tool call 解析得動嗎。加上約束解碼後應該接近 1.0</td>
+        </tr>
+        <tr>
+          <td><b>段落切分正確率</b></td>
+          <td class="mono tight">待測</td>
+          <td class="mono tight" style="color:var(--warn)">&gt; 0.85</td>
+          <td class="mono tight">待測</td>
+          <td>一段話切成幾筆有沒有對。<b>切錯比抽錯更難被發現</b></td>
+        </tr>
+        <tr>
+          <td><b>一次輸入完全正確率</b></td>
+          <td class="mono tight">待測</td>
+          <td class="mono tight" style="color:var(--warn)">&gt; 0.70</td>
+          <td class="mono tight">待測</td>
+          <td><b>主指標。</b>日期金額方向分類全對才算成功</td>
+        </tr>
+        <tr>
+          <td><b>分類 Macro-F1</b></td>
+          <td class="mono tight">待測</td>
+          <td class="mono tight" style="color:var(--warn)">&gt; 0.80</td>
+          <td class="mono tight">待測</td>
+          <td>取各分類 F1 平均，不讓「餐飲」這種大類蓋過小類</td>
+        </tr>
+        <tr>
+          <td>該留空卻硬猜的比率</td>
+          <td class="mono tight">待測</td>
+          <td class="mono tight" style="color:var(--warn)">&lt; 0.05</td>
+          <td class="mono tight">待測</td>
+          <td>金額沒講時有沒有亂編。<b>這項越低越好，錯帳都從這裡來</b></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note note--crit">
+    <div class="note__k">「待測」是刻意留的，不要先填數字</div>
+    <p>基線必須<b>第 1 週用留出集實際跑出來</b>，不能用估的。
+    我可以給目標值（那是我們要追的），但<b>基線一旦用猜的，整張對照表就沒有意義了</b>——
+    評審一問「你們的基線怎麼來的」就會破功。<br>
+    第 1 週的任務之一就是：把 1.5B 跟 7B 的 zero-shot 都跑過留出集，把左右兩欄填實。</p>
+  </div>
+
+  <div class="note note--warn">
+    <div class="note__k">最想看到的一格</div>
+    <p><b>「1.5B 微調後」那一欄，全面高於「7B 未微調」那一欄。</b><br>
+    如果成立，這份專題的結論就是一句很有力的話：
+    <b>在夠窄的任務上，一顆小模型配上好的訓練資料，勝過一顆大四倍的通用模型。</b></p>
+  </div>
+</section>
+
+<!-- ============ ⑨ 風險與排程 ============ -->
+<section class="sec" id="risk">
+  <div class="sec__h"><span class="sec__n">09</span><h2>風險與排程</h2></div>
+  <p class="sec__lead">
+    誠實講：<b>換成自行微調之後，工作量比呼叫 API 重不少。</b>排程要跟著改。
+  </p>
+
+  <h3 class="sub">四個風險，各自的退路</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>風險</th><th>徵兆</th><th>退路</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Colab 訓練到一半斷線</b></td>
+          <td>免費版常態，尤其晚上</td>
+          <td>每 50 步存 Drive，斷了接著跑。<b>備援用 Kaggle</b>（每週 30 小時，比 Colab 免費版慷慨）</td>
+        </tr>
+        <tr>
+          <td><b>微調後沒有比較好</b></td>
+          <td>評測跟基線差不多</td>
+          <td>退回 base ＋ few-shot ＋ 約束解碼，系統照樣能跑。
+          <b>而且負面結果也是結果</b>——照實寫進報告，比硬凹數字好</td>
+        </tr>
+        <tr>
+          <td><b>展示當天服務起不來</b></td>
+          <td>通道掛掉、Space 排隊</td>
+          <td>三層退路（見第 7 節）。最差就是 mock 模式，<b>網站不會死</b></td>
+        </tr>
+        <tr>
+          <td><b>標註量被低估</b></td>
+          <td>第 2 週還在寫種子資料</td>
+          <td><b>這是最可能發生的一個。</b>第 1 週就要開工，不能等前後端做完</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sub">調整後的三週</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step__n">W1</div>
+      <div class="step__b">
+        <div class="step__t">前後端整合 ＋ 同步開始標資料 ＋ 跑出基線</div>
+        <div class="step__d">
+          原本的「前後端整合完畢」不變，但<b>多了兩件必須平行進行的事</b>：
+          四人各寫 100 段種子資料、以及把 1.5B / 7B 的 zero-shot 跑過留出集把基線填實。<br>
+          <b>標註不能等。</b>它是唯一一件「越早開始越好、而且不依賴任何人做完」的工作。
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step__n">W2</div>
+      <div class="step__b">
+        <div class="step__t">微調 ＋ 把 function calling 接起來</div>
+        <div class="step__d">
+          模板擴增 → 轉格式 → 第一次 QLoRA → 第一次評測。
+          同時把五個工具在 FastAPI 這側實作完、兩輪流程串通。
+          <b>這週結束要能從畫面輸入一段話，走完兩輪，跑出確認表格。</b>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step__n">W3</div>
+      <div class="step__b">
+        <div class="step__t">加約束解碼 ＋ 迭代 ＋ 部署 ＋ 最終評測</div>
+        <div class="step__d">
+          補上 constrained decoding、依評測結果回頭補資料再訓一輪、
+          匯出 GGUF 佈上 HF Space、把對照表的數字全部填實。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub">四個人分別扛什麼</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th class="tight">成員</th><th>原本的模組</th><th>在這份方案裡負責</th></tr></thead>
+      <tbody>
+        <tr><td class="tight"><b>成員1</b></td><td>帳號與權限</td>
+          <td><b>模型服務層與工具派發</b>：<code>services/llm.py</code>、tool dispatch、重試、逾時、把兩輪流程包成一支可呼叫的介面</td></tr>
+        <tr><td class="tight"><b>成員2</b></td><td>記帳</td>
+          <td><b>解析任務本體</b>：工具 schema、訓練資料的組裝與擴增、QLoRA 微調、<code>record_transactions</code></td></tr>
+        <tr><td class="tight"><b>成員3</b></td><td>統計與預算</td>
+          <td><b>數字工具與分類體系</b>：<code>get_month_summary</code>、<code>get_savings_status</code>、<code>lookup_category</code> 背後的分類契約</td></tr>
+        <tr><td class="tight"><b>成員4</b></td><td>財務建議</td>
+          <td><b>評測與建議</b>：留出集標註、評測腳本、四個指標的對照表、建議生成的 prompt 與邊界規則</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <div class="note__k">留出集為什麼交給成員4</div>
+    <p>因為他不寫種子資料。<b>標訓練集的人不要標測試集</b>——
+    同一個人標，會不自覺用同一套判斷標準，評測就會偏樂觀。</p>
+  </div>
+</section>
+
+<footer class="foot">
+  <div>家庭記帳與財務控管系統 · LLM 技術方案</div>
+  <div style="font-family:var(--mono)">QWEN2.5-1.5B · QLORA · 5 TOOLS · 2 ROUNDS</div>
+</footer>
+
+</div>

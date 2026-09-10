@@ -316,101 +316,107 @@ td.tight { white-space:nowrap; }
 .mvc--m { border-top:2px solid var(--m3); }
 .mvc--m .mvc__k { color:var(--m3); }
 
-/* ---------- 心智圖 ---------- */
-.mm { margin-top:8px; }
-.mm__row { display:flex; align-items:stretch; gap:0; }
-.mm__root {
-  flex:0 0 168px; display:flex; align-items:center; justify-content:center;
-  position:relative;
+/* ---------- 心智圖：節點樹 ---------- */
+.mmwrap {
+  overflow-x: auto; overflow-y: hidden;
+  margin-top: 6px; padding-bottom: 6px;
+  border-radius: var(--r-card);
 }
-.mm__rootbox {
-  padding:18px 16px; border-radius:18px; text-align:center;
-  background:linear-gradient(135deg,var(--accent),var(--accent-2));
-  color:#fff; font-family:var(--serif); font-weight:700; font-size:16px;
-  line-height:1.4; box-shadow:0 12px 36px rgba(72,110,220,.35);
-}
-.mm__spine {
-  flex:0 0 34px; position:relative;
-}
-.mm__spine::before {
-  content:""; position:absolute; left:0; top:11%; bottom:11%;
-  width:1px; background:var(--line-3);
-}
-.mm__spine::after {
-  content:""; position:absolute; left:-16px; top:50%; width:16px; height:1px;
-  background:var(--line-3);
-}
-.mm__branches { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:12px; }
+.mmc { position: relative; }
+.mm-edges { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; }
 
-.mmb {
-  display:flex; gap:14px; align-items:flex-start;
-  padding:14px 16px; border-radius:var(--r-card);
-  background:var(--card); border:1px solid var(--line);
-  border-left:3px solid var(--c);
-  position:relative;
+/* 每個節點都是一則資訊，垂直置中對齊自己那條線 */
+.n {
+  position: absolute; transform: translateY(-50%); z-index: 1;
+  display: flex; align-items: center;
+  white-space: nowrap;
 }
-.mmb::before {
-  content:""; position:absolute; left:-34px; top:28px; width:34px; height:1px;
-  background:var(--line-2);
+
+.n--root {
+  padding: 14px 18px; border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; font-family: var(--serif); font-weight: 700; font-size: 15px;
+  line-height: 1.35; box-shadow: 0 12px 34px rgba(72,110,220,.34);
+  white-space: normal; max-width: 176px;
 }
-.mmb__id {
-  flex:0 0 auto; display:flex; flex-direction:column; gap:7px; width:170px;
+
+.n--mem {
+  flex-direction: column; align-items: stretch; gap: 6px;
+  padding: 10px 12px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--line-2);
+  border-left: 3px solid var(--c);
 }
 .mm__name {
-  width:100%; padding:8px 11px;
-  border-radius:var(--r-input);
-  border:1px solid var(--line-2);
-  background:var(--sunk); color:var(--ink);
-  font-family:var(--sans); font-size:14px; font-weight:500;
-  transition:border-color .18s var(--ease), background .18s var(--ease);
+  width: 100%; padding: 7px 10px;
+  border-radius: var(--r-input);
+  border: 1px solid var(--line-2);
+  background: var(--sunk); color: var(--ink);
+  font-family: var(--sans); font-size: 14px; font-weight: 500;
+  transition: border-color .18s var(--ease), background .18s var(--ease);
 }
-.mm__name::placeholder { color:var(--ink-dim); font-weight:400; }
+.mm__name::placeholder { color: var(--ink-dim); font-weight: 400; }
 .mm__name:focus {
-  outline:none; border-color:var(--c);
-  background:rgba(255,255,255,.06);
+  outline: none; border-color: var(--c); background: rgba(255,255,255,.06);
 }
-.mm__dom {
-  font-family:var(--serif); font-weight:600; font-size:15px; color:var(--c);
-  padding-left:2px;
+.n--mem .dom {
+  font-family: var(--serif); font-weight: 600; font-size: 14px; color: var(--c);
+  padding-left: 2px;
 }
-.mmb__leaves { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:7px; }
-.leaf { display:flex; gap:9px; align-items:baseline; flex-wrap:wrap; }
-.leaf__k {
-  flex:0 0 62px; font-size:11.5px; color:var(--ink-dim);
-  font-family:var(--mono); letter-spacing:.05em;
+
+.n--cat {
+  padding: 5px 12px; border-radius: var(--r-pill);
+  background: var(--sunk); border: 1px solid var(--c);
+  font-size: 12.5px; color: var(--ink);
 }
-.leaf__v { display:flex; flex-wrap:wrap; gap:5px; flex:1 1 auto; min-width:0; }
-.lchip {
-  padding:3px 9px; border-radius:var(--r-pill);
-  background:var(--sunk); border:1px solid var(--line);
-  font-size:11.5px; color:var(--ink-soft);
+.n--cat.is-llm {
+  background: var(--warn-wash); border-color: rgba(251,191,110,.55); color: var(--warn);
 }
-.lchip--llm {
-  border-color:rgba(251,191,110,.35); background:var(--warn-wash); color:var(--warn);
+
+.n--leaf {
+  gap: 8px; font-size: 12.5px; color: var(--ink-soft);
+}
+.n--leaf::before {
+  content: ""; width: 5px; height: 5px; flex: 0 0 5px;
+  border-radius: 50%; background: var(--c); opacity: .8;
+}
+.n--leaf.is-llm { color: var(--warn); }
+.n--leaf.is-llm::before { background: var(--warn); }
+.n--leaf.is-flag { color: var(--warn); }
+
+/* 連線上的提示字 */
+.elab {
+  position: absolute; transform: translate(-50%, -50%); z-index: 2;
+  padding: 1px 7px; border-radius: var(--r-pill);
+  background: var(--void); border: 1px solid var(--line-2);
+  font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+  white-space: nowrap;
 }
 
 .mm__bar {
-  margin-top:18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-  padding:14px 18px; border-radius:var(--r-card);
-  background:var(--card-2); border:1px solid var(--line);
+  margin-top: 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 18px; border-radius: var(--r-card);
+  background: var(--card-2); border: 1px solid var(--line);
 }
 .btn {
-  padding:9px 20px; border-radius:var(--r-pill); cursor:pointer;
-  border:1px solid transparent; font-family:var(--sans); font-size:14px; font-weight:500;
-  background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#fff;
-  transition:transform .16s var(--ease), box-shadow .16s var(--ease), opacity .16s;
+  padding: 9px 20px; border-radius: var(--r-pill); cursor: pointer;
+  border: 1px solid transparent; font-family: var(--sans); font-size: 14px; font-weight: 500;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+  transition: transform .16s var(--ease), box-shadow .16s var(--ease), opacity .16s;
 }
-.btn:hover { transform:translateY(-1px); box-shadow:0 10px 26px rgba(72,110,220,.34); }
-.btn:active { transform:translateY(0); }
-.btn:disabled { opacity:.5; cursor:default; transform:none; box-shadow:none; }
-.btn--ghost {
-  background:transparent; color:var(--ink-soft); border-color:var(--line-2);
+.btn:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(72,110,220,.34); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: .5; cursor: default; transform: none; box-shadow: none; }
+.btn--ghost { background: transparent; color: var(--ink-soft); border-color: var(--line-2); }
+.btn--ghost:hover { color: var(--ink); box-shadow: none; }
+.mm__state { font-size: 12.5px; color: var(--ink-faint); flex: 1 1 200px; }
+.mm__state b { color: var(--ink-soft); font-weight: 500; }
+.mm__state.is-ok b { color: var(--up); }
+.mm__state.is-warn b { color: var(--warn); }
+
+.mmhint {
+  margin-top: 10px; font-size: 12px; color: var(--ink-dim);
+  display: flex; gap: 16px; flex-wrap: wrap;
 }
-.btn--ghost:hover { color:var(--ink); box-shadow:none; }
-.mm__state { font-size:12.5px; color:var(--ink-faint); flex:1 1 200px; }
-.mm__state b { color:var(--ink-soft); font-weight:500; }
-.mm__state.is-ok b { color:var(--up); }
-.mm__state.is-warn b { color:var(--warn); }
 
 /* ---------- 頁尾 ---------- */
 .foot {
@@ -1344,108 +1350,20 @@ html { scroll-behavior:smooth; }
         <b>填上名字後按儲存</b>，其他人打開這頁就會看到。
       </p>
 
-      <div class="mm">
-        <div class="mm__row">
-          <div class="mm__root">
-            <div class="mm__rootbox">家庭記帳與<br>財務控管系統</div>
-          </div>
-          <div class="mm__spine"></div>
-          <div class="mm__branches">
+      <div class="mmwrap">
+        <div class="mmc" id="mmc"></div>
+      </div>
 
-            <article class="mmb" style="--c:var(--m1)">
-              <div class="mmb__id">
-                <input class="mm__name" type="text" placeholder="成員1" aria-label="成員1 的姓名" maxlength="20">
-                <span class="mm__dom">帳號與權限</span>
-              </div>
-              <div class="mmb__leaves">
-                <div class="leaf"><span class="leaf__k">資料表</span><span class="leaf__v">
-                  <span class="lchip">users</span><span class="lchip">sessions</span>
-                  <span class="lchip">families</span><span class="lchip">family_members</span>
-                  <span class="lchip">guardianships</span></span></div>
-                <div class="leaf"><span class="leaf__k">API</span><span class="leaf__v">
-                  <span class="lchip">註冊登入登出</span><span class="lchip">家庭與邀請碼</span>
-                  <span class="lchip">監管關係</span><span class="lchip">17 支</span></span></div>
-                <div class="leaf"><span class="leaf__k">畫面</span><span class="leaf__v">
-                  <span class="lchip">註冊與登入</span><span class="lchip">成員與權限</span></span></div>
-                <div class="leaf"><span class="leaf__k">LLM ★</span><span class="leaf__v">
-                  <span class="lchip lchip--llm">共用模型呼叫層</span>
-                  <span class="lchip lchip--llm">結構化輸出約束</span>
-                  <span class="lchip lchip--llm">重試與信心度</span></span></div>
-              </div>
-            </article>
+      <div class="mmhint">
+        <span>連線上的數字是該分支的 API 支數</span>
+        <span style="color:var(--warn)">橘色＝該模組自己的 LLM 工作</span>
+        <span style="color:var(--warn)">⚑ 第 1 週要凍結的跨模組契約</span>
+      </div>
 
-            <article class="mmb" style="--c:var(--m2)">
-              <div class="mmb__id">
-                <input class="mm__name" type="text" placeholder="成員2" aria-label="成員2 的姓名" maxlength="20">
-                <span class="mm__dom">記帳</span>
-              </div>
-              <div class="mmb__leaves">
-                <div class="leaf"><span class="leaf__k">資料表</span><span class="leaf__v">
-                  <span class="lchip">transactions</span><span class="lchip">categories</span>
-                  <span class="lchip">accounts</span><span class="lchip">nlp_parses</span></span></div>
-                <div class="leaf"><span class="leaf__k">API</span><span class="leaf__v">
-                  <span class="lchip">明細 CRUD</span><span class="lchip">nlp/parse</span>
-                  <span class="lchip">nlp/parse-batch</span><span class="lchip">nlp/confirm</span>
-                  <span class="lchip">10 支</span></span></div>
-                <div class="leaf"><span class="leaf__k">畫面</span><span class="leaf__v">
-                  <span class="lchip">段落記帳</span><span class="lchip">單筆手動</span>
-                  <span class="lchip">缺欄位提示</span></span></div>
-                <div class="leaf"><span class="leaf__k">LLM ★</span><span class="leaf__v">
-                  <span class="lchip lchip--llm">段落切分策略</span>
-                  <span class="lchip lchip--llm">欄位抽取 prompt</span>
-                  <span class="lchip lchip--llm">低信心判準</span></span></div>
-              </div>
-            </article>
-
-            <article class="mmb" style="--c:var(--m3)">
-              <div class="mmb__id">
-                <input class="mm__name" type="text" placeholder="成員3" aria-label="成員3 的姓名" maxlength="20">
-                <span class="mm__dom">統計與預算</span>
-              </div>
-              <div class="mmb__leaves">
-                <div class="leaf"><span class="leaf__k">資料表</span><span class="leaf__v">
-                  <span class="lchip">budgets</span><span class="lchip">savings_goals</span></span></div>
-                <div class="leaf"><span class="leaf__k">API</span><span class="leaf__v">
-                  <span class="lchip">summary</span><span class="lchip">stats 月／年</span>
-                  <span class="lchip">budgets</span><span class="lchip">savings-goal</span>
-                  <span class="lchip">6 支</span></span></div>
-                <div class="leaf"><span class="leaf__k">畫面</span><span class="leaf__v">
-                  <span class="lchip">我的總覽</span><span class="lchip">家庭總覽</span>
-                  <span class="lchip">統計圖表</span><span class="lchip">超支警告</span></span></div>
-                <div class="leaf"><span class="leaf__k">LLM ★</span><span class="leaf__v">
-                  <span class="lchip lchip--llm">超支說明文案</span>
-                  <span class="lchip lchip--llm">分類體系定義 ⚑</span></span></div>
-              </div>
-            </article>
-
-            <article class="mmb" style="--c:var(--m4)">
-              <div class="mmb__id">
-                <input class="mm__name" type="text" placeholder="成員4" aria-label="成員4 的姓名" maxlength="20">
-                <span class="mm__dom">財務建議</span>
-              </div>
-              <div class="mmb__leaves">
-                <div class="leaf"><span class="leaf__k">資料表</span><span class="leaf__v">
-                  <span class="lchip">advices</span><span class="lchip">basis_json 依據</span></span></div>
-                <div class="leaf"><span class="leaf__k">API</span><span class="leaf__v">
-                  <span class="lchip">advices</span><span class="lchip">advices/generate</span>
-                  <span class="lchip">2 支</span></span></div>
-                <div class="leaf"><span class="leaf__k">畫面</span><span class="leaf__v">
-                  <span class="lchip">建議卡片</span><span class="lchip">依據可驗算</span></span></div>
-                <div class="leaf"><span class="leaf__k">LLM ★</span><span class="leaf__v">
-                  <span class="lchip lchip--llm">建議生成 prompt</span>
-                  <span class="lchip lchip--llm">邊界規則</span>
-                  <span class="lchip lchip--llm">全系統評測</span></span></div>
-              </div>
-            </article>
-
-          </div>
-        </div>
-
-        <div class="mm__bar">
-          <button class="btn" id="save">儲存分工</button>
-          <button class="btn btn--ghost" id="clear">清空名字</button>
-          <span class="mm__state" id="state">尚未儲存過</span>
-        </div>
+      <div class="mm__bar">
+        <button class="btn" id="save">儲存分工</button>
+        <button class="btn btn--ghost" id="clear">清空名字</button>
+        <span class="mm__state" id="state">尚未儲存過</span>
       </div>
 
       <div class="note">
@@ -1476,6 +1394,129 @@ html { scroll-behavior:smooth; }
 <script>
 (function () {
   'use strict';
+
+  /* ============================================================
+     心智圖：一個節點一則資訊，層級靠連線串起來
+     葉節點先各佔一格，父節點取子節點的中線，所以連線不會交叉
+     ============================================================ */
+  var TREE = [
+    { dom: '帳號與權限', c: 'var(--m1)', api: '17 支', groups: [
+      { k: '資料表', items: ['users', 'sessions', 'families', 'family_members', 'guardianships'] },
+      { k: 'API', items: ['註冊 / 登入 / 登出', '家庭與邀請碼', '監管關係'] },
+      { k: '畫面', items: ['註冊與登入', '成員與權限'] },
+      { k: 'LLM', llm: true, items: ['共用模型呼叫層', '結構化輸出約束', '重試與信心度'] }
+    ]},
+    { dom: '記帳', c: 'var(--m2)', api: '10 支', groups: [
+      { k: '資料表', items: ['transactions', 'categories', 'accounts', 'nlp_parses'] },
+      { k: 'API', items: ['明細 CRUD', 'nlp/parse', 'nlp/parse-batch', 'nlp/confirm'] },
+      { k: '畫面', items: ['段落記帳', '單筆手動', '缺欄位提示'] },
+      { k: 'LLM', llm: true, items: ['段落切分策略', '欄位抽取 prompt', '低信心判準'] }
+    ]},
+    { dom: '統計與預算', c: 'var(--m3)', api: '6 支', groups: [
+      { k: '資料表', items: ['budgets', 'savings_goals'] },
+      { k: 'API', items: ['summary', 'stats 月 / 年', 'budgets', 'savings-goal'] },
+      { k: '畫面', items: ['我的總覽', '家庭總覽', '統計圖表', '超支警告'] },
+      { k: 'LLM', llm: true, items: ['超支說明文案', { t: '分類體系定義 ⚑', flag: true }] }
+    ]},
+    { dom: '財務建議', c: 'var(--m4)', api: '2 支', groups: [
+      { k: '資料表', items: ['advices', 'basis_json 依據'] },
+      { k: 'API', items: ['advices', 'advices/generate'] },
+      { k: '畫面', items: ['建議卡片', '依據可驗算'] },
+      { k: 'LLM', llm: true, items: ['建議生成 prompt', '邊界規則', '全系統評測'] }
+    ]}
+  ];
+
+  var COL = { root: 10, rootW: 176, mem: 248, memW: 178, cat: 496, leaf: 622 };
+  var LEAF_H = 28, CAT_GAP = 14, MEM_GAP = 40, PAD = 26, WIDTH = 836;
+
+  function buildTree() {
+    var host = document.getElementById('mmc');
+    if (!host) return;
+
+    /* --- 先排葉節點，父節點取中線 --- */
+    var y = PAD;
+    TREE.forEach(function (m, mi) {
+      if (mi) y += MEM_GAP;
+      m.groups.forEach(function (g, gi) {
+        if (gi) y += CAT_GAP;
+        g.nodes = g.items.map(function (it) {
+          var o = typeof it === 'string' ? { t: it } : it;
+          o.y = y + LEAF_H / 2;
+          y += LEAF_H;
+          return o;
+        });
+        g.y = (g.nodes[0].y + g.nodes[g.nodes.length - 1].y) / 2;
+      });
+      m.y = (m.groups[0].y + m.groups[m.groups.length - 1].y) / 2;
+    });
+    var H = y + PAD;
+    var rootY = (TREE[0].y + TREE[TREE.length - 1].y) / 2;
+
+    /* --- 連線 --- */
+    function edge(x1, y1, x2, y2, color, w, op) {
+      var mx = (x1 + x2) / 2;
+      return '<path d="M ' + x1 + ' ' + y1 + ' C ' + mx + ' ' + y1 + ', ' +
+        mx + ' ' + y2 + ', ' + x2 + ' ' + y2 + '" fill="none" stroke="' + color +
+        '" stroke-width="' + w + '" opacity="' + op + '" stroke-linecap="round"/>';
+    }
+
+    var nodes = [], labels = [];
+    var rootRight = COL.root + COL.rootW;
+    var memRight = COL.mem + COL.memW;
+
+    nodes.push('<div class="n n--root" style="left:' + COL.root + 'px;top:' + rootY +
+      'px;width:' + COL.rootW + 'px">家庭記帳與財務控管系統</div>');
+
+    TREE.forEach(function (m, mi) {
+      labels.push('<span class="elab" style="left:' + ((rootRight + COL.mem) / 2) +
+        'px;top:' + ((rootY + m.y) / 2) + 'px">' + m.api + '</span>');
+
+      nodes.push('<div class="n n--mem" style="--c:' + m.c + ';left:' + COL.mem +
+        'px;top:' + m.y + 'px;width:' + COL.memW + 'px">' +
+        '<input class="mm__name" type="text" placeholder="成員' + (mi + 1) +
+        '" aria-label="成員' + (mi + 1) + ' 的姓名" maxlength="20">' +
+        '<span class="dom">' + m.dom + '</span></div>');
+
+      m.groups.forEach(function (g, gi) {
+        var col = g.llm ? 'var(--warn)' : m.c;
+        g.cid = 'c' + mi + '-' + gi;
+        nodes.push('<div class="n n--cat' + (g.llm ? ' is-llm' : '') + '" id="' + g.cid +
+          '" style="--c:' + col + ';left:' + COL.cat + 'px;top:' + g.y + 'px">' +
+          g.k + (g.llm ? ' ★' : '') + '</div>');
+
+        g.nodes.forEach(function (o) {
+          nodes.push('<div class="n n--leaf' + (g.llm ? ' is-llm' : '') +
+            (o.flag ? ' is-flag' : '') + '" style="--c:' + col + ';left:' + COL.leaf +
+            'px;top:' + o.y + 'px">' + o.t + '</div>');
+        });
+      });
+    });
+
+    host.style.width = WIDTH + 'px';
+    host.style.height = H + 'px';
+    host.innerHTML = nodes.join('') + labels.join('');
+
+    /* 節點放進 DOM 之後才量得到分類藥丸的真實寬度，連線起點用量到的值 */
+    var paths = [];
+    TREE.forEach(function (m) {
+      paths.push(edge(rootRight, rootY, COL.mem, m.y, m.c, 2.4, .8));
+      m.groups.forEach(function (g) {
+        var col = g.llm ? 'var(--warn)' : m.c;
+        paths.push(edge(memRight, m.y, COL.cat, g.y, col, 1.6, .55));
+        var pill = document.getElementById(g.cid);
+        var catRight = COL.cat + (pill ? pill.offsetWidth : 62);
+        g.nodes.forEach(function (o) {
+          paths.push(edge(catRight, g.y, COL.leaf, o.y, col, 1, .34));
+        });
+      });
+    });
+
+    host.insertAdjacentHTML('afterbegin',
+      '<svg class="mm-edges" width="' + WIDTH + '" height="' + H + '" aria-hidden="true">' +
+      paths.join('') + '</svg>');
+  }
+
+  buildTree();
 
   var KEY = 'fambudget.mindmap.v1';
   var DOC = 'config/mindmap';
