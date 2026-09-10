@@ -90,7 +90,7 @@
             return '<div class="bgt"><div class="bgt__k">' +
               '<span class="dot" style="background:' + x.catColor + '"></span>' + esc(x.catName) + '</div>' +
               '<div class="bgt__t"><i style="width:' + Math.min(100, x.pct * 100) +
-              '%;background:' + (x.over ? 'var(--r-crit)' : x.catColor) + '"></i></div>' +
+              '%;background:' + (x.over ? 'var(--down)' : x.catColor) + '"></i></div>' +
               '<div class="bgt__v' + (x.over ? ' is-over' : '') + '">' +
               money(x.used) + ' / ' + money(x.limit) + '</div></div>';
           }).join('') + '</div>';
@@ -137,9 +137,9 @@
       return seg;
     }).join('');
     return '<div class="dnt"><svg width="160" height="160" viewBox="0 0 160 160">' + arcs +
-      '<text x="80" y="76" text-anchor="middle" font-size="10" fill="var(--t3)" ' +
+      '<text x="80" y="76" text-anchor="middle" font-size="10" fill="var(--ink-faint)" ' +
       'font-family="var(--mono)">本月支出</text>' +
-      '<text x="80" y="95" text-anchor="middle" font-size="15" fill="var(--t0)" ' +
+      '<text x="80" y="95" text-anchor="middle" font-size="15" fill="var(--ink)" ' +
       'font-weight="700" font-family="var(--mono)">' + Number(total).toLocaleString('en-US') + '</text>' +
       '</svg><div class="dnt__l">' + byCat.map(function (c) {
         return '<div class="dnt__i"><span class="dot" style="background:' + c.color + '"></span>' +
@@ -154,12 +154,12 @@
     return '<div class="bars">' + rows.map(function (r, i) {
       return '<div class="bars__g">' +
         '<div class="bars__p">' +
-          '<i style="height:' + (r.income / max * 100) + '%;background:var(--r-done);animation-delay:' + (i * 60) + 'ms"></i>' +
-          '<i style="height:' + (r.expense / max * 100) + '%;background:var(--r-high);animation-delay:' + (i * 60 + 30) + 'ms"></i>' +
+          '<i style="height:' + (r.income / max * 100) + '%;background:var(--up);animation-delay:' + (i * 60) + 'ms"></i>' +
+          '<i style="height:' + (r.expense / max * 100) + '%;background:var(--warn);animation-delay:' + (i * 60 + 30) + 'ms"></i>' +
         '</div><div class="bars__k">' + esc(r.m.slice(5)) + '</div></div>';
     }).join('') + '</div>' +
-      '<div class="lgd"><span><i style="background:var(--r-done)"></i>收入</span>' +
-      '<span><i style="background:var(--r-high)"></i>支出</span></div>';
+      '<div class="lgd"><span><i style="background:var(--up)"></i>收入</span>' +
+      '<span><i style="background:var(--warn)"></i>支出</span></div>';
   }
 
   function txRow(t) {
@@ -310,12 +310,12 @@
               (bs.length ? '<span class="tag tag--MEDIUM">' + bs.length + ' 項分類超支</span>' : '') +
             '</div><div class="row__sub">收入 ' + money(u.income) + '　支出 ' + money(u.expense) +
             '　預算 ' + money(u.budget) + '</div></div>' +
-            '<div class="sla"><div class="sla__v"' + (over ? ' style="color:var(--r-crit)"' : '') + '>' +
+            '<div class="sla"><div class="sla__v"' + (over ? ' style="color:var(--down)"' : '') + '>' +
               pct(u.expense / u.budget) + '</div>' +
               '<div class="sla__b"><i style="width:' + Math.min(100, u.expense / u.budget * 100) +
-              '%;background:' + (over ? 'var(--r-crit)' : 'var(--r-done)') + '"></i></div></div>' +
+              '%;background:' + (over ? 'var(--down)' : 'var(--up)') + '"></i></div></div>' +
             '<div class="row__do"><b class="num" style="color:' +
-              (u.income - u.expense >= 0 ? 'var(--r-done)' : 'var(--r-crit)') + '">' +
+              (u.income - u.expense >= 0 ? 'var(--up)' : 'var(--down)') + '">' +
               (u.income - u.expense >= 0 ? '+' : '') +
               Number(u.income - u.expense).toLocaleString('en-US') + '</b></div>' +
             '</article>';
@@ -326,7 +326,7 @@
         h += over.length ? '<div class="card">' + over.map(function (x) {
           return '<div class="bgt"><div class="bgt__k"><span class="dot" style="background:' +
             x.catColor + '"></span>' + esc(x.userName) + '　' + esc(x.catName) + '</div>' +
-            '<div class="bgt__t"><i style="width:100%;background:var(--r-crit)"></i></div>' +
+            '<div class="bgt__t"><i style="width:100%;background:var(--down)"></i></div>' +
             '<div class="bgt__v is-over">' + money(x.used) + ' / ' + money(x.limit) +
             '（' + pct(x.pct) + '）</div></div>';
         }).join('') + '</div>' : emptyState('沒有超支項目', '本月所有分類都在預算內。');
@@ -364,12 +364,12 @@
             (r.partial ? ' <span class="tag tag--soft">未完整</span>' : '') + '</td>' +
             '<td class="mono">' + money(r.income) + '</td>' +
             '<td class="mono">' + money(r.expense) + '</td>' +
-            '<td class="mono"><b style="color:' + (net >= 0 ? 'var(--r-done)' : 'var(--r-crit)') +
+            '<td class="mono"><b style="color:' + (net >= 0 ? 'var(--up)' : 'var(--down)') +
             '">' + money(net) + '</b></td>' +
             '<td class="mono">' + pct(rate) + '</td>' +
             '<td style="width:140px"><div class="sla__b"><i style="width:' +
             Math.max(0, Math.min(100, rate * 200)) + '%;background:' +
-            (rate >= 0.2 ? 'var(--r-done)' : (rate >= 0 ? 'var(--r-med)' : 'var(--r-crit)')) +
+            (rate >= 0.2 ? 'var(--up)' : (rate >= 0 ? 'var(--warn)' : 'var(--down)')) +
             '"></i></div></td></tr>';
         }).join('') + '</tbody></table></div></div>';
 
@@ -455,7 +455,7 @@
           '</div><div class="row__sub">' +
             (wards.length ? '監管：' + wards.map(function (g) { return esc(g.wardName); }).join('、') : '') +
             (wards.length && by.length ? '　｜　' : '') +
-            (by.length ? '<b style="color:var(--r-med)">被 ' +
+            (by.length ? '<b style="color:var(--warn)">被 ' +
               by.map(function (g) { return esc(g.guardianName); }).join('、') + ' 監管</b>' : '') +
             (!wards.length && !by.length ? '無監管關係' : '') +
           '</div></div>' +
@@ -472,7 +472,7 @@
       h += '<div class="sec"><h2 class="sec__t">角色</h2></div>';
       h += '<div class="tbl"><table><thead><tr><th>角色</th><th>說明</th></tr></thead><tbody>' +
         d.roles.map(function (r) {
-          return '<tr><td><b>' + esc(r.name) + '</b><br><span class="mono" style="color:var(--t4)">' +
+          return '<tr><td><b>' + esc(r.name) + '</b><br><span class="mono" style="color:var(--ink-dim)">' +
             esc(r.id) + '</span></td><td>' + esc(r.desc) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
 
@@ -504,7 +504,7 @@
         '</tr></thead><tbody>' + d.eval.map(function (e) {
           return '<tr><td><b>' + esc(e.task) + '</b></td><td>' + esc(e.metric) + '</td>' +
             '<td class="mono">' + e.base + '</td>' +
-            '<td class="mono"><b style="color:var(--t0)">' + e.ft + '</b></td>' +
+            '<td class="mono"><b style="color:var(--ink)">' + e.ft + '</b></td>' +
             '<td class="mono">' + e.target + '</td>' +
             '<td>' + (e.ft >= e.target ? '<span class="tag tag--done">達標</span>' :
               '<span class="tag tag--CRITICAL">未達</span>') + '</td></tr>';
@@ -558,7 +558,7 @@
           '<th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody>' +
           t.cols.map(function (c) {
             return '<tr><td class="mono"><b>' + esc(c[0]) + '</b></td>' +
-              '<td class="mono" style="color:var(--a)">' + esc(c[1]) + '</td>' +
+              '<td class="mono" style="color:var(--accent)">' + esc(c[1]) + '</td>' +
               '<td>' + esc(c[2]) + '</td></tr>';
           }).join('') + '</tbody></table></div></div></details>';
       }).join('');
@@ -617,18 +617,18 @@
       var p = pos[k], m = meta[k];
       if (!m) return;
       var isCore = core.indexOf(k) >= 0, isStar = star.indexOf(k) >= 0;
-      var stroke = isStar ? 'var(--r-high)' : (isCore ? 'var(--a)' : 'var(--line-3)');
+      var stroke = isStar ? 'var(--warn)' : (isCore ? 'var(--accent)' : 'var(--line-3)');
       s += '<rect x="' + p[0] + '" y="' + p[1] + '" width="' + p[2] + '" height="' + p[3] +
-        '" fill="' + (isCore || isStar ? 'var(--s3)' : 'var(--s2)') + '" stroke="' + stroke +
+        '" fill="' + (isCore || isStar ? 'var(--card-3)' : 'var(--card-2)') + '" stroke="' + stroke +
         '" stroke-width="' + (isCore || isStar ? 2 : 1) + '"/>';
       s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 19) + '" font-size="11.5" ' +
         'font-weight="700" font-family="var(--mono)" fill="' +
-        (isStar ? 'var(--r-high)' : (isCore ? 'var(--a-lit)' : 'var(--t0)')) + '">' + esc(k) + '</text>';
+        (isStar ? 'var(--warn)' : (isCore ? 'var(--accent-hi)' : 'var(--ink)')) + '">' + esc(k) + '</text>';
       s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 34) + '" font-size="9.5" ' +
-        'fill="var(--t3)">' + esc(m.label) + '　' + m.cols.length + ' 欄</text>';
+        'fill="var(--ink-faint)">' + esc(m.label) + '　' + m.cols.length + ' 欄</text>';
       if (p[3] > 58) {
         s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 51) + '" font-size="9" ' +
-          'fill="var(--t4)">' + (isStar ? '★ 評測與訓練資料來源' : '核心表') + '</text>';
+          'fill="var(--ink-dim)">' + (isStar ? '★ 評測與訓練資料來源' : '核心表') + '</text>';
       }
     });
     s += '</svg>';

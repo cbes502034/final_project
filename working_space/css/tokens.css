@@ -1,120 +1,152 @@
 /* ============================================================
-   tokens.css — VULNSCOPE 設計系統
-   與報告站台刻意不同：以「風險色」為主要視覺語言，而不是單一主色。
-   保留深色與直角，但改用分層表面、更大的字級落差、以及動態。
+   tokens.css — 設計權杖
+   視覺語言取自 Friends World（inkstone-web.onrender.com）：
+   星空底、藍紫色系、圓角、襯線標題、柔和的玻璃卡片。
    ============================================================ */
 :root {
-  /* -- 表面分層：越上層越亮，用來造出深度 -- */
-  --s0: #070A0F;   /* 頁面底 */
-  --s1: #0C1119;   /* 面板 */
-  --s2: #121926;   /* 卡片 */
-  --s3: #1A2333;   /* 浮起 */
-  --s4: #232E42;   /* 互動 hover */
+  /* -- 底層 -- */
+  --void:        #05060A;
+  --card:        rgba(11, 14, 24, .95);
+  --card-2:      rgba(18, 22, 36, .92);
+  --card-3:      rgba(26, 31, 50, .9);
+  --sunk:        rgba(255, 255, 255, .035);
 
-  --line:   #1D2637;
-  --line-2: #2B3852;
-  --line-3: #3D4D6B;
+  /* -- 線 -- */
+  --line:        rgba(255, 255, 255, .08);
+  --line-2:      rgba(255, 255, 255, .14);
+  --line-3:      rgba(255, 255, 255, .22);
 
   /* -- 文字 -- */
-  --t0: #F4F8FF;   /* 標題 */
-  --t1: #C6D2E4;   /* 內文 */
-  --t2: #8B9AB4;   /* 次要 */
-  --t3: #5D6B84;   /* 弱 */
-  --t4: #3F4B60;   /* 極弱 */
+  --ink:         #ECEEF4;
+  --ink-soft:    #A7ADBD;
+  --ink-faint:   #767D91;
+  --ink-dim:     #565D70;
 
-  /* -- 互動主色（沿用蒂芬妮綠家族，這是團隊的偏好） -- */
-  --a:      #00D9C0;
-  --a-lit:  #4DFFE4;
-  --a-dim:  rgba(0, 217, 192, .14);
-  --a-glow: rgba(77, 255, 228, .38);
+  /* -- 主色 -- */
+  --accent:      #6C9FFB;
+  --accent-2:    #8B7CF0;          /* 紫向，用於漸層與次要強調 */
+  --accent-hi:   #9BC0FF;
+  --accent-wash: rgba(108, 159, 251, .14);
+  --accent-glow: rgba(108, 159, 251, .35);
 
-  /* -- 風險色：這才是本產品的主要視覺語言 -- */
-  --r-crit: #FF4757;
-  --r-high: #FF8A3D;
-  --r-med:  #FFC93C;
-  --r-low:  #5B7085;
-  --r-done: #2FD98A;
+  /* -- 語意色：刻意柔和，與藍紫底協調，不用螢光 -- */
+  --up:          #6EE7B7;          /* 收入、良好 */
+  --down:        #FB8A8F;          /* 支出、超支 */
+  --warn:        #FBBF6E;          /* 注意 */
+  --info:        #8B9DF7;          /* 參考 */
 
-  --r-crit-bg: rgba(255, 71, 87, .13);
-  --r-high-bg: rgba(255, 138, 61, .13);
-  --r-med-bg:  rgba(255, 201, 60, .13);
-  --r-low-bg:  rgba(91, 112, 133, .13);
-  --r-done-bg: rgba(47, 217, 138, .13);
+  --up-wash:     rgba(110, 231, 183, .13);
+  --down-wash:   rgba(251, 138, 143, .13);
+  --warn-wash:   rgba(251, 191, 110, .13);
+  --info-wash:   rgba(139, 157, 247, .13);
+
+  /* -- 圓角：這一版全部都是圓的 -- */
+  --r-card:      16px;
+  --r-input:     12px;
+  --r-sm:        10px;
+  --r-xs:        8px;
+  --r-pill:      999px;
 
   /* -- 字體 -- */
-  --mono: "JetBrains Mono", "IBM Plex Mono", "Cascadia Mono", "Consolas", "Roboto Mono", monospace;
-  --sans: "Inter", "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC",
+          "Microsoft JhengHei", sans-serif;
+  --serif: "Noto Serif TC", "Songti TC", PMingLiU, Georgia, serif;
+  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "Cascadia Mono",
+          Consolas, monospace;
 
   /* -- 尺度 -- */
-  --rail: 232px;
-  --bar: 58px;
+  --rail: 236px;
+  --bar: 62px;
   --ease: cubic-bezier(.22, .8, .28, 1);
+
+  --shadow-card: 0 24px 60px rgba(0, 0, 0, .42), 0 2px 8px rgba(0, 0, 0, .3);
+  --shadow-pop:  0 18px 48px rgba(0, 0, 0, .55);
 }
 
-/* 全站直角，只用切角不用圓角 */
-* { box-sizing: border-box; border-radius: 0 !important; }
+* { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  background-color: var(--void);
+  /* Friends World 的六層漸層：一道斜向銀河 + 五團暈光 */
+  background-image:
+    linear-gradient(163deg,
+      rgba(0, 0, 0, 0) 26%,
+      rgba(86, 122, 208, .16) 40%,
+      rgba(126, 108, 214, .20) 50%,
+      rgba(78, 156, 210, .15) 60%,
+      rgba(0, 0, 0, 0) 74%),
+    radial-gradient(832px 608px at 6% -4%,  rgba(58, 104, 214, .55), rgba(0,0,0,0) 60%),
+    radial-gradient(704px 544px at 94% 2%,  rgba(124, 84, 206, .45), rgba(0,0,0,0) 58%),
+    radial-gradient(576px 448px at 72% 34%, rgba(52, 150, 200, .30), rgba(0,0,0,0) 62%),
+    radial-gradient(480px 384px at 22% 58%, rgba(96, 76, 190, .28), rgba(0,0,0,0) 62%),
+    radial-gradient(1024px 672px at 46% 104%, rgba(44, 92, 186, .40), rgba(0,0,0,0) 62%);
+  background-attachment: fixed;
+  scroll-behavior: smooth;
+}
 
 body {
   margin: 0;
-  background: var(--s0);
-  color: var(--t1);
+  background: transparent;
+  color: var(--ink);
   font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.75;
+  letter-spacing: .16px;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-/* 底層氛圍：兩道極淡的風險色暈，讓畫面不是死黑 */
-body::before {
-  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse 900px 500px at 12% -10%, rgba(255, 71, 87, .07), transparent 65%),
-    radial-gradient(ellipse 800px 600px at 95% 105%, rgba(0, 217, 192, .06), transparent 65%);
+/* 星空 canvas 疊在漸層之上、內容之下 */
+#stars {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
 }
 
-h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.01em; color: var(--t0); }
+h1, h2, h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+h4 { margin: 0; font-weight: 600; letter-spacing: .01em; }
 p { margin: 0; }
 ul { margin: 0; padding: 0; list-style: none; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 input, select { font: inherit; }
-a { color: var(--a); text-decoration: none; }
-a:hover { color: var(--a-lit); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hi); }
+table { border-collapse: collapse; }
 
-/* 數字一律等寬，欄位才對得齊 */
-.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.serif { font-family: var(--serif); }
 
-/* 鍵盤焦點看得見 */
-:focus-visible { outline: 2px solid var(--a-lit); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-xs); }
 
-::-webkit-scrollbar { width: 11px; height: 11px; }
-::-webkit-scrollbar-track { background: var(--s0); }
-::-webkit-scrollbar-thumb { background: var(--line-2); border: 3px solid var(--s0); }
-::-webkit-scrollbar-thumb:hover { background: var(--line-3); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: var(--r-pill); border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.22); background-clip: content-box; }
 
-/* ---------- 通用動態 ---------- */
+/* ---------- 動態 ---------- */
 @keyframes riseIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideL {
-  from { opacity: 0; transform: translateX(28px); }
+  from { opacity: 0; transform: translateX(30px); }
   to   { opacity: 1; transform: none; }
 }
-@keyframes pulseDot {
-  0%, 100% { opacity: .35; transform: scale(1); }
-  50%      { opacity: 1; transform: scale(1.35); }
-}
+@keyframes growW { from { width: 0 !important; } }
+@keyframes growH { from { height: 0 !important; } }
 @keyframes shimmer {
   from { background-position: -420px 0; }
   to   { background-position: 420px 0; }
 }
-@keyframes growW { from { width: 0 !important; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.rise { animation: riseIn .5s var(--ease) both; }
+.rise { animation: riseIn .55s var(--ease) both; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -123,4 +155,5 @@ a:hover { color: var(--a-lit); }
     transition-duration: .01ms !important;
   }
   html { scroll-behavior: auto; }
+  #stars { display: none; }
 }
