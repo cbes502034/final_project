@@ -316,6 +316,55 @@ td.tight { white-space:nowrap; }
 .mvc--m { border-top:2px solid var(--m3); }
 .mvc--m .mvc__k { color:var(--m3); }
 
+/* ---------- 各表欄位手風琴 ---------- */
+.accs { display: flex; flex-direction: column; gap: 8px; }
+.acc {
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--card); overflow: hidden;
+}
+.acc__h {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 12px 18px; cursor: pointer; list-style: none;
+  transition: background .18s var(--ease);
+}
+.acc__h::-webkit-details-marker { display: none; }
+.acc__h:hover { background: var(--card-2); }
+.acc[open] .acc__h { background: var(--card-2); border-bottom: 1px solid var(--line); }
+.acc__code { font-family: var(--mono); font-size: 13px; color: var(--accent-hi); }
+.acc__t { font-size: 13.5px; color: var(--ink); }
+.acc__n { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+.acc__b { padding: 14px 18px 18px; }
+.acc__note { font-size: 12.5px; color: var(--ink-faint); }
+
+/* ---------- 指向獨立文件的外連 ---------- */
+.dlink {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 18px; padding: 18px 20px;
+  border-radius: var(--r-card); text-decoration: none;
+  border: 1px solid rgba(251,191,110,.32);
+  background: linear-gradient(120deg, rgba(251,191,110,.10), rgba(251,191,110,.04));
+  transition: border-color .18s var(--ease), background .18s var(--ease);
+}
+.dlink:hover {
+  border-color: rgba(251,191,110,.6);
+  background: linear-gradient(120deg, rgba(251,191,110,.16), rgba(251,191,110,.07));
+  text-decoration: none;
+}
+.dlink__ic { flex: 0 0 22px; color: var(--warn); }
+.dlink__ic svg { width: 22px; height: 22px; display: block; }
+.dlink__m { display: flex; flex-direction: column; min-width: 0; }
+.dlink__t { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); }
+.dlink__s { font-size: 12.5px; color: var(--ink-faint); }
+.dlink__go {
+  width: 14px; height: 14px; flex: 0 0 14px; margin-left: auto; color: var(--warn);
+  opacity: .65; transition: opacity .18s var(--ease), transform .18s var(--ease);
+}
+.dlink:hover .dlink__go { opacity: 1; transform: translate(1px, -1px); }
+
+.nav a.nav__out { color: var(--warn); margin-top: 6px; }
+.nav a.nav__out i { color: var(--warn); opacity: .8; }
+.nav a.nav__out:hover { background: var(--warn-wash); color: var(--warn); }
+
 /* ---------- 心智圖：節點樹 ---------- */
 .mmwrap {
   overflow-x: auto; overflow-y: hidden;
@@ -470,8 +519,11 @@ html { scroll-behavior:smooth; }
       <a href="#api"><i>05</i>API：按人員分類</a>
       <a href="#arch"><i>06</i>系統架構</a>
       <a href="#mvc"><i>07</i>MVC 流程</a>
-      <a href="#llm"><i>08</i>LLM 架構</a>
-      <a href="#mindmap"><i>09</i>分工心智圖</a>
+      <a href="#db"><i>08</i>資料庫設計</a>
+      <a href="#llm"><i>09</i>LLM 設計</a>
+      <a href="#mindmap"><i>10</i>分工心智圖</a>
+      <a class="nav__out" href="https://claude.ai/code/artifact/6fc355a2-81e5-407b-9e8d-b2942ff26c3b" target="_blank" rel="noopener">
+        <i>↗</i>記帳模型設計</a>
     </div>
   </nav>
 
@@ -592,7 +644,7 @@ html { scroll-behavior:smooth; }
             <tr><td><b>只有一個月</b></td><td>不能有學習曲線陡的東西。每個新框架都要換算成「幾天學會」</td></tr>
             <tr><td><b>四人中三人沒有專案經驗</b></td><td>工具要好上手、錯誤訊息看得懂、查得到中文資料</td></tr>
             <tr><td><b>一人有 FastAPI / Docker / Render 實戰</b></td><td>後端主幹沿用熟悉的，不為了「更好」而換</td></tr>
-            <tr><td><b>沒有 GPU</b></td><td>模型只能用 API，或在 Colab 免費 T4 上微調小模型</td></tr>
+            <tr><td><b>沒有 GPU</b></td><td>只能在 Colab 或 Kaggle 的免費 T4 上微調小模型，這條直接決定了模型大小的上限</td></tr>
           </tbody>
         </table>
       </div>
@@ -829,18 +881,6 @@ html { scroll-behavior:smooth; }
         </table>
       </div>
 
-      <h3 class="sub">LLM</h3>
-      <div class="tw">
-        <table>
-          <thead><tr><th>工具</th><th>用途</th><th>說明</th></tr></thead>
-          <tbody>
-            <tr><td><b>Anthropic API</b></td><td>段落記帳解析、財務建議生成</td><td>組內有實戰經驗：Tool Use 兩輪架構、強制結構化輸出</td></tr>
-            <tr><td>Pydantic</td><td>約束模型輸出格式</td><td>模型回傳的 JSON <b>一定要過 Pydantic 驗證才採用</b></td></tr>
-            <tr><td>Colab 免費 T4</td><td>微調（第二階段）</td><td>沒有 GPU，只能靠免費雲端</td></tr>
-          </tbody>
-        </table>
-      </div>
-
       <h3 class="sub">開發與部署</h3>
       <div class="tw">
         <table>
@@ -887,22 +927,6 @@ html { scroll-behavior:smooth; }
         </div>
       </div>
 
-      <h3 class="sub">第一版不微調</h3>
-      <div class="tw">
-        <table>
-          <thead><tr><th>做法</th><th>成本</th><th>預期效果</th></tr></thead>
-          <tbody>
-            <tr><td><b>API + few-shot + 結構化輸出</b></td><td>低，一週內可上線</td><td>一次輸入完全正確率約 0.6–0.75</td></tr>
-            <tr><td>API + 微調小模型</td><td>高，要標註 + 訓練 + 評測</td><td>目標 0.75+</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="note note--warn">
-        <div class="note__k">但評測不能省</div>
-        <p>第一版先用 API 把系統跑起來，收集 <code>nlp_parses</code> 的真實資料，第二階段再微調——
-        這樣<b>即使微調來不及，系統仍然完整可用</b>。
-        但就算不微調，也要交出「零樣本 vs few-shot」的對照數字，<b>那是本專題的量化成果</b>。</p>
-      </div>
     </section>
 
     <!-- ============ 05 API 按人員分類 ============ -->
@@ -1101,8 +1125,8 @@ html { scroll-behavior:smooth; }
       </div>
 
       <div class="note note--warn">
-        <div class="note__k">Anthropic API 掛在 services 這一層，不在資料層</div>
-        <p>模型<b>只被 service 呼叫，永遠不直接寫資料庫</b>。
+        <div class="note__k">推論服務掛在 services 這一層，不在資料層</div>
+        <p>自架的模型<b>只被 service 呼叫，永遠不直接讀寫資料庫</b>。
         所有寫入都要先經過 Pydantic 驗證，並且在段落記帳的情況下，<b>還要先經過使用者確認</b>。</p>
       </div>
     </section>
@@ -1210,140 +1234,85 @@ html { scroll-behavior:smooth; }
     </section>
 
     <!-- ============ 08 LLM 架構 ============ -->
-    <section class="sec" id="llm">
-      <div class="sec__h"><span class="sec__n">08</span><h2>LLM 架構</h2></div>
+    <!-- ============ 08 資料庫設計 ============ -->
+    <section class="sec" id="db">
+      <div class="sec__h"><span class="sec__n">08</span><h2>資料庫設計</h2></div>
       <p class="sec__lead">
-        兩條路徑，優先順序差很多。<b>路徑 A 是系統的核心，路徑 B 是加值。</b>
+        13 張表、15 條關聯。核心是 <code>users</code> 與 <code>transactions</code>；
+        橘色那兩張（<code>nlp_parses</code>、<code>savings_goals</code>）是這個專題自己加的。
       </p>
 
-      <h3 class="sub">路徑 A · 段落記帳（核心）</h3>
-      <div class="steps">
-        <div class="step">
-          <div class="step__n">1</div>
-          <div class="step__b">
-            <div class="step__t">使用者寫一段話</div>
-            <div class="step__d" style="font-family:var(--mono);font-size:12.5px;color:var(--accent-hi)">
-              「早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500」
-            </div>
-          </div>
-        </div>
-        <div class="step step--llm">
-          <div class="step__n">2</div>
-          <div class="step__b">
-            <div class="step__t">POST /api/nlp/parse-batch — 模型做兩件事</div>
-            <div class="step__d">
-              <b>先切分</b>：這段話裡有幾筆？<br>
-              <b>再抽欄位</b>：每一筆的日期、金額、收支方向、分類、店家，<b>各自附一個信心度</b>。<br>
-              prompt 帶 few-shot 範例與家庭的分類體系；輸出格式由 Pydantic schema 約束。
-            </div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__n">3</div>
-          <div class="step__b">
-            <div class="step__t">Pydantic 驗證 — 過不了就重試</div>
-            <div class="step__d">模型回傳的 JSON 一定要通過 schema 驗證才採用。
-            驗不過就帶著錯誤訊息重試，<b>重試仍失敗才回錯誤給前端</b>。</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__n">4</div>
-          <div class="step__b">
-            <div class="step__t">前端逐筆列出來給人確認</div>
-            <div class="step__d">
-              每一列標出它對應原句的哪一段（切分也要被檢查）。<br>
-              <span style="color:var(--down)">缺欄位</span>→ 標在那一欄上，紅框 + 「必填」，<b>補齊前送出鈕停用</b>。<br>
-              <span style="color:var(--warn)">信心 &lt; 85%</span> → 標黃並顯示百分比。
-            </div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__n">5</div>
-          <div class="step__b">
-            <div class="step__t">POST /api/nlp/confirm-batch — 這時才寫入</div>
-            <div class="step__d"><b>模型從頭到尾沒有碰過資料庫。</b>
-            寫入的同時把「模型解析值 + 使用者修正值」一起存進 <code>nlp_parses</code>。</div>
-          </div>
-        </div>
-        <div class="step step--llm">
-          <div class="step__n">6</div>
-          <div class="step__b">
-            <div class="step__t">資料飛輪 — 修正變成下一輪的燃料</div>
-            <div class="step__d"><code>nlp_parses</code> 同時是<b>評測的來源</b>（算一次輸入完全正確率）
-            與<b>下一輪 few-shot / 微調的訓練資料</b>。使用者用得越多，資料越多。</div>
-          </div>
-        </div>
+      <figure>
+        <div class="figbox"><svg viewBox="0 0 940 500" role="img" aria-label="十三張資料表的關聯圖，核心是 users 與 transactions，nlp_parses 與 savings_goals 是本專題新增的兩張" style="width:100%;height:auto;display:block"><line x1="185" y1="59" x2="470" y2="67" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="185" y1="139" x2="470" y2="67" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><text x="327.5" y="99" text-anchor="middle" font-size="9.5" fill="#767D91">★存款目標</text><line x1="755" y1="151" x2="470" y2="67" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="755" y1="151" x2="755" y2="61" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="755" y1="241" x2="470" y2="67" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><text x="612.5" y="150" text-anchor="middle" font-size="9.5" fill="#767D91">監管</text><line x1="185" y1="219" x2="470" y2="67" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="470" y2="67" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="755" y2="61" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="185" y2="219" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="185" y2="353" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="470" y1="421" x2="470" y2="289" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><text x="470" y="351" text-anchor="middle" font-size="9.5" fill="#767D91">★評測</text><line x1="755" y1="353" x2="755" y2="61" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="755" y1="353" x2="185" y2="353" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="755" y1="443" x2="755" y2="61" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><line x1="185" y1="453" x2="470" y2="67" stroke="#8B9DF7" stroke-width="1" opacity=".28"/><rect x="385" y="36" width="170" height="62" rx="9" fill="rgba(108,159,251,.13)" stroke="#6C9FFB" stroke-width="1.6"/><text x="470" y="60" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#9BC0FF">users</text><text x="470" y="78" text-anchor="middle" font-size="10" fill="#9BC0FF" opacity=".72">使用者帳號</text><text x="470" y="92" text-anchor="middle" font-size="9.5" fill="#9BC0FF" opacity=".55">7 欄</text><rect x="110" y="116" width="150" height="46" rx="9" fill="rgba(251,191,110,.11)" stroke="#FBBF6E" stroke-width="1.6"/><text x="185" y="135" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#FBBF6E">savings_goals</text><text x="185" y="150" text-anchor="middle" font-size="10" fill="#FBBF6E" opacity=".72">每月存款目標</text><rect x="110" y="36" width="150" height="46" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="185" y="55" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">sessions</text><text x="185" y="70" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">登入工作階段</text><rect x="670" y="36" width="170" height="50" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="755" y="55" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">families</text><text x="755" y="70" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">家庭</text><rect x="670" y="126" width="170" height="50" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="755" y="145" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">family_members</text><text x="755" y="160" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">家庭成員與角色</text><rect x="670" y="216" width="170" height="50" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="755" y="235" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">guardianships</text><text x="755" y="250" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">監管關係</text><rect x="110" y="196" width="150" height="46" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="185" y="215" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">accounts</text><text x="185" y="230" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">帳戶／錢包</text><rect x="110" y="330" width="150" height="46" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="185" y="349" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">categories</text><text x="185" y="364" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">分類</text><rect x="385" y="256" width="170" height="66" rx="9" fill="rgba(108,159,251,.13)" stroke="#6C9FFB" stroke-width="1.6"/><text x="470" y="280" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#9BC0FF">transactions</text><text x="470" y="298" text-anchor="middle" font-size="10" fill="#9BC0FF" opacity=".72">收支明細</text><text x="470" y="312" text-anchor="middle" font-size="9.5" fill="#9BC0FF" opacity=".55">13 欄</text><rect x="385" y="396" width="170" height="50" rx="9" fill="rgba(251,191,110,.11)" stroke="#FBBF6E" stroke-width="1.6"/><text x="470" y="415" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#FBBF6E">nlp_parses</text><text x="470" y="430" text-anchor="middle" font-size="10" fill="#FBBF6E" opacity=".72">自然語言記帳解析紀錄</text><rect x="670" y="330" width="170" height="46" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="755" y="349" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">budgets</text><text x="755" y="364" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">預算</text><rect x="670" y="420" width="170" height="46" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="755" y="439" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">advices</text><text x="755" y="454" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">LLM 財務建議</text><rect x="110" y="430" width="150" height="46" rx="9" fill="rgba(255,255,255,.035)" stroke="#565D70" stroke-width="1.1"/><text x="185" y="449" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#A7ADBD">audit_logs</text><text x="185" y="464" text-anchor="middle" font-size="10" fill="#A7ADBD" opacity=".72">稽核紀錄</text></svg></div>
+        <figcaption>
+          <b>藍色是核心、橘色是本專題新增的兩張。</b>
+          <code>nlp_parses</code> 記下每一次的原始輸入、模型輸出與使用者修正值，
+          是評測來源也是下一輪訓練資料；<code>savings_goals</code> 帶 <code>period_key</code>，
+          目標改動保留歷史不覆蓋，否則回頭看會不知道當時的目標是多少。
+        </figcaption>
+      </figure>
+
+      <h3 class="sub">各表欄位</h3>
+      <div class="accs"><details class="acc" open><summary class="acc__h"><code class="acc__code">users</code><span class="acc__t">使用者帳號</span><span class="acc__n">7 欄</span></summary><div class="acc__b"><p class="acc__note">登入身分，與家庭角色分開</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>email</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>UNIQUE</td></tr><tr><td class="mono"><b>password_hash</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>bcrypt / argon2，絕不存明碼</td></tr><tr><td class="mono"><b>display_name</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>birth_year</b></td><td class="mono" style="color:var(--accent)">INT</td><td>判斷是否未成年</td></tr><tr><td class="mono"><b>created_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr><tr><td class="mono"><b>last_login_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">savings_goals</code><span class="acc__t">每月存款目標</span><span class="acc__n">7 欄</span></summary><div class="acc__b"><p class="acc__note">★ 註冊時就要填。改過的值保留歷史，不覆蓋</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>period_key</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'2026-09'。NULL = 預設值，套用到所有未指定的月份</td></tr><tr><td class="mono"><b>goal_amount</b></td><td class="mono" style="color:var(--accent)">NUMERIC(14,2)</td><td>每月想存多少</td></tr><tr><td class="mono"><b>warn_ratio</b></td><td class="mono" style="color:var(--accent)">NUMERIC</td><td>達可支配上限的幾成時提醒，預設 0.8</td></tr><tr><td class="mono"><b>created_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr><tr><td class="mono"><b>created_by</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>本人；未成年者可由 master 代設</td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">sessions</code><span class="acc__t">登入工作階段</span><span class="acc__n">8 欄</span></summary><div class="acc__b"><p class="acc__note">支援登出與強制下線</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">UUID</td><td>PK</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>refresh_token_hash</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>只存雜湊</td></tr><tr><td class="mono"><b>user_agent</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>ip_hash</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>issued_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr><tr><td class="mono"><b>expires_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr><tr><td class="mono"><b>revoked_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td>NULL = 仍有效</td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">families</code><span class="acc__t">家庭</span><span class="acc__n">6 欄</span></summary><div class="acc__b"><p class="acc__note">一個家庭一列</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>name</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>例如「林家」</td></tr><tr><td class="mono"><b>master_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users，最高權限</td></tr><tr><td class="mono"><b>currency</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>預設 'TWD'</td></tr><tr><td class="mono"><b>invite_code</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>邀請碼，可重新產生</td></tr><tr><td class="mono"><b>created_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">family_members</code><span class="acc__t">家庭成員與角色</span><span class="acc__n">5 欄</span></summary><div class="acc__b"><p class="acc__note">一人可屬於多個家庭</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>family_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>PK, FK → families</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>PK, FK → users</td></tr><tr><td class="mono"><b>role</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'master' / 'parent' / 'member'</td></tr><tr><td class="mono"><b>joined_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr><tr><td class="mono"><b>status</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'active' / 'invited' / 'removed'</td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">guardianships</code><span class="acc__t">監管關係</span><span class="acc__n">7 欄</span></summary><div class="acc__b"><p class="acc__note">誰看得到誰的明細。雙方都看得到這張表</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>guardian_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>ward_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>scope</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'all' / 'summary_only'</td></tr><tr><td class="mono"><b>created_by</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users，只有 master 能建立</td></tr><tr><td class="mono"><b>since</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr><tr><td class="mono"><b>ended_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">accounts</code><span class="acc__t">帳戶／錢包</span><span class="acc__n">6 欄</span></summary><div class="acc__b"><p class="acc__note">現金、銀行、悠遊卡、信用卡</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>name</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>kind</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'cash' / 'bank' / 'card' / 'ecard'</td></tr><tr><td class="mono"><b>balance</b></td><td class="mono" style="color:var(--accent)">NUMERIC(14,2)</td><td></td></tr><tr><td class="mono"><b>is_active</b></td><td class="mono" style="color:var(--accent)">BOOLEAN</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">categories</code><span class="acc__t">分類</span><span class="acc__n">7 欄</span></summary><div class="acc__b"><p class="acc__note">系統預設 + 家庭自訂</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>family_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>NULL = 系統預設</td></tr><tr><td class="mono"><b>name</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>kind</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'income' / 'expense'</td></tr><tr><td class="mono"><b>parent_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>支援兩層分類</td></tr><tr><td class="mono"><b>color</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>sort_order</b></td><td class="mono" style="color:var(--accent)">INT</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">transactions</code><span class="acc__t">收支明細</span><span class="acc__n">13 欄</span></summary><div class="acc__b"><p class="acc__note">核心表。所有統計都從這裡算</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>family_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → families，INDEX</td></tr><tr><td class="mono"><b>account_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → accounts</td></tr><tr><td class="mono"><b>category_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → categories</td></tr><tr><td class="mono"><b>kind</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'income' / 'expense'</td></tr><tr><td class="mono"><b>amount</b></td><td class="mono" style="color:var(--accent)">NUMERIC(14,2)</td><td>一律正數，方向看 kind</td></tr><tr><td class="mono"><b>occurred_on</b></td><td class="mono" style="color:var(--accent)">DATE</td><td>INDEX，統計用</td></tr><tr><td class="mono"><b>merchant</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>note</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>source</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'manual' / 'nlp' / 'import'</td></tr><tr><td class="mono"><b>created_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr><tr><td class="mono"><b>updated_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">nlp_parses</code><span class="acc__t">自然語言記帳解析紀錄</span><span class="acc__n">10 欄</span></summary><div class="acc__b"><p class="acc__note">★ 這是 LLM 評測的資料來源</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>transaction_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → transactions，NULL = 使用者放棄</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>raw_text</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>使用者原始輸入</td></tr><tr><td class="mono"><b>parsed_json</b></td><td class="mono" style="color:var(--accent)">JSONB</td><td>模型輸出的結構化結果</td></tr><tr><td class="mono"><b>confidence</b></td><td class="mono" style="color:var(--accent)">NUMERIC</td><td></td></tr><tr><td class="mono"><b>cat_confidence</b></td><td class="mono" style="color:var(--accent)">NUMERIC</td><td></td></tr><tr><td class="mono"><b>user_corrected</b></td><td class="mono" style="color:var(--accent)">JSONB</td><td>使用者修正後的值，NULL = 未修正</td></tr><tr><td class="mono"><b>model_ver</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>換模型要能分開比較</td></tr><tr><td class="mono"><b>created_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">budgets</code><span class="acc__t">預算</span><span class="acc__n">8 欄</span></summary><div class="acc__b"><p class="acc__note">月與年兩種週期</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>NULL = 家庭總預算</td></tr><tr><td class="mono"><b>family_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → families</td></tr><tr><td class="mono"><b>category_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>NULL = 總額預算</td></tr><tr><td class="mono"><b>period_type</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'month' / 'year'</td></tr><tr><td class="mono"><b>period_key</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'2026-09' 或 '2026'</td></tr><tr><td class="mono"><b>limit_amount</b></td><td class="mono" style="color:var(--accent)">NUMERIC(14,2)</td><td></td></tr><tr><td class="mono"><b>created_by</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">advices</code><span class="acc__t">LLM 財務建議</span><span class="acc__n">12 欄</span></summary><div class="acc__b"><p class="acc__note">每月結算後產生，附依據</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>family_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → families</td></tr><tr><td class="mono"><b>user_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>NULL = 家庭層級建議</td></tr><tr><td class="mono"><b>period_type</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'month' / 'year'</td></tr><tr><td class="mono"><b>period_key</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>level</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'ok' / 'info' / 'warn'</td></tr><tr><td class="mono"><b>title</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>LLM 生成</td></tr><tr><td class="mono"><b>body</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>LLM 生成</td></tr><tr><td class="mono"><b>basis_json</b></td><td class="mono" style="color:var(--accent)">JSONB</td><td>★ 依據的數字，由後端計算後餵給模型</td></tr><tr><td class="mono"><b>suggestions_json</b></td><td class="mono" style="color:var(--accent)">JSONB</td><td>LLM 生成</td></tr><tr><td class="mono"><b>model_ver</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>generated_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr></tbody></table></div></div></details><details class="acc"><summary class="acc__h"><code class="acc__code">audit_logs</code><span class="acc__t">稽核紀錄</span><span class="acc__n">7 欄</span></summary><div class="acc__b"><p class="acc__note">誰看了誰的資料、誰改了權限</p><div class="tw" style="margin-top:10px"><table><thead><tr><th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody><tr><td class="mono"><b>id</b></td><td class="mono" style="color:var(--accent)">BIGSERIAL</td><td>PK</td></tr><tr><td class="mono"><b>actor_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td>FK → users</td></tr><tr><td class="mono"><b>action</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td>'view_ward' / 'grant_guardianship' / 'change_role' …</td></tr><tr><td class="mono"><b>target_type</b></td><td class="mono" style="color:var(--accent)">TEXT</td><td></td></tr><tr><td class="mono"><b>target_id</b></td><td class="mono" style="color:var(--accent)">BIGINT</td><td></td></tr><tr><td class="mono"><b>meta_json</b></td><td class="mono" style="color:var(--accent)">JSONB</td><td></td></tr><tr><td class="mono"><b>created_at</b></td><td class="mono" style="color:var(--accent)">TIMESTAMPTZ</td><td></td></tr></tbody></table></div></div></details></div>
+
+      <h3 class="sub">五個設計重點</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">#</th><th>決定</th><th>為什麼</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td><b>帳號與家庭角色分開</b></td>
+              <td><code>users</code> 是登入身分，<code>family_members</code> 才是角色——一個人可以同時是甲家的管理者、乙家的成員</td></tr>
+            <tr><td class="num">2</td><td><b>監管關係獨立成表</b></td>
+              <td><code>guardianships</code> 有起訖時間。解除監管是設 <code>ended_at</code> 而不是刪除，因為稽核要看得到歷史</td></tr>
+            <tr><td class="num">3</td><td><b><code>nlp_parses</code> 是資料飛輪的核心</b></td>
+              <td>記下原始輸入、模型輸出、使用者修正值，既是評測來源也是下一輪訓練資料</td></tr>
+            <tr><td class="num">4</td><td><b><code>advices.basis_json</code> 存的是後端算好的數字</b></td>
+              <td>不是模型生成的——這樣使用者才驗算得了</td></tr>
+            <tr><td class="num">5</td><td><b>金額一律 <code>NUMERIC(14,2)</code></b></td>
+              <td><b>不用浮點數。</b>財務系統用 float 會有進位誤差，對不起來的帳最難查</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="note note--crit">
-        <div class="note__k">為什麼一定要分成 parse 與 confirm 兩支</div>
-        <p>如果模型解析完就直接寫入，<b>它錯了使用者只能事後去改</b>，
-        而且錯誤不會被記錄下來——飛輪就轉不起來。
-        分兩步讓「使用者的修正」變成一份<b>有標註的資料</b>，這是整個設計裡最值錢的一步。</p>
+        <div class="note__k">安全與隱私</div>
+        <p><code>password_hash</code> 用 bcrypt 或 argon2，<b>絕不存明碼</b>。
+        <code>sessions</code> 只存 refresh token 的雜湊，登出就是設 <code>revoked_at</code>。<br>
+        <code>audit_logs</code> 記錄「誰看了誰的資料」——<b>監管功能一旦存在，就必須有紀錄可查</b>，
+        否則權限會變成沒人管的黑箱。</p>
       </div>
+    </section>
 
-      <h3 class="sub">路徑 B · 財務建議（加值）</h3>
-      <div class="steps">
-        <div class="step">
-          <div class="step__n">1</div>
-          <div class="step__b">
-            <div class="step__t">analytics service 先把所有數字算出來</div>
-            <div class="step__d">收入、支出、各分類佔比、預算使用率、存款目標達成率——<b>全部由 SQL 與 Python 算</b>。</div>
-          </div>
-        </div>
-        <div class="step step--llm">
-          <div class="step__n">2</div>
-          <div class="step__b">
-            <div class="step__t">把「算好的數字」組進 prompt</div>
-            <div class="step__d">模型拿到的是結果，不是原始資料。<b>它沒有機會去算錯。</b></div>
-          </div>
-        </div>
-        <div class="step step--llm">
-          <div class="step__n">3</div>
-          <div class="step__b">
-            <div class="step__t">要求模型只做敘述與歸納</div>
-            <div class="step__d">邊界規則寫進 prompt：不做投資／保險／稅務建議、不對個人做價值判斷。</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__n">4</div>
-          <div class="step__b">
-            <div class="step__t">Pydantic 驗證輸出格式</div>
-            <div class="step__d">建議必須有標題、內容、分級三個欄位，缺一不可。</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step__n">5</div>
-          <div class="step__b">
-            <div class="step__t">把數字存進 advices.basis_json</div>
-            <div class="step__d"><b>使用者要能自己驗算</b>。每條建議都附上它是根據哪些數字算出來的。</div>
-          </div>
-        </div>
-      </div>
+    <section class="sec" id="llm">
+      <div class="sec__h"><span class="sec__n">09</span><h2>LLM 設計</h2></div>
+      <p class="sec__lead">
+        LLM 的部分<b>另外寫成一份獨立文件</b>——那邊要談模型選型、訓練參數、
+        工具定義與評測指標，內容性質跟這份手冊差太多，放在一起兩邊都不好讀。
+      </p>
+
+      <a class="dlink" href="https://claude.ai/code/artifact/6fc355a2-81e5-407b-9e8d-b2942ff26c3b" target="_blank" rel="noopener">
+        <span class="dlink__ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>
+        </span>
+        <span class="dlink__m">
+          <span class="dlink__t">記帳模型設計</span>
+          <span class="dlink__s">模型篩選 · 三段架構圖 · 兩輪工具呼叫 · 訓練管線 · 目標成效</span>
+        </span>
+        <svg class="dlink__go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 5h11v11"/><path d="M19 5 6 18"/></svg>
+      </a>
 
       <div class="note note--warn">
-        <div class="note__k">順序不能顛倒</div>
-        <p><b>模型不做任何算術。</b> 財務數字算錯會讓使用者做出錯誤決定，
-        而模型本來就不擅長算術。先算再敘述，不是先敘述再驗算。</p>
-      </div>
-
-      <h3 class="sub">評測：本專題的量化成果</h3>
-      <div class="tw">
-        <table>
-          <thead><tr><th>指標</th><th>怎麼算</th><th>為什麼用它</th></tr></thead>
-          <tbody>
-            <tr><td><b>一次輸入完全正確率</b></td><td>五個欄位<b>全對</b>才算一次成功</td><td>單看個別欄位的分數會高估體驗——使用者在意的是「我寫一句話，它有沒有<b>一次</b>記對」</td></tr>
-            <tr><td>切分正確率</td><td>一段話切出的筆數與人工標註一致</td><td>切錯比抽錯更難發現</td></tr>
-            <tr><td>分類 Macro-F1</td><td>各分類的 F1 取平均</td><td>避免被「餐飲」這種大類別的高分蓋過</td></tr>
-            <tr><td>零樣本 vs few-shot 對照</td><td>同一份測試集跑兩種 prompt</td><td><b>這是報告裡最有說服力的一張表</b></td></tr>
-          </tbody>
-        </table>
+        <div class="note__k">為什麼這份手冊裡看不到模型的細節</div>
+        <p>題目要求<b>自行微調開源模型</b>、而且要有 <b>function calling</b>，
+        那條路的技術決策（挑哪顆模型、QLoRA 怎麼設、五個工具各自為什麼存在、
+        沒有 GPU 要怎麼上線）自成一個題目。<br>
+        這份手冊講的是<b>系統本身</b>：功能、API、架構、分工。兩份分開看比較清楚。</p>
       </div>
     </section>
 
     <!-- ============ 09 心智圖 ============ -->
     <section class="sec" id="mindmap">
-      <div class="sec__h"><span class="sec__n">09</span><h2>分工心智圖</h2></div>
+      <div class="sec__h"><span class="sec__n">10</span><h2>分工心智圖</h2></div>
       <p class="sec__lead">
         不是「一個做前端、一個做後端」，而是<b>每人吃一條完整的功能模組</b>——
         從資料表、API、畫面，一路到該模組自己的 LLM。

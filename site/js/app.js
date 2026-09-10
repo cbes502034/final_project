@@ -669,128 +669,6 @@
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
-  /* ============================================================
-     07 模型評測
-     ============================================================ */
-  function vEval() {
-    head('模型評測', '自然語言記帳的抽取準確率 —— 這是本專題的量化成果');
-    $view.innerHTML = '<div class="page">' + skeleton(5) + '</div>';
-    API.nlpEval().then(function (d) {
-      var h = '<div class="page"><div class="tbl"><table><thead><tr>' +
-        '<th>任務</th><th>指標</th><th>未微調</th><th>微調後</th><th>目標</th><th>達標</th>' +
-        '</tr></thead><tbody>' + d.eval.map(function (e) {
-          return '<tr><td><b>' + esc(e.task) + '</b></td><td>' + esc(e.metric) + '</td>' +
-            '<td class="mono">' + e.base + '</td>' +
-            '<td class="mono"><b style="color:var(--ink)">' + e.ft + '</b></td>' +
-            '<td class="mono">' + e.target + '</td>' +
-            '<td>' + (e.ft >= e.target ? '<span class="tag tag--done">達標</span>' :
-              '<span class="tag tag--CRITICAL">未達</span>') + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
-
-
-      h += '<div class="sec"><h2 class="sec__t">解析範例與難點</h2></div>';
-      h += '<div class="tbl"><table><thead><tr><th>使用者說</th><th>解析成</th><th>難在哪</th>' +
-        '</tr></thead><tbody>' + d.demo.map(function (x) {
-          var c = global.DATA.categories.filter(function (y) { return y.id === x.out.cat; })[0];
-          return '<tr><td><b>「' + esc(x.raw) + '」</b></td>' +
-            '<td class="mono">' + esc(x.out.date) + '　' +
-            (x.out.kind === 'income' ? '+' : '−') + x.out.amount + '　' + esc(c.name) +
-            (x.out.merchant ? '　' + esc(x.out.merchant) : '') + '</td>' +
-            '<td>' + esc(x.note) + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
-
-      h += '</div>';
-      $view.innerHTML = h;
-    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
-  }
-
-  /* ============================================================
-     08 資料庫架構
-     ============================================================ */
-  function vSchema() {
-    head('資料庫架構', '13 張表與關聯，後端照這個建表');
-    $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
-    API.schema().then(function (d) {
-      var h = '<div class="page"><div class="card rise">' +
-        '<div class="card__h"><span class="card__t">關聯圖</span>' +
-        '<span class="card__s">' + d.schema.length + ' 張表</span></div>' +
-        erDiagram(d.schema, d.relations) + '</div>';
-
-      h += '<div class="sec"><h2 class="sec__t">各表欄位</h2>' +
-        '<span class="sec__n">DDL DRAFT</span></div>';
-      h += d.schema.map(function (t, i) {
-        return '<details class="acc" style="margin-bottom:8px"' + (i === 0 ? ' open' : '') + '>' +
-          '<summary class="acc__h"><span class="acc__ic" aria-hidden="true"><i></i><i></i></span>' +
-          '<code class="acc__code">' + esc(t.t) + '</code>' +
-          '<span class="acc__t">' + esc(t.label) + '</span>' +
-          '<span class="acc__en">' + esc(t.note) + '</span></summary>' +
-          '<div class="acc__b"><div class="tbl" style="border:0"><table><thead><tr>' +
-          '<th>欄位</th><th>型別</th><th>說明</th></tr></thead><tbody>' +
-          t.cols.map(function (c) {
-            return '<tr><td class="mono"><b>' + esc(c[0]) + '</b></td>' +
-              '<td class="mono" style="color:var(--accent)">' + esc(c[1]) + '</td>' +
-              '<td>' + esc(c[2]) + '</td></tr>';
-          }).join('') + '</tbody></table></div></div></details>';
-      }).join('');
-
-      h += '</div>';
-      $view.innerHTML = h;
-    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
-  }
-
-  function erDiagram(schema, rels) {
-    var W = 940, H = 580;
-    var pos = {
-      users:            [380, 40,  170, 62],
-      sessions:         [120, 40,  150, 46],
-      families:         [680, 40,  170, 50],
-      family_members:   [680, 130, 170, 50],
-      guardianships:    [680, 220, 170, 50],
-      accounts:         [120, 140, 150, 46],
-      categories:       [120, 320, 150, 46],
-      transactions:     [380, 250, 170, 66],
-      nlp_parses:       [380, 380, 170, 50],
-      budgets:          [680, 330, 170, 46],
-      advices:          [680, 420, 170, 46],
-      audit_logs:       [120, 420, 150, 46]
-    };
-    var meta = {};
-    schema.forEach(function (t) { meta[t.t] = t; });
-    var core = ['transactions', 'users'];
-    var star = ['nlp_parses'];
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">';
-
-    rels.forEach(function (r) {
-      var a = pos[r[0]], b = pos[r[1]];
-      if (!a || !b) return;
-      var ax = a[0] + a[2] / 2, ay = a[1] + a[3] / 2;
-      var bx = b[0] + b[2] / 2, by = b[1] + b[3] / 2;
-      s += '<path d="M' + ax + ' ' + ay + ' L' + bx + ' ' + ay + ' L' + bx + ' ' + by +
-        '" fill="none" stroke="var(--line-2)" stroke-width="1.1"/>';
-    });
-
-    Object.keys(pos).forEach(function (k) {
-      var p = pos[k], m = meta[k];
-      if (!m) return;
-      var isCore = core.indexOf(k) >= 0, isStar = star.indexOf(k) >= 0;
-      var stroke = isStar ? 'var(--warn)' : (isCore ? 'var(--accent)' : 'var(--line-3)');
-      s += '<rect x="' + p[0] + '" y="' + p[1] + '" width="' + p[2] + '" height="' + p[3] +
-        '" fill="' + (isCore || isStar ? 'var(--card-3)' : 'var(--card-2)') + '" stroke="' + stroke +
-        '" stroke-width="' + (isCore || isStar ? 2 : 1) + '"/>';
-      s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 19) + '" font-size="11.5" ' +
-        'font-weight="700" font-family="var(--mono)" fill="' +
-        (isStar ? 'var(--warn)' : (isCore ? 'var(--accent-hi)' : 'var(--ink)')) + '">' + esc(k) + '</text>';
-      s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 34) + '" font-size="9.5" ' +
-        'fill="var(--ink-faint)">' + esc(m.label) + '　' + m.cols.length + ' 欄</text>';
-      if (p[3] > 58) {
-        s += '<text x="' + (p[0] + 10) + '" y="' + (p[1] + 51) + '" font-size="9" ' +
-          'fill="var(--ink-dim)">' + (isStar ? '★ 評測與訓練資料來源' : '核心表') + '</text>';
-      }
-    });
-    s += '</svg>';
-    return '<div style="overflow-x:auto">' + s + '</div>';
-  }
-
   /* ---------- 共用 ---------- */
   function head(t, s) { $title.textContent = t; $sub.textContent = s; }
 
@@ -821,7 +699,7 @@
 
   /* ---------- 路由 ---------- */
   var ROUTES = { '': vHome, entry: vEntry, family: vFamily, stats: vStats,
-                 advice: vAdvice, members: vMembers, eval: vEval, schema: vSchema };
+                 advice: vAdvice, members: vMembers };
 
   function paint() {
     var page = (location.hash || '#/').replace(/^#\/?/, '').split('/')[0];
