@@ -67,27 +67,44 @@
   /* ---------- mock 模式的「資料庫」 ---------- */
   var state = null;
 
+  /* 註冊時填的存款目標。使用者改過之後要存得住，reset 再還原回這裡 */
+  var GOALS0 = null;
+  function applyGoals(map) {
+    if (!GOALS0) {
+      GOALS0 = {};
+      global.DATA.members.forEach(function (m) { GOALS0[m.id] = m.savingsGoal; });
+    }
+    global.DATA.members.forEach(function (m) {
+      m.savingsGoal = (map && map[m.id] !== undefined) ? map[m.id] : GOALS0[m.id];
+    });
+  }
+
   function load() {
     if (state) return state;
     var base = {
       me: 'U1',                                   // 模擬目前登入者
       transactions: clone(global.DATA.transactions),
-      budgets: clone(global.DATA.budgets)
+      budgets: clone(global.DATA.budgets),
+      goals: {}
     };
     try {
       var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (saved) {
         if (saved.me) base.me = saved.me;
         if (saved.extra) base.transactions = saved.extra.concat(base.transactions);
+        if (saved.goals) base.goals = saved.goals;
       }
     } catch (e) {}
+    applyGoals(base.goals);
     state = base;
     return state;
   }
   function save() {
     try {
       var extra = state.transactions.filter(function (t) { return t.id.indexOf('N') === 0; });
-      localStorage.setItem(KEY, JSON.stringify({ me: state.me, extra: extra }));
+      localStorage.setItem(KEY, JSON.stringify({
+        me: state.me, extra: extra, goals: state.goals || {}
+      }));
     } catch (e) {}
   }
 
@@ -332,11 +349,15 @@
     },
 
     setSavingsGoal: function (userId, goal) {
-      var D = global.DATA;
+      var st = load(), D = global.DATA;
       return sleep(240).then(function () {
         var m = D.members.filter(function (x) { return x.id === userId; })[0];
         if (!m) throw new Error('not found: ' + userId);
-        m.savingsGoal = Number(goal);
+        var v = Number(goal);
+        if (isNaN(v) || v < 0) throw new Error('存款目標要是 0 以上的數字');
+        st.goals[userId] = v;
+        applyGoals(st.goals);
+        save();
         return clone(m);
       });
     },
@@ -414,6 +435,7 @@
 
     reset: function () {
       try { localStorage.removeItem(KEY); } catch (e) {}
+      applyGoals(null);
       state = null;
       return sleep(120).then(function () { return { reset: true }; });
     }
@@ -452,6 +474,7 @@
     nlpConfirmBatch:   function (i)     { return req('/api/nlp/confirm-batch', { method: 'POST', body: { items: i } }); },
     deleteTransaction: function (id)    { return req('/api/transactions/' + encodeURIComponent(id), { method: 'DELETE' }); },
     budgets:           function ()      { return req('/api/budgets'); },
+    setSavingsGoal:    function (u, g)  { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g } }); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
     members:           function ()      { return req('/api/family'); },
     nlpEval:           function ()      { return req('/api/nlp/eval'); },
@@ -474,6 +497,7 @@
     nlpConfirmBatch:   function (i)    { return impl.nlpConfirmBatch(i); },
     deleteTransaction: function (i)    { return impl.deleteTransaction(i); },
     budgets:           function ()     { return impl.budgets(); },
+    setSavingsGoal:    function (u, g) { return impl.setSavingsGoal(u, g); },
     advices:           function (f)    { return impl.advices(f); },
     members:           function ()     { return impl.members(); },
     nlpEval:           function ()     { return impl.nlpEval(); },
