@@ -215,10 +215,10 @@
       '<div class="tx__c" style="background:' + t.catColor + '22;color:' + t.catColor +
         ';border-color:' + t.catColor + '55">' + esc(t.catName.slice(0, 2)) + '</div>' +
       '<div class="tx__m"><div class="tx__t">' + esc(t.merchant || t.catName) +
-        (t.source === 'nlp' ? ' <span class="tag tag--soft">語音記帳</span>' : '') + '</div>' +
+        (t.source === 'nlp' ? ' <span class="tag tag--soft">段落記帳</span>' : '') + '</div>' +
         '<div class="tx__s">' + esc(t.date) + '　' + esc(t.userName) +
         (t.note ? '　' + esc(t.note) : '') +
-        (t.raw ? '<br><span class="tx__raw">原話「' + esc(t.raw) + '」</span>' : '') + '</div></div>' +
+        (t.raw ? '<br><span class="tx__raw">原句「' + esc(t.raw) + '」</span>' : '') + '</div></div>' +
       '<div class="tx__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
         (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</div>' +
       '<button class="btn btn--sm" data-del="' + esc(t.id) + '">刪除</button>' +
@@ -421,7 +421,7 @@
 
   function filterBar() {
     var ks = [['all', '全部'], ['expense', '支出'], ['income', '收入']];
-    var ss = [['all', '不分來源'], ['nlp', '語音記帳'], ['manual', '手動輸入']];
+    var ss = [['all', '不分來源'], ['nlp', '段落記帳'], ['manual', '手動輸入']];
     return '<div class="bar"><div class="chips">' + ks.map(function (k) {
         return '<button class="chip' + (F.kind === k[0] ? ' on' : '') +
           '" data-f="kind" data-v="' + k[0] + '">' + k[1] + '</button>';
@@ -712,7 +712,7 @@
 
       h += '<div class="note"><div class="note__k">最重要的是最後一列</div><p>' +
         '<b>一次輸入完全正確率</b>（日期、金額、方向、分類全部都對）從 0.42 提升到 0.79。' +
-        '單看個別欄位的分數會高估實際體驗 —— 使用者在意的是「我講一句話，它有沒有一次記對」，' +
+        '單看個別欄位的分數會高估實際體驗 —— 使用者在意的是「我寫一句話，它有沒有一次記對」，' +
         '只要有一欄錯就要動手改，摩擦就回來了。</p></div>';
 
       h += '<div class="sec"><h2 class="sec__t">解析範例與難點</h2></div>';
@@ -967,9 +967,9 @@
         v[i.dataset.s] = i.value;
       });
       if (!v.amount) { toast('金額是必填的', 'err'); return; }
-      API.nlpConfirm({
+      API.createTransaction({
         date: v.date, amount: Number(v.amount), kind: v.kind, cat: v.cat,
-        merchant: v.merchant, note: v.note, raw: '', conf: 1, catConf: 1
+        merchant: v.merchant, note: v.note
       }).then(function () {
         renderMode(); loadTx(); toast('已寫入一筆', 'ok');
       }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); });

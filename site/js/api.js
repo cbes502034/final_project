@@ -25,7 +25,7 @@
 
    記帳
    GET    /api/transactions           明細（可帶 user / from / to / cat / kind / q）
-   POST   /api/transactions           新增
+   POST   /api/transactions           新增（手動記帳走這支，不經過模型）
    PATCH  /api/transactions/{id}      修改
    DELETE /api/transactions/{id}      刪除
    POST   /api/nlp/parse              ★ 單句記帳：一句話 → 一筆（不寫入）
@@ -325,6 +325,21 @@
       });
     },
 
+    /* 手動記帳不經過模型，走 POST /api/transactions，來源記成 manual。
+       之前這裡借用 nlp/confirm，害手動填的資料被標成 AI 記帳，來源篩選也篩不到 */
+    createTransaction: function (p) {
+      var s = load();
+      return sleep(260).then(function () {
+        var t = {
+          id: 'N' + Date.now(), user: s.me, date: p.date, amount: Number(p.amount),
+          kind: p.kind, cat: p.cat, merchant: p.merchant || '',
+          note: p.note || '', source: 'manual', raw: ''
+        };
+        s.transactions.unshift(t); save();
+        return clone(t);
+      });
+    },
+
     nlpConfirm: function (parsed) {
       var s = load();
       return sleep(260).then(function () {
@@ -472,6 +487,7 @@
     nlpParseBatch:     function (t)     { return req('/api/nlp/parse-batch', { method: 'POST', body: { text: t } }); },
     nlpConfirm:        function (p)     { return req('/api/nlp/confirm', { method: 'POST', body: p }); },
     nlpConfirmBatch:   function (i)     { return req('/api/nlp/confirm-batch', { method: 'POST', body: { items: i } }); },
+    createTransaction: function (p)     { return req('/api/transactions', { method: 'POST', body: p }); },
     deleteTransaction: function (id)    { return req('/api/transactions/' + encodeURIComponent(id), { method: 'DELETE' }); },
     budgets:           function ()      { return req('/api/budgets'); },
     setSavingsGoal:    function (u, g)  { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g } }); },
@@ -495,6 +511,7 @@
     nlpParseBatch:     function (t)    { return impl.nlpParseBatch(t); },
     nlpConfirm:        function (p)    { return impl.nlpConfirm(p); },
     nlpConfirmBatch:   function (i)    { return impl.nlpConfirmBatch(i); },
+    createTransaction: function (p)    { return impl.createTransaction(p); },
     deleteTransaction: function (i)    { return impl.deleteTransaction(i); },
     budgets:           function ()     { return impl.budgets(); },
     setSavingsGoal:    function (u, g) { return impl.setSavingsGoal(u, g); },

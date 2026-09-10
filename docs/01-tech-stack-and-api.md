@@ -223,7 +223,7 @@ final_project/
 | # | 方法 | 路徑 | 權限 | 用途 |
 |---|---|---|---|---|
 | 18 | GET | `/api/transactions` | 登入 | 明細。可帶 `userId` / `from` / `to` / `categoryId` / `kind` / `q` / `page` |
-| 19 | POST | `/api/transactions` | 登入 | 手動新增 |
+| 19 | POST | `/api/transactions` | 登入 | 手動新增。**單筆手動模式走這支**，不經過模型，寫入的 `source` 記成 `manual` |
 | 20 | PATCH | `/api/transactions/{id}` | 本人或監管者 | 修改 |
 | 21 | DELETE | `/api/transactions/{id}` | 本人 | 刪除 |
 | 22 | GET | `/api/categories` | 登入 | 分類體系（系統預設 + 家庭自訂） |
@@ -238,7 +238,7 @@ final_project/
 |---|---|---|---|---|
 | 24 | POST | `/api/nlp/parse` ★ | 登入 | 單句：一句話 → 一筆。**只解析，不寫入** |
 | 25 | POST | `/api/nlp/parse-batch` ★ | 登入 | **段落：一段話 → 切成 N 筆**。只解析，不寫入 |
-| 26 | POST | `/api/nlp/confirm` ★ | 登入 | 單筆確認後寫入，同時記錄修正供評測 |
+| 26 | POST | `/api/nlp/confirm` ★ | 登入 | 單筆確認後寫入，同時記錄修正供評測。`source` 記成 `nlp`，只有經過模型的資料才走這支 |
 | 27 | POST | `/api/nlp/confirm-batch` ★ | 登入 | 批次確認後一次寫入 N 筆 |
 
 **段落解析比單句難的地方在「切分」**：模型要先判斷這段話裡有幾筆。
