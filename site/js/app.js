@@ -57,6 +57,48 @@
       esc(e && e.message ? e.message : String(e)) + '<br>目前模式：<b>' + API.mode + '</b></div></div>';
   }
 
+  var SV_TW = { safe: '達標中', near: '接近上限', over: '存不到目標' };
+
+  /* 存款目標狀態卡。level: safe / near / over */
+  function savingsCard(sv, who) {
+    var lv = sv.level;
+    var pct100 = Math.min(100, Math.round(sv.ratio * 100));
+    var over = lv === 'over';
+    return '<div class="svg-card svg-card--' + lv + ' rise">' +
+      '<div class="svg-card__h">' +
+        '<span class="svg-card__ic">' + (over ? '!' : (lv === 'near' ? '~' : '✓')) + '</span>' +
+        '<span class="svg-card__t">' +
+          (over ? (who ? esc(who) + '這個月存不到目標' : '這個月存不到目標')
+                : (lv === 'near' ? '快接近可支配上限了' : '存款目標達標中')) + '</span>' +
+        '<span class="tag tag--' + (over ? 'down' : (lv === 'near' ? 'warn' : 'up')) + '">' +
+          SV_TW[lv] + '</span>' +
+      '</div>' +
+      '<div class="svg-card__bar"><i style="width:' + pct100 + '%"></i>' +
+        '<em style="left:100%"></em></div>' +
+      '<div class="svg-card__nums">' +
+        svN('每月存款目標', money(sv.goal)) +
+        svN('可支配上限', money(sv.allowance), '收入 − 目標') +
+        svN('本月已支出', money(sv.used)) +
+        svN(over ? '超出上限' : '還可以花',
+            money(over ? sv.shortfall : Math.max(0, sv.left)),
+            over ? '這個月會少存這麼多' : '') +
+      '</div>' +
+      (over
+        ? '<div class="svg-card__msg">照目前的支出，這個月實際只能存下 <b>' +
+          money(Math.max(0, sv.actual)) + '</b>，比目標少 <b>' + money(sv.shortfall) + '</b>。</div>'
+        : (lv === 'near'
+          ? '<div class="svg-card__msg">已用掉可支配額度的 <b>' + pct100 +
+            '%</b>。再花 ' + money(Math.max(0, sv.left)) + ' 就會影響到存款目標。</div>'
+          : '')) +
+      '</div>';
+  }
+
+  function svN(k, v, hint) {
+    return '<div class="svg-n"><span class="svg-n__k">' + esc(k) + '</span>' +
+      '<span class="svg-n__v">' + v + '</span>' +
+      (hint ? '<span class="svg-n__h">' + esc(hint) + '</span>' : '') + '</div>';
+  }
+
   /* ============================================================
      01 我的總覽
      ============================================================ */
@@ -71,8 +113,14 @@
         h += kpi('本月收入', d.income, '', d.period, 'ok', 0);
         h += kpi('本月支出', d.expense, '', d.count + ' 筆紀錄', 'warn', 1);
         h += kpi('結餘', d.net, '', '儲蓄率 ' + pct(d.rate), d.net >= 0 ? 'a' : 'crit', 2);
-        h += kpi('筆數', d.count, '筆', '本月已記錄', 'a', 3, true);
+        h += kpi(d.savings.level === 'over' ? '短少' : '可再支出',
+                 d.savings.level === 'over' ? d.savings.shortfall : Math.max(0, d.savings.left),
+                 '', '存款目標 ' + money(d.savings.goal),
+                 d.savings.level === 'over' ? 'crit' : (d.savings.level === 'near' ? 'warn' : 'ok'), 3);
         h += '</div>';
+
+        // 存款目標狀態，超支時放最上面
+        if (d.savings) h += savingsCard(d.savings, null);
 
         if (m.guardedBy && m.guardedBy.length) {
           h += '<div class="note note--warn"><div class="note__k">誰看得到你的紀錄</div><p>' +
@@ -420,6 +468,19 @@
         h += kpi('可檢視成員', d.members.length, '人', ROLE_TW[m.user.role] + '權限', 'a', 3, true);
         h += '</div>';
 
+        if (d.savings) h += savingsCard(d.savings, '全家');
+
+        var overs = d.members.filter(function (u) { return u.savingsLevel === 'over'; });
+        if (overs.length && d.savings.level !== 'over') {
+          h += '<div class="note note--crit"><div class="note__k">總體達標，但不是每個人都達標</div><p>' +
+            '家庭整體看起來安全，是因為結餘較多的成員把其他人的超支蓋過去了。' +
+            '實際上有 <b>' + overs.length + ' 位成員存不到自己的目標</b>：' +
+            overs.map(function (u) {
+              return '<b>' + esc(u.name) + '</b>（短少 ' + money(u.shortfall) + '）';
+            }).join('、') + '。<br>' +
+            '<b>看家庭總數會漏掉個人的問題</b>，所以每個人的狀態要分開看。</p></div>';
+        }
+
         h += '<div class="sec"><h2 class="sec__t">各成員本月狀況</h2></div>';
         h += '<div class="rows">' + d.members.map(function (u, i) {
           var over = u.expense > u.budget;
@@ -431,10 +492,13 @@
               '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
               '<span class="tag tag--' + (u.role === 'master' ? 'done' : 'soft') + '">' +
               ROLE_TW[u.role] + '</span>' +
-              (over ? '<span class="tag tag--CRITICAL">超出預算</span>' : '') +
+              (u.savingsLevel === 'over'
+                ? '<span class="tag tag--down">存不到目標 · 短少 ' + money(u.shortfall) + '</span>'
+                : (u.savingsLevel === 'near' ? '<span class="tag tag--warn">接近上限</span>'
+                                             : '<span class="tag tag--up">存款達標</span>')) +
               (bs.length ? '<span class="tag tag--MEDIUM">' + bs.length + ' 項分類超支</span>' : '') +
             '</div><div class="row__sub">收入 ' + money(u.income) + '　支出 ' + money(u.expense) +
-            '　預算 ' + money(u.budget) + '</div></div>' +
+            '　存款目標 ' + money(u.savingsGoal) + '　可支配 ' + money(u.allowance) + '</div></div>' +
             '<div class="sla"><div class="sla__v"' + (over ? ' style="color:var(--down)"' : '') + '>' +
               pct(u.expense / u.budget) + '</div>' +
               '<div class="sla__b"><i style="width:' + Math.min(100, u.expense / u.budget * 100) +
@@ -577,6 +641,7 @@
             '<span class="tag tag--' + (u.role === 'master' ? 'done' :
               (u.role === 'parent' ? 'MEDIUM' : 'soft')) + '">' + ROLE_TW[u.role] + '</span>' +
             (u.id === d.me ? '<span class="tag tag--na">目前登入</span>' : '') +
+            (u.age < 18 ? '<span class="tag tag--info">未成年 · 目標由管理者代設</span>' : '') +
           '</div><div class="row__sub">' +
             (wards.length ? '監管：' + wards.map(function (g) { return esc(g.wardName); }).join('、') : '') +
             (wards.length && by.length ? '　｜　' : '') +
@@ -584,10 +649,20 @@
               by.map(function (g) { return esc(g.guardianName); }).join('、') + ' 監管</b>' : '') +
             (!wards.length && !by.length ? '無監管關係' : '') +
           '</div></div>' +
-          '<div class="row__do">' + (u.id === d.me ? '' :
-            '<button class="btn btn--sm" data-switch="' + esc(u.id) + '">切換成這個身分</button>') +
+          '<div class="row__do">' +
+            '<span class="goal"><label>每月存款目標</label>' +
+            '<input class="goal__i" type="number" data-goal="' + esc(u.id) + '" value="' +
+            (u.savingsGoal || 0) + '"></span>' +
+            (u.id === d.me ? '' :
+            '<button class="btn btn--sm" data-switch="' + esc(u.id) + '">切換身分</button>') +
           '</div></article>';
       }).join('') + '</div>';
+
+      h += '<div class="note"><div class="note__k">每月存款目標是註冊時就要填的</div><p>' +
+        '註冊流程會請使用者設定「每月想存多少」。系統據此算出<b>可支配上限＝收入 − 存款目標</b>，' +
+        '支出超過上限就代表這個月存不到原本設定的金額，總覽頁會直接跳警告。<br>' +
+        '目標改動<b>保留歷史不覆蓋</b>（資料表 <code>savings_goals</code> 帶 period_key），' +
+        '否則之後回頭看會不知道當時的目標是多少。</p></div>';
 
       h += '<div class="note"><div class="note__k">監管是雙向可見的</div><p>' +
         '被監管者在自己的總覽頁會看到「誰看得到你的紀錄」。' +
@@ -940,6 +1015,16 @@
   });
 
   document.addEventListener('change', function (e) {
+    var g = e.target.closest ? e.target.closest('[data-goal]') : null;
+    if (g) {
+      var v = Number(g.value);
+      if (isNaN(v) || v < 0) { toast('存款目標要是 0 以上的數字', 'err'); return; }
+      API.setSavingsGoal(g.dataset.goal, v).then(function (m) {
+        toast(m.name + ' 的每月存款目標改為 ' + money(v), 'ok');
+        paint();
+      }).catch(function (err) { toast('設定失敗：' + err.message, 'err'); });
+      return;
+    }
     var s = e.target.closest ? e.target.closest('select[data-f]') : null;
     if (s) { F[s.dataset.f] = s.value; loadTx(); }
     if (e.target.closest && e.target.closest('[data-b]')) {

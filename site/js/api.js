@@ -38,6 +38,8 @@
    GET    /api/stats                  月或年統計（帶 periodType=month|year）
    GET    /api/budgets                預算與使用率
    PUT    /api/budgets                設定預算
+   GET    /api/savings-goal           ★ 每月存款目標與達成狀態
+   PUT    /api/savings-goal           ★ 設定每月存款目標（註冊時也走這支）
 
    建議
    GET    /api/advices                LLM 財務建議（帶 scope / period）
@@ -144,24 +146,63 @@
         var tx = s.transactions.filter(function (t) {
           return users.indexOf(t.user) >= 0 && t.date.indexOf(D.meta.period) === 0;
         });
-        var income = sum(tx, 'income'), expense = sum(tx, 'expense');
+        // 成員表上的 income / expense 是本月至今的合計（示範明細已含在內）；
+        // 使用者新記的（id 以 N 開頭）才另外加上去，這樣兩個畫面的數字才會一致
+        var added = tx.filter(function (t) { return String(t.id).indexOf('N') === 0; });
+        var income = users.reduce(function (n, u) {
+          var m = memberOf(u); return n + (m ? m.income : 0);
+        }, 0) + sum(added, 'income');
+        var expense = users.reduce(function (n, u) {
+          var m = memberOf(u); return n + (m ? m.expense : 0);
+        }, 0) + sum(added, 'expense');
         var byCat = {};
         tx.filter(function (t) { return t.kind === 'expense'; }).forEach(function (t) {
           byCat[t.cat] = (byCat[t.cat] || 0) + t.amount;
         });
+        // 存款目標：可支配上限 = 收入 − 目標，支出超過就存不到
+        var goal = users.reduce(function (n, u) {
+          var m = memberOf(u);
+          return n + (m && m.savingsGoal ? m.savingsGoal : 0);
+        }, 0);
+        var allow = income - goal;
+        var ratio = allow > 0 ? expense / allow : (expense > 0 ? 2 : 0);
+        var rule = D.savingsRule;
+        var level = ratio >= rule.overAt ? 'over' : (ratio >= rule.warnAt ? 'near' : 'safe');
+
         return {
           period: D.meta.period,
           scope: f.scope || 'me',
           income: income, expense: expense, net: income - expense,
           rate: income ? (income - expense) / income : 0,
           count: tx.length,
+          savings: {
+            goal: goal,
+            allowance: allow,
+            used: expense,
+            left: allow - expense,
+            ratio: ratio,
+            level: level,
+            shortfall: Math.max(0, expense - allow),
+            actual: income - expense,
+            rule: clone(rule)
+          },
           byCat: Object.keys(byCat).map(function (c) {
             var cat = D.categories.filter(function (x) { return x.id === c; })[0];
             return { cat: c, name: cat.name, color: cat.color, amount: byCat[c] };
           }).sort(function (a, b) { return b.amount - a.amount; }),
           monthly: clone(D.monthly),
           yearly: clone(D.yearly),
-          members: clone(D.members.filter(function (m) { return users.indexOf(m.id) >= 0; }))
+          members: D.members.filter(function (m) { return users.indexOf(m.id) >= 0; })
+            .map(function (m) {
+              var a = m.income - (m.savingsGoal || 0);
+              var r = a > 0 ? m.expense / a : (m.expense > 0 ? 2 : 0);
+              return Object.assign(clone(m), {
+                allowance: a,
+                savingsRatio: r,
+                savingsLevel: r >= rule.overAt ? 'over' : (r >= rule.warnAt ? 'near' : 'safe'),
+                shortfall: Math.max(0, m.expense - a)
+              });
+            })
         };
       });
     },
@@ -287,6 +328,16 @@
         s.transactions = s.transactions.filter(function (t) { return t.id !== id; });
         save();
         return { deleted: id };
+      });
+    },
+
+    setSavingsGoal: function (userId, goal) {
+      var D = global.DATA;
+      return sleep(240).then(function () {
+        var m = D.members.filter(function (x) { return x.id === userId; })[0];
+        if (!m) throw new Error('not found: ' + userId);
+        m.savingsGoal = Number(goal);
+        return clone(m);
       });
     },
 

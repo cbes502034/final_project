@@ -22,16 +22,29 @@ window.DATA = {
     { id: 'member', name: '成員', desc: '只看自己。被監管時會明確顯示「誰看得到你」' }
   ],
 
+  /* savingsGoal 是註冊時就要填的「每月想存多少」。
+     可支配上限 = 收入 − 存款目標，支出超過就代表這個月存不到目標。 */
   members: [
     { id: 'U1', name: '林建國', role: 'master', avatar: '國', age: 52,
-      joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000 },
+      joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000,
+      savingsGoal: 20000 },
     { id: 'U2', name: '陳淑芬', role: 'parent', avatar: '芬', age: 49,
-      joined: '2026-01-05', income: 52000, expense: 38900, budget: 40000 },
+      joined: '2026-01-05', income: 52000, expense: 38900, budget: 40000,
+      savingsGoal: 15000 },
     { id: 'U3', name: '林宇涵', role: 'member', avatar: '涵', age: 19,
-      joined: '2026-02-11', income: 8000, expense: 11450, budget: 10000 },
+      joined: '2026-02-11', income: 8000, expense: 11450, budget: 10000,
+      savingsGoal: 2000 },
     { id: 'U4', name: '林宇軒', role: 'member', avatar: '軒', age: 16,
-      joined: '2026-02-11', income: 3000, expense: 4820, budget: 4000 }
+      joined: '2026-02-11', income: 3000, expense: 4820, budget: 4000,
+      savingsGoal: 500 }
   ],
+
+  /* 超支警告的分級門檻。刻意讓使用者看得到，因為每個人對「接近」的定義不同 */
+  savingsRule: {
+    warnAt: 0.8,          // 支出達可支配上限的 80% → 提醒
+    overAt: 1.0,          // 超過 100% → 警告
+    note: '可支配上限 = 本月收入 − 每月存款目標。支出超過上限，就代表這個月存不到原本設定的金額。'
+  },
 
   /* 監管關係：誰看得到誰。刻意雙向透明——被監管者自己也看得到這張表 */
   guardianships: [
@@ -245,6 +258,14 @@ window.DATA = {
              ['display_name', 'TEXT', ''], ['birth_year', 'INT', '判斷是否未成年'],
              ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', '']] },
 
+    { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊時就要填。改過的值保留歷史，不覆蓋',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['period_key', 'TEXT', "'2026-09'。NULL = 預設值，套用到所有未指定的月份"],
+             ['goal_amount', 'NUMERIC(14,2)', '每月想存多少'],
+             ['warn_ratio', 'NUMERIC', '達可支配上限的幾成時提醒，預設 0.8'],
+             ['created_at', 'TIMESTAMPTZ', ''],
+             ['created_by', 'BIGINT', '本人；未成年者可由 master 代設']] },
+
     { t: 'sessions', label: '登入工作階段', note: '支援登出與強制下線',
       cols: [['id', 'UUID', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
              ['refresh_token_hash', 'TEXT', '只存雜湊'],
@@ -337,6 +358,7 @@ window.DATA = {
 
   relations: [
     ['sessions', 'users', 'N:1', ''],
+    ['savings_goals', 'users', 'N:1', '★存款目標'],
     ['family_members', 'users', 'N:1', ''],
     ['family_members', 'families', 'N:1', ''],
     ['guardianships', 'users', 'N:1', '監管'],
@@ -357,6 +379,7 @@ window.DATA = {
     { action: '記錄自己的收支', master: 'Y', parent: 'Y', member: 'Y' },
     { action: '查看自己的統計', master: 'Y', parent: 'Y', member: 'Y' },
     { action: '設定自己的預算', master: 'Y', parent: 'Y', member: '需管理者核准' },
+    { action: '設定每月存款目標', master: 'Y', parent: 'Y', member: '未成年由管理者代設' },
     { action: '查看被監管者的明細', master: 'Y（全家）', parent: 'Y（被指派的）', member: 'N' },
     { action: '查看家庭總覽', master: 'Y', parent: '僅摘要', member: 'N' },
     { action: '設定家庭預算', master: 'Y', parent: 'N', member: 'N' },
