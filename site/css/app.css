@@ -541,6 +541,14 @@
   .nav { display: flex; padding: 0 4px; flex: 0 0 auto; align-items: center; gap: 4px; }
   .nav__lb, .rail__f { display: none; }
   .nav__i { padding: 8px 13px; white-space: nowrap; }
+  /* 橫向排列時 doclink 會被擠扁然後直向換行，把整條側欄撐高，
+     所以這裡壓成跟導覽項一樣的膠囊 */
+  .doclink {
+    margin: 0 0 0 4px; padding: 8px 12px; gap: 8px;
+    flex: 0 0 auto; white-space: nowrap;
+  }
+  .doclink__m { flex-direction: row; align-items: baseline; gap: 6px; }
+  .doclink__s, .doclink__go { display: none; }
   .main { margin-left: 0; padding: 0 8px; }
   .top { top: 8px; }
   .page { padding: 18px 0 60px; }
