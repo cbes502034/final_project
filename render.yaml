@@ -37,8 +37,11 @@ services:
         value: SAMEORIGIN
 
   # ---------- 後端：FastAPI ----------
+  # ⚠️ 名字不能叫 fambudget-api —— Render 的子網域是全球共用的，
+  # fambudget-api.onrender.com 已經被另一個使用者的西班牙文記帳 App 佔走了。
+  # 千萬不要把前端的 api-base 指過去，那會把使用者的資料送到陌生人的伺服器。
   - type: web
-    name: fambudget-api
+    name: fambudget-backend
     runtime: python
     plan: free
     rootDir: backend

@@ -96,7 +96,7 @@ docker compose up
 改 `frontend/index.html` 這一行就好：
 
 ```html
-<meta name="api-base" content="https://fambudget-api.onrender.com">
+<meta name="api-base" content="https://fambudget-backend.onrender.com">
 ```
 
 留空 = mock 模式（讀 `data.js`）。填上網址 = 改用 `fetch` 打真後端。
@@ -114,7 +114,7 @@ docker compose up
 | 服務 | 型態 | 來源 | 說明 |
 |---|---|---|---|
 | `fambudget-web` | 靜態站台 | `./frontend` | 走 CDN。前端是 hash 路由，不需要 rewrite 規則 |
-| `fambudget-api` | Python 服務 | `./backend` | `uvicorn app.main:app`，健康檢查打 `/healthz` |
+| `fambudget-backend` | Python 服務 | `./backend` | `uvicorn app.main:app`，健康檢查打 `/healthz` |
 | `fambudget-db` | PostgreSQL | — | 免費方案 |
 
 ### 兩個機密要在 Render 後台手動填
@@ -133,7 +133,7 @@ docker compose up
 ### ⚠️ 這份 render.yaml 還沒生效，要先建立 Blueprint
 
 目前線上那個站台是**用 Render 後台手動建立的**，跟這份 `render.yaml` 無關——
-證據是裡面宣告的 `fambudget-api` 與 `fambudget-db` **根本不存在**。
+證據是裡面宣告的 `fambudget-backend` 與 `fambudget-db` **根本不存在**。
 
 要讓它真的生效（後端和資料庫才會被自動建立），步驟如下。
 **做完會換到新網址**，舊的 `llm-capstone-top20.onrender.com` 會停留在最後一次成功的建置。
@@ -145,7 +145,7 @@ docker compose up
    | 名稱 | 型態 | 來源 |
    |---|---|---|
    | `fambudget-web` | Static Site | `./frontend` |
-   | `fambudget-api` | Web Service (Python) | `./backend` |
+   | `fambudget-backend` | Web Service (Python) | `./backend` |
    | `fambudget-db` | PostgreSQL | — |
 
 4. 它會問你兩個標 `sync: false` 的變數，**這兩個只有你填得了**：
@@ -162,8 +162,8 @@ docker compose up
 | | |
 |---|---|
 | 前端 | `https://fambudget-web.onrender.com` |
-| 後端 | `https://fambudget-api.onrender.com` |
-| API 文件 | `https://fambudget-api.onrender.com/docs` |
+| 後端 | `https://fambudget-backend.onrender.com` |
+| API 文件 | `https://fambudget-backend.onrender.com/docs` |
 
 6. **確認新站台正常之後**，再回後台把舊的 `llm-capstone-top20` 服務刪掉。
    先確認再刪，不要反過來。

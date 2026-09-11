@@ -351,7 +351,7 @@ final_project/
 要切換到真後端，只要改 `site/index.html` 一行：
 
 ```html
-<meta name="api-base" content="https://fambudget-api.onrender.com">
+<meta name="api-base" content="https://fambudget-backend.onrender.com">
 ```
 
 留空 = mock 模式。填上網址 = 改用 `fetch` 打真後端。

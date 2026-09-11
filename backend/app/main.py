@@ -86,7 +86,7 @@ app = FastAPI(
 # 網站 B 必須明講「我允許 A 來打我」，否則瀏覽器會直接擋下來。
 #
 # 我們的前端在 fambudget-web.onrender.com，
-# 後端在 fambudget-api.onrender.com，兩個網域不同，所以一定要設。
+# 後端在 fambudget-backend.onrender.com，兩個網域不同，所以一定要設。
 #
 # 常見的卡關：前端 console 出現 "blocked by CORS policy"，
 # 九成是這裡的網址沒填對（少了 https://、多了結尾的斜線都會失敗）。
@@ -129,4 +129,4 @@ async def healthz() -> dict[str, str]:
     因為它的任務只是回答「這個程式還在跑嗎」。
     如果把資料庫查詢也寫進來，資料庫一慢就會被誤判成服務掛掉。
     """
-    return {"status": "ok", "service": "fambudget-api"}
+    return {"status": "ok", "service": "fambudget-backend"}
