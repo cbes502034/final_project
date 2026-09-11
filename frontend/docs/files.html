@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>檔案系統說明書</title>
+<meta name="description" content="從零開始講專案結構：為什麼要分資料夾、前後端分離是什麼意思、每個資料夾放什麼、以及「我要改某某功能該打開哪個檔案」的對照表。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="docs.css?v=8">
+<style>
+/* ---- 檔案系統說明書：用青色，跟 FastAPI 綠、RESTful 紫、手冊藍分開 ---- */
+.fs .sec__n { color: #5FB8D9; }
+.fs h3.sub { border-left-color: #5FB8D9; }
+.fs .hero__eyebrow { color: #5FB8D9; }
+.fs .note { border-left-color: #5FB8D9; }
+.fs .note--warn { border-left-color: var(--warn); }
+.fs .note--crit { border-left-color: var(--down); }
+
+/* 目錄樹 */
+pre.tree {
+  margin: 14px 0 0; padding: 16px 18px; overflow-x: auto;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  background: rgba(0,0,0,.34);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.95; color: var(--ink-soft);
+}
+pre.tree b   { color: var(--ink); font-weight: 500; }
+pre.tree i   { color: var(--ink-dim); font-style: normal; }
+pre.tree u   { color: #5FB8D9; text-decoration: none; }
+pre.tree s   { color: var(--warn); text-decoration: none; }
+pre.tree em  { color: var(--up); font-style: normal; }
+
+.codelabel {
+  display: flex; align-items: center; gap: 8px; margin-top: 20px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+  color: var(--ink-dim); text-transform: uppercase;
+}
+.codelabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+.vs { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 16px; }
+.vs__c { border-radius: var(--r-card); border: 1px solid var(--line); background: var(--card); padding: 16px 18px; }
+.vs__c h4 { margin: 0 0 8px; font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
+.vs__c p  { font-size: 13px; color: var(--ink-soft); }
+.vs--bad  { border-color: rgba(251,138,143,.3); }
+.vs--bad h4 { color: var(--down); }
+.vs--good { border-color: rgba(110,231,183,.3); }
+.vs--good h4 { color: var(--up); }
+
+/* 請求流程 */
+.flow { display: flex; flex-direction: column; margin-top: 18px; }
+.fl { display: flex; gap: 14px; align-items: flex-start; padding-bottom: 16px; position: relative; }
+.fl:last-child { padding-bottom: 0; }
+.fl::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 1px; background: var(--line-2); }
+.fl:last-child::before { display: none; }
+.fl__n {
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; z-index: 1;
+  display: grid; place-items: center; font-family: var(--mono); font-size: 12px;
+  background: var(--card-3); border: 1px solid var(--line-2); color: #5FB8D9;
+}
+.fl__b { flex: 1 1 auto; min-width: 0; padding-top: 3px; }
+.fl__t { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+.fl__d { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+
+td .fname { font-family: var(--mono); font-size: 12px; color: #5FB8D9; }
+</style>
+</head>
+<body class="fs">
+
+<div class="shell">
+  <nav class="rail">
+    <div class="rail__brand">
+      <div class="rail__mark" style="background:linear-gradient(135deg,#5FB8D9,#6C9FFB)">檔</div>
+      <div>
+        <div class="rail__t">檔案系統說明書</div>
+        <div class="rail__s">專案結構</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a href="#why"><i>01</i>為什麼要分資料夾</a>
+      <a href="#split"><i>02</i>前後端分離</a>
+      <a href="#tree"><i>03</i>整棵樹</a>
+      <a href="#frontend"><i>04</i>前端逐層看</a>
+      <a href="#backend"><i>05</i>後端逐層看</a>
+      <a href="#toolkit"><i>06</i>工具箱</a>
+      <a href="#trace"><i>07</i>一個請求的旅程</a>
+      <a href="#where"><i>08</i>我要改 X 開哪個檔</a>
+      <a href="#naming"><i>09</i>命名規則</a>
+      <a href="#ignore"><i>10</i>什麼不進版控</a>
+      <a class="nav__out" href="fastapi.html"><i>&#8599;</i>FastAPI 說明書</a>
+      <a class="nav__out" href="restful.html"><i>&#8599;</i>RESTful 說明書</a>
+      <a class="nav__out" href="index.html"><i>&#8599;</i>專題手冊</a>
+      <a class="nav__back" href="../index.html"><i>←</i>回到系統</a>
+    </div>
+  </nav>
+
+  <main class="main">
+  <div class="wrap">
+
+    <header class="hero">
+      <div class="hero__eyebrow">給第一次接觸這個專案的人</div>
+      <h1>檔案系統說明書</h1>
+      <p class="hero__lead">
+        打開一個沒看過的專案，最讓人不知所措的就是<b>「東西到底放在哪裡」</b>。
+        這份文件把每個資料夾走一遍，講清楚它放什麼、不放什麼，
+        最後給一張<b>「我要改某某功能，該打開哪個檔案」</b>的對照表。
+      </p>
+      <div class="hero__meta">
+        <div class="mchip"><span>預計閱讀</span><b>20 分鐘</b></div>
+        <div class="mchip"><span>前置知識</span><b>無</b></div>
+        <div class="mchip"><span>對應</span><b class="mono">cbes502034/final_project</b></div>
+      </div>
+    </header>
+
+    <!-- ============ 01 ============ -->
+    <section class="sec" id="why">
+      <div class="sec__h"><span class="sec__n">01</span><h2>為什麼要分資料夾</h2></div>
+      <p class="sec__lead">
+        四個人同時改一個專案，<b>資料夾就是分界線</b>。沒有分界線，
+        就會變成每天都在解 git 衝突。
+      </p>
+
+      <div class="vs">
+        <div class="vs__c vs--bad">
+          <h4>❌ 全部擠在一起</h4>
+          <pre class="tree" style="margin-top:0;font-size:12px">project/
+  index.html
+  app.js
+  server.py
+  models.py
+  utils.py
+  utils2.py
+  helper.py
+  <i>「那個算錢的函式在哪？」</i>
+  <i>「呃…utils 還是 helper？」</i></pre>
+        </div>
+        <div class="vs__c vs--good">
+          <h4>✅ 照職責分</h4>
+          <pre class="tree" style="margin-top:0;font-size:12px">project/
+  frontend/     <i>畫面</i>
+  backend/      <i>資料與規則</i>
+    app/
+      routers/  <i>收請求</i>
+      services/ <i>做事</i>
+      models/   <i>存什麼</i>
+  <i>「算錢的？services/analytics.py」</i></pre>
+        </div>
+      </div>
+
+      <h3 class="sub">分資料夾真正解決的三件事</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>問題</th><th>資料夾怎麼解決</th></tr></thead>
+          <tbody>
+            <tr><td><b>找不到東西</b></td>
+                <td>路徑本身就是分類。看到 <code>services/analytics.py</code>
+                    你就知道它是商業邏輯、跟統計有關</td></tr>
+            <tr><td><b>四個人一直衝突</b></td>
+                <td>每個人只改自己資料夾裡的檔案，git 幾乎不會撞到</td></tr>
+            <tr><td><b>不知道能不能改</b></td>
+                <td>「這是誰的？」看檔頭第一行就有負責人。
+                    <code>toolkit/</code> 底下的不要改</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 02 ============ -->
+    <section class="sec" id="split">
+      <div class="sec__h"><span class="sec__n">02</span><h2>前後端分離是什麼意思</h2></div>
+      <p class="sec__lead">
+        這個專案最上層只有兩個資料夾：<code>frontend/</code> 和 <code>backend/</code>。
+        它們是<b>兩個獨立的程式</b>，各自能單獨跑起來。
+      </p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th></th><th>frontend/</th><th>backend/</th></tr></thead>
+          <tbody>
+            <tr><td>語言</td><td>HTML / CSS / JavaScript</td><td>Python</td></tr>
+            <tr><td>跑在哪</td><td><b>使用者的瀏覽器</b></td><td><b>我們的伺服器</b></td></tr>
+            <tr><td>誰看得到原始碼</td><td><b>所有人</b>（按 F12 就看得到）</td><td>只有我們</td></tr>
+            <tr><td>負責</td><td>畫面、互動、收集輸入</td><td>資料、權限、計算、模型</td></tr>
+            <tr><td>部署</td><td>靜態檔案，走 CDN</td><td>Python 服務</td></tr>
+            <tr><td>怎麼溝通</td><td colspan="2" style="text-align:center">
+                <b>只透過 HTTP + JSON</b>，沒有別的管道</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--crit">
+        <div class="note__k">最重要的一個推論：前端的程式碼使用者全都看得到、也改得動</div>
+        <p>所以<b>任何「檢查」寫在前端都等於沒寫</b>。<br>
+        「只有管理者能刪除」「金額不能是負數」「這個人看不到那筆資料」——
+        這些前端可以做（體驗比較好，不用等伺服器回應），
+        但<b>後端一定要再檢查一次</b>。<br>
+        前端的檢查是「防止使用者打錯字」，後端的檢查才是「防止有人作弊」。</p>
+      </div>
+
+      <h3 class="sub">分離帶來的好處</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        <b>可以各自開發。</b> 前端在 mock 模式下不需要後端就能跑完整的畫面；
+        後端用 <code>/docs</code> 就能試打，不需要前端。<br>
+        <b>可以各自部署。</b> 改個文字只要重新發布前端，後端不用動。
+      </p>
+    </section>
+
+    <!-- ============ 03 ============ -->
+    <section class="sec" id="tree">
+      <div class="sec__h"><span class="sec__n">03</span><h2>整棵樹</h2></div>
+      <p class="sec__lead">先看全貌，後面再逐層講。</p>
+
+      <pre class="tree">final_project/
+│
+├── <b>frontend/</b>                <i>前端：純靜態，沒有建置步驟</i>
+│   ├── index.html            <i>系統本體，單頁 + hash 路由</i>
+│   ├── css/
+│   │   ├── tokens.css        <i>設計權杖：顏色、字體、圓角</i>
+│   │   └── app.css           <i>元件樣式</i>
+│   ├── js/
+│   │   ├── <u>api.js</u>        ★    <i>唯一的資料入口</i>
+│   │   ├── app.js            <i>畫面繪製與互動</i>
+│   │   ├── data.js           <i>示範資料（mock 模式用）</i>
+│   │   └── stars.js          <i>背景星空</i>
+│   └── docs/                 <i>說明文件，也是靜態網頁</i>
+│       ├── index.html        <i>專題手冊</i>
+│       ├── fastapi.html      <i>FastAPI 說明書</i>
+│       ├── restful.html      <i>RESTful 說明書</i>
+│       ├── files.html        <i>就是你現在看的這一份</i>
+│       ├── api.html          <i>API 瀏覽</i>
+│       ├── model.html        <i>記帳模型設計</i>
+│       ├── docs.css          <i>文件共用樣式</i>
+│       └── docs.js           <i>文件共用行為</i>
+│
+├── <b>backend/</b>                 <i>後端：FastAPI</i>
+│   ├── app/
+│   │   ├── main.py           <i>入口，只負責組裝</i>
+│   │   ├── <u>ownership.py</u>  ★    <i>分工的單一事實來源</i>
+│   │   ├── <em>toolkit/</em>          <em>已經寫好的工具，不用改</em>
+│   │   ├── <s>models/</s>           <s>你們要建：資料表定義</s>
+│   │   ├── <s>schemas/</s>          <s>你們要建：API 進出模型</s>
+│   │   ├── <s>routers/</s>          <s>你們要建：路由</s>
+│   │   └── <s>services/</s>         <s>你們要建：商業邏輯</s>
+│   ├── tests/
+│   ├── requirements.txt      <i>要裝哪些套件</i>
+│   ├── Dockerfile
+│   └── .env.example          <i>環境變數範本</i>
+│
+├── <b>docs/</b>                    <i>規格文件（Markdown）</i>
+│   ├── 01-tech-stack-and-api.md
+│   ├── <u>02-前後端串接契約.md</u> ★  <i>動工前一定要看</i>
+│   └── 分工心智圖.svg
+│
+├── docker-compose.yml        <i>本機一鍵起整套</i>
+├── render.yaml               <i>部署設定</i>
+└── README.md</pre>
+
+      <div class="note note--warn">
+        <div class="note__k">黃色那四個資料夾現在還不存在</div>
+        <p><code>models/</code>、<code>schemas/</code>、<code>routers/</code>、
+        <code>services/</code> <b>要你們自己 mkdir</b>。<br>
+        這是刻意的：那些是後端開發的主體，如果先給你們一堆有 TODO 的空檔案，
+        就變成填空題而不是開發了。<br>
+        綠色的 <code>toolkit/</code> 則是<b>已經寫好、完整可用</b>的工具，直接 import 就好。</p>
+      </div>
+    </section>
+
+    <!-- ============ 04 ============ -->
+    <section class="sec" id="frontend">
+      <div class="sec__h"><span class="sec__n">04</span><h2>前端逐層看</h2></div>
+
+      <h3 class="sub">為什麼沒有 node_modules、沒有 build</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        這個前端<b>沒有用任何框架，也沒有建置步驟</b>。
+        改完 CSS 存檔、按重新整理就看得到，不用等編譯。
+      </p>
+      <pre class="tree">python -m http.server 5174 --directory frontend</pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        一行就跑起來了。這是有意識的取捨——一個月的專題，
+        三個人沒寫過專案，<b>學 React + Vite 的時間拿去做模型比較划算</b>。
+      </p>
+
+      <h3 class="sub">js/api.js —— 整個前端最重要的檔案</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        <b>所有資料都從這裡進出，沒有第二條路。</b>
+        畫面要資料就呼叫 <code>API.summary()</code>，它不知道資料從哪來。
+      </p>
+
+      <pre class="tree">        app.js（畫面）
+             ↓ API.summary()
+        <b>api.js</b>
+        ├─ mock 轉接器 → 讀 data.js（假資料）
+        └─ http 轉接器 → fetch 真後端</pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        切換方式是改 <code>index.html</code> 的一行：
+      </p>
+      <pre class="tree">&lt;meta name="api-base" content=""&gt;                        <i>留空 = mock</i>
+&lt;meta name="api-base" content="https://…onrender.com"&gt;   <i>填上 = 真後端</i></pre>
+
+      <div class="note">
+        <div class="note__k">這個設計讓四個人可以平行動工</div>
+        <p>兩個轉接器的<b>簽章完全一致</b>，所以可以<b>一支一支路由慢慢接</b>——
+        後端做好哪支就改哪支，不必等全部完成。<br>
+        而且前端在 mock 模式下功能是完整的，<b>後端還沒開始就能展示</b>。</p>
+      </div>
+
+      <h3 class="sub">css/ 的兩個檔案分工</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>檔案</th><th>放什麼</th><th>什麼時候改</th></tr></thead>
+          <tbody>
+            <tr><td><span class="fname">tokens.css</span></td>
+                <td>顏色、字體、圓角、陰影這些<b>設計決定</b></td>
+                <td>要換整體配色時。改一個值，全站跟著變</td></tr>
+            <tr><td><span class="fname">app.css</span></td>
+                <td>各個<b>元件</b>長什麼樣：卡片、按鈕、表格</td>
+                <td>加新元件、調版面時</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        ⚠️ <b>不要在 app.css 裡寫死顏色。</b> 要用 <code>var(--accent)</code>
+        這種權杖，不然改配色時要翻遍整個檔案。
+      </p>
+    </section>
+
+    <!-- ============ 05 ============ -->
+    <section class="sec" id="backend">
+      <div class="sec__h"><span class="sec__n">05</span><h2>後端逐層看</h2></div>
+      <p class="sec__lead">
+        後端分成四層。<b>每一層只跟相鄰的層講話</b>，這是整個結構的核心規則。
+      </p>
+
+      <pre class="tree"><b>routers/</b>    收請求、驗權限、回結果      <i>← 不寫計算邏輯</i>
+    ↓
+<b>services/</b>   真正做事：計算、規則         <i>← 不碰 HTTP</i>
+    ↓
+<b>models/</b>     資料表長什麼樣               <i>← 不寫商業邏輯</i>
+    ↓
+PostgreSQL
+
+<b>schemas/</b>    橫跨在旁邊：定義 API 進出的形狀</pre>
+
+      <h3 class="sub">models/ 和 schemas/ 差在哪？這題最多人搞混</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th></th><th>回答的問題</th><th>例子</th></tr></thead>
+          <tbody>
+            <tr><td><span class="fname">models/</span></td>
+                <td><b>資料庫裡存什麼</b></td>
+                <td><code>User</code> 有 <code>password_hash</code></td></tr>
+            <tr><td><span class="fname">schemas/</span></td>
+                <td><b>API 收送什麼</b></td>
+                <td><code>UserResponse</code> <b>沒有</b> <code>password_hash</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--crit">
+        <div class="note__k">分開的好處立刻看得到</div>
+        <p>使用者資料表<b>一定</b>要存密碼雜湊，但<b>任何一支 API 的回應都不該把它送出去</b>。<br>
+        兩者分開之後，你<b>不可能「不小心」把密碼雜湊回傳給前端</b>——
+        因為 response model 裡根本沒有那一欄，FastAPI 會自動過濾掉。</p>
+      </div>
+
+      <h3 class="sub">為什麼 routers/ 不寫邏輯</h3>
+      <div class="vs">
+        <div class="vs__c vs--bad">
+          <h4>❌ 全寫在路由裡</h4>
+          <p>要測「存款目標超支的判斷對不對」，你得起一個 HTTP 請求、
+          準備 token、準備資料庫……<b>測一個算式要準備半天</b>。</p>
+        </div>
+        <div class="vs__c vs--good">
+          <h4>✅ 邏輯放 services/</h4>
+          <p><code>savings_status(income, expense, goal)</code> 是純函式，
+          <b>直接呼叫就能測，一秒跑完</b>。</p>
+        </div>
+      </div>
+
+      <h3 class="sub">ownership.py —— 分工的單一事實來源</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        「誰負責哪些路由、哪些檔案」寫在這個檔案，<b>不是寫在文件裡</b>。
+        它是程式讀得到的，而且 <code>pytest</code> 會檢查它有沒有跟程式碼走散。
+      </p>
+      <pre class="tree">cd backend
+python -m app.ownership      <i>印出分工表 + 進度條</i></pre>
+    </section>
+
+    <!-- ============ 06 ============ -->
+    <section class="sec" id="toolkit">
+      <div class="sec__h"><span class="sec__n">06</span><h2>toolkit/ 工具箱</h2></div>
+      <p class="sec__lead">
+        這個資料夾跟其他資料夾的差別：<b>它已經寫好了。</b>
+        你 import 來用，不用改也不用讀懂內部。
+      </p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>檔案</th><th>包住什麼</th><th>你會用到的</th></tr></thead>
+          <tbody>
+            <tr><td><span class="fname">config.py</span></td><td>pydantic-settings</td>
+                <td><code>settings.database_url</code></td></tr>
+            <tr><td><span class="fname">db.py</span></td><td>SQLAlchemy</td>
+                <td><code>Base</code>、<code>get_db</code></td></tr>
+            <tr><td><span class="fname">passwords.py</span></td><td>passlib / bcrypt</td>
+                <td><code>hash_password</code>、<code>verify_password</code></td></tr>
+            <tr><td><span class="fname">tokens.py</span></td><td>PyJWT</td>
+                <td><code>make_access_token</code>、<code>read_access_token</code></td></tr>
+            <tr><td><span class="fname">deps.py</span></td><td>FastAPI 依賴</td>
+                <td><code>current_user_id</code>、<code>paging</code></td></tr>
+            <tr><td><span class="fname">errors.py</span></td><td>HTTPException</td>
+                <td><code>not_found</code>、<code>forbidden</code>、<code>unauthorized</code></td></tr>
+            <tr><td><span class="fname">period.py</span></td><td>日期計算</td>
+                <td><code>month_range</code>、<code>recent_months</code></td></tr>
+            <tr><td><span class="fname">money.py</span></td><td>Decimal</td>
+                <td><code>to_decimal</code>、<code>ratio</code>、<code>quantize</code></td></tr>
+            <tr><td><span class="fname">images.py</span></td><td>圖片驗證</td>
+                <td><code>validate_avatar</code>、<code>from_data_uri</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <div class="note__k">三個約定</div>
+        <p><b>1. 不要改 toolkit/ 裡的東西。</b> 有問題在群組講，改了別人會踩到。<br>
+        <b>2. 不要在裡面寫跟「記帳」有關的邏輯。</b>
+        這裡的東西換一個題目也要能用。記帳規則寫在你們的 <code>services/</code>。<br>
+        <b>3. 金額一律走 money 模組，不要用 float。</b>
+        浮點數累加會產生 <code>12345.670000000002</code> 這種結果。</p>
+      </div>
+
+      <h3 class="sub">怎麼查一個工具怎麼用</h3>
+      <pre class="tree">python -c "from app.toolkit import period; help(period.month_range)"</pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        每支函式都寫了<b>參數、回傳、丟出什麼例外、範例</b>。
+        或是直接看 <code>tests/test_toolkit.py</code>——
+        <b>測試是最好的使用範例</b>，而且保證是對的。
+      </p>
+    </section>
+
+    <!-- ============ 07 ============ -->
+    <section class="sec" id="trace">
+      <div class="sec__h"><span class="sec__n">07</span><h2>一個請求的旅程</h2></div>
+      <p class="sec__lead">
+        跟著「使用者按下確認並寫入 5 筆」走一遍，你就知道每個檔案在哪一步出場。
+      </p>
+
+      <div class="flow">
+        <div class="fl"><div class="fl__n">1</div><div class="fl__b">
+          <div class="fl__t">frontend/js/app.js</div>
+          <div class="fl__d">使用者按下按鈕。把畫面上五列的欄位收回來，
+          呼叫 <code>API.nlpConfirmBatch(items)</code>。<b>前端不做任何金額運算。</b></div></div></div>
+
+        <div class="fl"><div class="fl__n">2</div><div class="fl__b">
+          <div class="fl__t">frontend/js/api.js</div>
+          <div class="fl__d">決定送去哪裡。mock 模式寫進 localStorage；
+          http 模式 <code>fetch</code> 打 <code>POST /api/nlp/confirm-batch</code>。</div></div></div>
+
+        <div class="fl"><div class="fl__n">3</div><div class="fl__b">
+          <div class="fl__t">backend/app/main.py</div>
+          <div class="fl__d">CORS 檢查通過，把請求交給對應的 router。</div></div></div>
+
+        <div class="fl"><div class="fl__n">4</div><div class="fl__b">
+          <div class="fl__t">backend/app/toolkit/deps.py</div>
+          <div class="fl__d">在路由執行<b>之前</b>驗證 token，取出使用者 ID。
+          驗不過直接回 401，<b>路由一行都不會跑</b>。</div></div></div>
+
+        <div class="fl"><div class="fl__n">5</div><div class="fl__b">
+          <div class="fl__t">backend/app/schemas/nlp.py</div>
+          <div class="fl__d">Pydantic 驗證送進來的資料格式。
+          欄位少了、型別錯了，<b>自動回 422</b>，你不用寫驗證程式碼。</div></div></div>
+
+        <div class="fl"><div class="fl__n">6</div><div class="fl__b">
+          <div class="fl__t">backend/app/routers/nlp.py</div>
+          <div class="fl__d">路由本體。<b>只做三件事</b>：確認權限、呼叫 service、回結果。</div></div></div>
+
+        <div class="fl"><div class="fl__n">7</div><div class="fl__b">
+          <div class="fl__t">backend/app/services/permission.py</div>
+          <div class="fl__d">這個人能不能寫這筆？不能就丟
+          <code>errors.forbidden()</code>。</div></div></div>
+
+        <div class="fl"><div class="fl__n">8</div><div class="fl__b">
+          <div class="fl__t">backend/app/models/transaction.py ＋ nlp.py</div>
+          <div class="fl__d">寫進 <code>transactions</code>，同時把「模型原本解析的值」
+          和「使用者改成什麼」寫進 <code>nlp_parses</code>。<b>這一步是資料飛輪的入口。</b></div></div></div>
+
+        <div class="fl"><div class="fl__n">9</div><div class="fl__b">
+          <div class="fl__t">回程</div>
+          <div class="fl__d">router 回 <code>{"created": 5}</code>，
+          前端接著重打 <code>GET /api/summary</code> 拿新的數字。<br>
+          <b>總覽的數字一律由後端重算</b>，前端不自己加總。</div></div></div>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">為什麼強調「前端不自己加總」</div>
+        <p>前端自己加比較快，但只要有兩個地方各自加總，<b>數字對不起來只是時間問題</b>。<br>
+        這個專案在原型階段就踩過一次：我的總覽用明細加總、家庭總覽用成員表，
+        <b>同一個人出現兩個支出數字</b>。</p>
+      </div>
+    </section>
+
+    <!-- ============ 08 ============ -->
+    <section class="sec" id="where">
+      <div class="sec__h"><span class="sec__n">08</span><h2>我要改 X，該打開哪個檔案</h2></div>
+      <p class="sec__lead">這一節是給你之後查的。</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:34%">我想改…</th><th>打開這個</th></tr></thead>
+          <tbody>
+            <tr><td>整體配色、字體、圓角</td>
+                <td><span class="fname">frontend/css/tokens.css</span></td></tr>
+            <tr><td>某個元件長什麼樣</td>
+                <td><span class="fname">frontend/css/app.css</span></td></tr>
+            <tr><td>某個畫面顯示什麼</td>
+                <td><span class="fname">frontend/js/app.js</span> 裡對應的 <code>vXxx()</code> 函式</td></tr>
+            <tr><td>示範資料（人名、金額）</td>
+                <td><span class="fname">frontend/js/data.js</span></td></tr>
+            <tr><td>前端要打哪支 API</td>
+                <td><span class="fname">frontend/js/api.js</span></td></tr>
+            <tr><td>切換 mock / 真後端</td>
+                <td><span class="fname">frontend/index.html</span> 的 <code>&lt;meta name="api-base"&gt;</code></td></tr>
+            <tr><td>新增一支 API</td>
+                <td><span class="fname">backend/app/routers/</span> 加函式 →
+                    <span class="fname">main.py</span> 掛上 →
+                    <span class="fname">ownership.py</span> 認領</td></tr>
+            <tr><td>資料表加一個欄位</td>
+                <td><span class="fname">backend/app/models/</span> →
+                    然後跑 <code>alembic revision --autogenerate</code></td></tr>
+            <tr><td>API 回傳的形狀</td>
+                <td><span class="fname">backend/app/schemas/</span></td></tr>
+            <tr><td>計算邏輯（統計、超支判斷）</td>
+                <td><span class="fname">backend/app/services/analytics.py</span></td></tr>
+            <tr><td>誰看得到誰</td>
+                <td><span class="fname">backend/app/services/permission.py</span></td></tr>
+            <tr><td>模型的 prompt</td>
+                <td><span class="fname">backend/app/services/llm/</span></td></tr>
+            <tr><td>環境變數（資料庫網址、密鑰）</td>
+                <td><span class="fname">backend/.env</span>（本機）／ Render 後台（線上）</td></tr>
+            <tr><td>要裝的套件</td>
+                <td><span class="fname">backend/requirements.txt</span></td></tr>
+            <tr><td>部署設定</td>
+                <td><span class="fname">render.yaml</span></td></tr>
+            <tr><td>分工、誰負責什麼</td>
+                <td><span class="fname">backend/app/ownership.py</span></td></tr>
+            <tr><td>這些說明文件</td>
+                <td><span class="fname">frontend/docs/</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--crit">
+        <div class="note__k">改了 CSS 或 JS 一定要把版號加一</div>
+        <p><code>frontend/index.html</code> 裡的 <code>?v=19</code> 是給瀏覽器看的快取版號。
+        <b>不加的話使用者會繼續看到舊版</b>，你會以為部署沒生效。<br>
+        另外 Render 的 CDN 對 HTML 有 <b>5 分鐘快取</b>，
+        改 HTML 之後線上最多會慢 5 分鐘才看到。急著驗的話網址後面加 <code>?cb=1</code>。</p>
+      </div>
+    </section>
+
+    <!-- ============ 09 ============ -->
+    <section class="sec" id="naming">
+      <div class="sec__h"><span class="sec__n">09</span><h2>命名規則</h2></div>
+      <p class="sec__lead">四個人用同一套，讀別人的程式碼才不用一直轉換。</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th>東西</th><th>寫法</th><th>例子</th></tr></thead>
+          <tbody>
+            <tr><td>Python 檔案、函式、變數</td><td>小寫底線</td>
+                <td class="rt">savings_goal、month_range()</td></tr>
+            <tr><td>Python 類別</td><td>大駝峰</td>
+                <td class="rt">Transaction、SavingsGoal</td></tr>
+            <tr><td>Python 常數</td><td>全大寫</td>
+                <td class="rt">MAX_BYTES、WARN_RATIO</td></tr>
+            <tr><td>資料表</td><td>小寫底線<b>複數</b></td>
+                <td class="rt">transactions、savings_goals</td></tr>
+            <tr><td>API 路徑</td><td>小寫連字號<b>複數</b></td>
+                <td class="rt">/api/savings-goal</td></tr>
+            <tr><td><b>JSON 欄位</b></td><td><b>小駝峰</b></td>
+                <td class="rt">savingsGoal、avatarUrl</td></tr>
+            <tr><td>JavaScript 函式、變數</td><td>小駝峰</td>
+                <td class="rt">nlpParseBatch、savingsLevel</td></tr>
+            <tr><td>CSS class</td><td>BEM 風格</td>
+                <td class="rt">.card__title、.nav__i--out</td></tr>
+            <tr><td>Git 分支</td><td>成員代號 + 領域</td>
+                <td class="rt">m2-ledger</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">Python 用底線、JSON 用駝峰，這個轉換要在 schemas/ 做</div>
+        <p>Python 的慣例是 <code>savings_goal</code>，JavaScript 的慣例是
+        <code>savingsGoal</code>。<b>兩邊都照自己的慣例來</b>，
+        在 Pydantic 模型上設定別名自動轉換：</p>
+        <pre class="tree" style="margin-top:10px">class SavingsOut(BaseModel):
+    savings_goal: int = Field(alias="savingsGoal")
+    model_config = ConfigDict(populate_by_name=True)</pre>
+        <p style="margin-top:10px"><b>不要讓前端遷就後端，也不要反過來。</b>
+        兩邊各自寫得自然，轉換集中在一個地方。</p>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section class="sec" id="ignore">
+      <div class="sec__h"><span class="sec__n">10</span><h2>什麼不進版控</h2></div>
+
+      <pre class="tree">__pycache__/        <i>Python 的編譯快取，每台機器都不一樣</i>
+.venv/  venv/       <i>虛擬環境，幾百 MB</i>
+.pytest_cache/      <i>測試快取</i>
+<b>.env</b>                <i>★ 環境變數，裡面有密碼和金鑰</i>
+*.db                <i>本機的資料庫檔案</i>
+.DS_Store           <i>macOS 自動產生的</i></pre>
+
+      <div class="note note--crit">
+        <div class="note__k">.env 絕對不可以 commit</div>
+        <p>裡面有 <code>JWT_SECRET</code>——<b>拿到它的人可以偽造任何人的登入權杖</b>。<br>
+        而且 <b>git 的歷史刪不掉</b>：就算你下一個 commit 把它刪除，
+        之前那個版本還在歷史裡，任何人 clone 下來都找得到。<br>
+        真的不小心 commit 了，<b>唯一的補救是立刻換一組新的密鑰</b>，
+        不要以為刪掉檔案就沒事了。</p>
+      </div>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:16px">
+        要給別人看「需要哪些環境變數」，用 <code>.env.example</code>——
+        它<b>只有變數名稱和說明，沒有真正的值</b>，所以可以進版控。
+      </p>
+
+      <div class="note">
+        <div class="note__k">接下來看哪一份</div>
+        <p><a href="fastapi.html">FastAPI 說明書</a> —— 怎麼寫後端<br>
+        <a href="restful.html">RESTful 說明書</a> —— API 該怎麼取名<br>
+        <a href="index.html">專題手冊</a> —— 源起、功能清單、分工、排程<br>
+        <code>docs/02-前後端串接契約.md</code> —— <b>動工前一定要看</b></p>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <div>家庭記帳與財務控管系統 · 檔案系統說明書</div>
+      <div class="mono">FRONTEND · BACKEND · DOCS</div>
+    </footer>
+
+  </div>
+  </main>
+</div>
+
+<script src="docs.js?v=1"></script>
+</body>
+</html>

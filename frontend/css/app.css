@@ -55,50 +55,39 @@
 .nav__i.on .nav__b { background: var(--accent); color: #fff; }
 .nav__b--hot { background: var(--down); color: #fff; }
 
-/* 專題說明文件：站外連結，釘在側欄底部不跟著捲動 */
-.doclink {
-  display: flex; align-items: center; gap: 11px;
-  margin: 0 10px 9px; padding: 10px 12px;
-  border-radius: var(--r-input); text-decoration: none;
-  border: 1px solid rgba(108, 159, 251, .28);
-  background: linear-gradient(120deg, var(--accent-wash), rgba(139, 124, 240, .1));
-  transition: border-color .18s var(--ease), background .18s var(--ease);
+/* ============================================================
+   文件清單：釘在側欄底部，不跟著捲動
+   ------------------------------------------------------------
+   刻意做得很緊湊。原本一份文件一張大卡片，三份就把側欄撐爆
+   （1366×768 的筆電上最後一個導覽項會被裁掉）。
+   清單式可以容納五六份都不會有問題。
+   ============================================================ */
+.docs { padding: 0 10px 6px; flex: 0 0 auto; }
+.docs__lb {
+  font-size: 10.5px; letter-spacing: .14em; color: var(--ink-dim);
+  padding: 7px 10px 4px; text-transform: uppercase;
 }
-.doclink:hover {
-  border-color: rgba(108, 159, 251, .55);
-  background: linear-gradient(120deg, rgba(108, 159, 251, .22), rgba(139, 124, 240, .16));
+.docs__i {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 10px; border-radius: var(--r-input);
+  color: var(--ink-soft); font-size: 13px; text-decoration: none;
+  transition: color .18s var(--ease), background .18s var(--ease);
 }
-.doclink__ic { width: 17px; height: 17px; flex: 0 0 17px; color: var(--accent-hi); }
+.docs__i svg { width: 15px; height: 15px; flex: 0 0 15px; opacity: .7; }
+.docs__i span { flex: 1 1 auto; min-width: 0; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; }
+.docs__i i {
+  font-style: normal; font-size: 11px; opacity: .35;
+  transition: opacity .18s var(--ease), transform .18s var(--ease);
+}
+.docs__i:hover { background: rgba(255,255,255,.05); color: var(--ink); }
+.docs__i:hover svg { opacity: 1; }
+.docs__i:hover i { opacity: .85; transform: translate(1px, -1px); }
 
-/* FastAPI 說明書：用綠色，跟藍色的專題說明文件分開 */
-.doclink--fa {
-  border-color: rgba(110, 231, 183, .26);
-  background: linear-gradient(120deg, rgba(110, 231, 183, .11), rgba(95, 184, 217, .07));
-}
-.doclink--fa:hover {
-  border-color: rgba(110, 231, 183, .5);
-  background: linear-gradient(120deg, rgba(110, 231, 183, .18), rgba(95, 184, 217, .12));
-}
-.doclink--fa .doclink__ic, .doclink--fa .doclink__go { color: var(--up); }
-
-/* RESTful 說明書：用紫色 */
-.doclink--rs {
-  border-color: rgba(139, 124, 240, .26);
-  background: linear-gradient(120deg, rgba(139, 124, 240, .12), rgba(108, 159, 251, .06));
-}
-.doclink--rs:hover {
-  border-color: rgba(139, 124, 240, .5);
-  background: linear-gradient(120deg, rgba(139, 124, 240, .19), rgba(108, 159, 251, .11));
-}
-.doclink--rs .doclink__ic, .doclink--rs .doclink__go { color: var(--accent-2); }
-.doclink__m { display: flex; flex-direction: column; min-width: 0; }
-.doclink__t { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
-.doclink__s { font-size: 10.5px; color: var(--ink-faint); line-height: 1.4; }
-.doclink__go {
-  width: 12px; height: 12px; flex: 0 0 12px; margin-left: auto; color: var(--accent-hi);
-  opacity: .6; transition: opacity .18s var(--ease), transform .18s var(--ease);
-}
-.doclink:hover .doclink__go { opacity: 1; transform: translate(1px, -1px); }
+/* 專題說明文件是主文件，給它一點顏色跟其他區隔 */
+.docs__i--main { color: var(--accent-hi); }
+.docs__i--main svg { opacity: .9; }
+.docs__i--main:hover { background: var(--accent-wash); color: #fff; }
 
 .rail__f { padding: 15px 18px 17px; border-top: 1px solid var(--line); }
 
@@ -563,14 +552,11 @@
   .nav { display: flex; padding: 0 4px; flex: 0 0 auto; align-items: center; gap: 4px; }
   .nav__lb, .rail__f { display: none; }
   .nav__i { padding: 8px 13px; white-space: nowrap; }
-  /* 橫向排列時 doclink 會被擠扁然後直向換行，把整條側欄撐高，
-     所以這裡壓成跟導覽項一樣的膠囊 */
-  .doclink {
-    margin: 0 0 0 4px; padding: 8px 12px; gap: 8px;
-    flex: 0 0 auto; white-space: nowrap;
-  }
-  .doclink__m { flex-direction: row; align-items: baseline; gap: 6px; }
-  .doclink__s, .doclink__go { display: none; }
+  /* 橫向排列時文件清單也要變成一排膠囊，不然會直向堆疊把側欄撐高 */
+  .docs { display: flex; padding: 0 4px; flex: 0 0 auto; align-items: center; gap: 2px; }
+  .docs__lb { display: none; }
+  .docs__i { padding: 8px 12px; white-space: nowrap; flex: 0 0 auto; }
+  .docs__i i { display: none; }
   .main { margin-left: 0; padding: 0 8px; }
   .top { top: 8px; }
   .page { padding: 18px 0 60px; }
