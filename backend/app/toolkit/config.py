@@ -25,7 +25,7 @@ pydantic-settings 的做法是：把所有設定寫成一個類別的欄位，
 而不是等到使用者按下登入按鈕的那一刻才發現 JWT_SECRET 是空的。
 """
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -103,6 +103,26 @@ class Settings(BaseSettings):
         ),
     )
 
+    @field_validator("jwt_secret")
+    @classmethod
+    def _secret_must_be_long_enough(cls, v: str) -> str:
+        """
+        JWT 密鑰太短的話，攻擊者暴力破解得出來，就能偽造任何人的登入權杖。
+
+        RFC 7518 建議 HMAC-SHA256 的密鑰至少 32 個位元組。
+        這裡在**啟動時**就擋下來，而不是等出事才發現。
+
+        產生一組：
+            python -c "import secrets;print(secrets.token_urlsafe(48))"
+        """
+        if len(v.encode("utf-8")) < 32:
+            raise ValueError(
+                f"JWT_SECRET 太短了（目前 {len(v.encode('utf-8'))} 個位元組，"
+                "至少要 32 個）。產生方式："
+                'python -c "import secrets;print(secrets.token_urlsafe(48))"'
+            )
+        return v
+
     @property
     def allowed_origins_list(self) -> list[str]:
         """
@@ -116,6 +136,6 @@ class Settings(BaseSettings):
 
 # 整個專案共用同一個 settings 物件。
 # 在別的檔案裡這樣用：
-#     from app.core.config import settings
+#     from app.toolkit.config import settings
 #     print(settings.database_url)
 settings = Settings()  # type: ignore[call-arg]

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=7">
+<link rel="stylesheet" href="docs.css?v=8">
 </head>
 <body>
 <div class="shell">
@@ -34,6 +34,7 @@
       <a href="#llm"><i>09</i>LLM 設計</a>
       <a href="#mindmap"><i>10</i>分工心智圖</a>
       <a class="nav__out" href="fastapi.html"><i>&#8599;</i>FastAPI 說明書</a>
+      <a class="nav__out" href="restful.html"><i>&#8599;</i>RESTful 說明書</a>
       <a class="nav__out" href="api.html"><i>&#8599;</i>API 瀏覽</a>
       <a class="nav__out" href="model.html"><i>↗</i>記帳模型設計</a>
       <a class="nav__back" href="../index.html"><i>←</i>回到系統</a>
@@ -56,7 +57,7 @@
         <div class="mchip"><span>線上原型</span><b><a href="https://fambudget-web.onrender.com" target="_blank" rel="noopener">fambudget-web</a></b></div>
         <div class="mchip"><span>原始碼</span><b class="mono">cbes502034/final_project</b></div>
         <div class="mchip"><span>技術棧</span><b>FastAPI · PostgreSQL · 純靜態前端</b></div>
-        <div class="mchip"><span>API</span><b>37 支路由</b></div>
+        <div class="mchip"><span>API</span><b>38 支路由</b></div>
         <div class="mchip"><span>資料表</span><b>13 張</b></div>
       </div>
     </header>
@@ -263,8 +264,21 @@
             <tr><td class="num">A6</td><td>修改密碼</td><td>需驗證舊密碼，並讓所有其他工作階段失效</td><td><span class="tag tag--s">S</span></td></tr>
             <tr><td class="num">A7</td><td>忘記密碼</td><td>寄送重設連結</td><td><span class="tag tag--s">S</span></td></tr>
             <tr><td class="num">A8</td><td>查看登入裝置</td><td>列出有效 session，可個別登出</td><td><span class="tag tag--s">S</span></td></tr>
+            <tr><td class="num">A9</td><td><b>個人資料</b></td><td>修改顯示名稱、出生年。<b>email 不開放改</b>（那是登入帳號）</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">A10</td><td><b>上傳大頭貼</b></td><td>前端 canvas 縮到 256×256 再上傳，後端驗證後存資料庫</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">A11</td><td>移除大頭貼</td><td>退回顯示文字頭像</td><td><span class="tag tag--m">M</span></td></tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">大頭貼不能存檔案系統</div>
+        <p><b>Render 的磁碟是暫時性的</b> —— 檔案寫進去，服務重新部署或重啟之後就不見了，
+        免費方案沒有持久磁碟。<br>
+        所以大頭貼要<b>存進資料庫</b>（<code>users.avatar_blob</code>）。
+        縮到 256×256 之後大約 20~50 KB，完全沒問題。<br>
+        <b>縮圖在前端做</b>，後端縮圖要裝 Pillow，映像檔會大好幾十 MB；
+        瀏覽器的 canvas 一行 <code>toBlob()</code> 就搞定。</p>
       </div>
 
       <h3 class="sub">B · 家庭與權限</h3>
@@ -488,14 +502,14 @@
     <section class="sec" id="api">
       <div class="sec__h"><span class="sec__n">05</span><h2>API 目錄：按人員分類</h2></div>
       <p class="sec__lead">
-        共 <b>37 支路由</b>。權限標示：公開 / 登入 / master / 監管者。
+        共 <b>38 支路由</b>。權限標示：公開 / 登入 / master / 監管者。
         <span class="tag tag--llm">★</span> 代表與 LLM 直接相關。
       </p>
 
       <div class="grid grid--2" style="margin-bottom:8px">
         <div class="card" style="border-top:2px solid var(--m1)">
           <div class="mvc__k" style="color:var(--m1)">成員1　<span style="opacity:.7">m1-auth</span></div>
-          <div class="mvc__t">認證與基礎建設 · 8 支</div>
+          <div class="mvc__t">認證與基礎建設 · 11 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">路由不多是刻意的——他同時扛著 <b>core/ 這個所有人都要用的地基</b>，路由少一點才能最快做完解鎖別人。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m2)">
@@ -537,6 +551,9 @@
             <tr><td class="num">6</td><td class="tight">GET</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>目前使用者、家庭角色、被誰監管</td></tr>
             <tr><td class="num">7</td><td class="tight">PATCH</td><td class="rt">/api/auth/password</td><td class="tight">登入</td><td>修改密碼，同時讓其他 session 失效</td></tr>
             <tr><td class="num">8</td><td class="tight">GET</td><td class="rt">/api/auth/sessions</td><td class="tight">登入</td><td>列出有效的登入裝置</td></tr>
+            <tr><td class="num">36</td><td class="tight">PATCH</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>修改個人資料：顯示名稱、出生年</td></tr>
+            <tr><td class="num">37</td><td class="tight">PUT</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>上傳大頭貼。前端已縮到 256×256</td></tr>
+            <tr><td class="num">38</td><td class="tight">DELETE</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>移除大頭貼，改回顯示文字頭像</td></tr>
           </tbody>
         </table>
       </div>
@@ -911,7 +928,7 @@
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · 四人 × 一個月專題</div>
-      <div class="mono">37 API · 13 TABLES · 8 SCREENS</div>
+      <div class="mono">38 API · 13 TABLES · 8 SCREENS</div>
     </footer>
 
   </div>

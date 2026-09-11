@@ -80,6 +80,17 @@
   background: linear-gradient(120deg, rgba(110, 231, 183, .18), rgba(95, 184, 217, .12));
 }
 .doclink--fa .doclink__ic, .doclink--fa .doclink__go { color: var(--up); }
+
+/* RESTful 說明書：用紫色 */
+.doclink--rs {
+  border-color: rgba(139, 124, 240, .26);
+  background: linear-gradient(120deg, rgba(139, 124, 240, .12), rgba(108, 159, 251, .06));
+}
+.doclink--rs:hover {
+  border-color: rgba(139, 124, 240, .5);
+  background: linear-gradient(120deg, rgba(139, 124, 240, .19), rgba(108, 159, 251, .11));
+}
+.doclink--rs .doclink__ic, .doclink--rs .doclink__go { color: var(--accent-2); }
 .doclink__m { display: flex; flex-direction: column; min-width: 0; }
 .doclink__t { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
 .doclink__s { font-size: 10.5px; color: var(--ink-faint); line-height: 1.4; }

@@ -8,6 +8,7 @@
 | **線上系統** | <https://fambudget-web.onrender.com> |
 | **專題手冊** | <https://fambudget-web.onrender.com/docs/> |
 | **FastAPI 說明書** | <https://fambudget-web.onrender.com/docs/fastapi.html> ← 沒學過 FastAPI 先讀這份 |
+| **RESTful 說明書** | <https://fambudget-web.onrender.com/docs/restful.html> |
 | **API 瀏覽** | <https://fambudget-web.onrender.com/docs/api.html> |
 | **前後端串接契約** | `docs/02-前後端串接契約.md` ← 動工前一定要看 |
 | **模型設計** | <https://fambudget-web.onrender.com/docs/model.html> |

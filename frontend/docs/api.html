@@ -8,13 +8,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=7">
+<link rel="stylesheet" href="docs.css?v=8">
 </head>
 <body>
 
 <nav class="docbar" style="max-width:1100px">
   <a href="index.html">← 專題手冊</a>
   <a href="fastapi.html">FastAPI 說明書</a>
+  <a href="restful.html">RESTful 說明書</a>
   <a href="model.html">記帳模型設計</a>
   <a href="../index.html">回到系統</a>
 </nav>
@@ -25,7 +26,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      共 <b>37 支路由</b>，依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>38 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -67,7 +68,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">37 ROUTES · 4 MODULES</div>
+    <div class="mono">38 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -189,8 +190,20 @@
       res: '1. analytics service 從資料庫算出所有數字\n2. 把「算好的數字」組成 prompt 的一部分\n3. 呼叫模型，要求它只做敘述與歸納\n4. Pydantic 驗證輸出格式\n5. 把數字存進 advices.basis_json（給使用者驗算用）',
       note: '<b>順序不能顛倒，模型不做任何算術。</b>財務數字算錯會讓使用者做出錯誤決定，而模型本來就不擅長算術。' },
 
-    { n: 36, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
-    { n: 37, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
+    { n: 36, o: 'm1', m: 'PATCH', p: '/api/auth/me', a: '登入',
+      d: '修改個人資料：顯示名稱、出生年',
+      body: '{\n  "displayName": "林建國",\n  "birthYear": 1974\n}',
+      note: '只能改自己的資料。email 不給改——那是登入帳號，要改的話等於換帳號，要另外設計驗證流程。' },
+    { n: 37, o: 'm1', m: 'PUT', p: '/api/auth/me/avatar', a: '登入',
+      d: '上傳大頭貼。前端已縮到 256×256',
+      body: '{\n  "image": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."\n}',
+      note: '⚠️ <b>Render 的磁碟是暫時性的</b>，檔案存進去重新部署就不見了。所以大頭貼存資料庫（bytes 欄位），不要寫檔案系統。<br>後端用 <code>toolkit.images.validate_avatar()</code> 驗證——<b>只看副檔名和 Content-Type 會被騙</b>，那兩個使用者可以隨便填。' },
+    { n: 38, o: 'm1', m: 'DELETE', p: '/api/auth/me/avatar', a: '登入',
+      d: '移除大頭貼，改回顯示文字頭像',
+      note: '移除之後 <code>avatarUrl</code> 回傳 null，前端自動退回文字頭像。' },
+
+    { n: 39, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
+    { n: 40, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
       note: '後端上線後<b>這支才是真正能送出請求的地方</b>。' }
   ];
 
@@ -281,8 +294,9 @@
         '</div></section>';
     });
     $list.innerHTML = h || '<div class="empty">沒有符合的路由。試試清掉搜尋字或切回「全部」。</div>';
+    var ours = ROUTES.filter(function (r) { return r.o !== 'sys'; }).length;
     $count.textContent = shown === ROUTES.length
-      ? ROUTES.length + ' 支路由'
+      ? ours + ' 支 ＋ 系統 ' + (ROUTES.length - ours) + ' 支'
       : shown + ' / ' + ROUTES.length + ' 支';
   }
 

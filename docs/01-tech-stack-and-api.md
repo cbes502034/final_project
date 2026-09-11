@@ -175,7 +175,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **37 條路由**。標示說明：
+共 **38 條路由**。標示說明：
 
 - **權限**：`公開` / `登入` / `master` / `監管者`
 - ★ 記號代表與 LLM 直接相關
@@ -192,6 +192,9 @@ final_project/
 | 6 | GET | `/api/auth/me` | 成員1 | 登入 | 目前使用者、家庭角色、被誰監管 |
 | 7 | PATCH | `/api/auth/password` | 成員1 | 登入 | 修改密碼，同時讓其他 session 失效 |
 | 8 | GET | `/api/auth/sessions` | 成員1 | 登入 | 列出有效的登入裝置 |
+| 36 | PATCH | `/api/auth/me` | 成員1 | 登入 | 修改個人資料：顯示名稱、出生年 |
+| 37 | PUT | `/api/auth/me/avatar` | 成員1 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
+| 38 | DELETE | `/api/auth/me/avatar` | 成員1 | 登入 | 移除大頭貼，改回顯示文字頭像 |
 
 **回應範例 — `POST /api/auth/login`**
 
@@ -340,8 +343,8 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 36 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
-| 37 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
+| 39 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
+| 40 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
 
 ---
 

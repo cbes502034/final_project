@@ -22,7 +22,7 @@ pytest 會自動找 `test_` 開頭的檔案和函式來執行。
 ===========================================================================
 為什麼要在檔案最上面設環境變數？
 ===========================================================================
-因為 `app.core.config` 在被 import 的當下就會讀環境變數，
+因為 `app.toolkit.config` 在被 import 的當下就會讀環境變數，
 少了 DATABASE_URL 或 JWT_SECRET 它會直接報錯。
 所以**一定要在 import app 之前**先把假的值塞進去。
 
@@ -32,7 +32,7 @@ pytest 會自動找 `test_` 開頭的檔案和函式來執行。
 import os
 
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
-os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production")
+os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-at-least-32-bytes-long")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -58,17 +58,21 @@ def test_自動文件產得出來():
     assert "paths" in r.json()
 
 
-def test_三十五支路由都有掛上去():
+def test_進度看得出來():
     """
-    API 目錄上有 35 支（第 36 支是 /healthz，第 37 支是 FastAPI 自己的 /docs）。
+    每完成一組路由，progress() 的數字要跟著動。
 
-    這支測試的價值在於：有人新增或刪掉路由時，數字對不上就會紅燈，
-    逼他回去更新 API 目錄文件。**讓文件和程式碼不會悄悄地失去同步。**
+    這支不是在驗「有沒有寫完」（現在當然沒寫完），
+    而是在驗**進度統計本身是對的** —— 已完成 + 未完成要等於宣告的總數。
     """
-    paths = client.get("/openapi.json").json()["paths"]
-    verbs = ("get", "post", "put", "patch", "delete")
-    n = sum(len([m for m in ops if m in verbs]) for ops in paths.values())
-    assert n == 36, f"預期 35 支 API + healthz = 36，實際 {n} 支"
+    from app.ownership import MEMBERS, progress
+
+    prog = progress()
+    for m in MEMBERS:
+        p = prog[m.key]
+        assert len(p["done"]) + len(p["todo"]) == len(m.routes), (
+            f"{m.label} 的進度統計對不上"
+        )
 
 
 def test_分工定義與程式碼一致():
@@ -87,26 +91,17 @@ def test_分工定義與程式碼一致():
     assert not problems, "分工定義與程式碼對不上：" + "；".join(problems)
 
 
-def test_沒帶權杖會被擋下來():
+def test_CORS_有設定():
     """
-    需要登入的路由，沒帶 token 就該回 401。
-
-    這支測試很重要：它守住 core/deps.py 的 get_current_user。
-    哪天有人不小心把那段檢查改壞，這裡會立刻紅燈。
+    CORS 沒設對的話，前端 console 會出現 blocked by CORS policy，
+    而且那個錯誤訊息看起來跟後端一點關係都沒有，很難查。
     """
-    r = client.get("/api/auth/me")
-    assert r.status_code == 401
-
-
-def test_尚未實作的路由會誠實回報():
-    """
-    還沒實作的路由回 501（Not Implemented），不是 500 或 404。
-
-    501 的意思是「這支路由存在，但還沒做」——
-    前端看到 501 就知道是進度問題，不是自己打錯網址。
-    """
-    r = client.post(
-        "/api/auth/login",
-        json={"email": "a@b.c", "password": "x"},
+    r = client.options(
+        "/healthz",
+        headers={
+            "Origin": "http://localhost:5174",
+            "Access-Control-Request-Method": "GET",
+        },
     )
-    assert r.status_code == 501
+    assert r.status_code in (200, 204)
+    assert "access-control-allow-origin" in {k.lower() for k in r.headers}

@@ -97,6 +97,9 @@ MEMBERS: list[Member] = [
             ("GET", "/api/auth/me"),
             ("PATCH", "/api/auth/password"),
             ("GET", "/api/auth/sessions"),
+            ("PATCH", "/api/auth/me"),
+            ("PUT", "/api/auth/me/avatar"),
+            ("DELETE", "/api/auth/me/avatar"),
         ],
         files=[
             "app/routers/auth.py",
@@ -104,10 +107,6 @@ MEMBERS: list[Member] = [
             "app/schemas/auth.py",
         ],
         shared=[
-            "app/core/config.py",
-            "app/core/database.py",
-            "app/core/security.py",
-            "app/core/deps.py",
             "app/services/llm/client.py",
         ],
         llm=(
@@ -359,13 +358,51 @@ def all_routes() -> dict[tuple[str, str], Member]:
     return out
 
 
-def check() -> list[str]:
+def progress() -> dict[str, dict]:
     """
-    比對這份定義與實際掛上去的路由，回傳所有對不上的地方。
+    比對「宣告要做的路由」與「實際掛上去的路由」，回傳每個人的進度。
 
-    回傳空清單代表完全一致。
+    回傳
+        dict: 鍵是成員代號，值是
+            `{"done": [...], "todo": [...], "member": Member}`。
+
+    注意
+        **路由還沒寫不算錯誤**，那是正常的進度。
+        這支的用途是讓大家隨時知道「還剩幾支」。
     """
     from app.main import app  # 延後匯入，避免循環相依
+
+    actual: set[tuple[str, str]] = set()
+    for route in app.routes:
+        methods = getattr(route, "methods", None)
+        path = getattr(route, "path", None)
+        if not methods or not path:
+            continue
+        for verb in methods:
+            if verb not in ("HEAD", "OPTIONS"):
+                actual.add((verb, path))
+
+    out = {}
+    for m in MEMBERS:
+        done = [r for r in m.routes if r in actual]
+        todo = [r for r in m.routes if r not in actual]
+        out[m.key] = {"member": m, "done": done, "todo": todo}
+    return out
+
+
+def check() -> list[str]:
+    """
+    檢查分工定義本身有沒有矛盾，以及有沒有「程式裡有但沒人認領」的路由。
+
+    回傳
+        list[str]: 所有問題。空清單代表沒問題。
+
+    注意
+        **不檢查「宣告了但還沒寫」** —— 那是進度不是錯誤，用 progress() 看。
+        這支只抓真正的矛盾：兩個人搶同一支、檔案重複認領、
+        或是有人加了路由卻忘記在這裡登記。
+    """
+    from app.main import app
 
     problems: list[str] = []
     declared = all_routes()
@@ -377,16 +414,14 @@ def check() -> list[str]:
         if not methods or not path:
             continue
         for verb in methods:
-            if verb in ("HEAD", "OPTIONS"):
-                continue
-            actual.add((verb, path))
+            if verb not in ("HEAD", "OPTIONS"):
+                actual.add((verb, path))
 
-    system = set(SYSTEM_ROUTES)
-
-    for key in sorted(actual - set(declared) - system):
-        problems.append(f"程式裡有但沒有人認領：{key[0]} {key[1]}")
-    for key in sorted(set(declared) - actual):
-        problems.append(f"{declared[key].label} 宣告了但程式裡沒有：{key[0]} {key[1]}")
+    for key in sorted(actual - set(declared) - set(SYSTEM_ROUTES)):
+        problems.append(
+            f"程式裡有但沒有人認領：{key[0]} {key[1]}"
+            "（在 ownership.py 的 MEMBERS 裡加上去）"
+        )
 
     seen: dict[str, str] = {}
     for m in MEMBERS:
@@ -399,32 +434,44 @@ def check() -> list[str]:
 
 
 def main() -> int:
-    # Windows 的主控台預設是 cp950，印不出 ⚠ 這類字元會整個爆掉。
-    # 這裡強制轉成 UTF-8；轉不了就算了，下面的字還是印得出來。
+    # Windows 主控台預設 cp950，印不出某些字元會整個爆掉
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
 
     total = sum(len(m.routes) for m in MEMBERS)
-    print("=" * 68)
-    print("分工定義　（app/ownership.py 是唯一的事實來源）")
-    print("=" * 68)
+    print("=" * 70)
+    print("分工與進度　（app/ownership.py 是唯一的事實來源）")
+    print("=" * 70)
+
+    prog = progress()
+    all_done = 0
     for m in MEMBERS:
-        print(f"\n{m.label} · {m.domain}    分支 {m.branch}    {len(m.routes)} 支路由")
+        p = prog[m.key]
+        d, t = len(p["done"]), len(p["todo"])
+        all_done += d
+        bar = "█" * d + "░" * t
+        print(f"\n{m.label} · {m.domain}    分支 {m.branch}")
+        print(f"  {bar}  {d}/{d + t} 支")
         print(f"  {m.scope.splitlines()[0]}")
         if m.shared:
             print(f"  [共用] 別人會用到，要最先完成：{', '.join(m.shared)}")
-    print(f"\n路由合計：{total} 支 + 系統 {len(SYSTEM_ROUTES)} 支 = {total + len(SYSTEM_ROUTES)}")
+        if t and t <= 12:
+            print(f"  還沒寫：{', '.join(f'{v} {p2}' for v, p2 in p['todo'])}")
 
-    print("\n" + "=" * 68)
+    print("\n" + "-" * 70)
+    print(f"總進度　{all_done}/{total} 支　"
+          f"({all_done * 100 // total if total else 0}%)")
+
+    print("\n" + "=" * 70)
     problems = check()
     if problems:
-        print(f"❌ 找到 {len(problems)} 個對不上的地方：")
+        print(f"❌ 找到 {len(problems)} 個問題：")
         for p in problems:
             print("   -", p)
         return 1
-    print("✅ 程式碼與分工定義完全一致")
+    print("✅ 分工定義沒有矛盾")
     return 0
 
 

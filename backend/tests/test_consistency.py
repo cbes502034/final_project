@@ -71,31 +71,56 @@ def test_分支名稱到處都一樣():
             assert m.branch in text, f"{src} 裡找不到分支名稱 {m.branch}"
 
 
-def test_ownership_列到的檔案都真的存在():
+def test_工具箱的檔案都在():
     """
-    分工表裡寫了一個檔案，那個檔案就必須存在。
+    toolkit/ 底下的東西是**已經寫好交付的**，少一個就代表交付不完整。
 
-    不然組員照著文件去找自己的檔案，會找不到。
+    成員自己要建的檔案（routers/、models/…）不在這裡檢查——
+    那些還沒建是正常的，屬於進度不是錯誤。
     """
-    from app.ownership import MEMBERS, SHARED_FILES
+    expected = [
+        "app/toolkit/__init__.py",
+        "app/toolkit/config.py",
+        "app/toolkit/db.py",
+        "app/toolkit/passwords.py",
+        "app/toolkit/tokens.py",
+        "app/toolkit/deps.py",
+        "app/toolkit/errors.py",
+        "app/toolkit/period.py",
+        "app/toolkit/money.py",
+    ]
+    missing = [f for f in expected
+               if not os.path.exists(os.path.join(REPO, "backend", f))]
+    assert not missing, "工具箱少了這些檔案：" + "、".join(missing)
 
-    missing = []
-    for m in MEMBERS:
-        for f in m.files + m.shared:
-            if not os.path.exists(os.path.join(REPO, "backend", f)):
-                missing.append(f"{m.label} 的 {f}")
-    for f in SHARED_FILES:
-        if not os.path.exists(os.path.join(REPO, "backend", f)):
-            missing.append(f"共用檔案 {f}")
 
-    assert not missing, "分工表列到但實際不存在的檔案：" + "、".join(missing)
-
-
-def test_每個檔案的檔頭都標了負責人():
+def test_工具箱沒有留下未完成的東西():
     """
-    每個 .py 檔案的第一段說明裡要寫「負責人」，組員打開檔案就知道是誰的。
+    ⚠️ **工具箱裡不可以有 TODO 或 NotImplementedError。**
 
-    __init__.py 例外——那些是共用的目錄說明。
+    它的定位是「完整可用的工具」，不是填空題。
+    留下 TODO 的話，成員 import 進來用到一半才發現是空的，
+    那比一開始就沒有這個工具還糟。
+    """
+    import glob
+
+    bad = []
+    for path in glob.glob(os.path.join(REPO, "backend", "app", "toolkit", "*.py")):
+        text = io.open(path, encoding="utf-8").read()
+        name = os.path.basename(path)
+        # 說明文字裡提到 TODO 是可以的，實際的標記不行
+        if "TODO(" in text:
+            bad.append(f"{name} 有 TODO 標記")
+        if "NotImplementedError" in text:
+            bad.append(f"{name} 有 NotImplementedError")
+    assert not bad, "工具箱不該有未完成的東西：" + "、".join(bad)
+
+
+def test_已建立的檔案都標了負責人():
+    """
+    分工表裡列到、而且**已經建立**的檔案，檔頭要寫負責人。
+
+    還沒建立的跳過——那是進度。
     """
     from app.ownership import MEMBERS
 
@@ -106,8 +131,10 @@ def test_每個檔案的檔頭都標了負責人():
 
     missing = []
     for f in sorted(owned):
-        head = read(os.path.join("backend", f))[:600]
-        if "負責人" not in head:
+        p = os.path.join(REPO, "backend", f)
+        if not os.path.exists(p):
+            continue
+        if "負責人" not in io.open(p, encoding="utf-8").read()[:600]:
             missing.append(f)
 
     assert not missing, "檔頭沒有標負責人的檔案：" + "、".join(missing)

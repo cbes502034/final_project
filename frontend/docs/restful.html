@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RESTful API 說明書</title>
+<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 38 支路由哪裡符合、哪裡故意不符合。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="docs.css?v=8">
+<style>
+/* ---- RESTful 說明書：用紫色，跟 FastAPI 的綠、手冊的藍分開 ---- */
+.rs .sec__n { color: var(--accent-2); }
+.rs h3.sub { border-left-color: var(--accent-2); }
+.rs .hero__eyebrow { color: var(--accent-2); }
+.rs .note { border-left-color: var(--accent-2); }
+.rs .note--warn { border-left-color: var(--warn); }
+.rs .note--crit { border-left-color: var(--down); }
+
+pre.code2 {
+  margin: 14px 0 0; padding: 15px 17px; overflow-x: auto;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  background: rgba(0,0,0,.34);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.9; color: var(--ink-soft);
+}
+pre.code2 b.ok { color: var(--up); font-weight: 500; }
+pre.code2 b.no { color: var(--down); font-weight: 500; }
+pre.code2 i  { color: var(--ink-dim); font-style: normal; }
+pre.code2 u  { color: var(--accent-hi); text-decoration: none; }
+
+.codelabel {
+  display: flex; align-items: center; gap: 8px; margin-top: 20px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+  color: var(--ink-dim); text-transform: uppercase;
+}
+.codelabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+.vs { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 16px; }
+.vs__c { border-radius: var(--r-card); border: 1px solid var(--line); background: var(--card); padding: 16px 18px; }
+.vs__c h4 { margin: 0 0 8px; font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
+.vs__c p  { font-size: 13px; color: var(--ink-soft); }
+.vs--bad  { border-color: rgba(251,138,143,.3); }
+.vs--bad h4 { color: var(--down); }
+.vs--good { border-color: rgba(110,231,183,.3); }
+.vs--good h4 { color: var(--up); }
+
+/* 圖書館比喻用的小卡 */
+.lib { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 16px; }
+.lib__c {
+  padding: 14px 16px; border-radius: var(--r-card);
+  background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--k);
+}
+.lib__v { font-family: var(--mono); font-size: 12px; color: var(--k); font-weight: 700; }
+.lib__p { font-family: var(--mono); font-size: 12.5px; color: var(--ink); margin: 4px 0 6px; }
+.lib__d { font-size: 12.5px; color: var(--ink-soft); }
+
+td.verdict-ok  { color: var(--up); white-space: nowrap; }
+td.verdict-no  { color: var(--warn); white-space: nowrap; }
+td.verdict-fix { color: var(--down); white-space: nowrap; }
+</style>
+</head>
+<body class="rs">
+
+<div class="shell">
+  <nav class="rail">
+    <div class="rail__brand">
+      <div class="rail__mark" style="background:linear-gradient(135deg,#8B7CF0,#6C9FFB)">R</div>
+      <div>
+        <div class="rail__t">RESTful 說明書</div>
+        <div class="rail__s">API 設計</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a href="#what"><i>01</i>REST 是什麼</a>
+      <a href="#noun"><i>02</i>網址是名詞</a>
+      <a href="#verbs"><i>03</i>五個方法</a>
+      <a href="#url"><i>04</i>網址怎麼設計</a>
+      <a href="#status"><i>05</i>狀態碼</a>
+      <a href="#idem"><i>06</i>安全與冪等</a>
+      <a href="#params"><i>07</i>參數放哪裡</a>
+      <a href="#ours"><i>08</i>檢查我們自己</a>
+      <a href="#break"><i>09</i>什麼時候該違反</a>
+      <a href="#pitfall"><i>10</i>十個常見錯誤</a>
+      <a class="nav__out" href="fastapi.html"><i>&#8599;</i>FastAPI 說明書</a>
+      <a class="nav__out" href="api.html"><i>&#8599;</i>API 瀏覽</a>
+      <a class="nav__out" href="index.html"><i>&#8599;</i>專題手冊</a>
+      <a class="nav__back" href="../index.html"><i>←</i>回到系統</a>
+    </div>
+  </nav>
+
+  <main class="main">
+  <div class="wrap">
+
+    <header class="hero">
+      <div class="hero__eyebrow">給沒設計過 API 的人</div>
+      <h1>RESTful API 說明書</h1>
+      <p class="hero__lead">
+        REST 不是技術，是一套<b>取名字的約定</b>。約定好之後，
+        別人看到你的網址就猜得出它會做什麼——不用問你、不用翻文件。<br>
+        這份文件會先用<b>圖書館</b>把概念講完，再回頭誠實檢查
+        我們自己的 38 支路由：哪些符合、哪些故意不符合、哪些該改。
+      </p>
+      <div class="hero__meta">
+        <div class="mchip"><span>預計閱讀</span><b>25 分鐘</b></div>
+        <div class="mchip"><span>前置知識</span><b>看過 FastAPI 說明書</b></div>
+        <div class="mchip"><span>本專案</span><b>38 支路由</b></div>
+      </div>
+    </header>
+
+    <!-- ============ 01 ============ -->
+    <section class="sec" id="what">
+      <div class="sec__h"><span class="sec__n">01</span><h2>REST 是什麼</h2></div>
+      <p class="sec__lead">
+        先講結論：<b>REST 是一套幫 API 取名字的規矩。</b>
+        它不會讓你的程式跑比較快，但會讓別人看得懂。
+      </p>
+
+      <h3 class="sub">沒有約定的世界長什麼樣</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        假設四個人各寫各的，沒有約定，你會得到這種東西：
+      </p>
+      <pre class="code2"><b class="no">POST</b> /getUserList          <i>← 「取得」用 POST？</i>
+<b class="no">GET</b>  /deleteTransaction?id=5   <i>← 用 GET 刪東西？</i>
+<b class="no">POST</b> /api/v2/doUpdateBudgetNew <i>← new？那 old 是什麼</i>
+<b class="no">POST</b> /transaction_create       <i>← 底線？其他都是駝峰</i></pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        四個人四種風格。<b>每接一支都要先問作者「這支怎麼用」</b>，
+        而且 <code>GET /deleteTransaction</code> 那支很危險——
+        瀏覽器和爬蟲會自動發 GET 請求，你的資料可能會被自己的搜尋引擎刪掉。
+      </p>
+
+      <h3 class="sub">有了約定之後</h3>
+      <pre class="code2"><b class="ok">GET</b>    /users              <i>看使用者清單</i>
+<b class="ok">DELETE</b> /transactions/5     <i>刪掉第 5 筆交易</i>
+<b class="ok">PATCH</b>  /budgets/3          <i>改第 3 筆預算的某些欄位</i></pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        <b>不用問任何人，你就看得懂這三支在做什麼。</b> 這就是 REST 的全部價值。
+      </p>
+
+      <div class="note">
+        <div class="note__k">名字的由來（知道就好，不重要）</div>
+        <p>REST 是 <b>RE</b>presentational <b>S</b>tate <b>T</b>ransfer 的縮寫，
+        來自 Roy Fielding 在 2000 年的博士論文。<br>
+        原始論文講的東西比我們用到的多很多，但<b>業界講的 REST</b>
+        九成就是這份文件講的這些約定。你不需要讀那篇論文。</p>
+      </div>
+    </section>
+
+    <!-- ============ 02 ============ -->
+    <section class="sec" id="noun">
+      <div class="sec__h"><span class="sec__n">02</span><h2>核心觀念：網址是名詞，動作是方法</h2></div>
+      <p class="sec__lead">
+        整份文件如果你只記得一句話，記這句：<br>
+        <b>網址講「對誰做」，HTTP 方法講「做什麼」。</b>
+      </p>
+
+      <h3 class="sub">用圖書館想</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        把 API 想成圖書館的櫃檯。<b>書</b>是資源，網址就是「哪一本書」，
+        方法就是「你要對它做什麼」：
+      </p>
+
+      <div class="lib">
+        <div class="lib__c" style="--k:#6EE7B7">
+          <div class="lib__v">GET</div>
+          <div class="lib__p">/books</div>
+          <div class="lib__d">給我書單</div>
+        </div>
+        <div class="lib__c" style="--k:#6EE7B7">
+          <div class="lib__v">GET</div>
+          <div class="lib__p">/books/5</div>
+          <div class="lib__d">給我第 5 本書</div>
+        </div>
+        <div class="lib__c" style="--k:#6C9FFB">
+          <div class="lib__v">POST</div>
+          <div class="lib__p">/books</div>
+          <div class="lib__d">進一本新書</div>
+        </div>
+        <div class="lib__c" style="--k:#FBBF6E">
+          <div class="lib__v">PATCH</div>
+          <div class="lib__p">/books/5</div>
+          <div class="lib__d">改第 5 本的書名</div>
+        </div>
+        <div class="lib__c" style="--k:#8B7CF0">
+          <div class="lib__v">PUT</div>
+          <div class="lib__p">/books/5</div>
+          <div class="lib__d">把第 5 本整本換掉</div>
+        </div>
+        <div class="lib__c" style="--k:#FB8A8F">
+          <div class="lib__v">DELETE</div>
+          <div class="lib__p">/books/5</div>
+          <div class="lib__d">報廢第 5 本</div>
+        </div>
+      </div>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:18px">
+        注意看：<b>網址只有兩種</b>——<code>/books</code>（全部）和
+        <code>/books/5</code>（其中一本）。六件不同的事，只用了兩個網址。
+        <b>動作全部藏在方法裡。</b>
+      </p>
+
+      <h3 class="sub">最常見的錯誤：把動詞寫進網址</h3>
+      <div class="vs">
+        <div class="vs__c vs--bad">
+          <h4>❌ 動詞在網址</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">POST /getBooks
+POST /createBook
+POST /updateBook
+POST /deleteBook
+
+<i>四個網址，全部都 POST</i>
+<i>網址會無限增加</i></pre>
+        </div>
+        <div class="vs__c vs--good">
+          <h4>✅ 動詞在方法</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">GET    /books
+POST   /books
+PATCH  /books/5
+DELETE /books/5
+
+<i>兩個網址，四個方法</i>
+<i>加功能不會加網址</i></pre>
+        </div>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">為什麼「動詞在網址」會失控</div>
+        <p>因為動詞是無限的。今天有 <code>createBook</code>，明天就會出現
+        <code>createBookWithAuthor</code>、<code>createBookBulk</code>、
+        <code>createBookV2</code>……<br>
+        <b>名詞是有限的。</b> 圖書館就是只有書、作者、借閱紀錄這幾種東西。
+        用名詞當網址，API 的規模就被鎖住了。</p>
+      </div>
+    </section>
+
+    <!-- ============ 03 ============ -->
+    <section class="sec" id="verbs">
+      <div class="sec__h"><span class="sec__n">03</span><h2>五個方法各自的意思</h2></div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th class="tight">方法</th><th>白話</th><th>用在</th><th>我們的例子</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="verb verb--GET">GET</span></td>
+              <td>我要看</td><td>讀資料，<b>不可以改任何東西</b></td>
+              <td class="rt">GET /api/transactions</td>
+            </tr>
+            <tr>
+              <td><span class="verb verb--POST">POST</span></td>
+              <td>我要新增一個</td><td>建立新資源，伺服器決定 ID</td>
+              <td class="rt">POST /api/transactions</td>
+            </tr>
+            <tr>
+              <td><span class="verb verb--PUT">PUT</span></td>
+              <td>把它設定成這樣</td><td><b>整個換掉</b>，沒給的欄位會變空</td>
+              <td class="rt">PUT /api/savings-goal</td>
+            </tr>
+            <tr>
+              <td><span class="verb verb--PATCH">PATCH</span></td>
+              <td>只改這幾個欄位</td><td><b>局部更新</b>，沒給的欄位保持原狀</td>
+              <td class="rt">PATCH /api/transactions/5</td>
+            </tr>
+            <tr>
+              <td><span class="verb verb--DELETE">DELETE</span></td>
+              <td>拿掉它</td><td>刪除</td>
+              <td class="rt">DELETE /api/transactions/5</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">PUT 和 PATCH 差在哪？這題最多人搞混</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        假設第 5 筆交易長這樣：
+      </p>
+      <pre class="code2">{ "amount": 320, "merchant": "自助餐", "note": "午餐" }</pre>
+
+      <div class="vs">
+        <div class="vs__c">
+          <h4 style="color:var(--accent-2)">PATCH /transactions/5</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">送 { "amount": 350 }
+
+結果：
+{ "amount": <b class="ok">350</b>,
+  "merchant": "自助餐",   <i>← 保留</i>
+  "note": "午餐" }        <i>← 保留</i></pre>
+        </div>
+        <div class="vs__c">
+          <h4 style="color:var(--warn)">PUT /transactions/5</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">送 { "amount": 350 }
+
+結果：
+{ "amount": <b class="ok">350</b>,
+  "merchant": <b class="no">null</b>,       <i>← 被清空！</i>
+  "note": <b class="no">null</b> }          <i>← 被清空！</i></pre>
+        </div>
+      </div>
+
+      <div class="note note--crit">
+        <div class="note__k">用錯的後果是真的會弄丟資料</div>
+        <p>使用者只想改金額，結果店家和備註都不見了——<b>而且不會有錯誤訊息</b>，
+        因為從伺服器的角度看，你確實叫它「把這筆設定成只有 amount 的樣子」。<br>
+        <b>不確定的時候用 PATCH。</b> 局部更新永遠比整個換掉安全。</p>
+      </div>
+    </section>
+
+    <!-- ============ 04 ============ -->
+    <section class="sec" id="url">
+      <div class="sec__h"><span class="sec__n">04</span><h2>網址怎麼設計</h2></div>
+
+      <h3 class="sub">五條規則</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">#</th><th>規則</th><th>❌</th><th>✅</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>用<b>名詞</b>，不用動詞</td>
+                <td class="rt">/getBooks</td><td class="rt">/books</td></tr>
+            <tr><td class="num">2</td><td>集合用<b>複數</b></td>
+                <td class="rt">/book/5</td><td class="rt">/books/5</td></tr>
+            <tr><td class="num">3</td><td>全部<b>小寫</b>，多字用連字號</td>
+                <td class="rt">/savingsGoal</td><td class="rt">/savings-goals</td></tr>
+            <tr><td class="num">4</td><td>結尾<b>不加斜線</b></td>
+                <td class="rt">/books/</td><td class="rt">/books</td></tr>
+            <tr><td class="num">5</td><td>層級表示<b>從屬關係</b></td>
+                <td class="rt">/getFamilyMembers?f=1</td><td class="rt">/families/1/members</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">層級要切到哪一層？</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        從屬關係可以無限往下疊，但<b>超過兩層就很難唸了</b>：
+      </p>
+      <pre class="code2"><b class="ok">/families/1/members</b>                       <i>還好</i>
+<b class="ok">/families/1/members/4</b>                     <i>還好</i>
+<u>/families/1/members/4/transactions</u>        <i>開始長了</i>
+<b class="no">/families/1/members/4/transactions/9/tags</b>  <i>沒人記得住</i></pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        <b>超過兩層就改用查詢參數：</b>
+      </p>
+      <pre class="code2"><b class="ok">/transactions?userId=4</b>            <i>比 /families/1/members/4/transactions 好</i></pre>
+
+      <div class="note">
+        <div class="note__k">我們的做法</div>
+        <p>本專案<b>一個使用者只屬於一個家庭</b>，而且登入之後後端就知道你是誰、
+        在哪個家庭。所以網址裡<b>完全不需要出現家庭 ID</b>——
+        <code>/api/transactions</code> 自然就是「我看得到的那些」。<br>
+        這比 <code>/families/1/transactions</code> 更安全：
+        <b>使用者沒機會把 1 改成 2 去偷看別人家的帳。</b></p>
+      </div>
+    </section>
+
+    <!-- ============ 05 ============ -->
+    <section class="sec" id="status">
+      <div class="sec__h"><span class="sec__n">05</span><h2>狀態碼是回應的一部分</h2></div>
+      <p class="sec__lead">
+        很多新手把所有回應都設成 200，再用回應內容的 <code>success: false</code> 表示失敗。
+        <b>這會讓前端寫得很痛苦。</b>
+      </p>
+
+      <div class="vs">
+        <div class="vs__c vs--bad">
+          <h4>❌ 全部回 200</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">200 OK
+{ "success": false,
+  "message": "找不到" }
+
+<i>前端的 fetch 不會進錯誤分支</i>
+<i>每支 API 都要自己拆內容判斷</i></pre>
+        </div>
+        <div class="vs__c vs--good">
+          <h4>✅ 用狀態碼</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">404 Not Found
+{ "detail": "找不到這筆紀錄" }
+
+<i>前端 if (!r.ok) 一行搞定</i>
+<i>瀏覽器、CDN、監控都看得懂</i></pre>
+        </div>
+      </div>
+
+      <h3 class="sub">三位數的第一個數字就是分類</h3>
+      <pre class="code2"><b class="ok">2xx</b>  成功        <i>你要的事做好了</i>
+<u>3xx</u>  轉址        <i>東西搬家了（我們用不到）</i>
+<b class="no">4xx</b>  <b>你錯了</b>      <i>請求有問題，重送一樣會失敗</i>
+<b class="no">5xx</b>  <b>我錯了</b>      <i>伺服器壞了，重送可能會成功</i></pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        <b>4xx 和 5xx 的分界很重要：</b> 4xx 是「使用者送錯東西」，
+        不用叫工程師起床；5xx 是「我們的程式壞了」，要有人去修。
+        分錯的話監控系統會一直誤報。
+      </p>
+
+      <h3 class="sub">這個專案會用到的</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">碼</th><th>意思</th><th>什麼時候回</th></tr></thead>
+          <tbody>
+            <tr><td class="num">200</td><td>成功</td><td>讀取、更新、刪除成功</td></tr>
+            <tr><td class="num">201</td><td>建立成功</td><td>註冊、新增一筆帳。<b>POST 成功要回 201 不是 200</b></td></tr>
+            <tr><td class="num">204</td><td>成功但沒內容</td><td>刪除成功且沒東西要回</td></tr>
+            <tr><td class="num">400</td><td>請求有問題</td><td>語意錯誤（格式錯誤請用 422）</td></tr>
+            <tr><td class="num">401</td><td><b>你還沒證明你是誰</b></td><td>沒帶 token、token 過期</td></tr>
+            <tr><td class="num">403</td><td><b>我知道你是誰，但你不能</b></td><td>成員想刪別人的帳</td></tr>
+            <tr><td class="num">404</td><td>找不到</td><td>那筆資料不存在</td></tr>
+            <tr><td class="num">409</td><td>衝突</td><td>email 已經被註冊過</td></tr>
+            <tr><td class="num">422</td><td>格式不對</td><td><b>Pydantic 自動回的</b>，你不用寫</td></tr>
+            <tr><td class="num">500</td><td>我們的程式壞了</td><td>沒接到的例外</td></tr>
+            <tr><td class="num">503</td><td>依賴的服務不行</td><td>模型服務叫不動。<b>不要回 500</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">401 和 403 分錯的具體後果</div>
+        <p>前端看到 401 會把使用者<b>導去登入頁</b>，看到 403 會顯示<b>「權限不足」</b>。<br>
+        分錯的話，權限不足的使用者會被一直踢回登入頁，
+        他重新登入還是不能用，然後就來問你為什麼系統壞了。</p>
+      </div>
+    </section>
+
+    <!-- ============ 06 ============ -->
+    <section class="sec" id="idem">
+      <div class="sec__h"><span class="sec__n">06</span><h2>安全與冪等</h2></div>
+      <p class="sec__lead">
+        兩個聽起來很學術、但實際影響很大的性質。
+      </p>
+
+      <h3 class="sub">安全（Safe）＝ 不會改變任何東西</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        只有 <b>GET</b> 是安全的。這代表瀏覽器、CDN、爬蟲
+        <b>可以自己決定要不要幫你多打幾次</b>，不會出事。
+      </p>
+      <div class="note note--crit">
+        <div class="note__k">所以絕對不要用 GET 做會改變資料的事</div>
+        <p>如果你寫了 <code>GET /deleteTransaction?id=5</code>：<br>
+        瀏覽器的預先抓取、聊天軟體的連結預覽、搜尋引擎的爬蟲……
+        <b>任何一個碰到這個網址，你的資料就沒了。</b><br>
+        這不是理論，是真的發生過的事故。</p>
+      </div>
+
+      <h3 class="sub">冪等（Idempotent）＝ 做幾次結果都一樣</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="tight">方法</th><th class="tight">安全</th><th class="tight">冪等</th><th>打兩次會怎樣</th></tr></thead>
+          <tbody>
+            <tr><td><span class="verb verb--GET">GET</span></td><td>✅</td><td>✅</td><td>看兩次，沒事</td></tr>
+            <tr><td><span class="verb verb--PUT">PUT</span></td><td>❌</td><td>✅</td><td>設定成一樣的值，沒事</td></tr>
+            <tr><td><span class="verb verb--DELETE">DELETE</span></td><td>❌</td><td>✅</td><td>第二次回 404，但東西一樣是沒了</td></tr>
+            <tr><td><span class="verb verb--PATCH">PATCH</span></td><td>❌</td><td>看情況</td><td>設定值就冪等，「加 100」就不冪等</td></tr>
+            <tr><td><span class="verb verb--POST">POST</span></td><td>❌</td><td>❌</td><td><b>會產生兩筆！</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">為什麼這件事在我們的專案裡特別重要</div>
+        <p>使用者在捷運上按下「確認並寫入 5 筆」，網路不穩，
+        前端沒收到回應就<b>自動重送</b>——結果寫進去 10 筆。<br>
+        <b>POST 不冪等是天生的</b>，所以批次寫入那支要特別小心：
+        要嘛前端不自動重送，要嘛後端用一個「這批的唯一識別碼」擋掉重複。</p>
+      </div>
+    </section>
+
+    <!-- ============ 07 ============ -->
+    <section class="sec" id="params">
+      <div class="sec__h"><span class="sec__n">07</span><h2>參數放路徑還是查詢字串？</h2></div>
+
+      <div class="vs">
+        <div class="vs__c">
+          <h4 style="color:var(--accent-hi)">路徑參數 — 指定「哪一個」</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">/transactions/<u>5</u>
+/family/members/<u>4</u></pre>
+          <p style="margin-top:10px">這一段<b>是資源身分的一部分</b>。
+          少了它，這個網址就不知道在講誰。</p>
+        </div>
+        <div class="vs__c">
+          <h4 style="color:var(--accent-hi)">查詢參數 — 篩選、排序、分頁</h4>
+          <pre class="code2" style="margin-top:0;font-size:12px">/transactions?<u>kind=expense</u>
+/transactions?<u>page=2</u></pre>
+          <p style="margin-top:10px">拿掉之後<b>網址仍然有意義</b>，
+          只是範圍變大。所以它們都應該是選填的。</p>
+        </div>
+      </div>
+
+      <h3 class="sub">一句話判斷</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        <b>拿掉它，網址還講得通嗎？</b><br>
+        講得通 → 查詢參數。　講不通 → 路徑參數。
+      </p>
+      <pre class="code2">/transactions/5      <i>拿掉 5 → /transactions 講得通嗎？</i>
+                     <i>講得通（全部），但意思完全不同 → 路徑參數 ✓</i>
+
+/transactions?page=2 <i>拿掉 page → /transactions 講得通嗎？</i>
+                     <i>講得通，而且意思一樣（只是第一頁）→ 查詢參數 ✓</i></pre>
+
+      <div class="note note--crit">
+        <div class="note__k">敏感資料絕對不可以放查詢參數</div>
+        <p>查詢參數會出現在網址上，而網址會被<b>瀏覽器歷史、伺服器日誌、
+        Referer 標頭、代理伺服器</b>全部記下來。<br>
+        密碼、token 這類東西一律放<b>請求主體</b>。
+        這就是為什麼登入是 POST 不是 GET。</p>
+      </div>
+    </section>
+
+    <!-- ============ 08 ============ -->
+    <section class="sec" id="ours">
+      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 38 支</h2></div>
+      <p class="sec__lead">
+        我把本專案的每一支路由都對上面的規則檢查過。
+        結果是：<b>38 支裡有 22 支不符合嚴格的 REST 慣例。</b>
+      </p>
+
+      <div class="note">
+        <div class="note__k">這個數字不代表設計很差</div>
+        <p>22 支裡面，<b>大部分是業界通用做法或刻意的取捨</b>，
+        只有 3 支是真的該改。下面逐類講。</p>
+      </div>
+
+      <h3 class="sub">第一類：業界通用，不用改（17 支）</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>路由</th><th>嚴格說的問題</th><th>為什麼不改</th></tr></thead>
+          <tbody>
+            <tr><td class="rt">POST /api/auth/login<br>POST /api/auth/logout<br>POST /api/auth/refresh<br>POST /api/auth/register</td>
+                <td>網址有動詞</td>
+                <td>REST 純粹主義者會說應該是 <code>POST /sessions</code>，但<b>沒有人真的這樣做</b>。
+                    這四支是全世界都看得懂的慣例，改成「正確」的反而沒人看得懂。</td></tr>
+            <tr><td class="rt">GET /api/auth/me</td>
+                <td>單數、而且 me 不是資源</td>
+                <td>「目前登入的那個人」的通用寫法。替代方案是
+                    <code>/users/{我的id}</code>，但前端還要先知道自己的 ID，多一趟往返。</td></tr>
+            <tr><td class="rt">GET,PATCH /api/auth/me<br>PUT,DELETE /api/auth/me/avatar<br>GET /api/summary<br>GET /api/family<br>GET,PUT /api/savings-goal<br>PATCH /api/auth/password</td>
+                <td>用了單數名詞</td>
+                <td>這些是 <b>singleton resource</b>（單例資源）——
+                    一個使用者只有一份摘要、只屬於一個家庭、每期只有一個存款目標。
+                    <b>單數在這種情況是正確的</b>，複數才奇怪。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">第二類：刻意違反，因為 REST 表達不了（5 支）</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th>路由</th><th>為什麼 REST 表達不了</th></tr></thead>
+          <tbody>
+            <tr><td class="rt">POST /api/nlp/parse<br>POST /api/nlp/parse-batch</td>
+                <td><b>它不建立任何東西。</b> 它把一段文字算成結構化欄位然後回傳，
+                    <b>刻意不寫進資料庫</b>。REST 的五個方法裡沒有一個能表達
+                    「幫我算一下但不要存」。硬要套的話只能叫
+                    <code>POST /parse-results</code>，然後假裝建立了一個不存在的資源——
+                    那更難懂。</td></tr>
+            <tr><td class="rt">POST /api/nlp/confirm<br>POST /api/nlp/confirm-batch</td>
+                <td>這兩支<b>其實是在建立 transactions</b>，嚴格說應該是
+                    <code>POST /api/transactions</code>。但我們刻意分開，
+                    因為<b>來源必須分得清楚</b>：走這支的 <code>source</code> 記
+                    <code>nlp</code>，走 transactions 的記 <code>manual</code>。
+                    混在一起的話模型正確率的分母就錯了。</td></tr>
+            <tr><td class="rt">POST /api/family/invite</td>
+                <td>產生一組邀請碼。勉強可以說是
+                    <code>POST /api/family/invites</code>（建立一張邀請），
+                    其實這樣更好——見下面第三類。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">第三類：真的該改（3 支）</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        這三支改成 RESTful 之後<b>更清楚</b>，不是為了合規而合規：
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>現在</th><th>建議改成</th><th>為什麼比較好</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="rt">POST /api/advices/<b style="color:var(--down)">generate</b></td>
+              <td class="rt">POST /api/advices</td>
+              <td>產生建議<b>就是在建立 advices 資源</b>。
+                  已經有 <code>GET /api/advices</code> 了，
+                  用同一個網址加 POST 完全符合直覺，也少一個網址。</td>
+            </tr>
+            <tr>
+              <td class="rt">POST /api/family/<b style="color:var(--down)">join</b></td>
+              <td class="rt">POST /api/family/members</td>
+              <td>加入家庭<b>就是建立一筆成員關係</b>。
+                  而且已經有 <code>PATCH /api/family/members/{id}</code> 了，
+                  用同一組路徑比較一致。</td>
+            </tr>
+            <tr>
+              <td class="rt">POST /api/auth/<b style="color:var(--down)">logout-all</b></td>
+              <td class="rt">DELETE /api/auth/sessions</td>
+              <td>「撤銷所有工作階段」<b>就是刪掉 sessions 集合</b>。
+                  而且已經有 <code>GET /api/auth/sessions</code> 了。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">改不改？</div>
+        <p>這三支目前<b>前端都還沒在用</b>，所以改的成本很低（改 router + 契約文件）。<br>
+        但也不是非改不可——<b>一致性比正確性重要</b>。
+        如果決定不改，就在報告裡誠實寫「我們知道這裡不是嚴格的 REST，理由是 X」，
+        那比假裝沒發現好得多。</p>
+      </div>
+    </section>
+
+    <!-- ============ 09 ============ -->
+    <section class="sec" id="break">
+      <div class="sec__h"><span class="sec__n">09</span><h2>什麼時候該違反 REST</h2></div>
+      <p class="sec__lead">
+        REST 是<b>指引不是法律</b>。知道什麼時候該破例，比死守規則更重要。
+      </p>
+
+      <h3 class="sub">三個正當的破例時機</h3>
+      <div class="grid grid--3" style="margin-top:14px">
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">1. 那個動作不是 CRUD</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            「解析這段文字但不要存」「重新計算」「寄一封信」——
+            這些本質上是<b>動作不是資源</b>。硬套 REST 會產生
+            <code>POST /parse-results</code> 這種假資源，更難懂。
+          </p>
+        </div>
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">2. 業界已有更強的慣例</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            <code>/login</code>、<code>/logout</code>、<code>/me</code>、
+            <code>/search</code>、<code>/healthz</code>。<br>
+            <b>大家都看得懂的東西，比理論上正確的東西有價值。</b>
+          </p>
+        </div>
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">3. RESTful 會讓前端多跑一趟</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            我們的 <code>/api/summary</code> 一次回傳
+            KPI、分類佔比、月趨勢、成員狀態。<b>嚴格 REST 會拆成四支</b>，
+            前端要打四次。一次回完，使用者體驗好得多。
+          </p>
+        </div>
+      </div>
+
+      <div class="note note--crit">
+        <div class="note__k">但這三個不可以破例</div>
+        <p><b>1. GET 絕對不可以改資料。</b> 這不是風格問題，是會出事故。<br>
+        <b>2. 狀態碼要用對。</b> 前端、CDN、監控全都靠它判斷。<br>
+        <b>3. 同一個專案裡要一致。</b> 你可以選擇不 RESTful，
+        但不可以<b>一半 RESTful 一半不</b>——那是最糟的情況。</p>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section class="sec" id="pitfall">
+      <div class="sec__h"><span class="sec__n">10</span><h2>十個常見錯誤</h2></div>
+      <p class="sec__lead">動工前掃一遍，寫完之後再對一次。</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">#</th><th>錯誤</th><th>會發生什麼</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>用 GET 做刪除或修改</td>
+                <td><b>爬蟲和預先抓取會幫你把資料刪光</b></td></tr>
+            <tr><td class="num">2</td><td>全部回 200，用內容表示失敗</td>
+                <td>前端每支都要自己拆內容判斷，而且監控看不出有錯</td></tr>
+            <tr><td class="num">3</td><td>401 和 403 混用</td>
+                <td>權限不足的使用者被一直踢回登入頁</td></tr>
+            <tr><td class="num">4</td><td>該用 PATCH 卻用 PUT</td>
+                <td><b>使用者只想改金額，店家和備註被清空</b>，而且沒有錯誤訊息</td></tr>
+            <tr><td class="num">5</td><td>沒權限時回空陣列</td>
+                <td>使用者以為「對方沒記帳」，而不是「我看不到」。<b>要回 403</b></td></tr>
+            <tr><td class="num">6</td><td>把 ID 放在查詢參數當主鍵用</td>
+                <td><code>/transactions?id=5</code> 語意模糊，而且不好做權限檢查</td></tr>
+            <tr><td class="num">7</td><td>單複數混用</td>
+                <td><code>/book/5</code> 和 <code>/books</code> 並存，別人每次都要猜</td></tr>
+            <tr><td class="num">8</td><td>回傳的欄位命名不一致</td>
+                <td>這支叫 <code>userId</code>、那支叫 <code>user_id</code>，前端要一直轉換</td></tr>
+            <tr><td class="num">9</td><td>POST 成功回 200 而不是 201</td>
+                <td>不算大錯，但前端沒辦法用狀態碼區分「建立」和「更新」</td></tr>
+            <tr><td class="num">10</td><td>錯誤訊息把內部細節吐出來</td>
+                <td><code>psycopg.errors.UniqueViolation: ...</code> 讓攻擊者知道你用什麼資料庫、
+                    表叫什麼名字。<b>要包成人看得懂的訊息</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <div class="note__k">動工前先看這兩份</div>
+        <p><a href="fastapi.html">FastAPI 說明書</a> —— 怎麼用程式把這些實作出來<br>
+        <a href="api.html">API 瀏覽</a> —— 本專案 38 支路由的完整清單<br>
+        還有 <code>docs/02-前後端串接契約.md</code> —— 每一支「我送什麼、你吐什麼」</p>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <div>家庭記帳與財務控管系統 · RESTful API 說明書</div>
+      <div class="mono">38 ROUTES · 5 METHODS</div>
+    </footer>
+
+  </div>
+  </main>
+</div>
+
+<script src="docs.js?v=1"></script>
+</body>
+</html>

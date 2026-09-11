@@ -40,7 +40,7 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.core.config import settings
+from app.toolkit.config import settings
 
 
 class Base(DeclarativeBase):
@@ -81,7 +81,7 @@ def get_db() -> Generator[Session, None, None]:
 
         from fastapi import Depends
         from sqlalchemy.orm import Session
-        from app.core.database import get_db
+        from app.toolkit.db import get_db
 
         @router.get("/something")
         def read_something(db: Session = Depends(get_db)):
@@ -90,7 +90,7 @@ def get_db() -> Generator[Session, None, None]:
     `Depends(get_db)` 的意思是「請 FastAPI 幫我準備好一個 db 再叫我」。
     你完全不用自己建立或關閉，FastAPI 會處理掉。
     這個機制叫做**依賴注入**，是 FastAPI 最核心的概念，
-    在 core/deps.py 裡還會用它做權限檢查。
+    在 toolkit/deps.py 裡還會用它做權限檢查。
     """
     db = SessionLocal()
     try:
