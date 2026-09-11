@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=5">
+<link rel="stylesheet" href="docs.css?v=6">
 <style>
 /* ---- FastAPI 說明書：用綠色當主色，跟手冊的藍、模型頁的琥珀分開 ---- */
 .fa .sec__n { color: var(--up); }
@@ -735,44 +735,46 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
       <h3 class="sub">誰負責哪些檔案</h3>
       <div class="tw">
         <table>
-          <thead><tr><th class="tight">成員</th><th>領域</th><th>主要檔案</th><th class="tight">路由</th></tr></thead>
+          <thead><tr><th class="tight">成員 / 分支</th><th>領域</th><th>你獨佔的檔案</th><th class="tight">路由</th></tr></thead>
           <tbody>
             <tr>
-              <td><b style="color:var(--m1)">成員1</b></td>
-              <td>帳號與權限</td>
-              <td><span class="fname">routers/auth.py</span>、<span class="fname">routers/family.py</span>、
-                  <span class="fname">core/*</span>、<span class="fname">services/permission.py</span>、
-                  <span class="fname">services/llm.py</span></td>
-              <td>1–17</td>
+              <td><b style="color:var(--m1)">成員1</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m1-auth</span></td>
+              <td>認證與基礎建設</td>
+              <td><span class="fname">routers/auth.py</span>、<span class="fname">models/user.py</span>、<span class="fname">schemas/auth.py</span>、<span class="fname">core/*</span>、<span class="fname">services/llm/client.py</span></td>
+              <td class="tight">8 支</td>
             </tr>
             <tr>
-              <td><b style="color:var(--m2)">成員2</b></td>
+              <td><b style="color:var(--m2)">成員2</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m2-ledger</span></td>
               <td>記帳 ★ 核心</td>
-              <td><span class="fname">routers/transactions.py</span>、<span class="fname">routers/nlp.py</span></td>
-              <td>18–27</td>
+              <td><span class="fname">routers/transactions.py</span>、<span class="fname">routers/nlp.py</span>、<span class="fname">models/transaction.py</span>、<span class="fname">models/nlp.py</span>、<span class="fname">schemas/*</span>、<span class="fname">services/llm/parse.py</span></td>
+              <td class="tight">8 支</td>
             </tr>
             <tr>
-              <td><b style="color:var(--m3)">成員3</b></td>
-              <td>統計與預算</td>
-              <td><span class="fname">routers/stats.py</span>、<span class="fname">routers/budgets.py</span>、
-                  <span class="fname">services/analytics.py</span></td>
-              <td>28–33</td>
+              <td><b style="color:var(--m3)">成員3</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m3-analytics</span></td>
+              <td>數字與建議</td>
+              <td><span class="fname">routers/categories.py</span>、<span class="fname">routers/stats.py</span>、<span class="fname">routers/budgets.py</span>、<span class="fname">routers/advices.py</span>、<span class="fname">services/analytics.py</span>、<span class="fname">services/llm/advice.py</span></td>
+              <td class="tight">10 支</td>
             </tr>
             <tr>
-              <td><b style="color:var(--m4)">成員4</b></td>
-              <td>財務建議</td>
-              <td><span class="fname">routers/advices.py</span></td>
-              <td>34–35</td>
+              <td><b style="color:var(--m4)">成員4</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m4-access</span></td>
+              <td>家庭與可見範圍</td>
+              <td><span class="fname">routers/family.py</span>、<span class="fname">models/family.py</span>、<span class="fname">schemas/family.py</span>、<span class="fname">services/permission.py</span>、<span class="fname">services/evaluation.py</span></td>
+              <td class="tight">9 支</td>
             </tr>
           </tbody>
         </table>
       </div>
 
       <div class="note note--warn">
-        <div class="note__k">成員1 的 core/ 要最優先完成</div>
+        <div class="note__k">兩件事要最優先完成</div>
         <p><code>core/deps.py</code> 的 <code>get_current_user</code> 和
         <code>services/permission.py</code> 的 <code>visible_user_ids</code>
         <b>其他三個人全部都要用</b>。這兩塊沒好，別人的路由寫不下去。</p>
+      </div>
+
+      <div class="note">
+        <div class="note__k">不確定某個檔案是誰的？問程式</div>
+        <p>分工寫在 <code class="fname">backend/app/ownership.py</code>，跑 <code>python -m app.ownership</code> 會印出完整的分工表。<br>而且 <code>pytest</code> 會檢查它有沒有跟程式碼、跟所有文件走散——<b>任何一邊改了忘記同步，測試就紅燈</b>。</p>
       </div>
 
       <h3 class="sub">實作一支路由的順序</h3>

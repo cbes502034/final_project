@@ -1,5 +1,5 @@
 """
-段落記帳。 ✦ 負責人：成員2（記帳） ★ 這是整個系統的核心
+段落記帳。 ✦ 負責人：成員2（記帳）　✦ 分支：m2-ledger　★ 整個系統的核心
 
 ===========================================================================
 這個檔案負責哪些路由
@@ -79,7 +79,7 @@ def parse(me=Depends(get_current_user), db: Session = Depends(get_db)):
     給整筆一個分數的話，前端只能整筆標黃，使用者不知道要檢查哪一欄。
     逐欄給，前端就能精準地只把分類那一格標黃。
 
-    TODO(成員2): 呼叫 services/llm.py 的 parse_one()，
+    TODO(成員2): 呼叫 services/llm/parse.py 的 parse_one()，
                  用 Pydantic 驗證模型回傳的 JSON，
                  驗不過就帶著錯誤訊息重試一次，再失敗才回錯誤給前端
     """
@@ -106,9 +106,9 @@ def parse_batch(me=Depends(get_current_user), db: Session = Depends(get_db)):
     **猜錯的金額比空白危險得多**：空白使用者一定會發現，
     猜錯的數字他可能直接按下確認就送出去了。
 
-    TODO(成員2): 呼叫 services/llm.py 的 parse_batch()。
+    TODO(成員2): 呼叫 services/llm/parse.py 的 parse_batch()。
                  prompt 要帶 few-shot 範例和這個家庭的分類體系
-                 （分類體系從 categories 表撈，由成員3 定義）
+                 （分類清單打成員3 的 GET /api/categories 拿，不要自己查 categories 表）
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員2 尚未實作")
 

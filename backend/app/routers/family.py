@@ -1,5 +1,5 @@
 """
-家庭與權限。 ✦ 負責人：成員1（帳號與權限）
+家庭與權限。 ✦ 負責人：成員4（家庭與可見範圍）　✦ 分支：m4-access
 
 ===========================================================================
 這個檔案負責哪些路由
@@ -46,7 +46,7 @@ def get_family(me=Depends(get_current_user), db: Session = Depends(get_db)):
     """
     回傳我所屬家庭的資訊，以及所有成員的角色。
 
-    TODO(成員1): 回傳形狀要跟 frontend/js/api.js 的 members() 一致
+    TODO(成員4): 回傳形狀要跟 frontend/js/api.js 的 members() 一致
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
@@ -60,7 +60,7 @@ def create_family(me=Depends(get_current_user), db: Session = Depends(get_db)):
     所以角色存在 `family_members` 而不是 `users` 上。
     這就是為什麼「帳號」和「家庭角色」要分成兩張表。
 
-    TODO(成員1): 建立 families 一筆 + family_members 一筆（role='master'）
+    TODO(成員4): 建立 families 一筆 + family_members 一筆（role='master'）
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
@@ -77,7 +77,7 @@ def create_invite(me=Depends(require_master), db: Session = Depends(get_db)):
     2. **會過期** —— 設個 7 天，過期的邀請碼不該還能用
     3. **用過就失效** —— 一組碼只能加入一個人
 
-    TODO(成員1): 產碼並寫進 family_invites（這張表要自己加進 models）
+    TODO(成員4): 產碼並寫進 family_invites（這張表要自己加進 models）
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
@@ -87,7 +87,7 @@ def join_family(me=Depends(get_current_user), db: Session = Depends(get_db)):
     """
     輸入邀請碼加入家庭，角色預設是 member。
 
-    TODO(成員1): 驗證碼有效、沒過期、沒被用過，
+    TODO(成員4): 驗證碼有效、沒過期、沒被用過，
                  然後建立 family_members 一筆，並把邀請碼標記成已使用
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
@@ -105,7 +105,7 @@ def update_member(user_id: int, me=Depends(require_master), db: Session = Depend
     ⚠️ **要擋住「把自己降級」**。如果家裡唯一的 master 把自己改成 member，
     就再也沒有人能管理這個家庭了，只能進資料庫手動救。
 
-    TODO(成員1): 實作，記得擋掉最後一個 master 自我降級
+    TODO(成員4): 實作，記得擋掉最後一個 master 自我降級
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
@@ -115,7 +115,7 @@ def remove_member(user_id: int, me=Depends(require_master), db: Session = Depend
     """
     把成員移出家庭。**標記 status='removed'，不要刪資料。**
 
-    TODO(成員1): 實作
+    TODO(成員4): 實作
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
@@ -128,7 +128,7 @@ def list_guardianships(me=Depends(get_current_user), db: Session = Depends(get_d
     ⚠️ **這支路由不是 master 限定**。一般成員也要查得到「誰看得到我」，
     因為那會顯示在他自己的總覽頁上。這是設計，不是疏忽。
 
-    TODO(成員1): 回傳兩個清單 —— guarding（我監管的人）、guardedBy（監管我的人）
+    TODO(成員4): 回傳兩個清單 —— guarding（我監管的人）、guardedBy（監管我的人）
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
@@ -138,7 +138,7 @@ def create_guardianship(me=Depends(require_master), db: Session = Depends(get_db
     """
     指定「誰看得到誰」。
 
-    TODO(成員1): 檢查兩人都在同一個家庭，避免建立跨家庭的監管關係
+    TODO(成員4): 檢查兩人都在同一個家庭，避免建立跨家庭的監管關係
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
@@ -148,6 +148,6 @@ def end_guardianship(gid: int, me=Depends(require_master), db: Session = Depends
     """
     解除監管關係。**設 ended_at，不要 DELETE。**
 
-    TODO(成員1): 實作
+    TODO(成員4): 實作
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")

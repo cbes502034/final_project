@@ -1,19 +1,20 @@
 """
-收支明細與分類。 ✦ 負責人：成員2（記帳）
+收支明細與分類。 ✦ 負責人：成員2（記帳）　✦ 分支：m2-ledger
 
 ===========================================================================
 這個檔案負責哪些路由
 ===========================================================================
 掛載前綴是 /api。
 
-    編號  方法    路徑                   權限          用途
-    --------------------------------------------------------------------
-     18   GET    /transactions          登入          明細（可篩選、分頁）
-     19   POST   /transactions          登入          手動新增（不經過模型）
-     20   PATCH  /transactions/{id}     本人或監管者  修改
-     21   DELETE /transactions/{id}     本人          刪除
-     22   GET    /categories            登入          分類體系
-     23   POST   /categories            master        新增家庭自訂分類
+    方法    路徑                   權限          用途
+    ------------------------------------------------------------------
+    GET    /transactions          登入          明細（可篩選、分頁）
+    POST   /transactions          登入          手動新增（不經過模型）
+    PATCH  /transactions/{id}     本人或監管者  修改
+    DELETE /transactions/{id}     本人          刪除
+
+分類體系（/api/categories）**不在這裡** —— 那是成員3 的 routers/categories.py。
+分類由成員3 定義，成員2 只是把清單寫進 prompt。
 
 ===========================================================================
 第 19 支和 /api/nlp/confirm 的差別 —— 這題很容易搞混
@@ -34,7 +35,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_master
+from app.core.deps import get_current_user
 
 router = APIRouter()
 
@@ -123,33 +124,5 @@ def delete_transaction(tx_id: int, me=Depends(get_current_user), db: Session = D
     監管者看得到，但不能替人刪帳——那會讓被監管者無法信任這份紀錄。
 
     TODO(成員2): 實作，權限檢查同上
-    """
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員2 尚未實作")
-
-
-@router.get("/categories", summary="分類體系")
-def list_categories(me=Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    回傳系統預設 + 這個家庭自訂的分類。
-
-    ⚠️ 這支路由的回傳值**成員2 和成員4 都會用到**：
-    成員2 要把分類清單寫進模型的 prompt，成員4 產生建議時要用。
-    分類體系由**成員3 定義**，是第 1 週唯一要凍結的跨模組契約。
-
-    TODO(成員2): 實作。分類定義好之前先回傳寫死的預設清單也可以，
-                 先讓前端串得起來比較重要
-    """
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員2 尚未實作")
-
-
-@router.post("/categories", status_code=status.HTTP_201_CREATED, summary="新增自訂分類")
-def create_category(me=Depends(require_master), db: Session = Depends(get_db)):
-    """
-    新增家庭自訂分類。只有 master 可以。
-
-    ⚠️ 新增分類會影響模型的 prompt（分類清單變了），
-    也會影響歷史統計的分組。**不要讓任何人隨便加。**
-
-    TODO(成員2): 實作
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員2 尚未實作")

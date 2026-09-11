@@ -1,5 +1,5 @@
 """
-財務建議。 ✦ 負責人：成員4（財務建議）
+財務建議。 ✦ 負責人：成員3（數字與建議）　✦ 分支：m3-analytics
 
 ===========================================================================
 這個檔案負責哪些路由
@@ -66,7 +66,7 @@ def list_advices(
     看到「你這個月餐飲超支 2,400」時，能展開看到是怎麼算出來的。
     **沒有依據的建議就是黑盒子，使用者不會信。**
 
-    TODO(成員4): 實作
+    TODO(成員3): 實作
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員4 尚未實作")
 
@@ -87,9 +87,9 @@ def generate_advices(me=Depends(require_master), db: Session = Depends(get_db)):
     ⚠️ 未成年成員的建議產生後，**要同時讓監管者看得到**。
     這是設計目的之一，不是額外功能。
 
-    TODO(成員4): 1. analytics.build_basis() 算數字
+    TODO(成員3): 1. analytics.build_basis() 算數字
                  2. 組 prompt（把邊界規則寫進去）
-                 3. llm.generate_advice() 呼叫模型
+                 3. services/llm/advice.py 的 generate() 呼叫模型
                  4. Pydantic 驗證輸出格式
                  5. 寫進 advices 表，basis_json 存第 1 步的數字
     """

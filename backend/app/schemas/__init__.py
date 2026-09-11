@@ -1,8 +1,15 @@
-"""Pydantic 模型：定義 API 進出的資料長什麼樣。
+"""
+Pydantic 模型：定義 API 進出的資料長什麼樣。一個檔案一個主人。
 
-models/ 是「資料庫裡存什麼」，schemas/ 是「API 收送什麼」，
-兩者刻意分開。例如 User 資料表有 password_hash，
-但任何一個回應 schema 都不該有這一欄。
+    檔案             主人     用在哪
+    ---------------------------------------------------------------
+    auth.py          成員1    註冊、登入、token、我是誰
+    family.py        成員4    家庭、成員、邀請碼、監管關係
+    transaction.py   成員2    明細的增改查
+    nlp.py           成員2    段落解析 ★ 同時用來驗證模型輸出
+    stats.py         成員3    摘要、統計、預算、存款目標
+    advice.py        成員3    財務建議 ★ 同時用來驗證模型輸出
 
-TODO(全員): 各自補上自己模組的 Request / Response 模型。
+models/ 是「資料庫裡存什麼」，schemas/ 是「API 收送什麼」，兩者刻意分開。
+例如 User 資料表有 password_hash，但任何一個回應 schema 都不該有這一欄。
 """

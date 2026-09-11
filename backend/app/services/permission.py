@@ -1,5 +1,6 @@
 """
-權限計算：誰看得到誰的資料。 ✦ 負責人：成員1（提供給大家共用）
+權限計算：誰看得到誰的資料。 ✦ 負責人：成員4（家庭與可見範圍）　✦ 分支：m4-access
+✦ 這是共用元件，成員2 與成員3 都要用，第 1 週要最優先完成
 
 ===========================================================================
 為什麼這段邏輯一定要獨立成一個檔案？
@@ -43,7 +44,7 @@ def visible_user_ids(db: Session, me_id: int, family_id: int) -> list[int]:
     ⚠️ **回傳的清單一定要包含自己**。漏掉的話使用者會看不到自己的帳，
     這是很容易犯的錯（寫查詢時只想到「監管的人」，忘了自己）。
 
-    TODO(成員1): 1. 查 family_members 拿到我的角色
+    TODO(成員4): 1. 查 family_members 拿到我的角色
                  2. role == 'master' → 回傳全家所有 active 成員
                  3. 否則 → [自己] + guardianships 裡 guardian_id 是我
                     且 ended_at 是 NULL 的那些 ward_id
@@ -59,7 +60,7 @@ def can_view(db: Session, me_id: int, target_id: int, family_id: int) -> bool:
 
     用在「帶了 user_id 參數」的查詢上：不能看就回 403。
 
-    TODO(成員1): return target_id in visible_user_ids(db, me_id, family_id)
+    TODO(成員4): return target_id in visible_user_ids(db, me_id, family_id)
     """
     return me_id == target_id
 
@@ -72,6 +73,6 @@ def can_edit(db: Session, me_id: int, owner_id: int) -> bool:
     監管者可以改（幫忙補資料），但**不能刪**。
     刪除只有本人可以——否則被監管者無法信任這份紀錄的完整性。
 
-    TODO(成員1): 實作。刪除請另外用 can_delete（本人限定）
+    TODO(成員4): 實作。刪除請另外用 can_delete（本人限定）
     """
     return me_id == owner_id

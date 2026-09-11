@@ -432,21 +432,11 @@
       });
     },
 
-    nlpEval: function () {
-      return sleep(LATENCY).then(function () {
-        return { eval: clone(global.DATA.nlpEval), demo: clone(global.DATA.nlpDemo) };
-      });
-    },
 
     categories: function () {
       return sleep(120).then(function () { return { categories: clone(global.DATA.categories) }; });
     },
 
-    schema: function () {
-      return sleep(LATENCY).then(function () {
-        return { schema: clone(global.DATA.schema), relations: clone(global.DATA.relations) };
-      });
-    },
 
     reset: function () {
       try { localStorage.removeItem(KEY); } catch (e) {}
@@ -480,7 +470,10 @@
 
   var http = {
     me:                function ()      { return req('/api/auth/me'); },
-    switchUser:        function (id)    { return req('/api/auth/switch', { method: 'POST', body: { userId: id } }); },
+    /* ⚠️ 後端沒有這支，也絕對不可以實作。
+       讓任何人任意切換身分等於把整套權限系統作廢。
+       接上真後端之後，「切換身分」這個鈕要換成正常的登入登出。 */
+    switchUser:        function (id)    { return Promise.reject(new Error('真後端不提供切換身分，請改用登入')); },
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
     transactions:      function (f)     { return req('/api/transactions' + qs(f)); },
     nlpParse:          function (t)     { return req('/api/nlp/parse', { method: 'POST', body: { text: t } }); },
@@ -493,9 +486,7 @@
     setSavingsGoal:    function (u, g)  { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g } }); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
     members:           function ()      { return req('/api/family'); },
-    nlpEval:           function ()      { return req('/api/nlp/eval'); },
     categories:        function ()      { return req('/api/categories'); },
-    schema:            function ()      { return req('/api/schema'); },
     reset:             function ()      { return Promise.resolve({ reset: false, note: '真後端不提供重置' }); }
   };
 
@@ -517,9 +508,7 @@
     setSavingsGoal:    function (u, g) { return impl.setSavingsGoal(u, g); },
     advices:           function (f)    { return impl.advices(f); },
     members:           function ()     { return impl.members(); },
-    nlpEval:           function ()     { return impl.nlpEval(); },
     categories:        function ()     { return impl.categories(); },
-    schema:            function ()     { return impl.schema(); },
     reset:             function ()     { return impl.reset(); }
   };
 })(window);

@@ -77,30 +77,162 @@ backend/
 
 ## 誰負責哪一塊
 
-| 成員 | 領域 | 主要檔案 | 路由編號 |
-|---|---|---|---|
-| **成員1** | 帳號與權限 | `routers/auth.py`、`routers/family.py`、`core/*`、`services/permission.py`、`services/llm.py` | 1–17 |
-| **成員2** | 記帳 | `routers/transactions.py`、`routers/nlp.py` ★ | 18–27 |
-| **成員3** | 統計與預算 | `routers/stats.py`、`routers/budgets.py`、`services/analytics.py` | 28–33 |
-| **成員4** | 財務建議 | `routers/advices.py` | 34–35 |
+分工的**單一事實來源是 `app/ownership.py`**，不是這份文件。
+那個檔案是程式讀得到的，而且 `pytest` 會檢查它有沒有跟程式碼走散——
+有人新增路由卻沒認領、或兩個人宣告同一支，測試就會紅燈。
 
-★ `routers/nlp.py` 是整個系統的核心。
+```bash
+python -m app.ownership      # 印出分工表並檢查一致性
+```
 
-**成員1 另外負責兩個大家共用的檔案**（`core/` 與 `services/llm.py`、
-`services/permission.py`），這兩塊在第 1 週要優先完成，
-因為其他三個人都要靠它們。
+### 四個領域
 
----
+| 成員 | 領域 | 分支 | 路由 | 獨佔檔案 | 共用元件（要最先完成） |
+|---|---|---|---|---|---|
+| **成員1** | **認證與基礎建設** | `m1-auth` | 8 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
+| **成員2** | **記帳** | `m2-ledger` | 8 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
+| **成員3** | **數字與建議** | `m3-analytics` | 10 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
+| **成員4** | **家庭與可見範圍** | `m4-access` | 9 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
 
-## 找到自己要做的事
+### 切分原則
 
-所有待辦都用 `TODO(負責人)` 標記，直接搜尋就好：
+1. **一個領域＝一個完整的概念**，不是一堆零散的路由湊數
+2. **一個檔案剛好一個主人**，四個人不會改到同一個檔案 → git 幾乎不衝突
+3. **會擋住別人的東西要盡量小**（`core/`、`permission.py`），才能最快完成解鎖別人
+4. **每個人都要有一份 LLM 工作** —— 這是任務的硬性要求
+
+### 各領域的邊界
+
+#### 成員1 · 認證與基礎建設　`m1-auth`
+
+負責「你是誰」以及整個後端的地基。
+屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層。
+不屬於他的：家庭角色與監管關係（那是成員4）。users 表存的是登入身分，family_members 表才是家庭角色，兩者刻意分開。
+
+**LLM 工作**：共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證。成員2 和成員3 都會呼叫它，所以第 1 週要先做出來。
+
+**路由（8 支）**
+
+```
+POST    /api/auth/register
+POST    /api/auth/login
+POST    /api/auth/refresh
+POST    /api/auth/logout
+POST    /api/auth/logout-all
+GET     /api/auth/me
+PATCH   /api/auth/password
+GET     /api/auth/sessions
+```
+
+#### 成員2 · 記帳　`m2-ledger`
+
+負責「記一筆帳」這個動作，從文字進來到寫進資料庫。★ 這是整個系統的核心。
+屬於他的：明細的增刪改查、段落解析、單句解析、確認後寫入、nlp_parses 的寫入。
+不屬於他的：分類體系的定義與 /api/categories（那是成員3 —— 分類由成員3 定義，成員2 只是把清單寫進 prompt）；統計加總（那是成員3，前端和這裡都不做任何加總）。
+
+**LLM 工作**：段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準。切分比抽欄位更難，而且切錯比抽錯更難發現。
+
+**路由（8 支）**
+
+```
+GET     /api/transactions
+POST    /api/transactions
+PATCH   /api/transactions/{tx_id}
+DELETE  /api/transactions/{tx_id}
+POST    /api/nlp/parse
+POST    /api/nlp/parse-batch
+POST    /api/nlp/confirm
+POST    /api/nlp/confirm-batch
+```
+
+#### 成員3 · 數字與建議　`m3-analytics`
+
+負責所有「算出來的東西」，以及把那些數字講成人話。
+屬於他的：分類體系、月年統計、預算、每月存款目標、財務建議。
+**整個系統只有這裡算錢** —— 路由不算、前端不算、模型更不算。
+不屬於他的：明細的寫入（那是成員2）；決定要算哪些人（那是成員4 的 permission）。
+
+**LLM 工作**：財務建議的 prompt 與邊界規則。順序不能顛倒：先用 analytics 算好數字，再餵給模型敘述，模型不做任何算術。
+
+**路由（10 支）**
+
+```
+GET     /api/categories
+POST    /api/categories
+GET     /api/summary
+GET     /api/stats
+GET     /api/budgets
+PUT     /api/budgets
+GET     /api/savings-goal
+PUT     /api/savings-goal
+GET     /api/advices
+POST    /api/advices/generate
+```
+
+#### 成員4 · 家庭與可見範圍　`m4-access`
+
+負責「誰在這個家庭裡」以及「誰看得到誰的資料」，另外扛模型評測。
+屬於他的：家庭、成員角色、邀請碼、監管關係、權限計算、稽核紀錄、評測。
+不屬於他的：登入本身（那是成員1）。成員1 回答「你是誰」，成員4 回答「你能看到什麼」。
+
+**LLM 工作**：模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1。**留出集必須 100% 人工標註**，否則量到的是「多像那個老師」而不是「多正確」。
+
+**路由（9 支）**
+
+```
+GET     /api/family
+POST    /api/family
+POST    /api/family/invite
+POST    /api/family/join
+PATCH   /api/family/members/{user_id}
+DELETE  /api/family/members/{user_id}
+GET     /api/guardianships
+POST    /api/guardianships
+DELETE  /api/guardianships/{gid}
+```
+
+
+### 分支規則
+
+每個人只在自己的分支上動自己清單裡的檔案。
+
+```bash
+git switch -c m2-ledger      # 換成你自己的分支名稱
+```
+
+**要改別人的檔案，先在群組講一聲。** 下面這幾個檔案沒有單一主人，
+動之前一樣要先講：
+
+- `backend/app/main.py`
+- `app/ownership.py`
+- `backend/app/models/__init__.py`
+- `backend/app/schemas/__init__.py`
+- `backend/app/routers/__init__.py`
+- `backend/app/services/__init__.py`
+- `backend/app/services/llm/__init__.py`
+
+### 第 1 週的相依順序
+
+```
+成員1  core/deps.py（get_current_user）        ← 其他三人的每一支路由都要用
+成員4  services/permission.py（visible_user_ids） ← 成員2、成員3 的查詢要用
+成員3  分類體系（GET /api/categories）          ← 成員2 寫 prompt、成員4 評測要用
+```
+
+**這三件事要最優先完成。** 前兩件可以平行做，做完其他人才動得了。
+
+### 找到自己要做的事
 
 ```bash
 grep -rn "TODO(成員2)" app/
 ```
 
-每個 TODO 底下都寫了要做哪幾步、為什麼要那樣做、常見的坑在哪裡。
+每個 TODO 底下都寫了要做哪幾步、為什麼那樣做、坑在哪裡。
+
+### 前端專用、後端不實作的路由
+
+- `POST /api/auth/switch`
+  示範模式的切換身分鈕。**後端絕對不可以實作這支** —— 讓任何人任意切換身分等於把整套權限系統作廢。接上真後端之後，這個鈕要換成正常的登入登出。
 
 ---
 
@@ -115,7 +247,7 @@ grep -rn "TODO(成員2)" app/
 | `ACCESS_TOKEN_MINUTES` | | access token 有效期，預設 30 分鐘 |
 | `REFRESH_TOKEN_DAYS` | | refresh token 有效期，預設 14 天 |
 
-`MODEL_BASE_URL` 留空時 `services/llm.py` 會回傳**形狀正確的假資料**。
+`MODEL_BASE_URL` 留空時 `services/llm/parse.py` 會回傳**形狀正確的假資料**。
 這是刻意的：第 1 週模型還沒訓練完，但前端已經要串了。
 等模型好了把網址填上去，其他程式碼一行都不用改。
 

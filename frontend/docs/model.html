@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=5">
+<link rel="stylesheet" href="docs.css?v=6">
 <style>
 /* ---- 模型設計頁專用 ---- */
 /* 權杖沿用專案的 tokens.css，跟手冊與產品同一套視覺 */
@@ -904,14 +904,14 @@ pre i { color:var(--ink-dim); font-style:normal; }
     <table>
       <thead><tr><th class="tight">成員</th><th>原本的模組</th><th>在這份方案裡負責</th></tr></thead>
       <tbody>
-        <tr><td class="tight"><b>成員1</b></td><td>帳號與權限</td>
-          <td><b>模型服務層與工具派發</b>：<code>services/llm.py</code>、tool dispatch、重試、逾時、把兩輪流程包成一支可呼叫的介面</td></tr>
-        <tr><td class="tight"><b>成員2</b></td><td>記帳</td>
-          <td><b>解析任務本體</b>：工具 schema、訓練資料的組裝與擴增、QLoRA 微調、<code>record_transactions</code></td></tr>
-        <tr><td class="tight"><b>成員3</b></td><td>統計與預算</td>
-          <td><b>數字工具與分類體系</b>：<code>get_month_summary</code>、<code>get_savings_status</code>、<code>lookup_category</code> 背後的分類契約</td></tr>
-        <tr><td class="tight"><b>成員4</b></td><td>財務建議</td>
-          <td><b>評測與建議</b>：留出集標註、評測腳本、四個指標的對照表、建議生成的 prompt 與邊界規則</td></tr>
+        <tr><td class="tight"><b>成員1</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m1-auth</span></td><td>認證與基礎建設</td>
+          <td><b>共用的模型服務層</b>：<code>services/llm/client.py</code>、逾時、重試、把回傳交給 Pydantic 驗證</td></tr>
+        <tr><td class="tight"><b>成員2</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m2-ledger</span></td><td>記帳</td>
+          <td><b>段落切分與欄位抽取的 prompt</b>：<code>services/llm/parse.py</code>、few-shot 範例挑選、低信心判準</td></tr>
+        <tr><td class="tight"><b>成員3</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m3-analytics</span></td><td>數字與建議</td>
+          <td><b>建議生成的 prompt 與邊界規則</b>：<code>services/llm/advice.py</code>、先算數字再敘述</td></tr>
+        <tr><td class="tight"><b>成員4</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m4-access</span></td><td>家庭與可見範圍</td>
+          <td><b>模型評測</b>：<code>services/evaluation.py</code>、人工標註留出集、零樣本 vs few-shot 對照</td></tr>
       </tbody>
     </table>
   </div>

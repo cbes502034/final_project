@@ -1,5 +1,5 @@
 """
-模型呼叫層。 ✦ 負責人：成員1（提供給大家共用）
+模型呼叫層（共用傳輸層）。 ✦ 負責人：成員1（認證與基礎建設）　✦ 分支：m1-auth
 
 ===========================================================================
 為什麼要有這一層？
@@ -26,6 +26,16 @@
     HTTP endpoint ← 這個檔案打的就是它
 
 llama.cpp 提供的是 OpenAI 相容的介面，所以呼叫方式跟一般 chat API 很像。
+
+===========================================================================
+這個檔案只做「怎麼把話送出去、怎麼把話收回來」
+===========================================================================
+**不要在這裡寫任何 prompt。** prompt 是領域知識，屬於用它的人：
+
+    成員2 的段落解析 prompt  →  services/llm/parse.py
+    成員3 的建議生成 prompt  →  services/llm/advice.py
+
+這裡只負責：組請求、設逾時、重試、把回傳的 JSON 交給 Pydantic 驗證。
 
 ===========================================================================
 model_base_url 留空時會回傳假資料 —— 這是刻意的
@@ -83,58 +93,25 @@ def _mock_batch(text: str) -> dict[str, Any]:
         "mock": True,
     }
 
-
-async def parse_batch(text: str, categories: list[dict[str, Any]]) -> dict[str, Any]:
+async def call_model(messages: list[dict], schema=None) -> dict:
     """
-    把一段話切成 N 筆並抽出欄位。這是整個系統的核心呼叫。
+    送一次請求給模型服務，回傳解析後的 JSON。 ✦ 成員2 與成員3 都呼叫這支
 
-    `categories` 要把這個家庭的分類清單傳進來，寫進 prompt，
-    否則模型會自己編一個分類名稱回來，那個名稱在資料庫裡不存在。
+    `messages` 是 OpenAI 相容格式的對話陣列，由呼叫的人自己組。
+    `schema` 是 Pydantic 模型，有給的話會拿來驗證模型的回傳。
 
-    回傳的形狀見 routers/nlp.py 的說明。
+    這支要處理的三件事，**其他人不要自己重寫一遍**：
 
-    TODO(成員2): prompt 的設計是你的主要工作，包含
-                 1. few-shot 範例要放幾個、放哪些（挑最容易錯的案例）
-                 2. 怎麼要求模型輸出嚴格的 JSON
-                 3. 切分的指示怎麼寫（這比抽欄位更難）
-    TODO(成員1): 補上重試機制 —— 模型回傳的 JSON 驗不過時，
-                 帶著錯誤訊息重試一次，再失敗才丟 ModelUnavailable
-    """
-    if not settings.model_base_url:
-        return _mock_batch(text)
+    1. **逾時** —— 一定要設。沒有逾時的話模型服務卡住時，
+       我們的 API 會跟著卡死，最後整個服務沒有回應。
+    2. **重試** —— JSON 驗不過時帶著錯誤訊息重試一次，再失敗才放棄。
+    3. **溫度要低** —— 這是抽取任務不是創作任務，
+       我們要的是「每次都給一樣的答案」。建議 0 ~ 0.2。
 
-    # TODO(成員1): 實際呼叫。大致長這樣：
-    #     async with httpx.AsyncClient(timeout=settings.model_timeout_seconds) as client:
-    #         resp = await client.post(
-    #             f"{settings.model_base_url}/v1/chat/completions",
-    #             json={"model": "fambudget-1.5b", "messages": [...], "temperature": 0.1},
-    #         )
-    #         resp.raise_for_status()
-    #         return _validate(resp.json())
-    #
-    # temperature 要設很低（0 ~ 0.2）。這是抽取任務不是創作任務，
-    # 我們要的是「每次都給一樣的答案」，不是有創意的答案。
-    raise ModelUnavailable("TODO：成員1 尚未接上真實模型服務")
-
-
-async def generate_advice(basis: dict[str, Any]) -> dict[str, Any]:
-    """
-    產生財務建議。
-
-    ⚠️ `basis` 必須是 **analytics 已經算好的數字**，不是原始交易資料。
-    模型的工作只是把數字組織成人看得懂的敘述，它不做任何算術。
-
-    TODO(成員4): prompt 設計，把邊界規則寫成硬約束
+    TODO(成員1): 用 httpx.AsyncClient 實作，逾時讀 settings.model_timeout_seconds。
+                 llama.cpp 提供的是 OpenAI 相容介面，打
+                 POST {model_base_url}/v1/chat/completions
     """
     if not settings.model_base_url:
-        return {
-            "advices": [
-                {
-                    "title": "（示範）餐飲支出佔比偏高",
-                    "body": "目前是假資料，MODEL_BASE_URL 設定後會換成真實產出。",
-                    "level": "info",
-                }
-            ],
-            "mock": True,
-        }
-    raise ModelUnavailable("TODO：成員4 尚未接上真實模型服務")
+        raise ModelUnavailable("MODEL_BASE_URL 未設定")
+    raise ModelUnavailable("TODO：成員1 尚未實作 call_model")

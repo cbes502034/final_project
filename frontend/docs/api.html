@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=5">
+<link rel="stylesheet" href="docs.css?v=6">
 </head>
 <body>
 
@@ -66,11 +66,11 @@
   'use strict';
 
   var OWNERS = [
-    { id: 'm1', name: '成員1', dom: '帳號與權限', c: '#6C9FFB' },
-    { id: 'm2', name: '成員2', dom: '記帳',       c: '#8B7CF0' },
-    { id: 'm3', name: '成員3', dom: '統計與預算', c: '#5FB8D9' },
-    { id: 'm4', name: '成員4', dom: '財務建議',   c: '#6EE7B7' },
-    { id: 'sys', name: '共用', dom: '系統',        c: '#767D91' }
+    { id: 'm1', name: '成員1', dom: '認證與基礎建設', branch: 'm1-auth', c: '#6C9FFB' },
+    { id: 'm2', name: '成員2', dom: '記帳', branch: 'm2-ledger', c: '#8B7CF0' },
+    { id: 'm3', name: '成員3', dom: '數字與建議', branch: 'm3-analytics', c: '#5FB8D9' },
+    { id: 'm4', name: '成員4', dom: '家庭與可見範圍', branch: 'm4-access', c: '#6EE7B7' },
+    { id: 'sys', name: '共用', dom: '系統', branch: '—', c: '#767D91' }
   ];
 
   /* 路由與回應形狀取自 frontend/js/api.js 的契約定義 */
@@ -100,25 +100,25 @@
       body: '{ "oldPassword": "………", "newPassword": "………" }' },
     { n: 8, o: 'm1', m: 'GET', p: '/api/auth/sessions', a: '登入',
       d: '列出有效的登入裝置' },
-    { n: 9, o: 'm1', m: 'GET', p: '/api/family', a: '登入',
+    { n: 9, o: 'm4', m: 'GET', p: '/api/family', a: '登入',
       d: '家庭資訊、成員清單、角色' },
-    { n: 10, o: 'm1', m: 'POST', p: '/api/family', a: '登入',
+    { n: 10, o: 'm4', m: 'POST', p: '/api/family', a: '登入',
       d: '建立家庭，建立者成為 master' },
-    { n: 11, o: 'm1', m: 'POST', p: '/api/family/invite', a: 'master',
+    { n: 11, o: 'm4', m: 'POST', p: '/api/family/invite', a: 'master',
       d: '產生邀請碼',
       res: '{ "code": "F7K2-9QX4", "expiresAt": "2026-09-18T00:00:00Z" }' },
-    { n: 12, o: 'm1', m: 'POST', p: '/api/family/join', a: '登入',
+    { n: 12, o: 'm4', m: 'POST', p: '/api/family/join', a: '登入',
       d: '用邀請碼加入家庭', body: '{ "code": "F7K2-9QX4" }' },
-    { n: 13, o: 'm1', m: 'PATCH', p: '/api/family/members/{userId}', a: 'master',
+    { n: 13, o: 'm4', m: 'PATCH', p: '/api/family/members/{userId}', a: 'master',
       d: '修改成員角色', body: '{ "role": "parent" }' },
-    { n: 14, o: 'm1', m: 'DELETE', p: '/api/family/members/{userId}', a: 'master',
+    { n: 14, o: 'm4', m: 'DELETE', p: '/api/family/members/{userId}', a: 'master',
       d: '移除成員（標記 removed，不刪資料）' },
-    { n: 15, o: 'm1', m: 'GET', p: '/api/guardianships', a: '登入',
+    { n: 15, o: 'm4', m: 'GET', p: '/api/guardianships', a: '登入',
       d: '監管關係。被監管者也看得到',
       note: '<b>監管必須雙向可見。</b>系統不提供「隱藏監管」的選項——偷偷監看家人的消費會破壞信任。' },
-    { n: 16, o: 'm1', m: 'POST', p: '/api/guardianships', a: 'master',
+    { n: 16, o: 'm4', m: 'POST', p: '/api/guardianships', a: 'master',
       d: '建立監管關係', body: '{ "guardianId": 1, "wardId": 4 }' },
-    { n: 17, o: 'm1', m: 'DELETE', p: '/api/guardianships/{id}', a: 'master',
+    { n: 17, o: 'm4', m: 'DELETE', p: '/api/guardianships/{id}', a: 'master',
       d: '解除監管（設 ended_at，不刪除）' },
 
     { n: 18, o: 'm2', m: 'GET', p: '/api/transactions', a: '登入',
@@ -132,10 +132,10 @@
       note: '<b>不經過模型</b>，寫入的 <code>source</code> 記成 <code>manual</code>。只有經過模型的資料才走 <code>/api/nlp/confirm</code>，否則 <code>nlp_parses</code> 這張評測用的表會被手動資料汙染。' },
     { n: 20, o: 'm2', m: 'PATCH', p: '/api/transactions/{id}', a: '本人或監管者', d: '修改' },
     { n: 21, o: 'm2', m: 'DELETE', p: '/api/transactions/{id}', a: '本人', d: '刪除' },
-    { n: 22, o: 'm2', m: 'GET', p: '/api/categories', a: '登入',
+    { n: 22, o: 'm3', m: 'GET', p: '/api/categories', a: '登入',
       d: '分類體系（系統預設 + 家庭自訂）',
       note: '<b>分類體系是唯一的跨模組阻塞點</b>：成員3 定義，成員2 要寫進 prompt，成員4 做建議時要用。第 1 週就要凍結。' },
-    { n: 23, o: 'm2', m: 'POST', p: '/api/categories', a: 'master', d: '新增家庭自訂分類' },
+    { n: 23, o: 'm3', m: 'POST', p: '/api/categories', a: 'master', d: '新增家庭自訂分類' },
     { n: 24, o: 'm2', m: 'POST', p: '/api/nlp/parse', a: '登入', llm: true,
       d: '單句：一句話 → 一筆。只解析，不寫入',
       body: '{ "text": "今天午餐吃了120" }',
@@ -172,9 +172,9 @@
       body: '{ "userId": 3, "goal": 2000, "period": "2026-09" }',
       note: '目標改動<b>保留歷史不覆蓋</b>（<code>savings_goals</code> 帶 <code>period_key</code>），否則之後回頭看會不知道當時的目標是多少。' },
 
-    { n: 34, o: 'm4', m: 'GET', p: '/api/advices', a: '登入',
+    { n: 34, o: 'm3', m: 'GET', p: '/api/advices', a: '登入',
       d: '財務建議清單', q: ['scope=me|family', 'period'] },
-    { n: 35, o: 'm4', m: 'POST', p: '/api/advices/generate', a: 'master', llm: true,
+    { n: 35, o: 'm3', m: 'POST', p: '/api/advices/generate', a: 'master', llm: true,
       d: '重新產生。後端先算好數字再餵給模型',
       res: '1. analytics service 從資料庫算出所有數字\n2. 把「算好的數字」組成 prompt 的一部分\n3. 呼叫模型，要求它只做敘述與歸納\n4. Pydantic 驗證輸出格式\n5. 把數字存進 advices.basis_json（給使用者驗算用）',
       note: '<b>順序不能顛倒，模型不做任何算術。</b>財務數字算錯會讓使用者做出錯誤決定，而模型本來就不擅長算術。' },
@@ -265,6 +265,7 @@
       h += '<section class="agroup" style="--k:' + o.c + '">' +
         '<div class="agroup__h">' +
         '<span class="agroup__t">' + o.name + ' · ' + o.dom + '</span>' +
+        '<span class="agroup__s">分支 ' + o.branch + '</span>' +
         '<span class="agroup__n">' + rs.length + ' 支</span></div><div class="rows">' +
         rs.map(function (r) { return routeHTML(r, o); }).join('') +
         '</div></section>';

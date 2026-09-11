@@ -71,6 +71,22 @@ def test_三十五支路由都有掛上去():
     assert n == 36, f"預期 35 支 API + healthz = 36，實際 {n} 支"
 
 
+def test_分工定義與程式碼一致():
+    """
+    app/ownership.py 是分工的單一事實來源。這支測試確認它沒有跟程式碼走散。
+
+    會紅燈的情況：有人新增了一支路由卻沒去 ownership.py 認領、
+    刪掉了一支路由卻忘了從定義裡移除、或兩個人宣告了同一支。
+
+    **這是避免功能衝突最有效的一道防線** —— 與其靠大家記得更新文件，
+    不如讓忘記更新的人在跑測試時就被擋下來。
+    """
+    from app.ownership import check
+
+    problems = check()
+    assert not problems, "分工定義與程式碼對不上：" + "；".join(problems)
+
+
 def test_沒帶權杖會被擋下來():
     """
     需要登入的路由，沒帶 token 就該回 401。

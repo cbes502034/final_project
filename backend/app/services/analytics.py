@@ -1,5 +1,5 @@
 """
-統計計算。 ✦ 負責人：成員3（統計與預算）
+統計計算。 ✦ 負責人：成員3（數字與建議）　✦ 分支：m3-analytics
 
 ===========================================================================
 這個檔案是整個系統唯一算錢的地方
@@ -9,7 +9,8 @@
 理由很簡單：同一個數字只要有兩個地方算得出來，
 就一定會有對不起來的那一天。這個專案在原型階段已經發生過一次。
 
-成員4 產生財務建議時，也是先呼叫這裡把數字算好，再餵給模型。
+成員3 產生財務建議時，也是先呼叫這裡把數字算好，再餵給模型——
+同一個人，所以不會有「算法改了但建議沒跟著改」的問題。
 """
 
 from decimal import Decimal
@@ -94,7 +95,7 @@ def by_category(db: Session, user_ids: list[int], period: str) -> list[dict[str,
 
 def build_basis(db: Session, user_ids: list[int], period: str) -> dict[str, Any]:
     """
-    把要餵給模型的數字全部算好，打包成一個 dict。 ✦ 成員4 會呼叫這支
+    把要餵給模型的數字全部算好，打包成一個 dict。 ✦ routers/advices.py 會呼叫這支
 
     ⚠️ 這支的回傳值有兩個用途，兩個都很重要：
 
@@ -105,8 +106,8 @@ def build_basis(db: Session, user_ids: list[int], period: str) -> dict[str, Any]
     使用者看到建議時能展開看到「這是根據哪些數字得出的」，
     沒有依據的建議就是黑盒子，使用者不會信。
 
-    TODO(成員4): 決定要放哪些數字進去。建議至少包含
+    TODO(成員3): 決定要放哪些數字進去。建議至少包含
                  收入、支出、結餘、儲蓄率、各分類佔比、
                  預算使用率、存款目標達成狀態、跟上個月的比較
     """
-    raise NotImplementedError("TODO：成員4 尚未實作")
+    raise NotImplementedError("TODO：成員3 尚未實作")

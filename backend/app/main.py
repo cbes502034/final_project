@@ -40,6 +40,7 @@ from app.routers import (
     advices,
     auth,
     budgets,
+    categories,
     family,
     nlp,
     stats,
@@ -107,10 +108,14 @@ app.add_middleware(
 # 實際的網址就是 /api/auth/login。
 #
 # tags 是給自動文件用的分類標籤，打開 /docs 就會看到照這個分組。
+#
+# 每一組的負責人寫在 app/ownership.py，那是分工的單一事實來源。
+# 跑 `python -m app.ownership` 可以檢查程式碼有沒有跟那份定義走散。
 # ===========================================================================
 app.include_router(auth.router, prefix="/api/auth", tags=["身分認證"])
 app.include_router(family.router, prefix="/api", tags=["家庭與權限"])
 app.include_router(transactions.router, prefix="/api", tags=["記帳"])
+app.include_router(categories.router, prefix="/api", tags=["分類體系"])
 app.include_router(nlp.router, prefix="/api/nlp", tags=["段落記帳（模型）"])
 app.include_router(stats.router, prefix="/api", tags=["統計"])
 app.include_router(budgets.router, prefix="/api", tags=["預算與存款目標"])
