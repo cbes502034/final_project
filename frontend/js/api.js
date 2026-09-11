@@ -42,6 +42,12 @@
    PUT    /api/savings-goal           ★ 設定每月存款目標（註冊時也走這支）
 
    建議
+   監管通知
+   GET    /api/notifications          通知清單（帶 since 只拿新的）
+   PATCH  /api/notifications/{id}     標記單則已讀
+   PATCH  /api/notifications          整批已讀（帶 readUntil）
+
+   建議
    GET    /api/advices                LLM 財務建議（帶 scope / period）
    POST   /api/advices/generate       重新產生（後端先算好數字再餵給模型）
 
@@ -85,7 +91,8 @@
       me: 'U1',                                   // 模擬目前登入者
       transactions: clone(global.DATA.transactions),
       budgets: clone(global.DATA.budgets),
-      goals: {}
+      goals: {},
+      readNotify: []
     };
     try {
       var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -93,6 +100,7 @@
         if (saved.me) base.me = saved.me;
         if (saved.extra) base.transactions = saved.extra.concat(base.transactions);
         if (saved.goals) base.goals = saved.goals;
+        if (saved.readNotify) base.readNotify = saved.readNotify;
       }
     } catch (e) {}
     applyGoals(base.goals);
@@ -103,7 +111,8 @@
     try {
       var extra = state.transactions.filter(function (t) { return t.id.indexOf('N') === 0; });
       localStorage.setItem(KEY, JSON.stringify({
-        me: state.me, extra: extra, goals: state.goals || {}
+        me: state.me, extra: extra, goals: state.goals || {},
+        readNotify: state.readNotify || []
       }));
     } catch (e) {}
   }
@@ -377,6 +386,101 @@
       });
     },
 
+    /* ---------------------------------------------------------
+       監管通知。真後端是子女寫入時建立通知列，
+       這裡用「明細裡有沒有被我監管的人新記的帳」現算，
+       形狀跟真的一樣，前端不用改。
+       --------------------------------------------------------- */
+    notifications: function (f) {
+      var s = load(), D = global.DATA;
+      f = f || {};
+      return sleep(120).then(function () {
+        var wards = D.guardianships
+          .filter(function (g) { return g.guardian === s.me; })
+          .map(function (g) { return g.ward; });
+
+        /* 真後端的 notifications 表有自增 id 跟 created_at，天生就能排序。
+           mock 沒有，所以這裡自己算一個時間戳當排序鍵：
+             新記的（id = 'N' + Date.now()）→ 直接取那串毫秒
+             種子資料（id = 'T1041'）      → 日期 + 流水號（同一天用流水號分先後） */
+        function stamp(t) {
+          var id = String(t.id);
+          if (id.charAt(0) === 'N') return Number(id.slice(1)) || 0;
+          return Date.parse(t.date + 'T12:00:00') + (Number(id.replace(/\D/g, '')) || 0);
+        }
+
+        var rows = s.transactions
+          .filter(function (t) { return wards.indexOf(t.user) >= 0; })
+          .map(function (t) {
+            var m = memberOf(t.user) || {};
+            var c = D.categories.filter(function (x) { return x.id === t.cat; })[0] || {};
+            var ts = stamp(t);
+            return {
+              id: 'NT' + t.id,
+              type: 'ward_transaction',
+              actorId: t.user,
+              actorName: m.name || '',
+              txId: t.id,
+              amount: t.amount,
+              cat: t.cat,
+              catName: c.name || '',
+              merchant: t.merchant || '',
+              createdAt: new Date(ts).toISOString(),
+              readAt: (s.readNotify || []).indexOf('NT' + t.id) >= 0
+                ? new Date().toISOString() : null,
+              _ts: ts
+            };
+          })
+          .sort(function (a, b) { return a._ts - b._ts; })   // 由舊到新
+          .slice(-20);                                       // 只留最近 20 筆
+
+        // unread 要用「全部」算，不是用這次回傳的那幾筆算。
+        // 用分頁後的算，第二次輪詢帶 since 回 0 筆時紅點就被清掉了。
+        var unread = rows.filter(function (r) { return !r.readAt; }).length;
+
+        // maxId 是「最新的那筆」。rows 是由舊到新，所以取最後一個。
+        // 這裡很容易寫反：如果清單是由新到舊，取 last 會拿到最舊的，
+        // 下次帶 since 就永遠切不到新紀錄，新通知永遠進不了清單。
+        var maxId = rows.length ? rows[rows.length - 1].id : (f.since || null);
+
+        // since 之後（更新）的才回，跟真後端的 WHERE id > :since 一樣
+        if (f.since) {
+          var cut = rows.filter(function (r) { return r.id === f.since; })[0];
+          if (cut) rows = rows.filter(function (r) { return r._ts > cut._ts; });
+        }
+        if (f.unreadOnly) rows = rows.filter(function (r) { return !r.readAt; });
+
+        // 回給前端時改成由新到舊，畫面上最新的排最上面
+        rows = rows.slice().reverse().map(function (r) {
+          var o = clone(r); delete o._ts; return o;
+        });
+        return { notifications: rows, unread: unread, maxId: maxId };
+      });
+    },
+
+    readNotification: function (id) {
+      var s = load();
+      return sleep(80).then(function () {
+        s.readNotify = s.readNotify || [];
+        if (s.readNotify.indexOf(id) < 0) s.readNotify.push(id);
+        save();
+        return { id: id, readAt: new Date().toISOString() };
+      });
+    },
+
+    readNotifications: function (untilId) {
+      var s = load();
+      return sleep(80).then(function () {
+        s.readNotify = s.readNotify || [];
+        s.transactions.forEach(function (t) {
+          var nid = 'NT' + t.id;
+          if (s.readNotify.indexOf(nid) < 0) s.readNotify.push(nid);
+        });
+        save();
+        return { updated: s.readNotify.length, unread: 0 };
+      });
+    },
+
     budgets: function () {
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
@@ -482,6 +586,9 @@
     nlpConfirmBatch:   function (i)     { return req('/api/nlp/confirm-batch', { method: 'POST', body: { items: i } }); },
     createTransaction: function (p)     { return req('/api/transactions', { method: 'POST', body: p }); },
     deleteTransaction: function (id)    { return req('/api/transactions/' + encodeURIComponent(id), { method: 'DELETE' }); },
+    notifications:     function (f)     { return req('/api/notifications' + qs(f)); },
+    readNotification:  function (i)     { return req('/api/notifications/' + encodeURIComponent(i), { method: 'PATCH', body: { read: true } }); },
+    readNotifications: function (u)     { return req('/api/notifications', { method: 'PATCH', body: { readUntil: u } }); },
     budgets:           function ()      { return req('/api/budgets'); },
     setSavingsGoal:    function (u, g)  { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g } }); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
@@ -504,6 +611,9 @@
     nlpConfirmBatch:   function (i)    { return impl.nlpConfirmBatch(i); },
     createTransaction: function (p)    { return impl.createTransaction(p); },
     deleteTransaction: function (i)    { return impl.deleteTransaction(i); },
+    notifications:     function (f)    { return impl.notifications(f); },
+    readNotification:  function (i)    { return impl.readNotification(i); },
+    readNotifications: function (u)    { return impl.readNotifications(u); },
     budgets:           function ()     { return impl.budgets(); },
     setSavingsGoal:    function (u, g) { return impl.setSavingsGoal(u, g); },
     advices:           function (f)    { return impl.advices(f); },

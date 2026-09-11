@@ -175,7 +175,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **38 條路由**。標示說明：
+共 **41 條路由**。標示說明：
 
 - **權限**：`公開` / `登入` / `master` / `監管者`
 - ★ 記號代表與 LLM 直接相關
@@ -220,6 +220,9 @@ final_project/
 | 15 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
 | 16 | POST | `/api/guardianships` | 成員4 | master | 建立監管關係 |
 | 17 | DELETE | `/api/guardianships/{id}` | 成員4 | master | 解除監管（設 `ended_at`，不刪除） |
+| 39 | GET | `/api/notifications` | 成員4 | 登入 | 通知清單。帶 since 只拿新的 |
+| 40 | PATCH | `/api/notifications/{nid}` | 成員4 | 本人 | 把一則標記成已讀 |
+| 41 | PATCH | `/api/notifications` | 成員4 | 本人 | 整批標記已讀 |
 
 ## 4-3　記帳 `/api/transactions`
 
@@ -227,7 +230,7 @@ final_project/
 |---|---|---|---|---|---|
 | 18 | GET | `/api/transactions` | 成員2 | 登入 | 明細。可帶 `userId` / `from` / `to` / `categoryId` / `kind` / `q` / `page` |
 | 19 | POST | `/api/transactions` | 成員2 | 登入 | 手動新增。**單筆手動模式走這支**，不經過模型，寫入的 `source` 記成 `manual` |
-| 20 | PATCH | `/api/transactions/{id}` | 成員2 | 本人或監管者 | 修改 |
+| 20 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改 |
 | 21 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除 |
 | 22 | GET | `/api/categories` | 成員3 | 登入 | 分類體系（系統預設 + 家庭自訂） |
 | 23 | POST | `/api/categories` | 成員3 | master | 新增家庭自訂分類 |
@@ -343,8 +346,8 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 39 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
-| 40 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
+| 42 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
+| 43 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
 
 ---
 

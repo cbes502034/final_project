@@ -759,3 +759,81 @@
   padding: 7px 14px; font-size: 13px; font-family: var(--mono);
 }
 .goal__i:focus { outline: none; border-color: var(--accent); }
+
+/* ============================================================
+   監管通知：鈴鐺與下拉面板
+   ============================================================ */
+.bell__wrap { position: relative; flex: 0 0 auto; }
+.bell__wrap[hidden] { display: none; }   /* 沒有監管對象就整個收起來 */
+.bell {
+  position: relative; width: 36px; height: 36px; cursor: pointer;
+  display: grid; place-items: center; border-radius: var(--r-sm);
+  background: transparent; border: 1px solid var(--line); color: var(--ink-soft);
+  transition: color .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
+}
+.bell svg { width: 18px; height: 18px; }
+.bell:hover { color: var(--ink); border-color: var(--line-2); background: var(--sunk); }
+.bell.has { color: var(--warn); border-color: rgba(251,191,110,.4); }
+.bell__n {
+  position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px;
+  padding: 0 4px; border-radius: 9px; background: var(--down); color: #fff;
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; line-height: 1;
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.bell__panel {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 60;
+  width: min(360px, calc(100vw - 32px));
+  background: var(--card-2); border: 1px solid var(--line-2);
+  border-radius: var(--r-card); box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+.bell__h {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; border-bottom: 1px solid var(--line);
+}
+.bell__t { font-family: var(--serif); font-size: 14px; font-weight: 600; color: var(--ink); }
+.bell__mute, .bell__all {
+  margin-left: auto; cursor: pointer; font-family: var(--sans); font-size: 11.5px;
+  padding: 4px 9px; border-radius: var(--r-pill);
+  border: 1px solid var(--line-2); background: transparent; color: var(--ink-faint);
+  transition: color .18s var(--ease), border-color .18s var(--ease);
+}
+.bell__all { margin-left: 0; color: var(--accent-hi); border-color: rgba(108,159,251,.35); }
+.bell__mute:hover, .bell__all:hover { color: var(--ink); border-color: var(--line-3); }
+
+.bell__list { max-height: 340px; overflow-y: auto; }
+.bell__i {
+  display: flex; gap: 10px; align-items: flex-start; width: 100%;
+  padding: 11px 14px; cursor: pointer; text-align: left;
+  background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  transition: background .18s var(--ease);
+}
+.bell__i:hover { background: var(--sunk); }
+.bell__i:last-child { border-bottom: 0; }
+.bell__dot {
+  width: 7px; height: 7px; border-radius: 50%; margin-top: 6px;
+  flex: 0 0 7px; background: transparent;
+}
+.bell__i.unread .bell__dot { background: var(--warn); }
+.bell__m { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bell__l { font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
+.bell__i.unread .bell__l { color: var(--ink); }
+.bell__s { font-size: 11px; color: var(--ink-dim); font-family: var(--mono); }
+
+.bell__empty {
+  padding: 26px 18px; text-align: center; font-size: 13px; color: var(--ink-faint);
+  line-height: 1.9;
+}
+.bell__empty span { font-size: 12px; color: var(--ink-dim); }
+
+.bell__f {
+  padding: 10px 14px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--ink-dim); line-height: 1.7;
+}
+.bell__f b { color: var(--warn); font-weight: 500; }
+
+@media (max-width: 560px) {
+  .bell__panel { right: -8px; width: calc(100vw - 24px); }
+}

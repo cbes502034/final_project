@@ -19,8 +19,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/tokens.css?v=19">
-<link rel="stylesheet" href="css/app.css?v=19">
+<link rel="stylesheet" href="css/tokens.css?v=23">
+<link rel="stylesheet" href="css/app.css?v=23">
 </head>
 <body>
 
@@ -106,6 +106,13 @@
         <svg class="search__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="search" type="search" placeholder="搜尋店家、備註…" autocomplete="off">
       </div>
+      <div class="bell__wrap">
+        <button class="bell" id="bell" title="監管通知" aria-label="監管通知">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
+          <span class="bell__n" id="bellDot" hidden>0</span>
+        </button>
+        <div class="bell__panel" id="bellPanel" hidden></div>
+      </div>
       <button class="btn btn--go" data-nav="entry">＋ 記一筆</button>
     </header>
 
@@ -119,9 +126,10 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=19"></script>
-<script src="js/data.js?v=19"></script>
-<script src="js/api.js?v=19"></script>
-<script src="js/app.js?v=19"></script>
+<script src="js/stars.js?v=23"></script>
+<script src="js/data.js?v=23"></script>
+<script src="js/api.js?v=23"></script>
+<script src="js/notify.js?v=23"></script>
+<script src="js/app.js?v=23"></script>
 </body>
 </html>

@@ -58,7 +58,7 @@
         <div class="mchip"><span>線上原型</span><b><a href="https://fambudget-web.onrender.com" target="_blank" rel="noopener">fambudget-web</a></b></div>
         <div class="mchip"><span>原始碼</span><b class="mono">cbes502034/final_project</b></div>
         <div class="mchip"><span>技術棧</span><b>FastAPI · PostgreSQL · 純靜態前端</b></div>
-        <div class="mchip"><span>API</span><b>38 支路由</b></div>
+        <div class="mchip"><span>API</span><b>41 支路由</b></div>
         <div class="mchip"><span>資料表</span><b>13 張</b></div>
       </div>
     </header>
@@ -308,7 +308,10 @@
             <tr><td>查看自己的統計</td><td>✓</td><td>✓</td><td>✓</td></tr>
             <tr><td>設定自己的預算</td><td>✓</td><td>✓</td><td>需管理者核准</td></tr>
             <tr><td>設定每月存款目標</td><td>✓</td><td>✓</td><td>未成年由管理者代設</td></tr>
-            <tr><td>查看被監管者明細</td><td>✓（全家）</td><td>✓（被指派的）</td><td>✗</td></tr>
+            <tr><td>查看被監管者明細（<b>唯讀</b>）</td><td>✓（全家）</td><td>✓（被指派的）</td><td>✗</td></tr>
+            <tr><td><b>修改／刪除被監管者的紀錄</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td><b>登入被監管者的帳號</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>收到子女新增紀錄的通知</td><td>✓</td><td>✓（被指派的）</td><td>✗</td></tr>
             <tr><td>查看家庭總覽</td><td>✓</td><td>僅摘要</td><td>✗</td></tr>
             <tr><td>設定家庭預算</td><td>✓</td><td>✗</td><td>✗</td></tr>
             <tr><td>邀請／移除成員</td><td>✓</td><td>✗</td><td>✗</td></tr>
@@ -322,6 +325,7 @@
         <div class="note__k">監管必須雙向可見</div>
         <p>系統不提供「隱藏監管」的選項。<b>偷偷監看家人的消費會破壞信任</b>，
         而信任正是家庭記帳能持續下去的前提。</p>
+        <p style="margin-top:8px"><b>而且監管是唯讀的。</b>管理者看得到子女的記帳明細，但<b>不能改、不能刪，更不能登入對方的帳號</b>。<br>        這條界線讓監管站得住腳：被監管的人知道自己的紀錄<b>不會被動手腳</b>。能登入對方帳號的話，這份信任就沒了。</p>
       </div>
 
       <h3 class="sub">C · 記帳（核心）</h3>
@@ -503,7 +507,7 @@
     <section class="sec" id="api">
       <div class="sec__h"><span class="sec__n">05</span><h2>API 目錄：按人員分類</h2></div>
       <p class="sec__lead">
-        共 <b>38 支路由</b>。權限標示：公開 / 登入 / master / 監管者。
+        共 <b>41 支路由</b>。權限標示：公開 / 登入 / master / 監管者。
         <span class="tag tag--llm">★</span> 代表與 LLM 直接相關。
       </p>
 
@@ -525,7 +529,7 @@
         </div>
         <div class="card" style="border-top:2px solid var(--m4)">
           <div class="mvc__k" style="color:var(--m4)">成員4　<span style="opacity:.7">m4-access</span></div>
-          <div class="mvc__t">家庭與可見範圍 · 9 支</div>
+          <div class="mvc__t">家庭與可見範圍 · 12 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">回答「你能看到什麼」。<code>permission.py</code> 是共用元件，成員2 與成員3 的查詢都要用，第 1 週要最優先完成。</p>
         </div>
       </div>
@@ -614,6 +618,9 @@
             <tr><td class="num">33</td><td class="tight">GET</td><td class="rt">/api/guardianships</td><td class="tight">登入</td><td>監管關係。<b>被監管者也看得到</b></td></tr>
             <tr><td class="num">34</td><td class="tight">POST</td><td class="rt">/api/guardianships</td><td class="tight">master</td><td>建立監管關係</td></tr>
             <tr><td class="num">35</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{id}</td><td class="tight">master</td><td>解除監管（設 <code>ended_at</code>，不刪除）</td></tr>
+            <tr><td class="num">39</td><td class="tight">GET</td><td class="rt">/api/notifications</td><td class="tight">登入</td><td>通知清單。帶 <code>since</code> 只拿新的</td></tr>
+            <tr><td class="num">40</td><td class="tight">PATCH</td><td class="rt">/api/notifications/{nid}</td><td class="tight">本人</td><td>把一則標記成已讀</td></tr>
+            <tr><td class="num">41</td><td class="tight">PATCH</td><td class="rt">/api/notifications</td><td class="tight">本人</td><td>整批標記已讀</td></tr>
           </tbody>
         </table>
       </div>
@@ -929,7 +936,7 @@
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · 四人 × 一個月專題</div>
-      <div class="mono">38 API · 13 TABLES · 8 SCREENS</div>
+      <div class="mono">41 API · 14 TABLES · 9 SCREENS</div>
     </footer>
 
   </div>

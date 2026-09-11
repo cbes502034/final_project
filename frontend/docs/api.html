@@ -27,7 +27,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>38 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>41 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -69,7 +69,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">38 ROUTES · 4 MODULES</div>
+    <div class="mono">41 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -142,7 +142,7 @@
       d: '手動新增。單筆手動模式走這支',
       body: '{\n  "date": "2026-09-10",\n  "amount": 250,\n  "kind": "expense",\n  "cat": "C01",\n  "merchant": "全家便利商店",\n  "note": ""\n}',
       note: '<b>不經過模型</b>，寫入的 <code>source</code> 記成 <code>manual</code>。只有經過模型的資料才走 <code>/api/nlp/confirm</code>，否則 <code>nlp_parses</code> 這張評測用的表會被手動資料汙染。' },
-    { n: 20, o: 'm2', m: 'PATCH', p: '/api/transactions/{id}', a: '本人或監管者', d: '修改' },
+    { n: 20, o: 'm2', m: 'PATCH', p: '/api/transactions/{id}', a: '本人', d: '修改' },
     { n: 21, o: 'm2', m: 'DELETE', p: '/api/transactions/{id}', a: '本人', d: '刪除' },
     { n: 22, o: 'm3', m: 'GET', p: '/api/categories', a: '登入',
       d: '分類體系（系統預設 + 家庭自訂）',
@@ -203,8 +203,21 @@
       d: '移除大頭貼，改回顯示文字頭像',
       note: '移除之後 <code>avatarUrl</code> 回傳 null，前端自動退回文字頭像。' },
 
-    { n: 39, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
-    { n: 40, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
+    { n: 39, o: 'm4', m: 'GET', p: '/api/notifications', a: '登入',
+      d: '通知清單。帶 <code>since</code> 只拿新的',
+      q: ['since', 'unreadOnly'],
+      res: '{\n  "notifications": [\n    {\n      "id": "N12", "type": "ward_transaction",\n      "actorId": "U3", "actorName": "林宇涵",\n      "txId": "T1051", "amount": 320, "cat": "C01",\n      "catName": "餐飲", "merchant": "全家",\n      "createdAt": "2026-09-11T13:20:05Z", "readAt": null\n    }\n  ],\n  "unread": 3,\n  "maxId": "N12"\n}',
+      note: '輪詢用。前端每 20 秒打一次，帶上次拿到的最大 id 當 <code>since</code>，只回更新的部分。<br>⚠️ <b>為什麼不用 SSE 或 WebSocket</b>：<code>EventSource</code> 沒辦法送自訂標頭，不能帶 <code>Authorization</code>，只能把 token 放網址上——那違反我們自己「token 絕不放查詢參數」的規則。輪詢 20 秒對這種通知完全夠用。' },
+    { n: 40, o: 'm4', m: 'PATCH', p: '/api/notifications/{nid}', a: '本人',
+      d: '把一則標記成已讀',
+      note: '使用者點開某一則通知時呼叫。' },
+    { n: 41, o: 'm4', m: 'PATCH', p: '/api/notifications', a: '本人',
+      d: '整批標記已讀',
+      body: '{ "readUntil": "N12" }',
+      note: '點「全部已讀」時呼叫。body 帶 <code>{"readUntil": 最大id}</code>，避免把點擊當下之後才進來的新通知也標成已讀。' },
+
+    { n: 42, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
+    { n: 43, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
       note: '後端上線後<b>這支才是真正能送出請求的地方</b>。' }
   ];
 

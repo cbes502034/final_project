@@ -823,7 +823,10 @@
     var sw = t.closest('[data-switch]');
     if (sw) {
       API.switchUser(sw.dataset.switch).then(function () {
-        paintWho(); paint(); toast('已切換身分', 'ok');
+        paintWho(); paint();
+        // 換人 = 換通知收件匣，先清掉上一個人的
+        if (global.Notify) { global.Notify.reset(); global.Notify.refresh(); }
+        toast('已切換身分', 'ok');
       });
       return;
     }
@@ -897,4 +900,7 @@
     API.mode === 'http' ? 'API ' + API.base : 'API mock';
   paintWho();
   paint();
+
+  /* 監管通知：輪詢 + 音效 + 鈴鐺。實作在 js/notify.js */
+  if (global.Notify) global.Notify.start();
 })(window);
