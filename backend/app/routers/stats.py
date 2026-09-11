@@ -72,7 +72,7 @@ def summary(
 
     TODO(成員3): 1. 用 services/permission.py 決定要算哪些人
                  2. 用 services/analytics.py 算數字
-                 3. 回傳形狀對照 site/js/api.js 的 summary()
+                 3. 回傳形狀對照 frontend/js/api.js 的 summary()
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員3 尚未實作")
 

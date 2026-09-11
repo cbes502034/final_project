@@ -356,7 +356,7 @@ final_project/
 
 留空 = mock 模式。填上網址 = 改用 `fetch` 打真後端。
 
-**`site/js/api.js` 裡 `mockAdapter` 與 `httpAdapter` 的簽章完全一致**，
+**`frontend/js/api.js` 裡 `mockAdapter` 與 `httpAdapter` 的簽章完全一致**，
 所以可以一支一支路由慢慢接 —— 後端做好哪支就改哪支，不必等全部完成。
 
 ---
@@ -427,5 +427,5 @@ docker compose up
 只跑前端（不需要後端也能完整展示）：
 
 ```bash
-python -m http.server 5174 --directory site
+python -m http.server 5174 --directory frontend
 ```

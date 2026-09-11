@@ -46,7 +46,7 @@ def get_family(me=Depends(get_current_user), db: Session = Depends(get_db)):
     """
     回傳我所屬家庭的資訊，以及所有成員的角色。
 
-    TODO(成員1): 回傳形狀要跟 site/js/api.js 的 members() 一致
+    TODO(成員1): 回傳形狀要跟 frontend/js/api.js 的 members() 一致
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 

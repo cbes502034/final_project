@@ -28,7 +28,7 @@ services:
   web:
     image: python:3.12-alpine
     working_dir: /site
-    volumes: ["./site:/site"]
+    volumes: ["./frontend:/site"]
     ports: ["5174:5174"]
     command: python -m http.server 5174
 

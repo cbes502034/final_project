@@ -85,7 +85,7 @@ app = FastAPI(
 # 瀏覽器規定：網頁 A 的 JavaScript 要去打網站 B 的 API，
 # 網站 B 必須明講「我允許 A 來打我」，否則瀏覽器會直接擋下來。
 #
-# 我們的前端在 llm-capstone-top20.onrender.com，
+# 我們的前端在 fambudget-web.onrender.com，
 # 後端在 fambudget-api.onrender.com，兩個網域不同，所以一定要設。
 #
 # 常見的卡關：前端 console 出現 "blocked by CORS policy"，

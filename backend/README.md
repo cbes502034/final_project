@@ -1,6 +1,6 @@
 # backend — FastAPI 後端
 
-> 第一次碰 FastAPI？**先讀站上的 [FastAPI 說明書](https://llm-capstone-top20.onrender.com/docs/fastapi.html)**，
+> 第一次碰 FastAPI？**先讀站上的 [FastAPI 說明書](https://fambudget-web.onrender.com/docs/fastapi.html)**，
 > 那份是從零開始教的。這份 README 假設你已經讀過了。
 
 ---

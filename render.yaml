@@ -16,21 +16,15 @@ databases:
 services:
   # ---------- 前端：純靜態 ----------
   - type: web
-    name: llm-capstone-top20
+    name: fambudget-web
     runtime: static
     buildCommand: ""
-    # ⚠️ 目錄名稱是 site 不是 frontend —— 這不是筆誤。
-    # Render 上這個服務是用後台建立的，發布目錄寫死成 site，
-    # 而且這份 blueprint 目前沒有被套用（fambudget-api 服務並不存在）。
-    # 改資料夾名稱會讓建置失敗，站台會停在上一次成功的版本。
-    # 要改名的步驟寫在 README 的「部署」那一節。
-    staticPublishPath: ./site
+    staticPublishPath: ./frontend
     pullRequestPreviewsEnabled: false
-    routes:
-      # 前端走 hash 路由，任何路徑都回 index.html
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    # 這裡刻意沒有 rewrite 規則。
+    # 前端走的是 hash 路由（#/entry），瀏覽器只會跟伺服器要 "/"，
+    # 井號後面完全不會送出去 —— 所以不需要「任何路徑都回 index.html」。
+    # 而且那種規則有機會把 /docs/*.html 這些真實檔案一起吃掉。
     headers:
       - path: /*
         name: X-Content-Type-Options
@@ -59,9 +53,11 @@ services:
           name: fambudget-db
           property: connectionString
       - key: ALLOWED_ORIGINS
-        value: https://llm-capstone-top20.onrender.com,http://localhost:5174
+        value: https://fambudget-web.onrender.com,http://localhost:5174
       # 下面兩個要在 Render 後台自行填入，不要寫進 repo
       - key: JWT_SECRET
         sync: false
-      - key: ANTHROPIC_API_KEY
+      # 我們自己微調的模型服務網址。留空時後端會回傳假資料，
+      # 前後端仍然串得起來。
+      - key: MODEL_BASE_URL
         sync: false

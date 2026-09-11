@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=3">
+<link rel="stylesheet" href="docs.css?v=4">
 </head>
 <body>
 
@@ -50,7 +50,7 @@
 
   <div class="note" style="margin-top:28px">
     <div class="note__k">後端還沒部署，這頁是規格不是實測</div>
-    <p>路由與回應形狀來自 <code>site/js/api.js</code> 的契約定義，前端目前跑在 mock 模式。
+    <p>路由與回應形狀來自 <code>frontend/js/api.js</code> 的契約定義，前端目前跑在 mock 模式。
     後端上線後 <b>FastAPI 會自動產生可直接送出請求的 <code>/docs</code></b>，
     那時這頁的角色會變成「按人員分工看」，實際試打請用 <code>/docs</code>。</p>
   </div>
@@ -73,7 +73,7 @@
     { id: 'sys', name: '共用', dom: '系統',        c: '#767D91' }
   ];
 
-  /* 路由與回應形狀取自 site/js/api.js 的契約定義 */
+  /* 路由與回應形狀取自 frontend/js/api.js 的契約定義 */
   var ROUTES = [
     { n: 1, o: 'm1', m: 'POST', p: '/api/auth/register', a: '公開',
       d: '註冊，同時建立每月存款目標',

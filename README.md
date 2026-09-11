@@ -5,11 +5,11 @@
 
 | | |
 |---|---|
-| **線上系統** | <https://llm-capstone-top20.onrender.com> |
-| **專題手冊** | <https://llm-capstone-top20.onrender.com/docs/> |
-| **FastAPI 說明書** | <https://llm-capstone-top20.onrender.com/docs/fastapi.html> ← 沒學過 FastAPI 先讀這份 |
-| **API 瀏覽** | <https://llm-capstone-top20.onrender.com/docs/api.html> |
-| **模型設計** | <https://llm-capstone-top20.onrender.com/docs/model.html> |
+| **線上系統** | <https://fambudget-web.onrender.com> |
+| **專題手冊** | <https://fambudget-web.onrender.com/docs/> |
+| **FastAPI 說明書** | <https://fambudget-web.onrender.com/docs/fastapi.html> ← 沒學過 FastAPI 先讀這份 |
+| **API 瀏覽** | <https://fambudget-web.onrender.com/docs/api.html> |
+| **模型設計** | <https://fambudget-web.onrender.com/docs/model.html> |
 
 ---
 
@@ -17,7 +17,7 @@
 
 ```
 final_project/
-├── site/                  前端：純靜態，無框架、無建置步驟
+├── frontend/              前端：純靜態，無框架、無建置步驟
 │   ├── index.html           系統本體（單頁 + hash 路由）
 │   ├── css/                 tokens.css 設計權杖 · app.css 元件
 │   ├── js/
@@ -59,11 +59,11 @@ final_project/
 ### 只跑前端（不需要後端也能完整展示）
 
 ```bash
-python -m http.server 5174 --directory site
+python -m http.server 5174 --directory frontend
 ```
 
 打開 <http://localhost:5174>。前端預設跑在 **mock 模式**，
-資料來自 `site/js/data.js`，所有功能都能操作。
+資料來自 `frontend/js/data.js`，所有功能都能操作。
 
 ### 只跑後端
 
@@ -93,7 +93,7 @@ docker compose up
 
 ## 前端怎麼切換到真後端
 
-改 `site/index.html` 這一行就好：
+改 `frontend/index.html` 這一行就好：
 
 ```html
 <meta name="api-base" content="https://fambudget-api.onrender.com">
@@ -101,7 +101,7 @@ docker compose up
 
 留空 = mock 模式（讀 `data.js`）。填上網址 = 改用 `fetch` 打真後端。
 
-`site/js/api.js` 裡 `mock` 與 `http` 兩個轉接器的**簽章完全一致**，
+`frontend/js/api.js` 裡 `mock` 與 `http` 兩個轉接器的**簽章完全一致**，
 所以可以**一支一支路由慢慢接** —— 後端做好哪支就改哪支，不必等全部完成。
 這是四個人能平行動工的關鍵。
 
@@ -113,7 +113,7 @@ docker compose up
 
 | 服務 | 型態 | 來源 | 說明 |
 |---|---|---|---|
-| `llm-capstone-top20` | 靜態站台 | `./site` | 走 CDN。所有路徑 rewrite 到 `index.html`（前端是 hash 路由） |
+| `fambudget-web` | 靜態站台 | `./frontend` | 走 CDN。前端是 hash 路由，不需要 rewrite 規則 |
 | `fambudget-api` | Python 服務 | `./backend` | `uvicorn app.main:app`，健康檢查打 `/healthz` |
 | `fambudget-db` | PostgreSQL | — | 免費方案 |
 
@@ -130,38 +130,52 @@ docker compose up
 **這兩個絕對不可以寫進 repo。** 一旦 commit 進 git 歷史，
 就算之後刪掉也救不回來——必須重新產生一組。
 
-### ⚠️ 前端資料夾叫 `site/` 不叫 `frontend/`
+### ⚠️ 這份 render.yaml 還沒生效，要先建立 Blueprint
 
-這是**已知的限制，不是命名疏忽**。
+目前線上那個站台是**用 Render 後台手動建立的**，跟這份 `render.yaml` 無關——
+證據是裡面宣告的 `fambudget-api` 與 `fambudget-db` **根本不存在**。
 
-Render 上的靜態站台是用**後台建立的**，不是從這份 `render.yaml` 來的——
-證據是 blueprint 裡的 `fambudget-api` 服務**根本不存在**。
-後台的「Publish directory」欄位寫死成 `site`，
-資料夾一改名建置就會失敗，站台會停在上一次成功的版本（不會掛掉，但不再更新）。
+要讓它真的生效（後端和資料庫才會被自動建立），步驟如下。
+**做完會換到新網址**，舊的 `llm-capstone-top20.onrender.com` 會停留在最後一次成功的建置。
 
-**想改成 `frontend/` 的話，順序是這樣，不能顛倒：**
+1. **Render 後台 → New → Blueprint**
+2. 選 `cbes502034/final_project` 這個 repo，分支 `main`
+3. Render 會讀到這份 `render.yaml`，列出三個資源，確認一下：
 
-1. 先到 Render 後台 → `llm-capstone-top20` → Settings →
-   把 **Publish directory** 從 `site` 改成 `frontend`
-2. 再執行：
+   | 名稱 | 型態 | 來源 |
+   |---|---|---|
+   | `fambudget-web` | Static Site | `./frontend` |
+   | `fambudget-api` | Web Service (Python) | `./backend` |
+   | `fambudget-db` | PostgreSQL | — |
 
-   ```bash
-   git mv site frontend
-   sed -i 's|./site|./frontend|' render.yaml
-   sed -i 's|"./site:/site"|"./frontend:/site"|' docker-compose.yml
-   ```
+4. 它會問你兩個標 `sync: false` 的變數，**這兩個只有你填得了**：
 
-3. push 之後確認 <https://llm-capstone-top20.onrender.com> 有更新到新版號
+   | 變數 | 填什麼 |
+   |---|---|
+   | `JWT_SECRET` | 隨機長字串。產生方式：`python -c "import secrets;print(secrets.token_urlsafe(48))"` |
+   | `MODEL_BASE_URL` | **先留空**。模型還沒訓練完，留空時後端會回傳形狀正確的假資料 |
 
-**先改程式再改後台，站台會停止更新。**
+5. Apply，等三個資源都變成 Live
 
-> 順帶一提：如果希望這份 `render.yaml` 真的生效（那樣後端和資料庫才會被建立），
-> 要在 Render 後台用 **Blueprint** 的方式重新建立這些服務，
-> 而不是一個一個手動開。那會換到新的網址，所以要不要做由你決定。
+建好之後的網址：
+
+| | |
+|---|---|
+| 前端 | `https://fambudget-web.onrender.com` |
+| 後端 | `https://fambudget-api.onrender.com` |
+| API 文件 | `https://fambudget-api.onrender.com/docs` |
+
+6. **確認新站台正常之後**，再回後台把舊的 `llm-capstone-top20` 服務刪掉。
+   先確認再刪，不要反過來。
+
+> **為什麼 render.yaml 裡沒有 rewrite 規則？**
+> 舊設定有一條 `/*` → `/index.html`。我們的前端走 **hash 路由**（`#/entry`），
+> 井號後面的東西根本不會送到伺服器，所以那條規則用不到；
+> 而且它有機會把 `/docs/*.html` 這些真實檔案一起吃掉。已經移除。
 
 ### 靜態站台的資產版號
 
-`site/index.html` 裡的 `?v=NN` 是給瀏覽器看的快取版號。
+`frontend/index.html` 裡的 `?v=NN` 是給瀏覽器看的快取版號。
 **改了 CSS 或 JS 一定要把這個數字往上加**，否則使用者的瀏覽器
 會繼續用舊的快取檔案，你會以為部署沒生效。
 
@@ -178,7 +192,7 @@ Render 上的靜態站台是用**後台建立的**，不是從這份 `render.yam
 | 成員3 | 統計與預算（分類體系由這裡定義，第 1 週要凍結） | 28–33 |
 | 成員4 | 財務建議（另含全系統評測） | 34–35 |
 
-詳細分工與三週排程見[專題手冊](https://llm-capstone-top20.onrender.com/docs/)。
+詳細分工與三週排程見[專題手冊](https://fambudget-web.onrender.com/docs/)。
 
 ### 找到自己要做的事
 
