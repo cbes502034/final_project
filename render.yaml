@@ -19,7 +19,12 @@ services:
     name: llm-capstone-top20
     runtime: static
     buildCommand: ""
-    staticPublishPath: ./frontend
+    # ⚠️ 目錄名稱是 site 不是 frontend —— 這不是筆誤。
+    # Render 上這個服務是用後台建立的，發布目錄寫死成 site，
+    # 而且這份 blueprint 目前沒有被套用（fambudget-api 服務並不存在）。
+    # 改資料夾名稱會讓建置失敗，站台會停在上一次成功的版本。
+    # 要改名的步驟寫在 README 的「部署」那一節。
+    staticPublishPath: ./site
     pullRequestPreviewsEnabled: false
     routes:
       # 前端走 hash 路由，任何路徑都回 index.html

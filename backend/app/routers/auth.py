@@ -194,7 +194,7 @@ def me(me=Depends(get_current_user), db: Session = Depends(get_db)):
     而信任是家庭記帳能持續下去的前提。
 
     TODO(成員1): 回傳 { user, family, role, guardedBy: [...] }
-                 形狀要跟 frontend/js/api.js 裡的契約一致
+                 形狀要跟 site/js/api.js 裡的契約一致
     """
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "TODO：成員1 尚未實作")
 
