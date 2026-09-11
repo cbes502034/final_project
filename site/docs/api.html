@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API 瀏覽</title>
+<meta name="description" content="家庭記帳系統的 37 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="docs.css?v=1">
+</head>
+<body>
+
+<nav class="docbar" style="max-width:1100px">
+  <a href="index.html">← 專題手冊</a>
+  <a href="model.html">記帳模型設計</a>
+  <a href="../index.html">回到系統</a>
+</nav>
+
+<div class="apiwrap">
+
+  <header class="hero" style="padding:44px 0 28px">
+    <div class="hero__eyebrow">API REFERENCE</div>
+    <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
+    <p class="hero__lead">
+      共 <b>37 支路由</b>，依四個功能模組分組。點任一列展開看參數與請求／回應。
+      標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
+    </p>
+    <div class="hero__meta">
+      <div class="mchip"><span>Base</span><b class="mono">/api</b></div>
+      <div class="mchip"><span>認證</span><b>Bearer JWT</b></div>
+      <div class="mchip"><span>格式</span><b>application/json</b></div>
+      <div class="mchip"><span>後端</span><b>FastAPI · 尚未部署</b></div>
+    </div>
+  </header>
+
+  <div class="abar">
+    <label class="asearch">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="搜尋路徑、用途、參數…" autocomplete="off" aria-label="搜尋路由">
+    </label>
+    <div class="achips" id="who"></div>
+    <div class="achips" id="verb"></div>
+    <span class="acount" id="count"></span>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="note" style="margin-top:28px">
+    <div class="note__k">後端還沒部署，這頁是規格不是實測</div>
+    <p>路由與回應形狀來自 <code>site/js/api.js</code> 的契約定義，前端目前跑在 mock 模式。
+    後端上線後 <b>FastAPI 會自動產生可直接送出請求的 <code>/docs</code></b>，
+    那時這頁的角色會變成「按人員分工看」，實際試打請用 <code>/docs</code>。</p>
+  </div>
+
+  <footer class="foot" style="max-width:none">
+    <div>家庭記帳與財務控管系統 · API 目錄</div>
+    <div class="mono">37 ROUTES · 4 MODULES</div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var OWNERS = [
+    { id: 'm1', name: '成員1', dom: '帳號與權限', c: '#6C9FFB' },
+    { id: 'm2', name: '成員2', dom: '記帳',       c: '#8B7CF0' },
+    { id: 'm3', name: '成員3', dom: '統計與預算', c: '#5FB8D9' },
+    { id: 'm4', name: '成員4', dom: '財務建議',   c: '#6EE7B7' },
+    { id: 'sys', name: '共用', dom: '系統',        c: '#767D91' }
+  ];
+
+  /* 路由與回應形狀取自 site/js/api.js 的契約定義 */
+  var ROUTES = [
+    { n: 1, o: 'm1', m: 'POST', p: '/api/auth/register', a: '公開',
+      d: '註冊，同時建立每月存款目標',
+      body: '{\n  "email": "a@example.com",\n  "password": "………",\n  "displayName": "林建國",\n  "birthYear": 1974,\n  "savingsGoal": 20000\n}',
+      res: '{\n  "accessToken": "eyJhbGciOi…",\n  "refreshToken": "eyJhbGciOi…",\n  "expiresIn": 1800,\n  "user": { "id": 1, "displayName": "林建國", "role": "master" }\n}',
+      note: '註冊流程會請使用者填「每月想存多少」，這個值直接寫進 <code>savings_goals</code>。' },
+    { n: 2, o: 'm1', m: 'POST', p: '/api/auth/login', a: '公開',
+      d: '登入，回傳 access + refresh token',
+      body: '{\n  "email": "a@example.com",\n  "password": "………"\n}',
+      res: '{\n  "accessToken": "eyJhbGciOi…",\n  "refreshToken": "eyJhbGciOi…",\n  "expiresIn": 1800,\n  "user": { "id": 1, "displayName": "林建國", "role": "master" }\n}' },
+    { n: 3, o: 'm1', m: 'POST', p: '/api/auth/refresh', a: '公開',
+      d: '用 refresh token 換新的 access token',
+      body: '{ "refreshToken": "eyJhbGciOi…" }' },
+    { n: 4, o: 'm1', m: 'POST', p: '/api/auth/logout', a: '登入',
+      d: '撤銷目前的 refresh token',
+      note: '登出是設 <code>sessions.revoked_at</code>，不刪除紀錄——稽核要看得到歷史。' },
+    { n: 5, o: 'm1', m: 'POST', p: '/api/auth/logout-all', a: '登入',
+      d: '撤銷所有裝置的 token' },
+    { n: 6, o: 'm1', m: 'GET', p: '/api/auth/me', a: '登入',
+      d: '目前使用者、家庭角色、被誰監管',
+      res: '{\n  "user": { "id": 1, "displayName": "林建國", "role": "master" },\n  "family": { "id": 1, "name": "林家" },\n  "guardedBy": []\n}' },
+    { n: 7, o: 'm1', m: 'PATCH', p: '/api/auth/password', a: '登入',
+      d: '修改密碼，同時讓其他 session 失效',
+      body: '{ "oldPassword": "………", "newPassword": "………" }' },
+    { n: 8, o: 'm1', m: 'GET', p: '/api/auth/sessions', a: '登入',
+      d: '列出有效的登入裝置' },
+    { n: 9, o: 'm1', m: 'GET', p: '/api/family', a: '登入',
+      d: '家庭資訊、成員清單、角色' },
+    { n: 10, o: 'm1', m: 'POST', p: '/api/family', a: '登入',
+      d: '建立家庭，建立者成為 master' },
+    { n: 11, o: 'm1', m: 'POST', p: '/api/family/invite', a: 'master',
+      d: '產生邀請碼',
+      res: '{ "code": "F7K2-9QX4", "expiresAt": "2026-09-18T00:00:00Z" }' },
+    { n: 12, o: 'm1', m: 'POST', p: '/api/family/join', a: '登入',
+      d: '用邀請碼加入家庭', body: '{ "code": "F7K2-9QX4" }' },
+    { n: 13, o: 'm1', m: 'PATCH', p: '/api/family/members/{userId}', a: 'master',
+      d: '修改成員角色', body: '{ "role": "parent" }' },
+    { n: 14, o: 'm1', m: 'DELETE', p: '/api/family/members/{userId}', a: 'master',
+      d: '移除成員（標記 removed，不刪資料）' },
+    { n: 15, o: 'm1', m: 'GET', p: '/api/guardianships', a: '登入',
+      d: '監管關係。被監管者也看得到',
+      note: '<b>監管必須雙向可見。</b>系統不提供「隱藏監管」的選項——偷偷監看家人的消費會破壞信任。' },
+    { n: 16, o: 'm1', m: 'POST', p: '/api/guardianships', a: 'master',
+      d: '建立監管關係', body: '{ "guardianId": 1, "wardId": 4 }' },
+    { n: 17, o: 'm1', m: 'DELETE', p: '/api/guardianships/{id}', a: 'master',
+      d: '解除監管（設 ended_at，不刪除）' },
+
+    { n: 18, o: 'm2', m: 'GET', p: '/api/transactions', a: '登入',
+      d: '收支明細',
+      q: ['userId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page'],
+      res: '{\n  "transactions": [\n    {\n      "id": "T1040", "user": "U1", "date": "2026-09-10",\n      "amount": 320, "kind": "expense", "cat": "C01",\n      "merchant": "公司附近自助餐", "note": "午餐",\n      "source": "nlp", "raw": "中午自助餐320",\n      "parsed": { "conf": 0.97, "catConf": 0.95 }\n    }\n  ],\n  "total": 14\n}',
+      note: '不帶 <code>userId</code> 回傳「你看得到的所有人」；帶了但沒權限看那個人 → <b>回 403 而不是空陣列</b>（空陣列會讓人以為對方沒記帳）。' },
+    { n: 19, o: 'm2', m: 'POST', p: '/api/transactions', a: '登入',
+      d: '手動新增。單筆手動模式走這支',
+      body: '{\n  "date": "2026-09-10",\n  "amount": 250,\n  "kind": "expense",\n  "cat": "C01",\n  "merchant": "全家便利商店",\n  "note": ""\n}',
+      note: '<b>不經過模型</b>，寫入的 <code>source</code> 記成 <code>manual</code>。只有經過模型的資料才走 <code>/api/nlp/confirm</code>，否則 <code>nlp_parses</code> 這張評測用的表會被手動資料汙染。' },
+    { n: 20, o: 'm2', m: 'PATCH', p: '/api/transactions/{id}', a: '本人或監管者', d: '修改' },
+    { n: 21, o: 'm2', m: 'DELETE', p: '/api/transactions/{id}', a: '本人', d: '刪除' },
+    { n: 22, o: 'm2', m: 'GET', p: '/api/categories', a: '登入',
+      d: '分類體系（系統預設 + 家庭自訂）',
+      note: '<b>分類體系是唯一的跨模組阻塞點</b>：成員3 定義，成員2 要寫進 prompt，成員4 做建議時要用。第 1 週就要凍結。' },
+    { n: 23, o: 'm2', m: 'POST', p: '/api/categories', a: 'master', d: '新增家庭自訂分類' },
+    { n: 24, o: 'm2', m: 'POST', p: '/api/nlp/parse', a: '登入', llm: true,
+      d: '單句：一句話 → 一筆。只解析，不寫入',
+      body: '{ "text": "今天午餐吃了120" }',
+      res: '{\n  "raw": "今天午餐吃了120",\n  "parsed": {\n    "occurredOn": "2026-09-10", "amount": 120,\n    "kind": "expense", "categoryId": 1, "merchant": null\n  },\n  "confidence": {\n    "amount": 0.98, "occurredOn": 0.96,\n    "kind": 0.97, "category": 0.94\n  },\n  "note": "「今天」已換算成實際日期",\n  "parseId": 881\n}' },
+    { n: 25, o: 'm2', m: 'POST', p: '/api/nlp/parse-batch', a: '登入', llm: true,
+      d: '段落：一段話 → 切成 N 筆。只解析，不寫入',
+      body: '{ "text": "早上買早餐55，中午跟同事吃飯320，晚上加油1200，今天打工賺了1500" }',
+      res: '{\n  "raw": "早上買早餐55，中午…",\n  "items": [\n    {\n      "seq": 1, "span": "早上買早餐55",\n      "date": "2026-09-10", "amount": 55,\n      "kind": "expense", "cat": "C01", "merchant": "",\n      "conf": { "date": 0.93, "amount": 0.99, "kind": 0.97, "cat": 0.88 },\n      "missing": [], "hint": ""\n    }\n  ],\n  "note": "切分結果也要讓使用者確認"\n}',
+      note: '<b>段落比單句難的地方在切分</b>：模型要先判斷這段話裡有幾筆。切錯（把兩筆合成一筆）比抽錯更難發現，所以每一列都要標出它對應原句的哪一段。<br><code>missing</code> 列出缺的欄位，前端直接標在那一欄上，補齊前送出鈕停用。' },
+    { n: 26, o: 'm2', m: 'POST', p: '/api/nlp/confirm', a: '登入', llm: true,
+      d: '單筆確認後寫入，同時記錄修正供評測',
+      body: '{\n  "raw": "今天午餐吃了120",\n  "parsed": { "occurredOn": "2026-09-10", "amount": 120, "kind": "expense", "categoryId": 1 },\n  "corrected": { "categoryId": 4 },\n  "parseId": 881\n}',
+      note: '<code>corrected</code> 有值就代表使用者改過——這筆會存進 <code>nlp_parses.user_corrected</code>，成為下一輪的訓練資料。<b>這是本系統的資料飛輪。</b>' },
+    { n: 27, o: 'm2', m: 'POST', p: '/api/nlp/confirm-batch', a: '登入', llm: true,
+      d: '批次確認後一次寫入 N 筆',
+      body: '{ "items": [ { "span": "早上買早餐55", "date": "2026-09-10", "amount": 55, "kind": "expense", "cat": "C01" } ] }',
+      res: '{ "created": 5 }' },
+
+    { n: 28, o: 'm3', m: 'GET', p: '/api/summary', a: '登入',
+      d: '個人／家庭摘要', q: ['scope=me|family', 'period=2026-09'],
+      res: '{\n  "period": "2026-09", "scope": "me",\n  "income": 68000, "expense": 41230,\n  "net": 26770, "rate": 0.39, "count": 4,\n  "savings": {\n    "goal": 20000, "allowance": 48000, "used": 41230,\n    "left": 6770, "ratio": 0.86, "level": "near",\n    "shortfall": 0, "actual": 26770\n  }\n}',
+      note: '<b>金額一律由後端算。</b>前端自己加總看起來比較快，但只要有兩個地方各自加總，數字對不起來只是時間問題——這個專案在原型階段就踩過一次。' },
+    { n: 29, o: 'm3', m: 'GET', p: '/api/stats', a: '登入',
+      d: '月或年統計', q: ['periodType=month|year', 'from', 'to'],
+      note: '年度統計在當年度要標示<b>「未完整」</b>，不要讓使用者拿未完整年度直接跟完整年度比，會誤判「今年支出變少了」。' },
+    { n: 30, o: 'm3', m: 'GET', p: '/api/budgets', a: '登入', d: '預算與使用率' },
+    { n: 31, o: 'm3', m: 'PUT', p: '/api/budgets', a: '本人或 master', d: '設定預算',
+      body: '{ "categoryId": 1, "period": "2026-09", "amount": 8000 }' },
+    { n: 32, o: 'm3', m: 'GET', p: '/api/savings-goal', a: '登入',
+      d: '每月存款目標與達成狀態',
+      res: '可支配上限 = 本月收入 − 每月存款目標\n使用率     = 支出 ÷ 可支配上限\n\n< 80%        達標中\n80% ~ 100%   接近上限\n> 100%       存不到目標，算出短少多少' },
+    { n: 33, o: 'm3', m: 'PUT', p: '/api/savings-goal', a: '本人；未成年由 master',
+      d: '設定每月存款目標（註冊時也走這支）',
+      body: '{ "userId": 3, "goal": 2000, "period": "2026-09" }',
+      note: '目標改動<b>保留歷史不覆蓋</b>（<code>savings_goals</code> 帶 <code>period_key</code>），否則之後回頭看會不知道當時的目標是多少。' },
+
+    { n: 34, o: 'm4', m: 'GET', p: '/api/advices', a: '登入',
+      d: '財務建議清單', q: ['scope=me|family', 'period'] },
+    { n: 35, o: 'm4', m: 'POST', p: '/api/advices/generate', a: 'master', llm: true,
+      d: '重新產生。後端先算好數字再餵給模型',
+      res: '1. analytics service 從資料庫算出所有數字\n2. 把「算好的數字」組成 prompt 的一部分\n3. 呼叫模型，要求它只做敘述與歸納\n4. Pydantic 驗證輸出格式\n5. 把數字存進 advices.basis_json（給使用者驗算用）',
+      note: '<b>順序不能顛倒，模型不做任何算術。</b>財務數字算錯會讓使用者做出錯誤決定，而模型本來就不擅長算術。' },
+
+    { n: 36, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
+    { n: 37, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
+      note: '後端上線後<b>這支才是真正能送出請求的地方</b>。' }
+  ];
+
+  var VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+  var fWho = 'all', fVerb = 'all', fQ = '';
+
+  var $list = document.getElementById('list');
+  var $count = document.getElementById('count');
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* JSON 上色：字串、數字、鍵各自一個顏色 */
+  function hl(src) {
+    return esc(src)
+      .replace(/(&quot;|")([^"&]*)(&quot;|")(\s*:)/g, '<span class="tk-k">"$2"</span>$4')
+      .replace(/:\s*(&quot;|")([^"&]*)(&quot;|")/g, ': <span class="tk-s">"$2"</span>')
+      .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="tk-n">$1</span>');
+  }
+
+  function chips() {
+    var w = OWNERS.map(function (o) {
+      return '<button class="achip" data-who="' + o.id + '" style="--k:' + o.c + '">' +
+        o.name + '</button>';
+    }).join('');
+    document.getElementById('who').innerHTML =
+      '<button class="achip on" data-who="all">全部</button>' + w;
+    document.getElementById('verb').innerHTML =
+      '<button class="achip on" data-verb="all">所有方法</button>' +
+      VERBS.map(function (v) {
+        return '<button class="achip" data-verb="' + v + '">' + v + '</button>';
+      }).join('');
+  }
+
+  function match(r) {
+    if (fWho !== 'all' && r.o !== fWho) return false;
+    if (fVerb !== 'all' && r.m !== fVerb) return false;
+    if (!fQ) return true;
+    var hay = (r.p + ' ' + r.d + ' ' + r.m + ' ' + (r.q || []).join(' ') +
+      ' ' + (r.note || '') + ' ' + (r.body || '') + ' ' + (r.res || '')).toLowerCase();
+    return hay.indexOf(fQ) >= 0;
+  }
+
+  function routeHTML(r, o) {
+    var path = esc(r.p).replace(/\{(\w+)\}/g, '<em>{$1}</em>');
+    var h = '<details class="route">' +
+      '<summary class="route__h">' +
+      '<span class="verb verb--' + r.m + '">' + r.m + '</span>' +
+      '<span class="route__p">' + path + '</span>' +
+      '<span class="route__d">' + esc(r.d) + '</span>' +
+      '<span class="route__r">' +
+      (r.llm ? '<span class="tag tag--llm">★ LLM</span>' : '') +
+      '<span class="tag">' + esc(r.a) + '</span>' +
+      '<span class="tag" style="border-color:' + o.c + '55;color:' + o.c + '">' + o.name + '</span>' +
+      '</span></summary><div class="route__b">';
+
+    if (r.q && r.q.length) {
+      h += '<div class="kv"><span class="kv__k">查詢參數</span><div class="params">' +
+        r.q.map(function (x) { return '<span class="param">' + esc(x) + '</span>'; }).join('') +
+        '</div></div>';
+    }
+    if (r.body) {
+      h += '<div class="kv"><span class="kv__k">請求</span>' +
+        '<pre class="code">' + hl(r.body) + '</pre></div>';
+    }
+    if (r.res) {
+      var isJson = r.res.indexOf('{') === 0;
+      h += '<div class="kv"><span class="kv__k">' + (isJson ? '回應' : '流程') + '</span>' +
+        '<pre class="code">' + (isJson ? hl(r.res) : esc(r.res)) + '</pre></div>';
+    }
+    if (r.note) h += '<p class="route__note">' + r.note + '</p>';
+    return h + '</div></details>';
+  }
+
+  function render() {
+    var shown = 0, h = '';
+    OWNERS.forEach(function (o) {
+      var rs = ROUTES.filter(function (r) { return r.o === o.id && match(r); });
+      if (!rs.length) return;
+      shown += rs.length;
+      h += '<section class="agroup" style="--k:' + o.c + '">' +
+        '<div class="agroup__h">' +
+        '<span class="agroup__t">' + o.name + ' · ' + o.dom + '</span>' +
+        '<span class="agroup__n">' + rs.length + ' 支</span></div><div class="rows">' +
+        rs.map(function (r) { return routeHTML(r, o); }).join('') +
+        '</div></section>';
+    });
+    $list.innerHTML = h || '<div class="empty">沒有符合的路由。試試清掉搜尋字或切回「全部」。</div>';
+    $count.textContent = shown === ROUTES.length
+      ? ROUTES.length + ' 支路由'
+      : shown + ' / ' + ROUTES.length + ' 支';
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-who],[data-verb]') : null;
+    if (!t) return;
+    var group = t.dataset.who !== undefined ? 'who' : 'verb';
+    if (group === 'who') fWho = t.dataset.who; else fVerb = t.dataset.verb;
+    Array.prototype.forEach.call(
+      document.getElementById(group).querySelectorAll('.achip'),
+      function (c) { c.classList.toggle('on', c === t); });
+    render();
+  });
+
+  document.getElementById('q').addEventListener('input', function (e) {
+    fQ = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  chips();
+  render();
+})();
+</script>
+</body>
+</html>
