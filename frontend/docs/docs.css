@@ -474,7 +474,11 @@ td.tight { white-space:nowrap; }
 
 /* ---------- 響應式 ---------- */
 @media (max-width:900px) {
-  .shell { flex-direction:column; }
+  /* 直向排列時 .shell 的 align-items:flex-start 會讓 .main 照內容撐寬，
+     程式碼區塊就把整頁推出視窗。stretch + width:100% 才會跟著容器收好，
+     寬內容改成在自己的 overflow-x 容器裡捲。 */
+  .shell { flex-direction:column; align-items:stretch; }
+  .main { width:100%; min-width:0; }
   .rail {
     position:static; width:100%; height:auto; flex:none;
     border-right:none; border-bottom:1px solid var(--line);

@@ -1,109 +1,160 @@
 # 家庭記帳與財務控管系統
 
-四人 × 一個月專題。以家庭為單位的記帳系統：每個成員各自記帳，
-子女的消費同步給父母監管，由 master 帳號集中檢視，
-並用語言模型做**一句話記帳**與**財務控管建議**。
+四人 × 一個月的期末專題。以家庭為單位的記帳系統，用自然語言降低輸入摩擦，
+用月／年兩個時間準據做財務控管。
 
 | | |
 |---|---|
-| 前端原型 | <https://llm-capstone-top20.onrender.com> |
-| 技術選型與 API 目錄 | [`docs/01-tech-stack-and-api.md`](docs/01-tech-stack-and-api.md) |
-
----
-
-## LLM 在這個系統的位置
-
-**核心是「一句話記帳」，不是財務建議。**
-
-記帳 App 最大的失敗原因不是功能不夠，是**懶得輸入** ——
-要選分類、填金額、挑日期，摩擦一高兩週後就放棄。
-
-一句話輸入把摩擦降到最低，但它必須處理這些：
-
-| 難點 | 例子 | 規則寫得出來嗎 |
-|---|---|---|
-| 店名歧義 | 「**全家**買飲料165」← 是店名不是家人 | **不行** |
-| 收支方向 | 「媽媽**給我**兩千」是收入 | **不行** |
-| 語意分類 | 便利商店算餐飲還是日用品 | **不行** |
-| 相對日期 | 今天／昨天 | 勉強 |
-| 中文數字 | 兩千 | 勉強 |
-
-每個人的講法都不一樣，規則永遠寫不完。這就是語言模型不可取代的位置。
-
-而且它產生**資料飛輪**：使用者每修正一次解析結果，
-就等於免費標了一筆訓練資料 —— 用得越久，模型越準，摩擦越低。
-
----
-
-## 三個設計原則
-
-**1. 模型不直接寫資料庫。**
-`/api/nlp/parse` 只解析，`/api/nlp/confirm` 才寫入。
-解析結果逐欄顯示信心度，低於 85% 的欄位標黃並說明原因。
-解析錯誤如果直接寫入，事後要找出來改比當下確認麻煩十倍。
-
-**2. 財務數字一律由後端計算。**
-模型只負責把算好的數字組織成人看得懂的敘述，
-每條建議都附「依據」讓使用者自行驗算。
-財務數字算錯會讓人做出錯誤決定，而模型本來就不擅長算術。
-
-**3. 監管必須雙向可見。**
-被監管者在自己的總覽頁會看到「誰看得到你的紀錄」，
-系統不提供隱藏監管的選項。偷偷監看家人的消費會破壞信任，
-而信任正是家庭記帳能持續下去的前提。
+| **線上系統** | <https://llm-capstone-top20.onrender.com> |
+| **專題手冊** | <https://llm-capstone-top20.onrender.com/docs/> |
+| **FastAPI 說明書** | <https://llm-capstone-top20.onrender.com/docs/fastapi.html> ← 沒學過 FastAPI 先讀這份 |
+| **API 瀏覽** | <https://llm-capstone-top20.onrender.com/docs/api.html> |
+| **模型設計** | <https://llm-capstone-top20.onrender.com/docs/model.html> |
 
 ---
 
 ## 目錄結構
 
 ```
-site/         前端（純靜態，無框架、無建置步驟）
-api/          後端（FastAPI + PostgreSQL）
-docs/         規格文件
-docker-compose.yml
-render.yaml
+final_project/
+├── frontend/              前端：純靜態，無框架、無建置步驟
+│   ├── index.html           系統本體（單頁 + hash 路由）
+│   ├── css/                 tokens.css 設計權杖 · app.css 元件
+│   ├── js/
+│   │   ├── api.js     ★     唯一的資料入口，mock / http 兩個轉接器
+│   │   ├── app.js           畫面繪製與互動
+│   │   ├── data.js          示範資料（mock 模式用）
+│   │   └── stars.js         canvas 星空背景
+│   └── docs/                說明文件（也是靜態頁）
+│       ├── index.html       專題手冊
+│       ├── fastapi.html     FastAPI 說明書
+│       ├── api.html         API 瀏覽
+│       └── model.html       記帳模型設計
+│
+├── backend/               後端：FastAPI
+│   ├── app/
+│   │   ├── main.py          入口，只負責組裝
+│   │   ├── core/            設定 · 資料庫 · 認證 · 依賴注入
+│   │   ├── models/          SQLAlchemy 資料表（13 張）
+│   │   ├── schemas/         Pydantic 請求／回應
+│   │   ├── routers/         路由，一個檔案一組
+│   │   └── services/        商業邏輯
+│   ├── tests/
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── README.md          ← 後端的詳細說明在這
+│
+├── docs/                  規格文件（Markdown / SVG）
+├── docker-compose.yml     本機一鍵起整套
+└── render.yaml            部署設定
 ```
 
-前端**不直接讀資料檔**，一律透過 `site/js/api.js`。
-要接後端只需改 `site/index.html` 的 `<meta name="api-base">`，
-畫面程式碼一行都不用動。
+**前端與後端完全分離**：前端是純靜態檔案，直接走 CDN；
+後端是獨立的 Python 服務。兩者只透過 HTTP JSON 溝通，可以各自部署、各自改版。
 
 ---
 
-## 本機執行
+## 本機開發
+
+### 只跑前端（不需要後端也能完整展示）
 
 ```bash
-# 一鍵起 db + api + web
+python -m http.server 5174 --directory frontend
+```
+
+打開 <http://localhost:5174>。前端預設跑在 **mock 模式**，
+資料來自 `frontend/js/data.js`，所有功能都能操作。
+
+### 只跑後端
+
+```bash
+cd backend
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload
+```
+
+打開 <http://localhost:8000/docs> 就是可以直接試打的 API 文件。
+
+### 一鍵起整套（資料庫 + 後端 + 前端）
+
+```bash
 docker compose up
 ```
 
-- 前端 <http://localhost:5174>
-- 後端 <http://localhost:8000>
-- API 文件 <http://localhost:8000/docs>
+| 服務 | 網址 |
+|---|---|
+| 前端 | <http://localhost:5174> |
+| 後端 | <http://localhost:8000> |
+| API 文件 | <http://localhost:8000/docs> |
+| PostgreSQL | `localhost:5432` |
 
-只跑前端（mock 模式，不需要後端）：
+---
 
-```bash
-python -m http.server 5174 --directory site
+## 前端怎麼切換到真後端
+
+改 `frontend/index.html` 這一行就好：
+
+```html
+<meta name="api-base" content="https://fambudget-api.onrender.com">
 ```
+
+留空 = mock 模式（讀 `data.js`）。填上網址 = 改用 `fetch` 打真後端。
+
+`frontend/js/api.js` 裡 `mock` 與 `http` 兩個轉接器的**簽章完全一致**，
+所以可以**一支一支路由慢慢接** —— 後端做好哪支就改哪支，不必等全部完成。
+這是四個人能平行動工的關鍵。
 
 ---
 
 ## 部署
 
-見 `render.yaml`。三個服務：靜態前端（走 CDN）、FastAPI 後端、免費 PostgreSQL。
+部署在 Render，設定全部寫在 `render.yaml`（Blueprint），推上 main 就會自動部署。
 
-`JWT_SECRET` 與 `ANTHROPIC_API_KEY` 標記為 `sync: false`，
-**要在 Render 後台自行填入，不要寫進 repo**。
+| 服務 | 型態 | 來源 | 說明 |
+|---|---|---|---|
+| `llm-capstone-top20` | 靜態站台 | `./frontend` | 走 CDN。所有路徑 rewrite 到 `index.html`（前端是 hash 路由） |
+| `fambudget-api` | Python 服務 | `./backend` | `uvicorn app.main:app`，健康檢查打 `/healthz` |
+| `fambudget-db` | PostgreSQL | — | 免費方案 |
+
+### 兩個機密要在 Render 後台手動填
+
+`render.yaml` 裡標了 `sync: false` 的兩個變數**不會從 repo 同步**，
+必須到 Render 後台的 Environment 頁面手動輸入：
+
+| 變數 | 說明 |
+|---|---|
+| `JWT_SECRET` | 簽 JWT 用的密鑰。拿到它的人可以偽造任何人的登入權杖 |
+| `MODEL_BASE_URL` | 我們自己微調的模型服務網址 |
+
+**這兩個絕對不可以寫進 repo。** 一旦 commit 進 git 歷史，
+就算之後刪掉也救不回來——必須重新產生一組。
+
+### 靜態站台的資產版號
+
+`frontend/index.html` 裡的 `?v=NN` 是給瀏覽器看的快取版號。
+**改了 CSS 或 JS 一定要把這個數字往上加**，否則使用者的瀏覽器
+會繼續用舊的快取檔案，你會以為部署沒生效。
 
 ---
 
-## 舊版內容
+## 分工
 
-本專案原本是「LLM 專題可行性研究與 Top 10 提案」的報告站台，
-2026-09-10 改做記帳系統。舊內容（報告站台、研究文件、前兩個題目的原型、
-選題投票服務）保留在 git tag `archive/top10-report`：
+每人吃一條完整的功能模組，從資料表、API、畫面一路到該模組自己的 LLM。
+
+| 成員 | 領域 | 路由編號 |
+|---|---|---|
+| 成員1 | 帳號與權限（另含大家共用的 `core/`、模型呼叫層、權限計算） | 1–17 |
+| 成員2 | 記帳 ★ 系統核心 | 18–27 |
+| 成員3 | 統計與預算（分類體系由這裡定義，第 1 週要凍結） | 28–33 |
+| 成員4 | 財務建議（另含全系統評測） | 34–35 |
+
+詳細分工與三週排程見[專題手冊](https://llm-capstone-top20.onrender.com/docs/)。
+
+### 找到自己要做的事
 
 ```bash
-git checkout archive/top10-report -- site research votes p03-archive p05-archive
+grep -rn "TODO(成員2)" backend/app/
 ```
+
+每個 TODO 底下都寫了要做哪幾步、為什麼那樣做、坑在哪裡。

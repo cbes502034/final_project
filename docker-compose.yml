@@ -14,7 +14,7 @@ services:
       retries: 10
 
   api:
-    build: ./api
+    build: ./backend
     depends_on:
       db: { condition: service_healthy }
     environment:
@@ -22,13 +22,13 @@ services:
       JWT_SECRET: dev-only-secret-change-in-production
       ALLOWED_ORIGINS: http://localhost:5174
     ports: ["8000:8000"]
-    volumes: ["./api:/app"]
+    volumes: ["./backend:/app"]
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   web:
     image: python:3.12-alpine
     working_dir: /site
-    volumes: ["./site:/site"]
+    volumes: ["./frontend:/site"]
     ports: ["5174:5174"]
     command: python -m http.server 5174
 

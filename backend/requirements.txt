@@ -18,8 +18,13 @@ pyjwt>=2.10,<3
 passlib[bcrypt]>=1.7,<2
 python-multipart>=0.0.20          # 表單登入用
 
-# --- LLM ---
-anthropic>=0.40,<1
+# --- 模型 ---
+# 我們的模型是自己微調的 Qwen2.5-1.5B，轉成 GGUF 後用 llama.cpp 架在
+# Hugging Face Space 上，後端只是用 HTTP 去打它 —— 所以這裡不需要任何
+# 模型套件，httpx 就夠了（在下面的測試區塊裡）。
+#
+# 訓練用的套件（transformers / peft / bitsandbytes / trl）刻意不放進來：
+# 那些只在 Colab 的訓練 notebook 裡用得到，裝進後端只會讓映像檔大好幾 GB。
 
 # --- 開發與測試 ---
 pytest>=8.3,<9

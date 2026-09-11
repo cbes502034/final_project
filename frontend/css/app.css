@@ -69,6 +69,17 @@
   background: linear-gradient(120deg, rgba(108, 159, 251, .22), rgba(139, 124, 240, .16));
 }
 .doclink__ic { width: 17px; height: 17px; flex: 0 0 17px; color: var(--accent-hi); }
+
+/* FastAPI 說明書：用綠色，跟藍色的專題說明文件分開 */
+.doclink--fa {
+  border-color: rgba(110, 231, 183, .26);
+  background: linear-gradient(120deg, rgba(110, 231, 183, .11), rgba(95, 184, 217, .07));
+}
+.doclink--fa:hover {
+  border-color: rgba(110, 231, 183, .5);
+  background: linear-gradient(120deg, rgba(110, 231, 183, .18), rgba(95, 184, 217, .12));
+}
+.doclink--fa .doclink__ic, .doclink--fa .doclink__go { color: var(--up); }
 .doclink__m { display: flex; flex-direction: column; min-width: 0; }
 .doclink__t { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
 .doclink__s { font-size: 10.5px; color: var(--ink-faint); line-height: 1.4; }

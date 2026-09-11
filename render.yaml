@@ -19,7 +19,7 @@ services:
     name: llm-capstone-top20
     runtime: static
     buildCommand: ""
-    staticPublishPath: ./site
+    staticPublishPath: ./frontend
     pullRequestPreviewsEnabled: false
     routes:
       # 前端走 hash 路由，任何路徑都回 index.html
@@ -42,7 +42,7 @@ services:
     name: fambudget-api
     runtime: python
     plan: free
-    rootDir: api
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz

@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FastAPI 說明書</title>
+<meta name="description" content="從零開始教會沒學過 FastAPI 的人：後端在做什麼、路由、Pydantic、依賴注入、資料庫、登入，全部用本專案的真實程式碼當例子。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="docs.css?v=3">
+<style>
+/* ---- FastAPI 說明書：用綠色當主色，跟手冊的藍、模型頁的琥珀分開 ---- */
+.fa .sec__n { color: var(--up); }
+.fa h3.sub { border-left-color: var(--up); }
+.fa .hero__eyebrow { color: var(--up); }
+.fa .nav a i { color: var(--ink-dim); }
+.fa .note { border-left-color: var(--up); }
+.fa .note--warn { border-left-color: var(--warn); }
+.fa .note--crit { border-left-color: var(--down); }
+
+/* 程式碼區塊 */
+pre.py {
+  margin: 14px 0 0; padding: 15px 17px; overflow-x: auto;
+  border-radius: var(--r-sm); border: 1px solid var(--line);
+  background: rgba(0,0,0,.34);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.85; color: var(--ink-soft);
+  tab-size: 4;
+}
+pre.py .tk-kw { color: #C792EA; }         /* 關鍵字 */
+pre.py .tk-st { color: #9BC0FF; }         /* 字串 */
+pre.py .tk-cm { color: #5A6273; font-style: italic; }  /* 註解 */
+pre.py .tk-dc { color: #6EE7B7; }         /* 裝飾器 */
+pre.py .tk-fn { color: #FBBF6E; }         /* 函式名 */
+pre.py .tk-nm { color: #5FB8D9; }         /* 數字 */
+pre.py b.hi { color: var(--ink); font-weight: 500; background: rgba(110,231,183,.14);
+              padding: 0 3px; border-radius: 3px; }
+
+.codelabel {
+  display: flex; align-items: center; gap: 8px; margin-top: 20px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+  color: var(--ink-dim); text-transform: uppercase;
+}
+.codelabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* 對照兩欄 */
+.vs { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 16px; }
+.vs__c { border-radius: var(--r-card); border: 1px solid var(--line); background: var(--card); padding: 16px 18px; }
+.vs__c h4 { margin: 0 0 8px; font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
+.vs__c p { font-size: 13px; color: var(--ink-soft); }
+.vs--bad { border-color: rgba(251,138,143,.3); }
+.vs--bad h4 { color: var(--down); }
+.vs--good { border-color: rgba(110,231,183,.3); }
+.vs--good h4 { color: var(--up); }
+
+/* 請求流程圖 */
+.flow { display: flex; flex-direction: column; gap: 0; margin-top: 18px; }
+.fl { display: flex; gap: 14px; align-items: flex-start; }
+.fl__n {
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-family: var(--mono); font-size: 12px;
+  background: var(--card-3); border: 1px solid var(--line-2); color: var(--up);
+}
+.fl__b { flex: 1 1 auto; min-width: 0; padding-bottom: 4px; }
+.fl__t { font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
+.fl__d { font-size: 13px; color: var(--ink-soft); }
+.fl__d code { color: var(--accent-hi); }
+.fl__ar { flex: 0 0 30px; text-align: center; color: var(--line-3); font-size: 15px; line-height: 1.2; }
+
+/* 檔案對照表裡的檔名 */
+td .fname { font-family: var(--mono); font-size: 12px; color: var(--up); }
+</style>
+</head>
+<body class="fa">
+
+<div class="shell">
+  <nav class="rail">
+    <div class="rail__brand">
+      <div class="rail__mark" style="background:linear-gradient(135deg,#6EE7B7,#5FB8D9)">F</div>
+      <div>
+        <div class="rail__t">FastAPI 說明書</div>
+        <div class="rail__s">從零開始</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a href="#why"><i>01</i>後端在做什麼</a>
+      <a href="#first"><i>02</i>第一支 API</a>
+      <a href="#route"><i>03</i>路由與方法</a>
+      <a href="#input"><i>04</i>三種收資料的方式</a>
+      <a href="#pydantic"><i>05</i>Pydantic 驗證</a>
+      <a href="#error"><i>06</i>錯誤與狀態碼</a>
+      <a href="#depends"><i>07</i>依賴注入</a>
+      <a href="#db"><i>08</i>接資料庫</a>
+      <a href="#auth"><i>09</i>登入怎麼做</a>
+      <a href="#split"><i>10</i>檔案怎麼分</a>
+      <a href="#ours"><i>11</i>你要改哪個檔案</a>
+      <a href="#trouble"><i>12</i>卡住的時候</a>
+      <a class="nav__out" href="api.html"><i>↗</i>API 瀏覽</a>
+      <a class="nav__out" href="index.html"><i>↗</i>專題手冊</a>
+      <a class="nav__back" href="../index.html"><i>←</i>回到系統</a>
+    </div>
+  </nav>
+
+  <main class="main">
+  <div class="wrap">
+
+    <header class="hero">
+      <div class="hero__eyebrow">給沒寫過後端的人</div>
+      <h1>FastAPI 說明書</h1>
+      <p class="hero__lead">
+        這份文件假設你<b>只會基本的程式語言</b>——知道什麼是函式、變數、if、迴圈，
+        就夠了。不需要學過後端、不需要懂資料庫、不需要知道什麼是 REST。
+        每個概念都會用<b>我們這個專案的真實程式碼</b>當例子，
+        讀完你就知道自己要打開哪個檔案、改哪一行。
+      </p>
+      <div class="hero__meta">
+        <div class="mchip"><span>預計閱讀</span><b>40 分鐘</b></div>
+        <div class="mchip"><span>前置知識</span><b>Python 基礎語法</b></div>
+        <div class="mchip"><span>對應程式碼</span><b class="mono">backend/</b></div>
+      </div>
+    </header>
+
+    <!-- ============ 01 ============ -->
+    <section class="sec" id="why">
+      <div class="sec__h"><span class="sec__n">01</span><h2>後端到底在做什麼</h2></div>
+      <p class="sec__lead">
+        先不要碰 FastAPI。我們從更基本的問題開始：<b>為什麼需要後端？</b>
+      </p>
+
+      <h3 class="sub">前端一個人做不到的三件事</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        我們的前端（就是你現在看到的這個網站）已經能記帳、能看統計、能跳超支警告。
+        那為什麼還要寫後端？因為有三件事前端做不到：
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>做不到的事</th><th>為什麼</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>資料存不住</b></td>
+              <td>前端的資料存在瀏覽器裡。換一台電腦就不見了，手機和筆電也看不到同一份帳。</td>
+            </tr>
+            <tr>
+              <td><b>多人看不到同一份資料</b></td>
+              <td>爸爸記的帳，媽媽的手機要看得到。資料必須放在一個<b>大家都連得到的地方</b>。</td>
+            </tr>
+            <tr>
+              <td><b>擋不住作弊</b></td>
+              <td>前端的程式碼使用者全都看得到、也改得動。「只有管理者能刪除」這種規則寫在前端等於沒寫——<b>權限檢查一定要在後端做</b>。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">後端就是一支「聽問題、給答案」的程式</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        把後端想成一個永遠待命的櫃檯。前端（瀏覽器）走過去問問題，櫃檯回答。
+        這一問一答有固定的格式，叫做 <b>HTTP 請求</b>與<b>回應</b>：
+      </p>
+
+      <div class="codelabel">前端問</div>
+      <pre class="py">GET /api/transactions?kind=expense HTTP/1.1
+Host: fambudget-api.onrender.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...</pre>
+
+      <div class="codelabel">後端答</div>
+      <pre class="py">200 OK
+Content-Type: application/json
+
+{"transactions": [{"id": 1, "amount": 320, "kind": "expense"}], "total": 1}</pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        就這樣。<b>後端的全部工作就是：收到這種請求，回一段 JSON。</b>
+        FastAPI 幫你做的，就是把這件事變得非常好寫。
+      </p>
+
+      <div class="note">
+        <div class="note__k">JSON 是什麼？</div>
+        <p>一種寫資料的格式，長得跟 Python 的 dict 幾乎一樣：
+        <code>{"名字": "值", "數字": 123, "清單": [1, 2, 3]}</code>。
+        前後端之間所有資料都用這個格式傳，因為<b>每種程式語言都讀得懂它</b>。</p>
+      </div>
+
+      <h3 class="sub">為什麼選 FastAPI</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        Python 的後端框架有好幾個。我們選 FastAPI 有三個理由，
+        第三個對這個專題特別重要：
+      </p>
+      <div class="grid grid--3" style="margin-top:14px">
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">寫起來就是普通 Python</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            定義一個函式，上面加一行裝飾器，就是一支 API。
+            不需要學一整套新的類別繼承架構。
+          </p>
+        </div>
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">自動驗證輸入</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            你宣告「這個欄位是整數」，前端傳文字進來它會自己擋掉並回報錯誤。
+            <b>你一行驗證程式碼都不用寫。</b>
+          </p>
+        </div>
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">自動產生文件</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            跑起來打開 <code>/docs</code>，你會看到一個可以<b>直接送出請求</b>的網頁。
+            四個人分工時，這等於免費得到一份永遠不會過期的對接文件。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 02 ============ -->
+    <section class="sec" id="first">
+      <div class="sec__h"><span class="sec__n">02</span><h2>第一支 API：五行程式</h2></div>
+      <p class="sec__lead">先跑起來，再理解。把下面五行存成 <code>hello.py</code>：</p>
+
+      <pre class="py"><span class="tk-kw">from</span> fastapi <span class="tk-kw">import</span> FastAPI
+
+app = FastAPI()
+
+<span class="tk-dc">@app.get</span>(<span class="tk-st">"/hello"</span>)
+<span class="tk-kw">def</span> <span class="tk-fn">say_hello</span>():
+    <span class="tk-kw">return</span> {<span class="tk-st">"message"</span>: <span class="tk-st">"你好"</span>}</pre>
+
+      <div class="codelabel">跑起來</div>
+      <pre class="py">uvicorn hello:app --reload</pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        打開 <code>http://localhost:8000/hello</code>，你會看到 <code>{"message":"你好"}</code>。
+        <b>然後打開 <code>http://localhost:8000/docs</code>——這才是重點。</b>
+        你會看到一個互動式網頁，列出你寫的每一支 API，
+        可以直接按「Try it out」送出請求看結果。這份文件是自動產生的，
+        你沒有寫任何文件。
+      </p>
+
+      <h3 class="sub">這五行各自在做什麼</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="tight">程式碼</th><th>意思</th></tr></thead>
+          <tbody>
+            <tr><td class="rt">app = FastAPI()</td><td>建立一個應用程式。整個專案只會有一個，我們的在 <code>backend/app/main.py</code>。</td></tr>
+            <tr><td class="rt">@app.get("/hello")</td><td><b>裝飾器。</b>告訴 FastAPI：「有人用 GET 打 /hello 的時候，執行下面這個函式。」</td></tr>
+            <tr><td class="rt">def say_hello():</td><td>普通的 Python 函式。函式的名字不重要，<b>裝飾器上的路徑才是網址</b>。</td></tr>
+            <tr><td class="rt">return {...}</td><td>回傳一個 dict，FastAPI 會自動轉成 JSON 送出去。你不用自己做轉換。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <div class="note__k">uvicorn 是什麼？</div>
+        <p>FastAPI 只是「寫 API 的工具」，它自己不會聽網路。
+        uvicorn 是真正在 8000 埠聽請求的伺服器程式。<br>
+        <code>uvicorn hello:app</code> 的意思是「<b>hello.py</b> 這個檔案裡，
+        那個叫 <b>app</b> 的變數」。<code>--reload</code> 是存檔後自動重啟，
+        開發時很方便，<b>正式環境不要開</b>。</p>
+      </div>
+    </section>
+
+    <!-- ============ 03 ============ -->
+    <section class="sec" id="route">
+      <div class="sec__h"><span class="sec__n">03</span><h2>路由與方法</h2></div>
+      <p class="sec__lead">
+        一支 API ＝ <b>一個方法</b> ＋ <b>一個路徑</b>。兩者合起來才是唯一的。
+      </p>
+
+      <h3 class="sub">五個方法，各自代表一種意圖</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="tight">方法</th><th>意思</th><th>我們專案的例子</th></tr></thead>
+          <tbody>
+            <tr><td><span class="verb verb--GET">GET</span></td><td>我要看資料</td><td class="rt">GET /api/transactions</td></tr>
+            <tr><td><span class="verb verb--POST">POST</span></td><td>我要新增一筆</td><td class="rt">POST /api/transactions</td></tr>
+            <tr><td><span class="verb verb--PUT">PUT</span></td><td>把這個東西設定成這樣</td><td class="rt">PUT /api/savings-goal</td></tr>
+            <tr><td><span class="verb verb--PATCH">PATCH</span></td><td>只改其中幾個欄位</td><td class="rt">PATCH /api/transactions/5</td></tr>
+            <tr><td><span class="verb verb--DELETE">DELETE</span></td><td>刪掉</td><td class="rt">DELETE /api/transactions/5</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:16px">
+        注意上面 <code>GET /api/transactions</code> 和 <code>POST /api/transactions</code>
+        <b>路徑一樣但方法不同，所以是兩支不同的 API</b>。這很常見。
+      </p>
+
+      <div class="note note--warn">
+        <div class="note__k">PUT 和 POST 的差別：冪等</div>
+        <p><b>POST</b> 打兩次會產生兩筆資料。<b>PUT</b> 打兩次結果一樣。<br>
+        「把九月的存款目標設成 20000」不管執行幾次結果都一樣，所以用 PUT。
+        這個性質叫<b>冪等</b>。<br>
+        這不只是名詞正確性的問題：<b>網路不穩時前端可能會重送請求</b>，
+        冪等的路由重送不會有副作用，非冪等的就會產生重複資料。</p>
+      </div>
+    </section>
+
+    <!-- ============ 04 ============ -->
+    <section class="sec" id="input">
+      <div class="sec__h"><span class="sec__n">04</span><h2>三種收資料的方式</h2></div>
+      <p class="sec__lead">
+        前端要把資料送進來，有三個位置可以放。<b>選錯位置是新手最常見的問題。</b>
+      </p>
+
+      <h3 class="sub">一、路徑參數 —— 指定「哪一個」</h3>
+      <pre class="py"><span class="tk-cm"># 網址：DELETE /api/transactions/5</span>
+
+<span class="tk-dc">@router.delete</span>(<span class="tk-st">"/transactions/<b class="hi">{tx_id}</b>"</span>)
+<span class="tk-kw">def</span> <span class="tk-fn">delete_transaction</span>(<b class="hi">tx_id: int</b>):
+    <span class="tk-cm"># tx_id 自動就是 5（而且已經轉成整數了）</span>
+    ...</pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        路徑裡用大括號寫一個名字，函式參數用<b>同樣的名字</b>接。
+        你宣告 <code>: int</code>，FastAPI 就會幫你轉型別；
+        有人打 <code>/transactions/abc</code>，它會自己回錯誤，<b>你的函式根本不會被執行</b>。
+      </p>
+
+      <h3 class="sub">二、查詢參數 —— 篩選、排序、分頁</h3>
+      <pre class="py"><span class="tk-cm"># 網址：GET /api/transactions?kind=expense&amp;page=2</span>
+
+<span class="tk-dc">@router.get</span>(<span class="tk-st">"/transactions"</span>)
+<span class="tk-kw">def</span> <span class="tk-fn">list_transactions</span>(
+    <b class="hi">kind: str | None = None</b>,       <span class="tk-cm"># 有預設值 → 可有可無</span>
+    <b class="hi">page: int = <span class="tk-nm">1</span></b>,                <span class="tk-cm"># 沒帶的話就是 1</span>
+):
+    ...</pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        <b>怎麼分辨是路徑參數還是查詢參數？</b>
+        FastAPI 的規則很簡單：名字有出現在路徑的大括號裡 → 路徑參數；
+        沒有 → 查詢參數。你不用特別宣告。
+      </p>
+
+      <div class="codelabel">加上說明與驗證</div>
+      <pre class="py"><span class="tk-kw">from</span> fastapi <span class="tk-kw">import</span> Query
+
+page: int = Query(<span class="tk-nm">1</span>, <b class="hi">ge=<span class="tk-nm">1</span></b>, description=<span class="tk-st">"第幾頁，從 1 開始"</span>)</pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        <code>ge=1</code> 是「大於等於 1」，有人傳 <code>page=0</code> 會被自動擋下。
+        <code>description</code> 會顯示在 <code>/docs</code> 上——<b>等於順手把文件寫好了</b>。
+      </p>
+
+      <h3 class="sub">三、請求主體 —— 送一整包資料進來</h3>
+      <pre class="py"><span class="tk-kw">from</span> pydantic <span class="tk-kw">import</span> BaseModel
+
+<span class="tk-kw">class</span> <span class="tk-fn">LoginRequest</span>(BaseModel):
+    email: str
+    password: str
+
+<span class="tk-dc">@router.post</span>(<span class="tk-st">"/login"</span>)
+<span class="tk-kw">def</span> <span class="tk-fn">login</span>(<b class="hi">payload: LoginRequest</b>):
+    <span class="tk-cm"># payload.email、payload.password 直接就能用</span>
+    ...</pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        FastAPI 看到參數的型別是一個 Pydantic 模型，就知道「這包東西在請求主體裡」，
+        會自動把 JSON 轉成物件。<b>這是下一節的主角。</b>
+      </p>
+
+      <div class="note note--crit">
+        <div class="note__k">密碼絕對不可以放在查詢參數</div>
+        <p>查詢參數會出現在網址上，而網址會被<b>瀏覽器歷史、伺服器日誌、
+        Referer 標頭</b>全部記下來。密碼、權杖這類敏感資料一律放在請求主體。<br>
+        這就是為什麼登入一定是 POST 而不是 GET。</p>
+      </div>
+    </section>
+
+    <!-- ============ 05 ============ -->
+    <section class="sec" id="pydantic">
+      <div class="sec__h"><span class="sec__n">05</span><h2>Pydantic：型別標註突然變得有用</h2></div>
+      <p class="sec__lead">
+        Python 的型別標註（<code>x: int</code>）平常只是給人看的註解，<b>不會真的檢查</b>。
+        Pydantic 讓它變成真的會執行的驗證。
+      </p>
+
+      <h3 class="sub">沒有 Pydantic 的話你要寫什麼</h3>
+      <div class="vs">
+        <div class="vs__c vs--bad">
+          <h4>❌ 自己驗</h4>
+          <pre class="py" style="margin-top:0;font-size:11.5px"><span class="tk-kw">def</span> <span class="tk-fn">create</span>(data: dict):
+    <span class="tk-kw">if</span> <span class="tk-st">"amount"</span> <span class="tk-kw">not in</span> data:
+        <span class="tk-kw">return</span> error(<span class="tk-st">"缺少 amount"</span>)
+    <span class="tk-kw">if</span> <span class="tk-kw">not</span> isinstance(data[<span class="tk-st">"amount"</span>], int):
+        <span class="tk-kw">return</span> error(<span class="tk-st">"amount 要是整數"</span>)
+    <span class="tk-kw">if</span> data[<span class="tk-st">"amount"</span>] &lt;= <span class="tk-nm">0</span>:
+        <span class="tk-kw">return</span> error(<span class="tk-st">"amount 要大於 0"</span>)
+    <span class="tk-cm"># ...每個欄位都要寫三次</span></pre>
+        </div>
+        <div class="vs__c vs--good">
+          <h4>✅ 用 Pydantic</h4>
+          <pre class="py" style="margin-top:0;font-size:11.5px"><span class="tk-kw">class</span> <span class="tk-fn">TxCreate</span>(BaseModel):
+    amount: Decimal = Field(gt=<span class="tk-nm">0</span>)
+    kind: Literal[<span class="tk-st">"income"</span>, <span class="tk-st">"expense"</span>]
+    merchant: str | None = <span class="tk-kw">None</span>
+
+<span class="tk-cm"># 驗證的程式碼：零行</span>
+<span class="tk-cm"># 格式錯誤 FastAPI 自己回 422，</span>
+<span class="tk-cm"># 而且會明講是哪個欄位錯、錯在哪</span></pre>
+        </div>
+      </div>
+
+      <h3 class="sub">回應也要宣告：一道安全網</h3>
+      <pre class="py"><span class="tk-kw">class</span> <span class="tk-fn">UserResponse</span>(BaseModel):
+    id: int
+    display_name: str
+    <span class="tk-cm"># 注意：這裡沒有 password_hash</span>
+
+<span class="tk-dc">@router.get</span>(<span class="tk-st">"/me"</span>, <b class="hi">response_model=UserResponse</b>)
+<span class="tk-kw">def</span> <span class="tk-fn">me</span>():
+    user = db.get(User, <span class="tk-nm">1</span>)
+    <span class="tk-kw">return</span> user   <span class="tk-cm"># 就算整個 user 物件含密碼雜湊…</span>
+                  <span class="tk-cm"># …FastAPI 也只會送出 id 和 display_name</span></pre>
+
+      <div class="note">
+        <div class="note__k">這就是我們把 models 和 schemas 分開的原因</div>
+        <p><code>models/</code> 說的是「<b>資料庫裡存什麼</b>」——User 一定要有 password_hash。<br>
+        <code>schemas/</code> 說的是「<b>API 收送什麼</b>」——UserResponse 絕對不能有 password_hash。<br>
+        兩者分開之後，你<b>不可能「不小心」把密碼雜湊回傳給前端</b>，
+        因為 response model 裡根本沒有那一欄。</p>
+      </div>
+    </section>
+
+    <!-- ============ 06 ============ -->
+    <section class="sec" id="error">
+      <div class="sec__h"><span class="sec__n">06</span><h2>錯誤與狀態碼</h2></div>
+      <p class="sec__lead">
+        出錯時不要 <code>return {"error": "..."}</code>，要<b>丟出 HTTPException</b>。
+      </p>
+
+      <pre class="py"><span class="tk-kw">from</span> fastapi <span class="tk-kw">import</span> HTTPException, status
+
+<span class="tk-kw">if</span> tx <span class="tk-kw">is</span> <span class="tk-kw">None</span>:
+    <span class="tk-kw">raise</span> HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=<span class="tk-st">"找不到這筆紀錄"</span>,
+    )</pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        差別在哪？<code>return</code> 會讓 HTTP 狀態碼還是 <b>200（成功）</b>，
+        前端的 <code>fetch</code> 不會進入錯誤處理分支，它會以為一切正常然後拿到一包看不懂的東西。
+        <code>raise HTTPException</code> 才會真的回傳錯誤狀態碼。
+      </p>
+
+      <h3 class="sub">這個專案會用到的狀態碼</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">碼</th><th>意思</th><th>什麼時候用</th></tr></thead>
+          <tbody>
+            <tr><td class="num">200</td><td>成功</td><td>預設值，不用特別寫</td></tr>
+            <tr><td class="num">201</td><td>建立成功</td><td>註冊、新增一筆帳。讓前端一看就知道東西建好了</td></tr>
+            <tr><td class="num">401</td><td><b>你還沒證明你是誰</b></td><td>沒帶 token、token 過期 → 前端該導去登入頁</td></tr>
+            <tr><td class="num">403</td><td><b>我知道你是誰，但你不能做這件事</b></td><td>一般成員想刪別人的帳 → 前端該顯示「權限不足」</td></tr>
+            <tr><td class="num">404</td><td>找不到</td><td>那筆資料不存在</td></tr>
+            <tr><td class="num">409</td><td>衝突</td><td>email 已經被註冊過了</td></tr>
+            <tr><td class="num">422</td><td>格式不對</td><td><b>Pydantic 自動回的</b>，你不用自己寫</td></tr>
+            <tr><td class="num">500</td><td>我們的程式壞了</td><td>沒接到的例外。看到這個就是要去修 bug</td></tr>
+            <tr><td class="num">503</td><td>依賴的服務不行</td><td>模型服務叫不動。<b>不要回 500</b>，我們沒壞</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">401 和 403 一定要分清楚</div>
+        <p>分錯的後果很具體：前端會把「權限不足」的使用者<b>一直踢回登入頁</b>，
+        他重新登入還是不能用，然後就來問你為什麼系統壞了。</p>
+      </div>
+    </section>
+
+    <!-- ============ 07 ============ -->
+    <section class="sec" id="depends">
+      <div class="sec__h"><span class="sec__n">07</span><h2>依賴注入：FastAPI 最核心的概念</h2></div>
+      <p class="sec__lead">
+        這一節最重要。看懂了，後面的資料庫和登入都會變得很簡單。
+      </p>
+
+      <h3 class="sub">先看問題</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        我們有三十幾支需要登入的路由。每一支都要做這七件事：
+      </p>
+      <pre class="py"><span class="tk-cm"># 1. 從標頭拿出 Authorization</span>
+<span class="tk-cm"># 2. 檢查格式是不是 "Bearer xxxxx"</span>
+<span class="tk-cm"># 3. 驗證簽名</span>
+<span class="tk-cm"># 4. 檢查有沒有過期</span>
+<span class="tk-cm"># 5. 拿出 user_id</span>
+<span class="tk-cm"># 6. 去資料庫撈使用者</span>
+<span class="tk-cm"># 7. 確認帳號沒被停用</span></pre>
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:12px">
+        三十幾支每支都複製一次？不可能維護。而且<b>只要有一支忘記寫，
+        那支就變成任何人都能打的漏洞</b>。
+      </p>
+
+      <h3 class="sub">解法：宣告你需要什麼，FastAPI 幫你準備好</h3>
+      <pre class="py"><span class="tk-kw">from</span> fastapi <span class="tk-kw">import</span> Depends
+
+<span class="tk-dc">@router.get</span>(<span class="tk-st">"/transactions"</span>)
+<span class="tk-kw">def</span> <span class="tk-fn">list_transactions</span>(<b class="hi">me = Depends(get_current_user)</b>):
+    <span class="tk-cm"># 能執行到這一行，代表上面七步全部通過了</span>
+    <span class="tk-cm"># me 就是已經驗證過的登入者</span>
+    ...</pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        <code>Depends(get_current_user)</code> 的意思是
+        <b>「執行我之前，先幫我把這件事做完」</b>。
+        如果驗證失敗，<code>get_current_user</code> 裡會丟出 401，
+        <b>路由的程式碼一行都不會被執行</b>。
+      </p>
+
+      <h3 class="sub">依賴可以疊起來</h3>
+      <pre class="py"><span class="tk-kw">def</span> <span class="tk-fn">require_master</span>(<b class="hi">me = Depends(get_current_user)</b>):
+    <span class="tk-cm"># 這個依賴自己也用了另一個依賴</span>
+    <span class="tk-kw">if</span> me.role != <span class="tk-st">"master"</span>:
+        <span class="tk-kw">raise</span> HTTPException(<span class="tk-nm">403</span>, <span class="tk-st">"只有管理者可以"</span>)
+    <span class="tk-kw">return</span> me
+
+<span class="tk-dc">@router.post</span>(<span class="tk-st">"/family/invite"</span>)
+<span class="tk-kw">def</span> <span class="tk-fn">invite</span>(me = Depends(require_master)):
+    <span class="tk-cm"># 「要登入」和「要是管理者」兩層檢查都做完了</span>
+    ...</pre>
+
+      <div class="note">
+        <div class="note__k">這在我們專案的哪裡</div>
+        <p><code class="fname">backend/app/core/deps.py</code> ——
+        <code>get_current_user</code> 和 <code>require_master</code> 都在這個檔案。
+        你寫路由時只要 import 進來用就好，<b>不用理解裡面怎麼實作的</b>。</p>
+      </div>
+    </section>
+
+    <!-- ============ 08 ============ -->
+    <section class="sec" id="db">
+      <div class="sec__h"><span class="sec__n">08</span><h2>接資料庫</h2></div>
+      <p class="sec__lead">
+        我們用 SQLAlchemy。它讓你<b>用 Python 的類別和物件操作資料庫</b>，
+        不用手寫 SQL 字串。
+      </p>
+
+      <h3 class="sub">一張表 ＝ 一個類別</h3>
+      <pre class="py"><span class="tk-kw">from</span> sqlalchemy.orm <span class="tk-kw">import</span> Mapped, mapped_column
+<span class="tk-kw">from</span> app.core.database <span class="tk-kw">import</span> Base
+
+<span class="tk-kw">class</span> <span class="tk-fn">Transaction</span>(Base):
+    __tablename__ = <span class="tk-st">"transactions"</span>
+
+    id: Mapped[int] = mapped_column(primary_key=<span class="tk-kw">True</span>)
+    user_id: Mapped[int] = mapped_column(ForeignKey(<span class="tk-st">"users.id"</span>))
+    amount: Mapped[Decimal] = mapped_column(Numeric(<span class="tk-nm">14</span>, <span class="tk-nm">2</span>))
+    kind: Mapped[str]
+    merchant: Mapped[str | None]</pre>
+
+      <div class="note note--crit">
+        <div class="note__k">金額一定要用 Numeric，不能用 float</div>
+        <p>浮點數在二進位下無法精確表示 0.1 這種值。累加幾千筆之後
+        你會得到 <code>12345.670000000002</code>。<br>
+        <b>財務系統不能接受這個。</b>資料庫用 <code>NUMERIC(14,2)</code>，
+        Python 這邊用 <code>Decimal</code>。</p>
+      </div>
+
+      <h3 class="sub">在路由裡用它</h3>
+      <pre class="py"><span class="tk-kw">from</span> sqlalchemy.orm <span class="tk-kw">import</span> Session
+<span class="tk-kw">from</span> app.core.database <span class="tk-kw">import</span> get_db
+
+<span class="tk-dc">@router.get</span>(<span class="tk-st">"/transactions"</span>)
+<span class="tk-kw">def</span> <span class="tk-fn">list_transactions</span>(<b class="hi">db: Session = Depends(get_db)</b>):
+    <span class="tk-kw">return</span> db.query(Transaction).filter(
+        Transaction.kind == <span class="tk-st">"expense"</span>
+    ).all()</pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        又是 <code>Depends</code>。你不用自己建立連線、也不用記得關閉——
+        <code>get_db</code> 用了 <code>yield</code>，所以<b>不管路由成功還是出錯，
+        連線都一定會被關掉</b>。忘記關連線是後端最常見的資源洩漏，
+        寫成這樣就不會發生。
+      </p>
+
+      <h3 class="sub">寫入要記得 commit</h3>
+      <pre class="py">tx = Transaction(user_id=<span class="tk-nm">1</span>, amount=Decimal(<span class="tk-st">"320"</span>), kind=<span class="tk-st">"expense"</span>)
+db.add(tx)
+<b class="hi">db.commit()</b>        <span class="tk-cm"># ← 忘記這行的話，資料根本沒存進去</span>
+db.refresh(tx)      <span class="tk-cm"># 把資料庫產生的 id 讀回來</span></pre>
+
+      <div class="note note--warn">
+        <div class="note__k">批次寫入要嘛全成功，要嘛全不寫</div>
+        <p>段落記帳一次要寫 5 筆。如果寫到第 3 筆失敗，前面 2 筆已經進去了，
+        使用者會看到「寫入失敗」但明細裡卻多了兩筆——<b>然後他會再按一次，變成重複記帳</b>。<br>
+        做法：迴圈裡只 <code>db.add()</code>，<b>迴圈結束後才 commit 一次</b>；
+        中間出錯就 <code>db.rollback()</code>。</p>
+      </div>
+    </section>
+
+    <!-- ============ 09 ============ -->
+    <section class="sec" id="auth">
+      <div class="sec__h"><span class="sec__n">09</span><h2>登入怎麼做</h2></div>
+      <p class="sec__lead">
+        HTTP 是「無狀態」的：伺服器處理完一個請求就忘光了，下一個請求進來時它不知道你是誰。
+        那登入之後怎麼記住？
+      </p>
+
+      <h3 class="sub">JWT：一張有簽名的通行證</h3>
+      <pre class="py">eyJhbGciOiJIUzI1NiJ9 . eyJzdWIiOiIxIiwiZXhwIjoxNzY4fQ . 3vQ2n1k...
+<span class="tk-cm">└──── 標頭 ────┘   └──────── 內容 ────────┘   └─ 簽名 ─┘</span></pre>
+      <div class="tw" style="margin-top:14px">
+        <table>
+          <thead><tr><th class="tight">部分</th><th>裝什麼</th><th>誰讀得到</th></tr></thead>
+          <tbody>
+            <tr><td>標頭</td><td>用什麼演算法簽的</td><td>所有人</td></tr>
+            <tr><td>內容</td><td>你是誰、什麼時候過期</td><td><b style="color:var(--warn)">所有人</b></td></tr>
+            <tr><td>簽名</td><td>用密鑰算出來的驗證碼</td><td>只有伺服器算得出來</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--crit">
+        <div class="note__k">JWT 的內容是公開的，不是加密的</div>
+        <p>中間那段只是 base64 編碼，<b>任何人複製貼到線上工具就能解開來看</b>。
+        所以永遠不要把密碼、身分證字號放進 JWT。<br>
+        它保證的是「<b>沒有人能竄改內容</b>」，不是「沒有人看得到內容」。</p>
+      </div>
+
+      <h3 class="sub">完整的登入流程</h3>
+      <div class="flow">
+        <div class="fl"><div class="fl__n">1</div><div class="fl__b">
+          <div class="fl__t">使用者送出 email 和密碼</div>
+          <div class="fl__d"><code>POST /api/auth/login</code>，資料放在請求主體（不是網址）</div></div></div>
+        <div class="fl"><div class="fl__ar">↓</div><div class="fl__b" style="padding-bottom:10px"></div></div>
+        <div class="fl"><div class="fl__n">2</div><div class="fl__b">
+          <div class="fl__t">後端比對密碼</div>
+          <div class="fl__d">把輸入的密碼再雜湊一次，跟資料庫存的比。
+          <b>不是把資料庫的解回來</b>——bcrypt 是單向的，解不回來。</div></div></div>
+        <div class="fl"><div class="fl__ar">↓</div><div class="fl__b" style="padding-bottom:10px"></div></div>
+        <div class="fl"><div class="fl__n">3</div><div class="fl__b">
+          <div class="fl__t">發兩張 token</div>
+          <div class="fl__d"><b>access token</b>（30 分鐘，每次請求都帶）＋
+          <b>refresh token</b>（14 天，只用來換新的 access token）</div></div></div>
+        <div class="fl"><div class="fl__ar">↓</div><div class="fl__b" style="padding-bottom:10px"></div></div>
+        <div class="fl"><div class="fl__n">4</div><div class="fl__b">
+          <div class="fl__t">之後每個請求都帶著 access token</div>
+          <div class="fl__d"><code>Authorization: Bearer eyJhbGciOi...</code></div></div></div>
+        <div class="fl"><div class="fl__ar">↓</div><div class="fl__b" style="padding-bottom:10px"></div></div>
+        <div class="fl"><div class="fl__n">5</div><div class="fl__b">
+          <div class="fl__t">過期時前端自動續期</div>
+          <div class="fl__d">某支 API 回 401 → 前端自動打 <code>/refresh</code> →
+          拿到新的 → <b>把剛才失敗的請求重送一次</b>。使用者完全沒感覺。</div></div></div>
+      </div>
+
+      <h3 class="sub">為什麼要兩張 token？</h3>
+      <div class="vs">
+        <div class="vs__c">
+          <h4 style="color:var(--accent-hi)">access token · 30 分鐘</h4>
+          <p>每次請求都帶著，到處跑，外洩風險高 → <b>所以讓它很快過期</b>。<br><br>
+          它<b>不存在資料庫裡</b>，所以沒辦法主動撤銷。這就是為什麼要設短。</p>
+        </div>
+        <div class="vs__c">
+          <h4 style="color:var(--accent-hi)">refresh token · 14 天</h4>
+          <p>只在換新 access token 時用，露臉次數少。<br><br>
+          它<b>存在資料庫的 sessions 表裡</b>，所以登出時可以標記成作廢。</p>
+        </div>
+      </div>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:16px">
+        結果是：使用者不用每 30 分鐘重新登入一次（前端自動續期），
+        但如果帳號被盜，撤銷 refresh token 之後，<b>攻擊者最多再撐 30 分鐘</b>。
+      </p>
+
+      <div class="note note--warn">
+        <div class="note__k">「登出」在 JWT 系統裡的真正意義</div>
+        <p>我們沒辦法把已經發出去的 access token 收回來——它不在資料庫裡。
+        所以登出其實是：<b>把 sessions 那筆設 revoked_at</b> ＋ 前端刪掉 token。<br>
+        手上那張 access token 最多還能用 30 分鐘，但想續期就會被擋下來。</p>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section class="sec" id="split">
+      <div class="sec__h"><span class="sec__n">10</span><h2>檔案怎麼分</h2></div>
+      <p class="sec__lead">
+        三十五支路由全寫在 <code>main.py</code> 會變成兩千行的怪物，而且四個人一起改必定衝突。
+        FastAPI 用 <code>APIRouter</code> 解決這件事。
+      </p>
+
+      <div class="codelabel">routers/auth.py — 各自的檔案</div>
+      <pre class="py"><span class="tk-kw">from</span> fastapi <span class="tk-kw">import</span> APIRouter
+
+<b class="hi">router = APIRouter()</b>
+
+<span class="tk-dc">@router.post</span>(<span class="tk-st">"/login"</span>)     <span class="tk-cm"># 注意：這裡不寫 /api/auth</span>
+<span class="tk-kw">def</span> <span class="tk-fn">login</span>():
+    ...</pre>
+
+      <div class="codelabel">main.py — 掛上去</div>
+      <pre class="py"><span class="tk-kw">from</span> app.routers <span class="tk-kw">import</span> auth
+
+app.include_router(auth.router, <b class="hi">prefix=<span class="tk-st">"/api/auth"</span></b>, tags=[<span class="tk-st">"身分認證"</span>])
+
+<span class="tk-cm"># 結果：routers/auth.py 裡的 "/login"</span>
+<span class="tk-cm">#       實際網址變成 /api/auth/login</span></pre>
+
+      <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
+        <code>prefix</code> 會自動加在每一支路由前面。
+        <code>tags</code> 是給自動文件用的分類，打開 <code>/docs</code> 就會照這個分組。
+      </p>
+
+      <div class="note">
+        <div class="note__k">這就是四個人能平行動工的關鍵</div>
+        <p>每個人改自己的 router 檔案，<b>git 幾乎不會衝突</b>。
+        <code>main.py</code> 只有七行 <code>include_router</code>，
+        任何人打開它三十秒就能看懂整個系統有哪些功能。</p>
+      </div>
+
+      <h3 class="sub">為什麼 routers 不寫邏輯</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">
+        我們的規定是：<b>routers 只做三件事——收請求、驗權限、回結果。</b>
+        真正的計算與規則寫在 <code>services/</code>。
+      </p>
+      <div class="vs">
+        <div class="vs__c vs--bad">
+          <h4>❌ 全寫在路由裡</h4>
+          <p>要測「存款目標超支的判斷對不對」，你得起一個 HTTP 請求、
+          準備 token、準備資料庫……測一個算式要準備半天。</p>
+        </div>
+        <div class="vs__c vs--good">
+          <h4>✅ 邏輯放 services</h4>
+          <p><code>savings_status(income, expense, goal)</code> 是純函式，
+          直接呼叫就能測，<b>一秒跑完</b>。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 11 ============ -->
+    <section class="sec" id="ours">
+      <div class="sec__h"><span class="sec__n">11</span><h2>在我們的專案裡，你要改哪個檔案</h2></div>
+      <p class="sec__lead">
+        骨架已經搭好了，每支路由都有中文說明和 <code>TODO</code>。你的工作是把 TODO 填掉。
+      </p>
+
+      <h3 class="sub">先找到自己的工作</h3>
+      <pre class="py"><span class="tk-cm"># 把「成員2」換成你自己</span>
+grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
+
+      <h3 class="sub">誰負責哪些檔案</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="tight">成員</th><th>領域</th><th>主要檔案</th><th class="tight">路由</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b style="color:var(--m1)">成員1</b></td>
+              <td>帳號與權限</td>
+              <td><span class="fname">routers/auth.py</span>、<span class="fname">routers/family.py</span>、
+                  <span class="fname">core/*</span>、<span class="fname">services/permission.py</span>、
+                  <span class="fname">services/llm.py</span></td>
+              <td>1–17</td>
+            </tr>
+            <tr>
+              <td><b style="color:var(--m2)">成員2</b></td>
+              <td>記帳 ★ 核心</td>
+              <td><span class="fname">routers/transactions.py</span>、<span class="fname">routers/nlp.py</span></td>
+              <td>18–27</td>
+            </tr>
+            <tr>
+              <td><b style="color:var(--m3)">成員3</b></td>
+              <td>統計與預算</td>
+              <td><span class="fname">routers/stats.py</span>、<span class="fname">routers/budgets.py</span>、
+                  <span class="fname">services/analytics.py</span></td>
+              <td>28–33</td>
+            </tr>
+            <tr>
+              <td><b style="color:var(--m4)">成員4</b></td>
+              <td>財務建議</td>
+              <td><span class="fname">routers/advices.py</span></td>
+              <td>34–35</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">成員1 的 core/ 要最優先完成</div>
+        <p><code>core/deps.py</code> 的 <code>get_current_user</code> 和
+        <code>services/permission.py</code> 的 <code>visible_user_ids</code>
+        <b>其他三個人全部都要用</b>。這兩塊沒好，別人的路由寫不下去。</p>
+      </div>
+
+      <h3 class="sub">實作一支路由的順序</h3>
+      <div class="flow">
+        <div class="fl"><div class="fl__n">1</div><div class="fl__b">
+          <div class="fl__t">先寫 schemas/</div>
+          <div class="fl__d">決定這支 API <b>收什麼、回什麼</b>。先把資料形狀定下來，後面才不會改來改去。</div></div></div>
+        <div class="fl"><div class="fl__n">2</div><div class="fl__b">
+          <div class="fl__t">再寫 models/</div>
+          <div class="fl__d">資料表長什麼樣。欄位定義照專題手冊的資料庫設計那一節。</div></div></div>
+        <div class="fl"><div class="fl__n">3</div><div class="fl__b">
+          <div class="fl__t">邏輯寫進 services/</div>
+          <div class="fl__d">計算、規則。<b>純函式，好測試。</b></div></div></div>
+        <div class="fl"><div class="fl__n">4</div><div class="fl__b">
+          <div class="fl__t">最後回到 routers/ 把 TODO 填掉</div>
+          <div class="fl__d">路由只負責串起來：驗權限 → 呼叫 service → 回結果。</div></div></div>
+        <div class="fl"><div class="fl__n">5</div><div class="fl__b">
+          <div class="fl__t">打開 /docs 直接試打</div>
+          <div class="fl__d">不用等前端、不用裝 Postman。右上角 Authorize 貼上 token 就能試需要登入的路由。</div></div></div>
+      </div>
+
+      <div class="note">
+        <div class="note__k">前端已經寫好了，回應形狀要對得上</div>
+        <p><code class="fname">frontend/js/api.js</code> 裡面有<b>完整的路由契約</b>，
+        而且 mock 模式已經用假資料把所有畫面跑起來了。<br>
+        你的 API 回應只要跟那份形狀一致，前端把 <code>&lt;meta name="api-base"&gt;</code>
+        填上網址就能直接接上，<b>一行前端程式碼都不用改</b>。<br>
+        不確定要回什麼形狀時，<b>去看 api.js，那是唯一的真相來源</b>。</p>
+      </div>
+    </section>
+
+    <!-- ============ 12 ============ -->
+    <section class="sec" id="trouble">
+      <div class="sec__h"><span class="sec__n">12</span><h2>卡住的時候</h2></div>
+      <p class="sec__lead">下面這幾個是一定會遇到的，先看過有印象就好。</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:38%">你看到的錯誤</th><th>原因與解法</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="rt">blocked by CORS policy</td>
+              <td>前端網域沒有被允許。改 <code>.env</code> 的 <code>ALLOWED_ORIGINS</code>。
+                  <b>網址要完整（含 https://），結尾不要加斜線。</b></td>
+            </tr>
+            <tr>
+              <td class="rt">ValidationError:<br>database_url Field required</td>
+              <td>沒建立 <code>.env</code>，或少了必填變數。
+                  <b>這是刻意的設計</b>——寧可啟動時就失敗，也不要等使用者按下按鈕才發現設定是空的。</td>
+            </tr>
+            <tr>
+              <td class="rt">422 Unprocessable Entity</td>
+              <td>送進來的資料格式不對。<b>回應主體裡會明講是哪個欄位、錯在哪</b>，仔細讀它。</td>
+            </tr>
+            <tr>
+              <td class="rt">501 Not Implemented</td>
+              <td>那支路由還沒實作。<b>這是正常的，不是 bug</b>——去找對應的 TODO。</td>
+            </tr>
+            <tr>
+              <td class="rt">資料沒有存進去</td>
+              <td>忘記 <code>db.commit()</code>。這個錯誤不會有任何提示，是最容易卡很久的一個。</td>
+            </tr>
+            <tr>
+              <td class="rt">改了程式但沒生效</td>
+              <td>啟動時沒加 <code>--reload</code>。</td>
+            </tr>
+            <tr>
+              <td class="rt">ModuleNotFoundError: No module named 'app'</td>
+              <td>你在錯的目錄下執行。<b>要在 <code>backend/</code> 底下跑</b>，不是在 <code>backend/app/</code>。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">三個永遠可以用的除錯方法</h3>
+      <div class="grid grid--3" style="margin-top:14px">
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">1. 打開 /docs 試打</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            排除前端的干擾。如果在 <code>/docs</code> 上打得通、在前端打不通，
+            那就是<b>前端或 CORS 的問題</b>，不是你的路由。
+          </p>
+        </div>
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">2. 看實際送出的 SQL</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            把 <code class="fname">core/database.py</code> 的
+            <code>echo=False</code> 改成 <code>True</code>，
+            SQLAlchemy 會把每一句 SQL 印出來。<b>查完記得改回去。</b>
+          </p>
+        </div>
+        <div class="card">
+          <h4 class="sub2" style="margin-top:0;color:var(--ink)">3. 先 print 再說</h4>
+          <p style="font-size:13px;color:var(--ink-soft)">
+            在可疑的地方 <code>print(變數)</code>，看值是不是你以為的那樣。
+            <b>八成的 bug 是「我以為這裡是 5，結果是字串 '5'」。</b>
+          </p>
+        </div>
+      </div>
+
+      <div class="note">
+        <div class="note__k">最後一句</div>
+        <p>這份文件涵蓋的是你這個專案<b>真的會用到</b>的部分，不是 FastAPI 的全部。
+        遇到這裡沒寫的東西，官方文件 <a href="https://fastapi.tiangolo.com/zh/" target="_blank" rel="noopener">fastapi.tiangolo.com</a>
+        有中文版，寫得很好。<br>
+        但<b>先把 TODO 填完再去讀那些</b>——會用比全懂重要。</p>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <div>家庭記帳與財務控管系統 · FastAPI 說明書</div>
+      <div class="mono">BACKEND · 35 ROUTES · 4 MEMBERS</div>
+    </footer>
+
+  </div>
+  </main>
+</div>
+
+</body>
+</html>
