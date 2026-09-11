@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=6">
+<link rel="stylesheet" href="docs.css?v=7">
 </head>
 <body>
 
@@ -48,7 +48,17 @@
 
   <div id="list"></div>
 
-  <div class="note" style="margin-top:28px">
+  <div class="note note--warn" style="margin-top:22px">
+    <div class="note__k">要串接的話，看這一份：前後端串接契約</div>
+    <p>這一頁列的是<b>有哪些路由</b>。真正動工時你需要的是
+    <b>「我要送什麼、後端要吐什麼、前端拿去幹嘛」</b> ——
+    那些寫在 <code>docs/02-前後端串接契約.md</code>。<br>
+    那份文件<b>不是手寫的</b>：它是把前端的 mock 轉接器實際跑起來，
+    把每一支的真實回傳形狀 dump 出來產生的。
+    <b>所以照著做就一定接得上</b>，形狀不對畫面就會壞，沒有第三種可能。</p>
+  </div>
+
+  <div class="note" style="margin-top:16px">
     <div class="note__k">後端還沒部署，這頁是規格不是實測</div>
     <p>路由與回應形狀來自 <code>frontend/js/api.js</code> 的契約定義，前端目前跑在 mock 模式。
     後端上線後 <b>FastAPI 會自動產生可直接送出請求的 <code>/docs</code></b>，

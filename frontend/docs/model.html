@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=6">
+<link rel="stylesheet" href="docs.css?v=7">
 <style>
 /* ---- 模型設計頁專用 ---- */
 /* 權杖沿用專案的 tokens.css，跟手冊與產品同一套視覺 */
@@ -863,57 +863,76 @@ pre i { color:var(--ink-dim); font-style:normal; }
     </table>
   </div>
 
-  <h3 class="sub">調整後的三週</h3>
+  <h3 class="sub">六週排程：模型線</h3>
+  <p style="color:var(--ink-soft);max-width:64ch">
+    總長六週 = 實作四週 + 測試不到一週 + 報告簡報。
+    <b>模型線跟後端線是並行的</b> —— 標註資料不用寫程式，第 1 週就能開始，
+    那是唯一能跟後端開發平行的工作。壓到第 3 週才做，等於浪費了兩週產能。
+  </p>
+
   <div class="steps">
     <div class="step">
       <div class="step__n">W1</div>
       <div class="step__b">
-        <div class="step__t">前後端整合 ＋ 同步開始標資料 ＋ 跑出基線</div>
-        <div class="step__d">
-          原本的「前後端整合完畢」不變，但<b>多了兩件必須平行進行的事</b>：
-          四人各寫 100 段種子資料、以及把 1.5B / 7B 的 zero-shot 跑過留出集把基線填實。<br>
-          <b>標註不能等。</b>它是唯一一件「越早開始越好、而且不依賴任何人做完」的工作。
-        </div>
+        <div class="step__t">標註開工 ＋ 把基線填實</div>
+        <div class="step__d">四人各寫 100 段種子資料（每人每天 1 小時就夠），
+        同時把 1.5B 與 7B 的 zero-shot 跑過留出集，<b>對照表的第一欄先填滿</b>。<br>
+        <b>標註不能等。</b> 它是唯一一件「越早開始越好、而且不依賴任何人做完」的工作。</div>
       </div>
     </div>
     <div class="step">
       <div class="step__n">W2</div>
       <div class="step__b">
-        <div class="step__t">微調 ＋ 把 function calling 接起來</div>
-        <div class="step__d">
-          模板擴增 → 轉格式 → 第一次 QLoRA → 第一次評測。
-          同時把五個工具在 FastAPI 這側實作完、兩輪流程串通。
-          <b>這週結束要能從畫面輸入一段話，走完兩輪，跑出確認表格。</b>
-        </div>
+        <div class="step__t">資料備齊 ＋ 環境跑通</div>
+        <div class="step__d">標註補到 300 筆、模板擴增、轉成訓練格式。
+        <b>Colab 環境先完整跑通一次</b>（哪怕只訓練 10 步）——
+        把斷線、爆記憶體、套件版本這些坑先踩完，不要留到真的要訓練的時候。</div>
       </div>
     </div>
     <div class="step">
       <div class="step__n">W3</div>
       <div class="step__b">
-        <div class="step__t">加約束解碼 ＋ 迭代 ＋ 部署 ＋ 最終評測</div>
-        <div class="step__d">
-          補上 constrained decoding、依評測結果回頭補資料再訓一輪、
-          匯出 GGUF 佈上 HF Space、把對照表的數字全部填實。
-        </div>
+        <div class="step__t">few-shot 基準線 ＋ 第一輪 QLoRA</div>
+        <div class="step__d">先把 few-shot 版接進系統讓大家用起來，<b>基準線數字定案</b>。
+        接著跑第一輪微調與評測。<br>
+        <span style="color:var(--warn)">⚠️ 硬切線：這週結束沒有第一輪的數字，
+        第 4 週就放棄第二輪，用 few-shot 版收尾。</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step__n">W4</div>
+      <div class="step__b">
+        <div class="step__t">第二輪微調 ＋ 接回系統</div>
+        <div class="step__d">用第 3 週四個人自己使用時收集到的<b>真實修正資料</b>再訓練一次。
+        這一輪才是主要成果。<br>
+        <span style="color:var(--warn)">⚠️ 最後兩天不准改模型，留給「接回去 + 確認沒壞」。</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step__n">W5</div>
+      <div class="step__b">
+        <div class="step__t">評測定稿</div>
+        <div class="step__d">把 zero-shot / few-shot / 第一輪 / 第二輪四欄的數字全部補齊，
+        算出一次輸入完全正確率、切分正確率、分類 Macro-F1。</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step__n">W6</div>
+      <div class="step__b">
+        <div class="step__t">報告與緩衝</div>
+        <div class="step__d">對照表、圖表、失敗案例分析。
+        <b>把做不到的事也寫進去</b> —— 那比假裝全部都成功更有說服力。</div>
       </div>
     </div>
   </div>
 
-  <h3 class="sub">四個人分別扛什麼</h3>
-  <div class="tw">
-    <table>
-      <thead><tr><th class="tight">成員</th><th>原本的模組</th><th>在這份方案裡負責</th></tr></thead>
-      <tbody>
-        <tr><td class="tight"><b>成員1</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m1-auth</span></td><td>認證與基礎建設</td>
-          <td><b>共用的模型服務層</b>：<code>services/llm/client.py</code>、逾時、重試、把回傳交給 Pydantic 驗證</td></tr>
-        <tr><td class="tight"><b>成員2</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m2-ledger</span></td><td>記帳</td>
-          <td><b>段落切分與欄位抽取的 prompt</b>：<code>services/llm/parse.py</code>、few-shot 範例挑選、低信心判準</td></tr>
-        <tr><td class="tight"><b>成員3</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m3-analytics</span></td><td>數字與建議</td>
-          <td><b>建議生成的 prompt 與邊界規則</b>：<code>services/llm/advice.py</code>、先算數字再敘述</td></tr>
-        <tr><td class="tight"><b>成員4</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m4-access</span></td><td>家庭與可見範圍</td>
-          <td><b>模型評測</b>：<code>services/evaluation.py</code>、人工標註留出集、零樣本 vs few-shot 對照</td></tr>
-      </tbody>
-    </table>
+  <div class="note note--crit">
+    <div class="note__k">為什麼一定要留到兩輪</div>
+    <p>第一輪幾乎一定會讓你失望 —— 資料太少、參數沒調好、格式沒對齊。
+    做過的人都知道。<b>第二輪才是真的。</b><br>
+    這是報告裡「我們試了但沒成功」和「<b>0.42 → 0.61 → 0.79</b>」的差別。<br><br>
+    而且第二輪用的是<b>真實使用者的修正</b>，不是我們自己編的範例——
+    資料飛輪從投影片上的概念變成真的轉過一圈，這件事本身就值得寫一節。</p>
   </div>
 
   <div class="note">
