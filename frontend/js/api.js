@@ -996,6 +996,17 @@
             var pct = allow > 0 ? Math.floor(spent / allow * 100) : (spent > 0 ? 200 : 0);
             if (pct < a.percent) return null;               // 還沒跨過
             var g = a.group ? groupOf(a.group) : null;
+
+            /* 門檻是「造成跨越的那筆記帳」當下才響的，不是月初。
+               用那個範圍裡最後一筆的日期當時間，通知才會排在合理的位置，
+               也不會顯示成「11 天前」。 */
+            var lastAt = scopeTx.reduce(function (mx, t) {
+              var ts = String(t.id).charAt(0) === 'N'
+                ? Number(String(t.id).slice(1))
+                : Date.parse(t.date + 'T20:00:00');
+              return Math.max(mx, ts || 0);
+            }, 0);
+            var when = lastAt || alertTs(a);
             return {
               id: 'NA' + a.id + D.meta.period,
               type: 'budget_alert',
@@ -1007,10 +1018,10 @@
               groupName: g ? g.name : '整體',
               spent: spent,
               allowance: allow,
-              createdAt: new Date(alertTs(a)).toISOString(),
+              createdAt: new Date(when).toISOString(),
               readAt: (s.readNotify || []).indexOf('NA' + a.id + D.meta.period) >= 0
                 ? new Date().toISOString() : null,
-              _ts: alertTs(a)
+              _ts: when + a.percent
             };
           })
           .filter(Boolean);
