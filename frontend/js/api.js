@@ -411,10 +411,30 @@
       f = f || {};
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
+        /* 只認契約上有的篩選參數。
+           ⚠️ 這一段是有來由的：前端曾經送 user=U3，而契約寫的是 userId。
+           mock 當時默默忽略不認得的參數，所以「篩選沒生效」在 mock 下
+           看起來完全正常——直到接上真後端才會發現。寧可現在就吵。 */
+        var OK = ['userId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page'];
+        Object.keys(f).forEach(function (k) {
+          if (OK.indexOf(k) < 0) {
+            throw new Error('不認得的篩選參數「' + k + '」，契約上只有：' + OK.join('、'));
+          }
+        });
+
         var vis = visibleUsers(s.me);
+
+        /* 帶了 userId 但沒權限看那個人 → 擋下來，不要回空陣列。
+           回空陣列的話前端分不出「這個人沒記帳」和「你不能看」。 */
+        if (f.userId && f.userId !== 'all' && vis.indexOf(f.userId) < 0) {
+          var err = new Error('你沒有權限看這個人的紀錄');
+          err.status = 403;
+          throw err;
+        }
+
         var rows = s.transactions.filter(function (t) {
           if (vis.indexOf(t.user) < 0) return false;
-          if (f.user && f.user !== 'all' && t.user !== f.user) return false;
+          if (f.userId && f.userId !== 'all' && t.user !== f.userId) return false;
           if (f.kind && f.kind !== 'all' && t.kind !== f.kind) return false;
           if (f.source && f.source !== 'all' && (t.source || 'manual') !== f.source) return false;
           if (f.q) {

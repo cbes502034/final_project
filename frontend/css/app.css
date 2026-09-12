@@ -939,3 +939,88 @@ body.is-out .main { padding: 0; }
   .prof__out { flex-direction: column; align-items: flex-start; }
   .prof__out button { margin-left: 0; }
 }
+
+/* ============================================================
+   成員明細（唯讀）、可展開的說明、被通知指到的那一筆
+   ============================================================ */
+
+/* ---- 成員與權限：整列可點 ---- */
+.row--open { cursor: pointer; }
+.row--open:hover { border-color: var(--line-3); }
+.row__go {
+  flex: 0 0 auto; font-size: 11.5px; color: var(--ink-dim);
+  opacity: 0; transition: opacity .18s var(--ease), color .18s var(--ease);
+}
+.row--open:hover .row__go { opacity: 1; color: var(--accent-hi); }
+
+.hint { font-size: 12.5px; color: var(--ink-faint); line-height: 1.8; margin: 0 0 14px; }
+
+/* ---- 點開才看的說明 ---- */
+.fold {
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--card); margin-bottom: 12px; overflow: hidden;
+}
+.fold__h {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 13px 16px 13px 38px; cursor: pointer; position: relative;
+  list-style: none; transition: background .18s var(--ease);
+}
+.fold__h::-webkit-details-marker { display: none; }
+.fold__h:hover { background: var(--sunk); }
+.fold__h::before {
+  content: ''; position: absolute; left: 16px; top: 18px;
+  width: 6px; height: 6px; border-right: 1.6px solid var(--ink-dim);
+  border-bottom: 1.6px solid var(--ink-dim); transform: rotate(-45deg);
+  transition: transform .2s var(--ease), border-color .2s var(--ease);
+}
+.fold[open] .fold__h::before { transform: rotate(45deg); border-color: var(--accent); }
+.fold__t { font-family: var(--serif); font-size: 14px; font-weight: 600; color: var(--ink); }
+.fold__s { font-size: 11.5px; color: var(--ink-dim); line-height: 1.6; }
+.fold__b { padding: 0 16px 16px; }
+
+/* ---- 成員抬頭 ---- */
+.mhead { display: flex; align-items: center; gap: 18px; padding: 20px; }
+.mhead__m { min-width: 0; flex: 1 1 auto; }
+.mhead__top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.mhead__n { font-family: var(--serif); font-size: 19px; font-weight: 600; color: var(--ink); }
+.mhead__s { font-size: 13px; color: var(--ink-soft); line-height: 1.8; margin: 0; }
+.mhead__h { font-size: 11.5px; color: var(--warn); }
+.mhead__n2 {
+  flex: 0 0 auto; text-align: right; display: flex;
+  flex-direction: column; gap: 2px; padding-left: 18px;
+  border-left: 1px solid var(--line);
+}
+.mhead__n2 b { font-family: var(--mono); font-size: 22px; color: var(--ink); font-weight: 500; }
+.mhead__n2 span { font-size: 11px; color: var(--ink-dim); }
+
+.back {
+  display: inline-block; margin-bottom: 14px;
+  font-size: 12.5px; color: var(--ink-faint); text-decoration: none;
+  transition: color .18s var(--ease);
+}
+.back:hover { color: var(--accent-hi); }
+
+/* ---- 被通知指到的那一筆 ---- */
+.tx.is-hit {
+  border-color: var(--accent);
+  background: rgba(108, 159, 251, .10);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 0 22px rgba(108, 159, 251, .16);
+  animation: hitpulse 1.5s var(--ease) 1;
+}
+@keyframes hitpulse {
+  0%   { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 0 rgba(108, 159, 251, .5); }
+  45%  { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 30px rgba(108, 159, 251, .45); }
+  100% { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 22px rgba(108, 159, 251, .16); }
+}
+.note--hit { border-left-color: var(--accent); }
+.note--hit .note__k { color: var(--accent-hi); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tx.is-hit { animation: none; }
+}
+
+@media (max-width: 560px) {
+  .mhead { flex-wrap: wrap; gap: 14px; }
+  .mhead__n2 { border-left: 0; padding-left: 0; text-align: left; flex-direction: row; align-items: baseline; gap: 6px; }
+  .row__go { display: none; }
+}

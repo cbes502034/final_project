@@ -267,8 +267,11 @@
       }
       state.open = false;
       render();
-      // 跳到家庭總覽看那個人的明細（唯讀）
-      location.hash = '#/family';
+      /* 跳到那個人的記帳表單，並把這一筆標起來。
+         只跳到家庭總覽的話，使用者還要自己在一堆紀錄裡找是哪一筆。 */
+      if (n && n.actorId) {
+        location.hash = '#/member/' + n.actorId + (n.txId ? '/' + n.txId : '');
+      }
       return;
     }
 

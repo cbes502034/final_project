@@ -477,7 +477,7 @@
         <div class="card">
           <h4 class="sub2" style="margin-top:0;color:var(--ink)">React / Vue</h4>
           <p style="font-size:13px;color:var(--ink-soft)">
-            九個畫面已經寫完（含登入、註冊、個人資料），重寫是純成本。三個沒有專案經驗的人要同時學 React、Vite、hooks，
+            十個畫面已經寫完（含登入、註冊、個人資料、成員紀錄），重寫是純成本。三個沒有專案經驗的人要同時學 React、Vite、hooks，
             再加上後端與模型，一個月做不完。<br><br>
             <b>這是有意識的取捨，不是能力不足</b>——要寫進報告。有時間該升級的是<b>打包</b>（Vite），
             不是框架，因為那只影響建置流程，不必重寫畫面。
@@ -649,7 +649,7 @@
           <div class="layer__h"><span class="layer__t">瀏覽器</span><span class="layer__s">site/ · 純靜態，無建置步驟</span></div>
           <div class="boxes">
             <div class="box"><b>index.html</b> 單頁 · hash 路由</div>
-            <div class="box"><b>app.js</b> 九個畫面的繪製與互動</div>
+            <div class="box"><b>app.js</b> 十個畫面的繪製與互動</div>
             <div class="box"><b>stars.js</b> canvas 星空</div>
             <div class="box"><b>tokens.css</b> 設計權杖</div>
           </div>
@@ -726,7 +726,7 @@
           <div class="mvc__k">View</div>
           <div class="mvc__t">frontend/ 前端</div>
           <ul class="mvc__l">
-            <li><code>app.js</code> 九個畫面的繪製</li>
+            <li><code>app.js</code> 十個畫面的繪製</li>
             <li><code>api.js</code> 唯一的資料入口</li>
             <li>不含任何金額計算</li>
             <li>只負責顯示與收集輸入</li>
@@ -936,7 +936,7 @@
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · 四人 × 一個月專題</div>
-      <div class="mono">41 API · 14 TABLES · 9 SCREENS</div>
+      <div class="mono">41 API · 14 TABLES · 10 SCREENS</div>
     </footer>
 
   </div>
@@ -972,7 +972,7 @@
     { dom: '家庭與可見範圍', c: '#6EE7B7', api: '12 支', branch: 'm4-access', groups: [
       { k: '資料表', items: ['families', 'family_members', 'guardianships', 'audit_logs', 'notifications'] },
       { k: 'API', items: ['家庭與邀請碼', '成員角色', '監管關係'] },
-      { k: '畫面', items: ['成員與權限', '監管通知鈴鐺'] },
+      { k: '畫面', items: ['成員與權限', '監管通知鈴鐺', '成員紀錄（唯讀）'] },
       { k: 'LLM', llm: true, items: ['留出集人工標註', '零樣本 vs few-shot', '正確率與 Macro-F1'] }
     ]}
   ];

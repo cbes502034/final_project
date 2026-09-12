@@ -23,7 +23,7 @@
   var $toasts = document.getElementById('toasts');
 
   var ME = null;
-  var F = { user: 'all', kind: 'all', source: 'all', q: '' };
+  var F = { userId: 'all', kind: 'all', source: 'all', q: '' };
   var STAT = { period: 'month' };
   var draft = null;                       // 自然語言解析後、尚未確認的暫存
 
@@ -166,7 +166,7 @@
       }).then(function (d) {
         var box = document.getElementById('recent');
         if (!box || !d) return;
-        box.innerHTML = d.transactions.slice(0, 6).map(txRow).join('') ||
+        box.innerHTML = d.transactions.slice(0, 6).map(function (t) { return txRow(t); }).join('') ||
           emptyState('還沒有紀錄', '到「記帳」頁用一句話記下第一筆。');
       }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -223,8 +223,11 @@
     return !!(ME && ME.user && t.user === ME.user.id);
   }
 
-  function txRow(t) {
-    return '<div class="tx">' +
+  /* hit = 要標起來的那一筆 id（從通知點進來時用）。
+     ⚠️ 不要寫成 .map(txRow)——map 會把索引值當成第二個參數傳進來。
+     所以呼叫端一律包一層 function。 */
+  function txRow(t, hit) {
+    return '<div class="tx' + (hit && hit === t.id ? ' is-hit' : '') + '">' +
       '<div class="tx__c" style="background:' + t.catColor + '22;color:' + t.catColor +
         ';border-color:' + t.catColor + '55">' + esc(t.catName.slice(0, 2)) + '</div>' +
       '<div class="tx__m"><div class="tx__t">' + esc(t.merchant || t.catName) +
@@ -448,7 +451,7 @@
     if (!box) return;
     API.transactions(Object.assign({}, F)).then(function (d) {
       box.innerHTML = d.transactions.length
-        ? d.transactions.map(txRow).join('')
+        ? d.transactions.map(function (t) { return txRow(t); }).join('')
         : emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。');
     }).catch(function (e) { box.innerHTML = errState(e); });
   }
@@ -644,9 +647,10 @@
       h += '<div class="rows">' + d.members.map(function (u, i) {
         var wards = d.guardianships.filter(function (g) { return g.guardian === u.id; });
         var by = d.guardianships.filter(function (g) { return g.ward === u.id; });
-        return '<article class="row" style="animation-delay:' + (i * 50) +
+        return '<article class="row row--open" data-open="' + esc(u.id) + '" ' +
+          'title="看 ' + esc(u.name) + ' 的記帳紀錄" style="animation-delay:' + (i * 50) +
           'ms;grid-template-columns:44px 1fr 200px">' +
-          '<div class="ava">' + esc(u.avatar) + '</div>' +
+          ava(u) +
           '<div class="row__m"><div class="row__top">' +
             '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
             '<span class="tag tag--' + (u.role === 'master' ? 'done' :
@@ -665,20 +669,29 @@
             '<input class="goal__i" type="number" data-goal="' + esc(u.id) + '" value="' +
             (u.savingsGoal || 0) + '"' + (canSetGoal(u, d) ? '' : ' disabled') + '></span>' +
             (canSetGoal(u, d) ? '' : '<span class="tag tag--na">唯讀</span>') +
+            '<span class="row__go">看紀錄 →</span>' +
           '</div></article>';
       }).join('') + '</div>';
 
 
 
-      h += '<div class="sec"><h2 class="sec__t">角色</h2></div>';
+      h += '<p class="hint">點任何一列可以看那個人的記帳紀錄（<b>唯讀</b>）。' +
+        '下面兩份說明預設收起來，需要時點開。</p>';
+
+      h += '<details class="fold"><summary class="fold__h">' +
+        '<span class="fold__t">三種角色分別是什麼</span>' +
+        '<span class="fold__s">master／parent／member 各自負責什麼</span>' +
+        '</summary><div class="fold__b">';
       h += '<div class="tbl"><table><thead><tr><th>角色</th><th>說明</th></tr></thead><tbody>' +
         d.roles.map(function (r) {
           return '<tr><td><b>' + esc(r.name) + '</b><br><span class="mono" style="color:var(--ink-dim)">' +
             esc(r.id) + '</span></td><td>' + esc(r.desc) + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
+        }).join('') + '</tbody></table></div></div></details>';
 
-      h += '<div class="sec"><h2 class="sec__t">權限矩陣</h2>' +
-        '<span class="sec__n">PERMISSIONS</span></div>';
+      h += '<details class="fold"><summary class="fold__h">' +
+        '<span class="fold__t">誰可以做什麼</span>' +
+        '<span class="fold__s">完整權限矩陣。監管是唯讀的——看得到，不能改、不能刪</span>' +
+        '</summary><div class="fold__b">';
       h += '<div class="tbl"><table><thead><tr><th>動作</th><th>管理者</th><th>家長</th><th>成員</th>' +
         '</tr></thead><tbody>' + d.permissions.map(function (p) {
           function cell(v) {
@@ -688,9 +701,115 @@
           }
           return '<tr><td><b>' + esc(p.action) + '</b></td><td>' + cell(p.master) +
             '</td><td>' + cell(p.parent) + '</td><td>' + cell(p.member) + '</td></tr>';
-        }).join('') + '</tbody></table></div></div>';
+        }).join('') + '</tbody></table></div></div></details></div>';
       $view.innerHTML = h;
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+
+  /* ============================================================
+     單一成員的記帳紀錄（唯讀）
+
+     從兩個地方進來：
+       成員與權限點某一列       → #/member/U3
+       通知點某一則             → #/member/U3/T1051（那一筆會標起來）
+     ============================================================ */
+  function vMember(id, hit) {
+    head('成員紀錄', '唯讀檢視');
+    $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
+
+    /* 先問「我看不看得到」，確認之後才去拿明細。
+       沒權限就不要發那個請求——後端會回 403，前端也不該去撞。 */
+    Promise.all([API.me(), API.members()])
+      .then(function (r) {
+        var me = r[0], d = r[1];
+        var u = d.members.filter(function (x) { return x.id === id; })[0];
+
+        if (!u) {
+          $view.innerHTML = '<div class="page"><div class="note note--warn">' +
+            '<div class="note__k">找不到這個人</div>' +
+            '<p>這個家庭裡沒有 <code>' + esc(id) + '</code> 這位成員。</p>' +
+            '</div></div>';
+          return;
+        }
+
+        /* 看得到誰是後端說了算（me.visible）。
+           前端這裡擋一次是為了給一句人話，並且不要去發一個註定被拒絕的請求。
+           真正的把關在 API：帶了沒權限的 userId 會回 403（不是空陣列——
+           回空的話，前端分不出「這個人沒記帳」和「你不能看」）。 */
+        if ((me.visible || []).indexOf(id) < 0) {
+          $view.innerHTML = '<div class="page"><div class="note note--warn">' +
+            '<div class="note__k">看不到這個人的紀錄</div>' +
+            '<p>你沒有被指派監管 <b>' + esc(u.name) + '</b>。<br>' +
+            '監管關係由管理者建立，而且雙方都看得到——系統不提供隱藏監管。</p>' +
+            '</div>' + backLink() + '</div>';
+          return;
+        }
+
+        return API.transactions({ userId: id }).then(function (tx) {
+          render(me, d, u, tx);
+        });
+      })
+      .catch(function (e) {
+        $view.innerHTML = '<div class="page">' + errState(e) + '</div>';
+      });
+
+    function render(me, d, u, tx) {
+      var mine = id === d.me;
+      var by = d.guardianships.filter(function (g) { return g.ward === id; });
+
+      var h = '<div class="page">' + backLink();
+
+      h += '<div class="card mhead">' +
+        ava(u, 'ava--xl') +
+        '<div class="mhead__m">' +
+          '<div class="mhead__top">' +
+            '<span class="mhead__n">' + esc(u.name) + '</span>' +
+            '<span class="tag tag--' + (u.role === 'master' ? 'done' :
+              (u.role === 'parent' ? 'MEDIUM' : 'soft')) + '">' +
+              ROLE_TW[u.role] + '</span>' +
+            (mine ? '<span class="tag tag--na">這是你自己</span>'
+                  : '<span class="tag tag--info">唯讀檢視</span>') +
+          '</div>' +
+          '<p class="mhead__s">' +
+            (mine
+              ? '這是你自己的紀錄，可以刪除。'
+              : '你看得到 <b>' + esc(u.name) + '</b> 的每一筆紀錄，' +
+                '但<b>不能修改、不能刪除</b>，也不能登入對方的帳號。') +
+            (by.length && !mine
+              ? '<br><span class="mhead__h">被 ' +
+                by.map(function (g) { return esc(g.guardianName); }).join('、') +
+                ' 監管</span>'
+              : '') +
+          '</p>' +
+        '</div>' +
+        '<div class="mhead__n2"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
+      '</div>';
+
+      if (hit) {
+        h += '<div class="note note--hit"><div class="note__k">通知指的是這一筆</div>' +
+          '<p>下面<b>藍框標起來</b>的那一列就是通知講的那筆紀錄。</p></div>';
+      }
+
+      h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
+        '<span class="sec__n">' + tx.total + ' 筆</span></div>';
+
+      h += '<div class="txs" id="mtx">' + (tx.transactions.length
+        ? tx.transactions.map(function (t) { return txRow(t, hit); }).join('')
+        : emptyState('還沒有紀錄', esc(u.name) + '這個月還沒有記過帳。')) + '</div></div>';
+
+      $view.innerHTML = h;
+
+      // 標起來的那一筆捲進畫面，不然在長清單裡要自己找
+      var el = document.querySelector('.tx.is-hit');
+      if (el) setTimeout(function () {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 120);
+    }
+  }
+
+  function backLink() {
+    return '<a class="back" href="#/members">← 回成員與權限</a>';
   }
 
   /* ---------- 共用 ---------- */
@@ -882,12 +1001,15 @@
   /* ---------- 路由 ---------- */
   var ROUTES = { '': vHome, entry: vEntry, family: vFamily, stats: vStats,
                  advice: vAdvice, members: vMembers,
-                 login: vLogin, register: vRegister, profile: vProfile };
+                 login: vLogin, register: vRegister, profile: vProfile,
+                 member: vMember };
 
   var OPEN = ['login', 'register'];      // 沒登入也能看的頁
 
   function paint() {
-    var page = (location.hash || '#/').replace(/^#\/?/, '').split('/')[0];
+    // #/member/U3/T1051 → ['member', 'U3', 'T1051']
+    var parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
+    var page = parts[0];
     API.authState().then(function (a) {
       /* 登入閘。沒登入只能待在 login／register，
          登入了就別再讓他看登入頁。 */
@@ -895,9 +1017,11 @@
       if (a.loggedIn && OPEN.indexOf(page) >= 0) { location.hash = '#/'; return; }
 
       if (a.loggedIn) document.body.classList.remove('is-out');
-      (ROUTES[page] || vHome)();
+      (ROUTES[page] || vHome)(parts[1], parts[2]);
+      // 看某個成員的紀錄時，左邊仍然亮「成員與權限」
+      var lit = page === 'member' ? 'members' : page;
       Array.prototype.forEach.call(document.querySelectorAll('.nav__i'), function (b) {
-        b.classList.toggle('on', b.dataset.nav === page);
+        b.classList.toggle('on', b.dataset.nav === lit);
       });
     });
   }
@@ -909,6 +1033,14 @@
 
     var nav = t.closest('[data-nav]');
     if (nav) { location.hash = '#/' + nav.dataset.nav; return; }
+
+    /* 成員那一列點下去看他的紀錄。
+       存款目標的輸入框也在這一列裡，點它不能跳走。 */
+    var open = t.closest('[data-open]');
+    if (open && !t.closest('input') && !t.closest('label')) {
+      location.hash = '#/member/' + open.dataset.open;
+      return;
+    }
 
     if (t.closest('#logout') || t.closest('#logout2')) {
       API.logout().then(function () {
