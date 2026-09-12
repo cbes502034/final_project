@@ -567,7 +567,8 @@
         h += kpi('家庭收入', d.income, '', d.period, 'ok', 0);
         h += kpi('家庭支出', d.expense, '', d.members.length + ' 位成員', 'warn', 1);
         h += kpi('結餘', d.net, '', '儲蓄率 ' + pct(d.rate), 'a', 2);
-        h += kpi('可檢視成員', d.members.length, '人', ROLE_TW[m.user.role] + '權限', 'a', 3, true);
+        h += kpi('每月零用金', d.allowance || 0, '',
+          '子女已花 ' + money(d.wardSpend || 0), 'a', 3);
         h += '</div>';
 
         if (d.savings) h += savingsCard(d.savings, '全家');
@@ -836,9 +837,11 @@
 
     /* 先問「我看不看得到」，確認之後才去拿明細。
        沒權限就不要發那個請求——後端會回 403，前端也不該去撞。 */
-    Promise.all([API.me(), API.members()])
+    Promise.all([API.me(), API.members(), API.allowances().catch(function () {
+      return { allowances: [] };
+    })])
       .then(function (r) {
-        var me = r[0], d = r[1];
+        var me = r[0], d = r[1], al = r[2];
         var u = d.members.filter(function (x) { return x.id === id; })[0];
 
         if (!u) {
@@ -862,6 +865,8 @@
           return;
         }
 
+        var a = (al.allowances || []).filter(function (x) { return x.wardId === id; })[0];
+        u.allowance = a ? a.amount : 0;
         return API.transactions({ userId: id }).then(function (tx) {
           render(me, d, u, tx);
         });
@@ -897,6 +902,16 @@
 
       /* 未成年的存款目標由管理者代設——設定的地方就放在
          看得到他紀錄的這一頁，不要塞回成員名冊那張表。 */
+      if (!mine) {
+        /* 我給他多少零用金。這是設定，不是一筆支出紀錄——
+           不要另外記一筆「給小孩 3000」，否則他花掉之後同一筆錢會被算兩次。 */
+        h += '<div class="sec"><h2 class="sec__t">每月零用金' + helpBtn('allowance') + '</h2></div>' +
+          '<div class="card prof__goal">' +
+            '<input class="goal__i" type="number" min="0" ' +
+              'data-allow="' + esc(u.id) + '" value="' + (u.allowance || 0) + '">' +
+          '</div>';
+      }
+
       if (canSetGoal(u, d) && !mine) {
         h += '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
           '<div class="card prof__goal">' +
@@ -1150,6 +1165,16 @@
               cell(p.master) + cell(p.parent) + cell(p.member) + '</tr>';
           }).join('') + '</tbody></table></div>';
       }
+    },
+    allowance: {
+      t: '每月零用金',
+      b: '<p>你每個月給他多少錢。<b>這是設定，不是一筆支出紀錄。</b></p>' +
+         '<p>不要另外記一筆「給小孩 3000」——他把那 3000 花掉時會記成支出，' +
+         '同一筆錢就被算了兩次，家庭支出會憑空多一倍。</p>' +
+         '<p>所以家庭總覽是這樣算的：' +
+         '<b>子女的支出算進家庭支出</b>（那筆錢確實離開了這個家），' +
+         '<b>子女的收入不算進家庭收入</b>（零用錢是家裡給的）。</p>' +
+         '<p>這個數字只拿來跟「他實際花了多少」做對照。</p>'
     },
     avatar: {
       t: '大頭貼',
@@ -2140,6 +2165,16 @@
   });
 
   document.addEventListener('change', function (e) {
+    var al = e.target.closest ? e.target.closest('[data-allow]') : null;
+    if (al) {
+      var av = Number(al.value);
+      if (isNaN(av) || av < 0) { toast('零用金要是 0 以上的數字', 'err'); return; }
+      API.setAllowance(al.dataset.allow, av).then(function (r) {
+        toast('每月給 ' + (r.wardName || '他') + ' ' + money(av), 'ok');
+      }).catch(function (err) { toast('設定失敗：' + err.message, 'err'); });
+      return;
+    }
+
     var gg = e.target.closest ? e.target.closest('[data-ggoal]') : null;
     if (gg) {
       var gv = Number(gg.value);
