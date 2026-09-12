@@ -391,3 +391,25 @@ def test_群組與提醒的前端三層都有():
     app = read("frontend/js/app.js")
     assert "function vGroups(" in app, "app.js 少了群組頁"
     assert "function paintAlerts(" in app, "app.js 少了提醒設定"
+
+
+def test_權限矩陣要跟_data_js_一致():
+    """手冊的權限矩陣是從 frontend/js/data.js 的 permissions 生出來的。
+
+    這兩份本來各寫各的，而且已經各自長出對方沒有的列——
+    手冊有「收到子女新增紀錄的通知」，data.js 沒有；
+    data.js 有「查看沒有指派給自己的人」，手冊沒有。
+    """
+    data = read("frontend/js/data.js")
+    handbook = read("frontend/docs/index.html")
+
+    actions = re.findall(r"\{ action: '([^']+)'", data)
+    assert actions, "data.js 裡找不到 permissions"
+
+    missing = [a for a in actions
+               if ("<td>%s</td>" % a) not in handbook
+               and ("<td><b>%s</b></td>" % a) not in handbook]
+    assert not missing, "手冊的權限矩陣少了：" + "、".join(missing)
+
+    # 建立群組不分角色，這是刻意的設計，不可以被悄悄改掉
+    assert "{ action: '建立群組（帳本）', master: 'Y', parent: 'Y', member: 'Y' }" in data,         "建立群組應該三個角色都可以——記帳的分類方式不該由家裡的階級決定"

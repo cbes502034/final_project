@@ -474,10 +474,19 @@ window.DATA = {
     { action: '設定每月存款目標', master: 'Y', parent: 'Y', member: '未成年由管理者代設' },
     { action: '查看被監管者的明細', master: 'Y（被指派的）', parent: 'Y（被指派的）', member: 'N' },
     { action: '查看沒有指派給自己的人', master: 'N', parent: 'N', member: 'N' },
+    { action: '修改／刪除被監管者的紀錄', master: 'N', parent: 'N', member: 'N' },
+    { action: '登入被監管者的帳號', master: 'N', parent: 'N', member: 'N' },
+    { action: '收到被監管者新增紀錄的通知', master: 'Y（被指派的）', parent: 'Y（被指派的）', member: 'N' },
     { action: '查看家庭總覽', master: 'Y', parent: '僅摘要', member: 'N' },
     { action: '設定家庭預算', master: 'Y', parent: 'N', member: 'N' },
     { action: '邀請／移除成員', master: 'Y', parent: 'N', member: 'N' },
     { action: '建立監管關係', master: 'Y', parent: 'N', member: 'N' },
+    /* 群組不看角色：誰都可以開自己的帳本。
+       ⚠️ 這是刻意的——記帳的分類方式是個人的事，不該由家裡的階級決定。 */
+    { action: '建立群組（帳本）', master: 'Y', parent: 'Y', member: 'Y' },
+    { action: '管理自己建的群組', master: 'Y', parent: 'Y', member: 'Y' },
+    { action: '管理別人建的群組', master: 'N', parent: 'N', member: 'N' },
+    { action: '設定自己的階段性提醒', master: 'Y', parent: 'Y', member: 'Y' },
     { action: '查看「誰看得到我」', master: 'Y', parent: 'Y', member: 'Y（強制可見）' },
     { action: '匯出資料', master: 'Y（限可見範圍）', parent: 'Y（限可見範圍）', member: 'Y（只有自己）' }
   ]
