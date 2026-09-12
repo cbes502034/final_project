@@ -9,6 +9,30 @@
   var API = global.API;
   var $view = document.getElementById('view');
 
+  /* 側欄收合。記在 localStorage，下次打開維持上次的樣子。 */
+  (function () {
+    var K = 'fambudget.rail';
+    var min = false;
+    try { min = localStorage.getItem(K) === '1'; } catch (e) {}
+    document.body.classList.toggle('rail-min', min);
+
+    /* 收起來之後只剩圖示，滑過去要看得到名字。
+       直接拿標籤的文字當 title，不用在 HTML 裡重寫一遍。 */
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.nav__i, .docs__i'), function (b) {
+        var t = b.querySelector('.nav__t, span');
+        if (t && !b.title) b.title = t.textContent.trim();
+      });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest || !e.target.closest('#railx')) return;
+      var now = !document.body.classList.contains('rail-min');
+      document.body.classList.toggle('rail-min', now);
+      try { localStorage.setItem(K, now ? '1' : '0'); } catch (err) {}
+      var b = document.getElementById('railx');
+      if (b) b.title = now ? '展開側欄' : '收合側欄';
+    });
+  })();
+
   /* 頂欄的兩個方案。用網址挑：?bar=text 或 ?bar=icon，預設 text。
      挑定之後把這段拿掉、只留選中的那一套樣式。 */
   (function () {

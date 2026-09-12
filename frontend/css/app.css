@@ -1976,3 +1976,56 @@ body.bar-icon #searchDrawer[hidden] { display: none !important; }
   .cols > .col + .col > .sec:first-child { border-top: 1px solid var(--line); }
 }
 
+
+
+/* ============================================================
+   側欄收合
+   ------------------------------------------------------------
+   --rail 這個權杖同時控制側欄的寬度和內容區的左邊界，
+   所以只要在 body 上換掉它的值，兩邊就會一起動。
+   ============================================================ */
+.railx {
+  margin-left: auto; flex: 0 0 auto;
+  width: 26px; height: 26px; display: grid; place-items: center;
+  color: var(--ink-dim);
+  transition: color .16s var(--ease), background-color .16s var(--ease),
+              transform .24s var(--back);
+}
+.railx svg { width: 15px; height: 15px; }
+.railx:hover { color: var(--ink); background: var(--sunk); }
+.railx:active { transform: scale(.88); }
+
+.rail, .main { transition: width .24s var(--out), margin-left .24s var(--out); }
+
+body.rail-min { --rail: 58px; }
+body.rail-min .railx { transform: rotate(180deg); margin-left: 0; }
+body.rail-min .railx:active { transform: rotate(180deg) scale(.88); }
+body.rail-min .brand__n,
+body.rail-min .nav__t,
+body.rail-min .nav__lb,
+body.rail-min .docs__lb,
+body.rail-min .docs__i span,
+body.rail-min .docs__i i,
+body.rail-min .who__n,
+body.rail-min .who__r,
+body.rail-min .who__out,
+body.rail-min .rail__meta { display: none; }
+
+body.rail-min .brand { justify-content: center; padding: 14px 0; }
+body.rail-min .nav { padding-left: 0; padding-right: 0; }
+body.rail-min .nav__i,
+body.rail-min .docs__i { justify-content: center; padding: 10px 0; }
+body.rail-min .nav__i::before { left: 0; }
+body.rail-min .who { justify-content: center; padding: 12px 0; }
+body.rail-min .docs { padding-left: 0; padding-right: 0; }
+
+/* 收起來之後靠 title 顯示名稱，所以 hover 要有回饋 */
+body.rail-min .nav__i:hover, body.rail-min .docs__i:hover { background: var(--sunk); }
+
+@media (max-width: 900px) {
+  .railx { display: none; }
+  body.rail-min { --rail: 232px; }
+  body.rail-min .brand__n, body.rail-min .nav__t, body.rail-min .nav__lb,
+  body.rail-min .docs__lb, body.rail-min .docs__i span,
+  body.rail-min .who__n, body.rail-min .who__r, body.rail-min .who__out { display: inline; }
+}
