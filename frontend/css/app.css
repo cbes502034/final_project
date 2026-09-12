@@ -1042,13 +1042,12 @@ body.is-out .main {
 
 
 /* 存款目標自己一張卡，不再擠在成員名冊那一列裡 */
-.prof__goal { display: flex; align-items: center; gap: 20px; padding: 20px; }
-.prof__goal .goal { flex: 0 0 auto; margin-left: auto; }
-.prof__goal .goal__i { width: 148px; font-size: 15px; }
+/* 一個輸入框不需要佔滿一整條。跟其他欄位一樣寬就好。 */
+.prof__goal { padding: 0 28px 26px; }
+.prof__goal .goal__i { width: 200px; font-size: 15px; }
 
 @media (max-width: 560px) {
-  .prof__goal { flex-direction: column; align-items: flex-start; }
-  .prof__goal .goal { margin-left: 0; }
+  .prof__goal .goal__i { width: 100%; }
 }
 
 /* ============================================================
@@ -1886,3 +1885,26 @@ body.bar-icon.dw-on #view { opacity: 1; pointer-events: auto; }
 /* ⚠️ #searchDrawer 自己有 display:flex，會蓋過 [hidden] 的 display:none。
    方案二要靠 hidden 收起來，所以這裡補一條贏過它。 */
 body.bar-icon #searchDrawer[hidden] { display: none !important; }
+
+
+/* ============================================================
+   「加一個門檻」那一排
+   ------------------------------------------------------------
+   它是一列行內控制項，不是表單的結尾，所以按鈕不該被推到
+   自己一整行去置中——那會讓一個小功能佔掉兩倍高度。
+   三個東西排在同一條線上就好。
+   ============================================================ */
+.anew {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  padding-top: 18px; border-top: 1px solid var(--line);
+}
+.anew > div:last-child { width: auto; display: block; }
+.anew > div:last-child .btn { min-width: 0; padding: 9px 18px; }
+.anew input { width: 92px; }
+.anew select { min-width: 170px; }
+.anew .fld > span { font-size: 11.5px; }
+
+@media (max-width: 560px) {
+  .anew { gap: 10px; }
+  .anew select { min-width: 0; flex: 1 1 140px; }
+}

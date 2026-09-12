@@ -792,12 +792,11 @@
       /* 未成年的存款目標由管理者代設——設定的地方就放在
          看得到他紀錄的這一頁，不要塞回成員名冊那張表。 */
       if (canSetGoal(u, d) && !mine) {
-        h += '<div class="card prof__goal">' +
-          '<div class="prof__m"><p class="prof__l">每月存款目標</p></div>' +
-          '<span class="goal"><label>每月存款目標</label>' +
+        h += '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
+          '<div class="card prof__goal">' +
             '<input class="goal__i" type="number" min="0" ' +
-            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
-        '</div>';
+              'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '">' +
+          '</div>';
       }
 
       h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
@@ -1202,11 +1201,8 @@
 
         '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
         '<div class="card prof__goal">' +
-          '<div class="prof__m">' +
-          '</div>' +
-          '<span class="goal"><label>每月存款目標</label>' +
-            '<input class="goal__i" type="number" min="0" ' +
-            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
+          '<input class="goal__i" type="number" min="0" ' +
+            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '">' +
         '</div>' +
 
         '<div class="sec"><h2 class="sec__t">階段性提醒' + helpBtn('alerts') + '</h2></div>' +
@@ -1222,9 +1218,6 @@
           '<div><button class="btn" type="submit">更改密碼</button></div>' +
         '</form>' +
 
-        '<div class="card prof__out">' +
-          '<button class="btn" id="logout2">登出</button>' +
-        '</div>' +
       '</div>';
       $view.innerHTML = h;
       paintAlerts();
@@ -1368,7 +1361,7 @@
         w.innerHTML = ava(m.user, 'ava--sm') +
           '<span class="who__n">' + esc(m.user.name) + '</span>' +
           '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>' +
-          '';
+          '<button class="who__out" id="logout">登出</button>';
       }
       var f = document.getElementById('famName');
       if (f) f.textContent = m.family.family + '　' + m.family.period;
