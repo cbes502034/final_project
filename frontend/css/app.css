@@ -1926,11 +1926,16 @@ body.bar-icon #searchDrawer[hidden] { display: none !important; }
 .mbar__b:hover { background: var(--card-2); }
 .mbar__b.open { background: var(--accent-wash); }
 .mbar__n { font-size: 15px; color: var(--ink); font-weight: 500; }
-.mbar__b > svg {
+/* 給箭頭自己的 class，不要用「按鈕底下的 svg」這種靠結構的選擇器——
+   結構一變（例如按鈕被拆開）就對不上，而且不會報錯，只會變得很大。 */
+.mbar__cv {
   width: 14px; height: 14px; color: var(--ink-dim); margin-left: auto;
   transition: transform .22s var(--back);
 }
-.mbar__b.open > svg { transform: rotate(180deg); color: var(--accent); }
+.mbar__b.open .mbar__cv { transform: rotate(180deg); color: var(--accent); }
+.mbar { display: flex; align-items: center; }
+.mbar .q { margin-right: 24px; }
+.mbar__b { flex: 1 1 auto; }
 
 .mbar__p {
   position: absolute; top: 100%; left: 0; right: 0; z-index: 25;
@@ -2290,3 +2295,41 @@ body.bar-icon .bell__wrap, body.bar-icon .gsw { position: relative; }
   background: var(--warn); border-color: var(--warn); color: var(--card);
 }
 .btn--sure:hover { background: var(--warn); border-color: var(--warn); color: var(--card); }
+
+
+/* ============================================================
+   窄螢幕的頂欄
+   ------------------------------------------------------------
+   文字方案在 375px 上擺不下：標題 ＋ 帳本名稱 ＋ 230px 的行內搜尋
+   ＋ 鈴鐺，加起來超出畫面 147px。
+
+   所以窄螢幕不管選了哪個方案，頂欄一律用圖示——
+   空間不夠的時候，能按到比看得懂名字更重要。
+   ============================================================ */
+@media (max-width: 760px) {
+  body.bar-text #searchBtn { display: grid; }
+  body.bar-text #searchDrawer {
+    position: absolute; top: 100%; left: 0; right: 0;
+    display: flex; padding: 14px 18px; min-width: 0;
+    border-left: 0; border-right: 0;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line-2);
+    box-shadow: 0 14px 28px rgba(60, 50, 35, .09);
+  }
+  body.bar-text #searchDrawer[hidden] { display: none !important; }
+
+  body.bar-text .gsw__n,
+  body.bar-text .gsw__cv,
+  body.bar-text .gsw__d { display: none; }
+  body.bar-text .gsw__ic { display: block; }
+  body.bar-text .ic__d { display: block; }
+  body.bar-text .gsw__b { width: 52px; padding: 0; }
+
+  .top { padding-left: 16px; }
+  .top__s { display: none; }
+  .top__t { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ic, .bell { width: 48px; }
+
+  /* 提示訊息不要比畫面寬 */
+  .toasts { max-width: calc(100vw - 24px); right: 12px; left: auto; }
+  .toast { max-width: 100%; }
+}

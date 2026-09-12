@@ -320,12 +320,16 @@
        兩張帶說明的大卡片收成一條。要用哪一種是常態性的選擇，
        選好之後幾乎不會再動，不值得一直佔著版面。 */
     h += '<div class="mbar">' +
+      /* ⚠️ helpBtn() 回傳的是一個 <button>，不可以放進另一個 <button> 裡。
+         HTML 不允許按鈕巢狀——瀏覽器解析到內層按鈕時會把外層直接關掉，
+         後面的東西就被踢出去變成兄弟節點，樣式全部對不上。
+         問號放在按鈕外面。 */
       '<button class="mbar__b" id="modeBtn">' +
         '<span class="mbar__n">' + (MODE === 'para' ? '段落記帳' : '單筆手動') + '</span>' +
-        helpBtn(MODE === 'para' ? 'entry' : '') +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-          '<path d="m6 9 6 6 6-6"/></svg>' +
+        '<svg class="mbar__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
       '</button>' +
+      (MODE === 'para' ? helpBtn('entry') : '') +
       '<div class="mbar__p" id="modePanel" hidden>' +
         modeRow('para', '段落記帳', '一次寫一整段，自動切成好幾筆') +
         modeRow('single', '單筆手動', '一次填一筆，欄位自己選') +

@@ -432,3 +432,23 @@ def test_每一條建立紀錄的路徑都要帶群組():
         i = api.index(fn)
         body = api[i:i + 1400]
         assert "groupFor(" in body, "%s 沒有走 groupFor()，新紀錄會沒有群組" % fn
+
+
+def test_問號不可以放在按鈕裡面():
+    """helpBtn() 回傳的是 <button>，放進另一個 <button> 會被瀏覽器拆開。
+
+    這真的發生過：記帳頁的模式切換鈕裡放了問號，
+    解析器在內層按鈕的位置把外層關掉，後面的箭頭 SVG 被踢出按鈕，
+    CSS 對不上就用原始尺寸畫出來——畫面上出現一個 1162px 的巨大箭頭。
+
+    而且它不會報錯，只會變得很醜。
+    """
+    app = read("frontend/js/app.js")
+    for mo in re.finditer(r"helpBtn\(", app):
+        # 往前找最近的標籤開頭，確認不是 <button
+        before = app[max(0, mo.start() - 400):mo.start()]
+        opens = before.count("<button")
+        closes = before.count("</button>")
+        assert opens <= closes, (
+            "第 %d 個字元附近的 helpBtn() 被包在 <button> 裡面了" % mo.start()
+        )
