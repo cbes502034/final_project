@@ -155,7 +155,7 @@ final_project/
 │   │   │   └── advices.py
 │   │   └── services/           商業邏輯，路由只負責接收與回傳
 │   │       ├── llm.py     ★    Anthropic 呼叫、結構化輸出約束、重試
-│   │       ├── permission.py   依角色與監管關係算出可見範圍
+│   │       ├── permission.py   依監管關係算出可見範圍（角色不參與）
 │   │       └── analytics.py    月年統計、預算使用率
 │   ├── tests/
 │   ├── requirements.txt
@@ -390,10 +390,10 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 資料表 | 畫面 | 該模組的 LLM |
 |---|---|---|---|---|---|---|
-| **成員1** | **認證與基礎建設** | `m1-auth` | 8 支 | `users` `sessions` | 註冊與登入 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
+| **成員1** | **認證與基礎建設** | `m1-auth` | 11 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 8 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
 | **成員3** | **數字與建議** | `m3-analytics` | 10 支 | `categories` `budgets` `savings_goals` `advices` | 我的總覽、家庭總覽、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
-| **成員4** | **家庭與可見範圍** | `m4-access` | 9 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` | 成員與權限 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
+| **成員4** | **家庭與可見範圍** | `m4-access` | 12 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` | 成員與權限、成員紀錄（唯讀）、監管通知 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
 
 ### 切分原則
 

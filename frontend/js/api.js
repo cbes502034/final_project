@@ -157,11 +157,19 @@
   function memberOf(id) {
     return global.DATA.members.filter(function (m) { return m.id === id; })[0];
   }
-  /* 我看得到誰的資料：自己 + 被我監管的人（master 看全家） */
+  /* 我看得到誰的資料：自己 ＋ 我監管的人。就這樣。
+     ------------------------------------------------------------
+     ⚠️ 角色不給可見範圍。master 也一樣——沒有被指派監管誰，
+        就只看得到自己。可見範圍來自 guardianships 這張表，不是頭銜。
+
+     ⚠️ 被監管的人看不到任何別人，包含監管他的人。
+        監管是單向的：你看得到我，不代表我看得到你。
+
+     （原本 master 是看全家的。改掉是因為「家裡最高權限」和
+       「可以看某個人的消費明細」是兩件事——後者要有明確的監管關係，
+       這樣被監管的人才知道自己被誰看著。） */
   function visibleUsers(meId) {
-    var me = memberOf(meId);
-    if (!me) return [meId];
-    if (me.role === 'master') return global.DATA.members.map(function (m) { return m.id; });
+    if (!memberOf(meId)) return [meId];
     var wards = global.DATA.guardianships
       .filter(function (g) { return g.guardian === meId; })
       .map(function (g) { return g.ward; });
@@ -730,9 +738,24 @@
     members: function () {
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
+        /* 名字、角色、監管關係是公開的——被監管的人必須知道自己被誰看著，
+           所以這張表不能藏。但「存款目標」是個人財務資料，
+           看不到那個人的就不要送過去。⚠️ 後端也要這樣做：
+           前端把欄位藏起來不算保護，資料根本不該離開伺服器。 */
+        var vis = visibleUsers(s.me);
         return {
           me: s.me,
-          members: clone(D.members),
+          visible: vis,
+          members: D.members.map(function (m) {
+            var o = clone(m);
+            if (vis.indexOf(m.id) < 0) {
+              delete o.savingsGoal;
+              delete o.income;
+              delete o.expense;
+              delete o.budget;
+            }
+            return o;
+          }),
           roles: clone(D.roles),
           guardianships: D.guardianships.map(function (g) {
             return Object.assign(clone(g), {

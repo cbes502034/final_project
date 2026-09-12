@@ -466,11 +466,14 @@
       .then(function (r) {
         var d = r[0], m = r[1], b = r[2];
         var h = '<div class="page">';
-        if (m.user.role === 'member') {
-          h += '<div class="note note--warn"><div class="note__k">權限不足</div><p>' +
-            '你目前的角色是<b>成員</b>，只看得到自己的紀錄。' +
-            '若要檢視家庭總覽，需要管理者調整角色。<br>' +
-            '（想看不同角色的畫面，登出後用登入頁下面的展示帳號登入。）</p></div></div>';
+        /* 門檻不是角色，是「有沒有人被指派給你看」。
+           一個沒有監管對象的管理者，家庭總覽上也只有自己，沒有意義。 */
+        if ((m.visible || []).length <= 1) {
+          h += '<div class="note note--warn"><div class="note__k">你只看得到自己</div><p>' +
+            '家庭總覽會把<b>你監管的人</b>的收支合起來看。' +
+            '你目前沒有被指派監管任何人，所以這裡只會有你自己的數字——' +
+            '那跟「我的總覽」是同一份。<br>' +
+            '監管關係由管理者建立，而且<b>雙方都看得到</b>，系統不提供隱藏監管。</p></div></div>';
           $view.innerHTML = h;
           return;
         }
@@ -645,10 +648,13 @@
       var h = '<div class="page"><div class="sec"><h2 class="sec__t">家庭成員</h2>' +
         '<span class="sec__n">' + d.members.length + ' 人</span></div>';
       h += '<div class="rows">' + d.members.map(function (u, i) {
+        var seeable = (d.visible || []).indexOf(u.id) >= 0;
         var wards = d.guardianships.filter(function (g) { return g.guardian === u.id; });
         var by = d.guardianships.filter(function (g) { return g.ward === u.id; });
-        return '<article class="row row--open" data-open="' + esc(u.id) + '" ' +
-          'title="看 ' + esc(u.name) + ' 的記帳紀錄" style="animation-delay:' + (i * 50) +
+        return '<article class="row' + (seeable
+            ? ' row--open" data-open="' + esc(u.id) + '" title="看 ' + esc(u.name) + ' 的記帳紀錄'
+            : '" title="你沒有監管這個人，看不到紀錄') +
+          '" style="animation-delay:' + (i * 50) +
           'ms;grid-template-columns:44px 1fr 200px">' +
           ava(u) +
           '<div class="row__m"><div class="row__top">' +
@@ -665,11 +671,14 @@
             (!wards.length && !by.length ? '無監管關係' : '') +
           '</div></div>' +
           '<div class="row__do">' +
-            '<span class="goal"><label>每月存款目標</label>' +
-            '<input class="goal__i" type="number" data-goal="' + esc(u.id) + '" value="' +
-            (u.savingsGoal || 0) + '"' + (canSetGoal(u, d) ? '' : ' disabled') + '></span>' +
-            (canSetGoal(u, d) ? '' : '<span class="tag tag--na">唯讀</span>') +
-            '<span class="row__go">看紀錄 →</span>' +
+            (seeable
+              ? '<span class="goal"><label>每月存款目標</label>' +
+                '<input class="goal__i" type="number" data-goal="' + esc(u.id) + '" value="' +
+                (u.savingsGoal || 0) + '"' + (canSetGoal(u, d) ? '' : ' disabled') + '></span>' +
+                (canSetGoal(u, d) ? '' : '<span class="tag tag--na">唯讀</span>')
+              : '<span class="goal goal--hid"><label>每月存款目標</label>' +
+                '<span class="goal__x" title="你沒有監管這個人">—</span></span>') +
+            (seeable ? '<span class="row__go">看紀錄 →</span>' : '') +
           '</div></article>';
       }).join('') + '</div>';
 

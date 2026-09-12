@@ -308,7 +308,8 @@
             <tr><td>查看自己的統計</td><td>✓</td><td>✓</td><td>✓</td></tr>
             <tr><td>設定自己的預算</td><td>✓</td><td>✓</td><td>需管理者核准</td></tr>
             <tr><td>設定每月存款目標</td><td>✓</td><td>✓</td><td>未成年由管理者代設</td></tr>
-            <tr><td>查看被監管者明細（<b>唯讀</b>）</td><td>✓（全家）</td><td>✓（被指派的）</td><td>✗</td></tr>
+            <tr><td>查看被監管者明細（<b>唯讀</b>）</td><td>✓（被指派的）</td><td>✓（被指派的）</td><td>✗</td></tr>
+            <tr><td><b>查看沒有指派給自己的人</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
             <tr><td><b>修改／刪除被監管者的紀錄</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
             <tr><td><b>登入被監管者的帳號</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
             <tr><td>收到子女新增紀錄的通知</td><td>✓</td><td>✓（被指派的）</td><td>✗</td></tr>
@@ -325,6 +326,7 @@
         <div class="note__k">監管必須雙向可見</div>
         <p>系統不提供「隱藏監管」的選項。<b>偷偷監看家人的消費會破壞信任</b>，
         而信任正是家庭記帳能持續下去的前提。</p>
+        <p style="margin-top:8px"><b>可見範圍來自監管關係，不是頭銜。</b>管理者是家裡權限最高的人，但他能看誰的明細，一樣要看 <code>guardianships</code> 這張表——<b>沒有被指派監管誰，就只看得到自己</b>。<br>這條界線讓「誰看得到我」永遠是一個可以查、可以列出來的清單，而不是一句「管理者本來就看得到」。</p>
         <p style="margin-top:8px"><b>而且監管是唯讀的。</b>管理者看得到子女的記帳明細，但<b>不能改、不能刪，更不能登入對方的帳號</b>。<br>        這條界線讓監管站得住腳：被監管的人知道自己的紀錄<b>不會被動手腳</b>。能登入對方帳號的話，這份信任就沒了。</p>
       </div>
 

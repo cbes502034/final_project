@@ -17,7 +17,7 @@ window.DATA = {
 
   /* ---------- 家庭成員與角色 ---------- */
   roles: [
-    { id: 'master', name: '管理者', desc: '家庭最高權限：看全家、管成員、設預算、指派監管關係' },
+    { id: 'master', name: '管理者', desc: '家庭最高權限：管成員、設預算、指派監管關係。看得到誰一樣要看監管關係——沒指派就只看得到自己' },
     { id: 'parent', name: '家長', desc: '看自己 + 被指派監管的成員' },
     { id: 'member', name: '成員', desc: '只看自己。被監管時會明確顯示「誰看得到你」' }
   ],
@@ -380,7 +380,8 @@ window.DATA = {
     { action: '查看自己的統計', master: 'Y', parent: 'Y', member: 'Y' },
     { action: '設定自己的預算', master: 'Y', parent: 'Y', member: '需管理者核准' },
     { action: '設定每月存款目標', master: 'Y', parent: 'Y', member: '未成年由管理者代設' },
-    { action: '查看被監管者的明細', master: 'Y（全家）', parent: 'Y（被指派的）', member: 'N' },
+    { action: '查看被監管者的明細', master: 'Y（被指派的）', parent: 'Y（被指派的）', member: 'N' },
+    { action: '查看沒有指派給自己的人', master: 'N', parent: 'N', member: 'N' },
     { action: '查看家庭總覽', master: 'Y', parent: '僅摘要', member: 'N' },
     { action: '設定家庭預算', master: 'Y', parent: 'N', member: 'N' },
     { action: '邀請／移除成員', master: 'Y', parent: 'N', member: 'N' },

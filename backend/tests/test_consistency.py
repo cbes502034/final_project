@@ -274,3 +274,39 @@ def test_切換身分已經從前端絕跡():
         src = read(rel)
         assert "前端專用、後端不實作" not in src, "%s 的說法過時了" % rel
         assert "示範模式專用" not in src, "%s 的說法過時了" % rel
+
+
+def test_規格文件的分工總表也要對():
+    """docs/01 的分工總表用第三種寫法標路由數（`| 8 支 |`）。
+
+    前兩條測試數的是路由明細表的列數，抓不到這張總表——
+    所以它也飄掉過：成員1 停在 8 支（實際 11）、成員4 停在 9 支（實際 12）。
+    """
+    from app.ownership import MEMBERS
+
+    spec = read("docs/01-tech-stack-and-api.md")
+    for m in MEMBERS:
+        mo = re.search(
+            r"\| \*\*%s\*\* \| \*\*%s\*\* \| `%s` \| (\d+) 支 \|"
+            % (re.escape(m.label), re.escape(m.domain), re.escape(m.branch)),
+            spec)
+        assert mo, "分工總表裡找不到 %s" % m.label
+        assert int(mo.group(1)) == len(m.routes), \
+            "分工總表說 %s 有 %s 支，ownership.py 說 %d 支" % (
+                m.label, mo.group(1), len(m.routes))
+
+
+def test_可見範圍不可以用角色判斷():
+    """可見範圍只能由 guardianships 決定。
+
+    寫成 `if role == 'master': return everyone` 的話，
+    被監管的人就無法確認自己的紀錄被誰看過——「誰看得到我」
+    必須是一份可以查、可以列出來的清單。
+    """
+    api = read("frontend/js/api.js")
+    mo = re.search(r"function visibleUsers\(meId\) \{(.*?)\n  \}", api, re.S)
+    assert mo, "api.js 裡找不到 visibleUsers"
+    body = mo.group(1)
+    assert "role" not in body, \
+        "visibleUsers 又用角色判斷了：\n" + body
+    assert "guardianships" in body, "visibleUsers 沒有看 guardianships"
