@@ -15,13 +15,34 @@
      蓋住的話，被遮的那一列會被切掉一半，看起來像壞掉。
 
      面板是絕對定位的（貼著頂欄），所以用內容區的 padding 把位置讓出來。 */
+  /* 頂欄有多高，吸附的東西就要從那裡開始。
+     高度會變：窄螢幕的圖示列比較矮、標題換行會變高、抽屜拉開又更高。
+     所以用 ResizeObserver 盯著它，不要在 CSS 裡寫死。 */
+  function measureTop() {
+    var top = document.querySelector('.top');
+    if (!top) return;
+    var h = Math.round(top.getBoundingClientRect().height);
+    document.body.style.setProperty('--top-h', h + 'px');
+  }
+  if (global.ResizeObserver) {
+    var ro = new ResizeObserver(measureTop);
+    var t0 = document.querySelector('.top');
+    if (t0) ro.observe(t0);
+  }
+  window.addEventListener('resize', measureTop);
+  measureTop();
+
   function pushForDrawer() {
     var open = ['#gswPanel', '#bellPanel', '#searchDrawer']
       .map(function (sel) { return document.querySelector(sel); })
       .filter(function (e) { return e && !e.hidden && getComputedStyle(e).position === 'absolute'; })[0];
     var h = open ? Math.ceil(open.getBoundingClientRect().height) : 0;
     document.body.style.setProperty('--dw-h', h + 'px');
+    /* 抽屜是絕對定位貼在頂欄下緣，所以吸附的表頭也要多讓開這段高度，
+       否則表頭會被抽屜蓋住。 */
+    document.body.style.setProperty('--dw-h-live', h + 'px');
     document.body.classList.toggle('dw-push', h > 0);
+    measureTop();
   }
   global.__pushForDrawer = pushForDrawer;   // notify.js 開關鈴鐺時也要叫
 
@@ -1424,8 +1445,26 @@
       /* 左右兩欄。大頭貼、存款目標、密碼都只需要半欄的寬度，
          各自獨佔一整條的話，整頁會被拉得很長而且空空的。
          階段性提醒有清單又有新增列，需要整欄，所以放在下面。 */
+      /* 基本資料在左，其他設定在右。
+         階段性提醒有清單又有新增列，需要整欄，放下面。 */
       var h = '<div class="page">' +
         '<div class="cols"><div class="col">' +
+
+        '<div class="sec"><h2 class="sec__t">基本資料</h2></div>' +
+        '<form class="card prof__form" id="profF">' +
+          '<label class="fld"><span>名字</span>' +
+            '<input type="text" id="pfName" value="' + esc(u.name) + '" required></label>' +
+          '<label class="fld"><span>出生年份</span>' +
+            '<input type="number" id="pfYear" min="1900" max="' + new Date().getFullYear() + '" ' +
+              'value="' + (u.birthYear || '') + '" placeholder="例如 1974">' +
+            '</label>' +
+          '<label class="fld"><span>Email</span>' +
+            '<input type="email" value="' + esc(u.email || '') + '" disabled>' +
+            '</label>' +
+          '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
+        '</form>' +
+
+        '</div><div class="col">' +
 
         '<div class="sec"><h2 class="sec__t">大頭貼' + helpBtn('avatar') + '</h2></div>' +
         '<div class="card prof">' +
@@ -1444,22 +1483,6 @@
           '<input class="goal__i" type="number" min="0" ' +
             'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '">' +
         '</div>' +
-
-        '</div><div class="col">' +
-
-        '<div class="sec"><h2 class="sec__t">基本資料</h2></div>' +
-        '<form class="card prof__form" id="profF">' +
-          '<label class="fld"><span>名字</span>' +
-            '<input type="text" id="pfName" value="' + esc(u.name) + '" required></label>' +
-          '<label class="fld"><span>出生年份</span>' +
-            '<input type="number" id="pfYear" min="1900" max="' + new Date().getFullYear() + '" ' +
-              'value="' + (u.birthYear || '') + '" placeholder="例如 1974">' +
-            '</label>' +
-          '<label class="fld"><span>Email</span>' +
-            '<input type="email" value="' + esc(u.email || '') + '" disabled>' +
-            '</label>' +
-          '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
-        '</form>' +
 
         '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
         '<form class="card prof__form" id="pwF">' +

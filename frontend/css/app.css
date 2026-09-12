@@ -2088,7 +2088,13 @@ body.rail-min .nav__i:hover, body.rail-min .docs__i:hover { background: var(--su
 .txt { width: 100%; border-collapse: collapse; }
 
 .txt thead th {
-  position: sticky; top: 58px; z-index: 5;
+  /* ⚠️ 這裡不要用 position: sticky。
+     表格外層是 overflow-x: auto（為了讓寬表格自己橫向捲動），
+     那會讓它變成捲動容器——sticky 只會對那個容器生效，不是對視窗。
+     結果表頭吸不住，只是帶著 z-index 滑到頂欄底下，
+     畫在紀錄列上面，把那一列切掉一半。
+
+     吸附在這個結構下做不到，硬做只會遮住東西，所以不做。 */
   padding: 10px 14px; text-align: left; white-space: nowrap;
   background: var(--card-3); border-bottom: 1px solid var(--line-2);
   font-size: 11px; font-weight: 500; letter-spacing: .08em;
@@ -2349,3 +2355,5 @@ body.dw-push #view { padding-top: var(--dw-h, 0px); }
 
 /* 推開之後就不需要壓暗了——沒有東西被蓋住 */
 body.dw-on #view { opacity: 1; pointer-events: auto; }
+
+
