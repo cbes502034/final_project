@@ -211,6 +211,8 @@
     document.body.classList.toggle('dw-on', state.open);
     // 抽屜拉開要把內容推下去，不要蓋住
     if (global.__pushForDrawer) setTimeout(global.__pushForDrawer, 0);
+    // 抽屜在版面最上面，捲到下面才打開的話會開在畫面外
+    if (state.open) setTimeout(function () { global.scrollTo(0, 0); }, 40);
     if (!state.open) {
       // 關起來就把內容清掉。留著的話，換人之後 DOM 裡還躺著
       // 上一個使用者的記帳明細 —— 看不到不等於不在。

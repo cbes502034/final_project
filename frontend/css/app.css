@@ -2357,3 +2357,74 @@ body.dw-push #view { padding-top: var(--dw-h, 0px); }
 body.dw-on #view { opacity: 1; pointer-events: auto; }
 
 
+
+
+/* ============================================================
+   新手導覽
+   ------------------------------------------------------------
+   用一個方框把目標圈起來、其餘變暗。
+   暗的部分是用 box-shadow 往外撐 9999px 做出來的——
+   比 clip-path 相容性好，而且邊緣是直角，跟整體一致。
+   ============================================================ */
+.tour { position: fixed; inset: 0; z-index: 300; pointer-events: none; }
+body.tour-on { overflow: hidden; }
+
+.tour__hole {
+  position: fixed; pointer-events: none;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 9999px rgba(28, 24, 18, .55);
+  transition: left .28s var(--out), top .28s var(--out),
+              width .28s var(--out), height .28s var(--out);
+}
+
+.tour__box {
+  position: fixed; width: 300px; pointer-events: auto;
+  background: var(--card); border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-pop); padding: 18px 20px 16px;
+  transition: left .28s var(--out), top .28s var(--out);
+}
+.tour__n {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  letter-spacing: .1em; margin-bottom: 8px;
+}
+.tour__box h4 { font-family: var(--serif); font-size: 16px; margin-bottom: 8px; }
+.tour__box p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.9; }
+.tour__a {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.tour__skip {
+  margin-right: auto; font-size: 12px; color: var(--ink-dim);
+  background: transparent; border: 0; padding: 4px 0;
+}
+.tour__skip:hover { color: var(--ink); }
+
+/* 詢問視窗比說明彈窗窄一點，像一句問話 */
+.tw2 .hp__c { width: min(380px, 100%); }
+.tw2 .hp__b p { font-size: 14.5px; }
+
+@media (max-width: 560px) {
+  .tour__box { width: calc(100vw - 24px); left: 12px !important; }
+}
+
+
+/* ============================================================
+   抽屜是版面的一部分，不是浮層
+   ------------------------------------------------------------
+   用 padding 把內容往下推只在捲到最上面時有用；捲動之後，
+   視窗停在原本的文件位置，看到的還是被蓋住的那一段。
+
+   所以面板直接放進版面裡（頂欄與內容之間），佔真實的空間——
+   不管捲到哪裡都不會壓到任何東西。
+   ============================================================ */
+.gsw__p.inflow,
+.bell__panel.inflow,
+#searchDrawer.inflow {
+  position: static; width: auto; left: auto; right: auto;
+  max-height: none; box-shadow: none;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-2);
+  border-left: 0; border-right: 0;
+}
+/* 版面裡的東西不需要再讓位 */
+body.dw-push #view { padding-top: 0; }

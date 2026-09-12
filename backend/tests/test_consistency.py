@@ -452,3 +452,134 @@ def test_問號不可以放在按鈕裡面():
         assert opens <= closes, (
             "第 %d 個字元附近的 helpBtn() 被包在 <button> 裡面了" % mo.start()
         )
+
+
+# ===========================================================================
+# 前端：呼叫了一個不存在的函式
+# ===========================================================================
+#
+# 這一類壞法最難發現：檔案語法完全正確，node --check 也過，
+# 畫面照常長出來——直到使用者剛好點到那一行，才在主控台丟 ReferenceError。
+#
+# 實際踩過：抽屜改成推開內容之後，量測高度的 measureTop() 被拿掉了，
+# 但 pushForDrawer() 裡還留著一行呼叫。每捲一次、每開一次抽屜就噴一次，
+# 累積 131 個錯誤，而畫面上完全看不出來。
+#
+# 下面這支用很土的方法解決：把字串、註解、正則塗掉，
+# 收集所有宣告過的名字，再去找呼叫得出來卻沒宣告的。
+
+_BROWSER = set(
+    """
+    if for while switch catch return typeof new delete void instanceof in of do
+    else try finally function var let const throw case break continue yield await
+    Array Object String Number Boolean Date Math JSON RegExp Error Promise Set Map
+    parseInt parseFloat isNaN isFinite encodeURIComponent decodeURIComponent
+    setTimeout setInterval clearTimeout clearInterval requestAnimationFrame
+    alert confirm prompt fetch console document window localStorage sessionStorage
+    Uint8Array Intl Symbol WeakMap Proxy Reflect BigInt structuredClone
+    queueMicrotask getComputedStyle matchMedia CustomEvent Event DOMParser
+    MutationObserver IntersectionObserver ResizeObserver AbortController
+    FileReader Image Audio Blob File FormData URL URLSearchParams Headers
+    Request Response XMLHttpRequest WebSocket EventSource Notification
+    TextEncoder TextDecoder Worker
+    """.split()
+)
+
+# 正則後面可以接的旗標；判斷「這個 / 是正則還是除號」用前一個字元
+_BEFORE_RE = set("(,=:[!&|?{};\n+-*%~^<>")
+
+
+def _blank(src):
+    """把字串、樣板、正則、註解換成等長的空白，行號才對得起來。
+
+    ⚠️ 正則一定要處理。像 /^[^']*$/ 裡的單引號如果被當成字串開頭，
+    從那一行開始所有引號配對就全錯，後面會冒出一整串假警報。
+    """
+    out, i, n, prev = [], 0, len(src), ""
+    while i < n:
+        c, two = src[i], src[i:i + 2]
+        if c == "/" and two not in ("//", "/*") and (prev == "" or prev in _BEFORE_RE):
+            j, in_class = i + 1, False
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == "[":
+                    in_class = True
+                elif src[j] == "]":
+                    in_class = False
+                elif src[j] == "/" and not in_class:
+                    break
+                elif src[j] == "\n":
+                    break
+                j += 1
+            if j < n and src[j] == "/":
+                j += 1
+                while j < n and src[j] in "gimsuy":
+                    j += 1
+                out.append(" " * (j - i))
+                prev, i = "/", j
+                continue
+        if two == "//":
+            j = src.find("\n", i)
+            j = n if j < 0 else j
+            out.append(" " * (j - i))
+            i = j
+        elif two == "/*":
+            j = src.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append("".join(ch if ch == "\n" else " " for ch in src[i:j]))
+            i = j
+        elif c in "\"'`":
+            j = i + 1
+            while j < n and src[j] != c:
+                if src[j] == "\\":
+                    j += 1
+                j += 1
+            j = min(j + 1, n)
+            out.append("".join(ch if ch == "\n" else " " for ch in src[i:j]))
+            i = j
+        else:
+            out.append(c)
+            if not c.isspace():
+                prev = c
+            i += 1
+    return "".join(out)
+
+
+def _declared(code):
+    names = set()
+    for pat in (
+        r"\bfunction\s+([A-Za-z_$][\w$]*)",
+        r"\b(?:var|let|const)\s+([A-Za-z_$][\w$]*)",
+        r",\s*([A-Za-z_$][\w$]*)\s*=",
+        r"\bcatch\s*\(\s*([A-Za-z_$][\w$]*)",
+    ):
+        names |= set(re.findall(pat, code))
+    for mo in re.finditer(r"\bfunction\s*[A-Za-z_$\w]*\s*\(([^)]*)\)", code):
+        for p in mo.group(1).split(","):
+            p = p.strip()
+            if re.match(r"^[A-Za-z_$][\w$]*$", p):
+                names.add(p)
+    return names
+
+
+def test_前端沒有呼叫不存在的函式():
+    """語法對、檔案載得進來，但按下去就 ReferenceError 的那一類。"""
+    problems = []
+    for path in (
+        "frontend/js/app.js",
+        "frontend/js/api.js",
+        "frontend/js/notify.js",
+        "frontend/js/data.js",
+        "frontend/js/stars.js",
+    ):
+        code = _blank(read(path))
+        known = _declared(code) | _BROWSER
+        for mo in re.finditer(r"(?<![.\w$])([a-zA-Z_$][\w$]*)\s*\(", code):
+            if mo.group(1) in known:
+                continue
+            line = code.count("\n", 0, mo.start()) + 1
+            problems.append("%s:%d 呼叫了沒有宣告的 %s()" % (path, line, mo.group(1)))
+
+    assert not problems, "\n".join(problems)

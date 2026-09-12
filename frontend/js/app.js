@@ -10,41 +10,49 @@
   var $view = document.getElementById('view');
   var DATA_CATS = {};   // 分類 id → 名稱，確認訊息要用
 
-  /* 抽屜拉開時把下面的內容往下推，不要蓋住它。
-     檔案櫃的抽屜是把東西推開，不是壓在上面——
-     蓋住的話，被遮的那一列會被切掉一半，看起來像壞掉。
+  /* 抽屜不要浮在內容上面。
+     ------------------------------------------------------------
+     一開始是用 padding-top 把內容往下推，但那只有在頁面捲到最上面
+     才有用：捲動之後文件整體往下移，視窗還停在原本的文件位置，
+     看到的仍然是被蓋住的那一段（實測有 5 個元素被蓋到）。
 
-     面板是絕對定位的（貼著頂欄），所以用內容區的 padding 把位置讓出來。 */
-  /* 頂欄有多高，吸附的東西就要從那裡開始。
-     高度會變：窄螢幕的圖示列比較矮、標題換行會變高、抽屜拉開又更高。
-     所以用 ResizeObserver 盯著它，不要在 CSS 裡寫死。 */
-  function measureTop() {
-    var top = document.querySelector('.top');
-    if (!top) return;
-    var h = Math.round(top.getBoundingClientRect().height);
-    document.body.style.setProperty('--top-h', h + 'px');
+     所以改成把面板**搬進版面裡**——放到頂欄和內容之間當一個真的區塊。
+     它佔的是真實的空間，不管捲到哪裡都不會壓到任何東西。
+
+     圖示模式維持一般下拉（小面板貼著按鈕），那是慣例，不搬。 */
+  function placePanel(panel) {
+    if (!panel) return;
+    var main = document.querySelector('.main');
+    var view = document.getElementById('view');
+    if (!main || !view) return;
+
+    if (!document.body.classList.contains('bar-text')) {
+      panel.classList.remove('inflow');
+      return;
+    }
+    /* ⚠️ 重繪會在原位生一個同 id 的新面板，搬走的舊的還在 main 裡，
+       於是 querySelector 查到的是文件順序在前的那一個（原位、關著的），
+       看起來就像「按了沒反應」。所以搬之前先把舊的清掉。 */
+    var stale = main.querySelector(':scope > #' + panel.id);
+    if (stale && stale !== panel) stale.remove();
+    if (panel.parentElement !== main) main.insertBefore(panel, view);
+    panel.classList.add('inflow');
   }
-  if (global.ResizeObserver) {
-    var ro = new ResizeObserver(measureTop);
-    var t0 = document.querySelector('.top');
-    if (t0) ro.observe(t0);
-  }
-  window.addEventListener('resize', measureTop);
-  measureTop();
+
+  /* ⚠️ 只有這兩個是抽屜。#searchDrawer 在文字模式是頂欄上的行內搜尋框，
+     把它搬進版面的話，頂欄的搜尋就不見了。 */
+  var DRAWERS = ['#gswPanel', '#bellPanel'];
 
   function pushForDrawer() {
-    var open = ['#gswPanel', '#bellPanel', '#searchDrawer']
-      .map(function (sel) { return document.querySelector(sel); })
-      .filter(function (e) { return e && !e.hidden && getComputedStyle(e).position === 'absolute'; })[0];
-    var h = open ? Math.ceil(open.getBoundingClientRect().height) : 0;
-    document.body.style.setProperty('--dw-h', h + 'px');
-    /* 抽屜是絕對定位貼在頂欄下緣，所以吸附的表頭也要多讓開這段高度，
-       否則表頭會被抽屜蓋住。 */
-    document.body.style.setProperty('--dw-h-live', h + 'px');
-    document.body.classList.toggle('dw-push', h > 0);
-    measureTop();
+    DRAWERS.forEach(function (sel) {
+      var e = document.querySelector(sel);
+      if (e) placePanel(e);
+    });
+    var open = DRAWERS.map(function (sel) { return document.querySelector(sel); })
+      .filter(function (e) { return e && !e.hidden; })[0];
+    document.body.classList.toggle('dw-on', !!open);
   }
-  global.__pushForDrawer = pushForDrawer;   // notify.js 開關鈴鐺時也要叫
+  global.__pushForDrawer = pushForDrawer;
 
   /* 側欄收合。記在 localStorage，下次打開維持上次的樣子。 */
   (function () {
@@ -1367,6 +1375,192 @@
     });
   }
 
+
+  /* ============================================================
+     新手導覽
+
+     第一次打開時先問一句「要不要帶你走一遍」，願意的人才走。
+     不強迫、隨時可以跳過，跳過之後不會再問。
+
+     每一步用一個方框把目標圈起來（其餘變暗），旁邊放一句話。
+     說明只講「這裡能做什麼」，不解釋系統怎麼實作。
+     ============================================================ */
+  var TOUR_KEY = 'fambudget.tour';
+  var TOUR = [
+    { sel: '.nav__i[data-nav="entry"]', hash: '#/',
+      t: '從這裡記帳',
+      b: '打一段話就好，例如「早餐55 中午吃飯320」，系統會幫你拆成一筆一筆。' },
+    { sel: '.kpis .kpi:last-child', hash: '#/',
+      t: '這個月還能花多少',
+      b: '收入扣掉你設定的存款目標，剩下的就是能放心花的錢。' },
+    { sel: '#gswBtn', hash: '#/',
+      t: '切換帳本',
+      b: '家用、旅遊基金可以分開記。切過去之後，統計和目標都只看那一本。' },
+    { sel: '#bell', hash: '#/',
+      t: '通知',
+      b: '家人記帳、或是你花到設定的比例時，這裡會亮。' },
+    { sel: '.nav__i[data-nav="profile"]', hash: '#/',
+      t: '設定在這裡',
+      b: '每月想存多少、花到幾成提醒你，都在個人資料裡設定。' },
+    { sel: '.docs__i--main', hash: '#/',
+      t: '看不懂就來這裡',
+      b: '完整的使用說明放在這。另外，畫面上標題旁邊的「?」可以隨時點開。' }
+  ];
+  var tourAt = -1;
+
+  function clamp(v, lo, hi) {
+    if (hi < lo) return lo;                   // 空間比框還小：貼著上緣就好
+    return Math.max(lo, Math.min(v, hi));
+  }
+
+  function tourDone() {
+    try { return localStorage.getItem(TOUR_KEY) === 'done'; } catch (e) { return true; }
+  }
+  function tourRemember() {
+    try { localStorage.setItem(TOUR_KEY, 'done'); } catch (e) {}
+  }
+
+  function tourAsk() {
+    if (tourDone()) return;
+    var w = el('<div class="hp tw2 on" id="tourAsk">' +
+      '<div class="hp__c" role="dialog" aria-modal="true">' +
+        '<div class="hp__b" style="padding-top:26px">' +
+          '<h3 style="font-size:19px;margin-bottom:10px">第一次用？</h3>' +
+          '<p>花一分鐘帶你走一遍，看完就知道東西都在哪裡。</p>' +
+        '</div>' +
+        '<div class="hp__d" style="justify-content:center;gap:10px">' +
+          '<button class="btn" id="tourNo">自己看看就好</button>' +
+          '<button class="btn btn--go" id="tourYes">好，帶我走一遍</button>' +
+        '</div>' +
+      '</div></div>');
+    document.body.appendChild(w);
+    document.body.classList.add('hp-on');
+  }
+
+  function tourAskClose() {
+    var w = document.getElementById('tourAsk');
+    if (w) w.remove();
+    document.body.classList.remove('hp-on');
+  }
+
+  function tourStart() {
+    tourAskClose();
+    tourAt = -1;
+    if (!document.getElementById('tour')) {
+      document.body.appendChild(el(
+        '<div class="tour" id="tour">' +
+          '<div class="tour__hole" id="tourHole"></div>' +
+          '<div class="tour__box" id="tourBox"></div>' +
+        '</div>'));
+    }
+    tourGo(1);
+  }
+
+  function tourEnd() {
+    var w = document.getElementById('tour');
+    if (w) w.remove();
+    document.body.classList.remove('tour-on');
+    tourRemember();
+    tourAt = -1;
+  }
+
+  function tourGo(delta) {
+    var next = tourAt + delta;
+    if (next < 0) next = 0;
+    if (next >= TOUR.length) { tourEnd(); toast('隨時可以從「使用說明」再看一次', 'ok'); return; }
+    tourAt = next;
+    var step = TOUR[tourAt];
+
+    if (step.hash && location.hash !== step.hash) { location.hash = step.hash; }
+    document.body.classList.add('tour-on');
+    setTimeout(tourPaint, 260);
+  }
+
+  function tourPaint() {
+    var step = TOUR[tourAt];
+    var hole = document.getElementById('tourHole');
+    var box = document.getElementById('tourBox');
+    if (!hole || !box) return;
+
+    var el0 = document.querySelector(step.sel);
+    if (!el0) { tourGo(1); return; }          // 那個東西這次不在畫面上就跳過
+
+    /* 導覽期間 body 是 overflow:hidden（不讓使用者自己捲，否則圈圈會跟目標分家）。
+       但那也擋掉了我們自己的 scrollIntoView——目標在畫面外的那幾步就會圈到空氣。
+       所以捲的當下先解開，捲完立刻鎖回去；同一個 tick 內做完，不會閃。 */
+    var locked = document.body.classList.contains('tour-on');
+    if (locked) document.body.classList.remove('tour-on');
+    /* ⚠️ 一定要 'instant'。tokens.css 給了 html { scroll-behavior: smooth }，
+       用 'auto' 會繼承成動畫捲動，下一行 getBoundingClientRect() 讀到的
+       還是捲之前的位置——圈圈就畫在目標的舊位址，看起來像圈到空氣。 */
+    el0.scrollIntoView({ block: 'center', behavior: 'instant' });
+    if (locked) document.body.classList.add('tour-on');
+
+    var r = el0.getBoundingClientRect();
+    /* ⚠️ 圈圈有過場動畫，所以它從這裡搬到那裡的途中，
+       getBoundingClientRect() 讀到的是「動畫現在畫到哪」，不是最後停的位置。
+       後面排說明框要避開它，一定得用下面這四個數字，不能回頭去讀 DOM。 */
+    var pad = 6;
+    var hx = Math.max(2, r.left - pad);
+    var hy = Math.max(2, r.top - pad);
+    var hw = r.width + pad * 2;
+    var hgt = r.height + pad * 2;
+    hole.style.left = hx + 'px';
+    hole.style.top = hy + 'px';
+    hole.style.width = hw + 'px';
+    hole.style.height = hgt + 'px';
+
+    box.innerHTML =
+      '<div class="tour__n">' + (tourAt + 1) + ' / ' + TOUR.length + '</div>' +
+      '<h4>' + esc(step.t) + '</h4>' +
+      '<p>' + esc(step.b) + '</p>' +
+      '<div class="tour__a">' +
+        '<button class="tour__skip" id="tourSkip">跳過</button>' +
+        (tourAt > 0 ? '<button class="btn btn--sm" id="tourPrev">上一步</button>' : '') +
+        '<button class="btn btn--sm btn--go" id="tourNext">' +
+          (tourAt === TOUR.length - 1 ? '完成' : '下一步') + '</button>' +
+      '</div>';
+
+    /* 說明框的位置。
+
+       規矩只有一條：**不可以蓋住它正在指的東西**。
+       先試右邊，再試左邊；手機上卡片幾乎滿版，兩邊都塞不下，
+       這時候要改放上面或下面（挑空間大的那一側），不能硬擠回原位——
+       擠回去就會正好疊在目標上，使用者只看到一個框跟一片灰。 */
+    var gap = 14, edge = 12;
+    var bw = Math.min(300, innerWidth - edge * 2);
+    box.style.width = bw + 'px';
+    box.style.top = '0px';
+    box.style.left = '0px';
+    var bh = box.getBoundingClientRect().height;
+
+    /* 要避開的是「圈圈」，不是目標本身——圈圈比目標大一圈，
+       而且貼邊時會被夾住，位置跟目標對不起來。 */
+    var hRight = hx + hw, hBottom = hy + hgt;
+    var left, top;
+
+    if (hRight + gap + bw <= innerWidth - edge) {
+      left = hRight + gap;                                    // 放右邊
+      top = clamp(hy + hgt / 2 - bh / 2, edge, innerHeight - bh - edge);
+    } else if (hx - gap - bw >= edge) {
+      left = hx - gap - bw;                                   // 放左邊
+      top = clamp(hy + hgt / 2 - bh / 2, edge, innerHeight - bh - edge);
+    } else {
+      /* 兩邊都塞不下（手機上卡片幾乎滿版）：改放上面或下面，挑空間大的那側。
+         不能硬擠回原位——擠回去就正好疊在目標上，
+         使用者只看到一個框跟一片灰，根本不知道你在指什麼。 */
+      left = clamp(hx + hw / 2 - bw / 2, edge, innerWidth - bw - edge);
+      var below = innerHeight - hBottom - gap;
+      var above = hy - gap;
+      top = (below >= bh || below >= above)
+        ? clamp(hBottom + gap, edge, innerHeight - bh - edge)
+        : clamp(hy - gap - bh, edge, innerHeight - bh - edge);
+    }
+
+    box.style.left = Math.round(left) + 'px';
+    box.style.top = Math.round(top) + 'px';
+  }
+
   /* ---------- 共用 ---------- */
   function head(t, s) { $title.textContent = t; $sub.textContent = s; }
 
@@ -1631,6 +1825,8 @@
           }).join('') +
           '<a class="gsw__more" href="#/groups">管理群組 →</a>' +
         '</div>';
+      // 重繪之後面板是新的，馬上搬到版面裡，避免留下同 id 的舊節點
+      pushForDrawer();
     }).catch(function () { box.hidden = true; });
   }
 
@@ -1688,6 +1884,21 @@
   document.addEventListener('click', function (e) {
     var t = e.target;
     if (!t.closest) return;
+
+    /* 導覽進行中：只有導覽自己的按鈕能按 */
+    if (document.getElementById('tourAsk')) {
+      if (t.closest('#tourYes')) tourStart();
+      else if (t.closest('#tourNo')) { tourAskClose(); tourRemember(); }
+      e.preventDefault(); e.stopPropagation();
+      return;
+    }
+    if (tourAt >= 0) {
+      if (t.closest('#tourNext')) tourGo(1);
+      else if (t.closest('#tourPrev')) tourGo(-1);
+      else if (t.closest('#tourSkip')) tourEnd();
+      e.preventDefault(); e.stopPropagation();
+      return;
+    }
 
     /* 確認視窗開著的時候，底下什麼都不能點 */
     if (dangerOn) {
@@ -1784,10 +1995,12 @@
       var gp = document.getElementById('gswPanel');
       if (gp) {
         gp.hidden = !gp.hidden;
-        // 抽屜拉開時，按鈕本身跟底下的內容都要有反應
         document.getElementById('gswBtn').classList.toggle('open', !gp.hidden);
         document.body.classList.toggle('dw-on', !gp.hidden);
         setTimeout(pushForDrawer, 0);
+        /* 抽屜在版面最上面。捲到下面才點開的話它會開在畫面外，
+           看起來像沒反應——所以直接回到頂端。 */
+        if (!gp.hidden) setTimeout(function () { window.scrollTo(0, 0); }, 40);
       }
       return;
     }
@@ -2278,9 +2491,14 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && helpOpen) closeHelp();
     if (e.key === 'Escape' && dangerOn) dangerClose();
+    if (e.key === 'Escape' && tourAt >= 0) tourEnd();
+    if (e.key === 'ArrowRight' && tourAt >= 0) tourGo(1);
+    if (e.key === 'ArrowLeft' && tourAt >= 0) tourGo(-1);
   });
 
   /* 捲動一點點就讓頂欄浮出陰影，知道自己不在最上面 */
+  window.addEventListener('resize', function () { if (tourAt >= 0) tourPaint(); });
+
   window.addEventListener('scroll', function () {
     document.body.classList.toggle('scrolled', window.scrollY > 4);
   }, { passive: true });
@@ -2305,5 +2523,14 @@
 
   API.authState().then(function (a) {
     if (a.loggedIn && global.Notify) global.Notify.start();
+
+    /* 第一次打開才問。網址帶 ?tour=1 可以重看一次。 */
+    if (!a.loggedIn) return;
+    if (/[?&]tour=1/.test(location.search)) {
+      try { localStorage.removeItem(TOUR_KEY); } catch (e) {}
+      setTimeout(tourStart, 600);
+    } else {
+      setTimeout(tourAsk, 900);
+    }
   });
 })(window);
