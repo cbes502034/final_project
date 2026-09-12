@@ -9,6 +9,17 @@
   var API = global.API;
   var $view = document.getElementById('view');
 
+  /* 頂欄的兩個方案。用網址挑：?bar=text 或 ?bar=icon，預設 text。
+     挑定之後把這段拿掉、只留選中的那一套樣式。 */
+  (function () {
+    var m = /[?&]bar=(text|icon)/.exec(location.search);
+    var pick = m ? m[1] : (function () {
+      try { return localStorage.getItem('fambudget.bar') || 'text'; } catch (e) { return 'text'; }
+    })();
+    if (m) { try { localStorage.setItem('fambudget.bar', pick); } catch (e) {} }
+    document.body.classList.add('bar-' + pick);
+  })();
+
   /* 展示用帳號。mock 模式的登入頁會列出來，免得評審還要猜 email。
      接上真後端（API.mode === 'http'）之後就不顯示了。 */
   var DEMO = [
@@ -483,11 +494,8 @@
         /* 門檻不是角色，是「有沒有人被指派給你看」。
            一個沒有監管對象的管理者，家庭總覽上也只有自己，沒有意義。 */
         if ((m.visible || []).length <= 1) {
-          h += '<div class="note note--warn"><div class="note__k">你只看得到自己</div><p>' +
-            '家庭總覽會把<b>你監管的人</b>的收支合起來看。' +
-            '你目前沒有被指派監管任何人，所以這裡只會有你自己的數字——' +
-            '那跟「我的總覽」是同一份。<br>' +
-            '監管關係由管理者建立，而且<b>雙方都看得到</b>，系統不提供隱藏監管。</p></div></div>';
+          h += '<div class="note note--warn"><div class="note__k">你只看得到自己</div>' +
+            '<p>目前沒有成員指派給你。</p></div></div>';
           $view.innerHTML = h;
           return;
         }
@@ -659,7 +667,9 @@
     head('成員與權限', '角色、監管關係、以及每個角色看得到什麼');
     $view.innerHTML = '<div class="page">' + skeleton(5) + '</div>';
     API.members().then(function (d) {
-      var h = '<div class="page"><div class="sec"><h2 class="sec__t">家庭成員</h2>' +
+      PERMS = d;   // 問號要用，見 HELP.perms
+      var h = '<div class="page"><div class="sec"><h2 class="sec__t">家庭成員' +
+        helpBtn('perms') + '</h2>' +
         '<span class="sec__n">' + d.members.length + ' 人</span></div>';
       h += '<div class="rows">' + d.members.map(function (u, i) {
         var seeable = (d.visible || []).indexOf(u.id) >= 0;
@@ -699,34 +709,9 @@
 
 
 
-      h += '<p class="hint">有「<b>看紀錄</b>」的成員是被指派給你監管的，' +
-        '點進去可以看他的每一筆記帳。沒有的表示不在你的可見範圍內。<br>' +
-        '下面兩份說明預設收起來，需要時點開。</p>';
+      h += '';
 
-      h += '<details class="fold"><summary class="fold__h">' +
-        '<span class="fold__t">三種角色分別是什麼</span>' +
-        '<span class="fold__s">master／parent／member 各自負責什麼</span>' +
-        '</summary><div class="fold__b">';
-      h += '<div class="tbl"><table><thead><tr><th>角色</th><th>說明</th></tr></thead><tbody>' +
-        d.roles.map(function (r) {
-          return '<tr><td><b>' + esc(r.name) + '</b><br><span class="mono" style="color:var(--ink-dim)">' +
-            esc(r.id) + '</span></td><td>' + esc(r.desc) + '</td></tr>';
-        }).join('') + '</tbody></table></div></div></details>';
-
-      h += '<details class="fold"><summary class="fold__h">' +
-        '<span class="fold__t">誰可以做什麼</span>' +
-        '<span class="fold__s">完整權限矩陣。監管是唯讀的——看得到，不能改、不能刪</span>' +
-        '</summary><div class="fold__b">';
-      h += '<div class="tbl"><table><thead><tr><th>動作</th><th>管理者</th><th>家長</th><th>成員</th>' +
-        '</tr></thead><tbody>' + d.permissions.map(function (p) {
-          function cell(v) {
-            if (v === 'Y') return '<span class="tag tag--done">可</span>';
-            if (v === 'N') return '<span class="tag tag--na">不可</span>';
-            return '<span class="tag tag--MEDIUM">' + esc(v) + '</span>';
-          }
-          return '<tr><td><b>' + esc(p.action) + '</b></td><td>' + cell(p.master) +
-            '</td><td>' + cell(p.parent) + '</td><td>' + cell(p.member) + '</td></tr>';
-        }).join('') + '</tbody></table></div></div></details></div>';
+      h += '</div>';
       $view.innerHTML = h;
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -795,17 +780,11 @@
               ROLE_TW[u.role] + '</span>' +
             (mine ? '<span class="tag tag--na">這是你自己</span>' : '') +
           '</div>' +
-          '<p class="mhead__s">' +
-            (mine
-              ? '這是你自己的紀錄，可以刪除。'
-              : '你看得到 <b>' + esc(u.name) + '</b> 的每一筆紀錄，' +
-                '但<b>不能修改、不能刪除</b>，也不能登入對方的帳號。') +
-            (by.length && !mine
-              ? '<br><span class="mhead__h">被 ' +
-                by.map(function (g) { return esc(g.guardianName); }).join('、') +
-                ' 監管</span>'
-              : '') +
-          '</p>' +
+          (by.length && !mine
+            ? '<p class="mhead__s"><span class="mhead__h">被 ' +
+              by.map(function (g) { return esc(g.guardianName); }).join('、') +
+              ' 監管</span></p>'
+            : '') +
         '</div>' +
         '<div class="mhead__n2"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
       '</div>';
@@ -814,20 +793,11 @@
          看得到他紀錄的這一頁，不要塞回成員名冊那張表。 */
       if (canSetGoal(u, d) && !mine) {
         h += '<div class="card prof__goal">' +
-          '<div class="prof__m">' +
-            '<p class="prof__l"><b>' + esc(u.name) + '</b> 未滿 18 歲，' +
-            '每月存款目標由你代設。' +
-            '<br><span class="prof__h">改完立刻生效。他本人看得到這個數字。</span></p>' +
-          '</div>' +
+          '<div class="prof__m"><p class="prof__l">每月存款目標</p></div>' +
           '<span class="goal"><label>每月存款目標</label>' +
             '<input class="goal__i" type="number" min="0" ' +
             'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
         '</div>';
-      }
-
-      if (hit) {
-        h += '<div class="note note--hit"><div class="note__k">通知指的是這一筆</div>' +
-          '<p>下面<b>藍框標起來</b>的那一列就是通知講的那筆紀錄。</p></div>';
       }
 
       h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
@@ -871,7 +841,7 @@
       var gone = d.groups.filter(function (g) { return g.archived; });
 
       var h = '<div class="page">' +
-        '<p class="hint">右上角切換帳本，統計和存款目標都會跟著那一本走。</p>';
+        '';
 
       h += '<div class="sec"><h2 class="sec__t">我的帳本' + helpBtn('books') + '</h2>' +
         '<span class="sec__n">' + live.length + ' 本</span></div>';
@@ -963,8 +933,6 @@
           }).join('') + '</div></div>';
       }
 
-      h += '<div class="note note--warn"><div class="note__k">把人移出帳本之前</div>' +
-        '<p>他會看不到這本帳的所有紀錄，包含自己記的那些。</p></div>';
 
       $view.innerHTML = h + '</div>';
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
@@ -1062,6 +1030,23 @@
          '<b>數字是系統算的，不是模型猜的</b>——' +
          '你可以自己核對。</p>'
     },
+    perms: {
+      t: '誰可以做什麼',
+      build: function () {
+        if (!PERMS) return '<p>資料還在載入。</p>';
+        function cell(v) {
+          if (v === 'Y') return '<td>可以</td>';
+          if (v === 'N') return '<td style="color:var(--ink-dim)">不可以</td>';
+          return '<td>' + esc(v) + '</td>';
+        }
+        return '<div class="hp__t"><table><thead><tr><th>　</th>' +
+          '<th>管理者</th><th>家長</th><th>成員</th></tr></thead><tbody>' +
+          PERMS.permissions.map(function (p) {
+            return '<tr><td>' + esc(p.action) + '</td>' +
+              cell(p.master) + cell(p.parent) + cell(p.member) + '</tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+    },
     avatar: {
       t: '大頭貼',
       b: '<p>選一張圖就好，系統會自動裁成正方形並縮小，' +
@@ -1078,10 +1063,13 @@
   }
 
   var helpOpen = false;
+  var PERMS = null;   // 成員頁載入後放這裡，給權限矩陣的問號用
 
   function openHelp(key) {
     var h = HELP[key];
     if (!h || helpOpen) return;
+    // 有些說明的內容要現算（例如權限矩陣要讀目前的成員資料）
+    if (h.build) h = { t: h.t, b: h.build() };
     helpOpen = true;
 
     var wrap = el('<div class="hp" id="hp">' +
@@ -1173,7 +1161,7 @@
           '<em class="fld__h">至少 8 個字</em></label>' +
         '<label class="fld"><span>每月存款目標</span>' +
           '<input type="number" id="rgGoal" min="0" value="0">' +
-          '<em class="fld__h">之後可以改。收入減掉這個數字就是可支配上限</em></label>' +
+          '</label>' +
         '<button class="btn btn--go gate__go" type="submit">建立帳號</button>' +
         '<p class="gate__alt">已經有帳號了？<a href="#/login">回去登入</a></p>' +
       '</form>');
@@ -1190,7 +1178,6 @@
         '<div class="card prof">' +
           '<div class="prof__a" id="profAva">' + ava(u, 'ava--xl') + '</div>' +
           '<div class="prof__m">' +
-            '<p class="prof__l">選一張照片就好，系統會自動裁切縮小。</p>' +
             '<div class="prof__do">' +
               '<label class="btn btn--sm btn--go">選一張圖' +
                 '<input type="file" id="avaF" accept="image/png,image/jpeg,image/webp" hidden></label>' +
@@ -1206,18 +1193,16 @@
           '<label class="fld"><span>出生年份</span>' +
             '<input type="number" id="pfYear" min="1900" max="' + new Date().getFullYear() + '" ' +
               'value="' + (u.birthYear || '') + '" placeholder="例如 1974">' +
-            '<em class="fld__h">未滿 18 歲的存款目標會由家裡的管理者代為設定</em></label>' +
+            '</label>' +
           '<label class="fld"><span>Email</span>' +
             '<input type="email" value="' + esc(u.email || '') + '" disabled>' +
-            '<em class="fld__h">這是你的登入帳號，目前不能更改</em></label>' +
+            '</label>' +
           '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
         '</form>' +
 
         '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
         '<div class="card prof__goal">' +
           '<div class="prof__m">' +
-            '<p class="prof__l">這個月希望存下多少錢。' +
-            '<br><span class="prof__h">改完立刻生效，不用按儲存。</span></p>' +
           '</div>' +
           '<span class="goal"><label>每月存款目標</label>' +
             '<input class="goal__i" type="number" min="0" ' +
@@ -1237,11 +1222,8 @@
           '<div><button class="btn" type="submit">更改密碼</button></div>' +
         '</form>' +
 
-        '<div class="sec"><h2 class="sec__t">登出</h2></div>' +
         '<div class="card prof__out">' +
-          '<p class="prof__l">登出會把這台裝置的登入狀態清掉。' +
-          '<br><span class="prof__h">其他裝置不受影響</span></p>' +
-          '<button class="btn btn--sm" id="logout2">登出</button>' +
+          '<button class="btn" id="logout2">登出</button>' +
         '</div>' +
       '</div>';
       $view.innerHTML = h;
@@ -1258,10 +1240,7 @@
     Promise.all([API.alerts(), API.savingsGoals()]).then(function (r) {
       var list = r[0].alerts || [], goals = r[1].goals || [];
 
-      var h = '<p class="prof__l">花到幾成的時候提醒你。' +
-        '<br><span class="prof__h">同一個門檻一個月只會響一次。</span></p>';
-
-      h += list.length
+      var h = list.length
         ? '<div class="alist">' + list.map(function (a) {
             return '<div class="ai' + (a.enabled ? '' : ' off') + '">' +
               '<span class="ai__p">' + esc(a.percent) + '%</span>' +
@@ -1272,7 +1251,7 @@
               '<button class="ai__x" data-adel="' + esc(a.id) + '" title="刪掉">×</button>' +
             '</div>';
           }).join('') + '</div>'
-        : '<p class="prof__h">還沒設任何門檻。</p>';
+        : '<p class="prof__h">還沒設定</p>';
 
       h += '<form class="anew" id="anewF">' +
         '<label class="fld"><span>百分比</span>' +
@@ -1348,15 +1327,21 @@
         ? { icon: '全', name: '全部帳本', color: 'var(--ink-faint)' }
         : gs.filter(function (g) { return g.id === GROUP; })[0];
 
-      /* 觸發只是一顆圖示。目前在哪一本帳，用右下角那一點的顏色表示；
-         名字寫在 title 上，滑過去就看得到，不佔版面。 */
+      /* 兩種長相都畫出來，由 body 上的 class 決定顯示哪一種：
+           方案一（bar-text）文字 ＋ 抽屜
+           方案二（bar-icon）圖示 ＋ 一般下拉
+         挑定之後把另一邊刪掉就好。 */
       box.innerHTML =
         '<button class="ic gsw__b" id="gswBtn" title="帳本：' + esc(cur.name) + '" ' +
           'aria-label="切換帳本，目前是' + esc(cur.name) + '">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">' +
+          '<svg class="gsw__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">' +
             '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>' +
             '<path d="M10 4h8.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H10"/></svg>' +
           '<span class="ic__d" style="background:' + esc(cur.color) + '"></span>' +
+          '<span class="gsw__d" style="background:' + esc(cur.color) + '"></span>' +
+          '<span class="gsw__n">' + esc(cur.name) + '</span>' +
+          '<svg class="gsw__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
         '</button>' +
         '<div class="gsw__p" id="gswPanel" hidden>' +
           '<button class="gsw__i' + (GROUP === 'all' ? ' on' : '') + '" data-group="all">' +
@@ -1383,7 +1368,7 @@
         w.innerHTML = ava(m.user, 'ava--sm') +
           '<span class="who__n">' + esc(m.user.name) + '</span>' +
           '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>' +
-          '<button class="who__out" id="logout" title="登出">登出</button>';
+          '';
       }
       var f = document.getElementById('famName');
       if (f) f.textContent = m.family.family + '　' + m.family.period;

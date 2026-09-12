@@ -1814,3 +1814,75 @@ input[type="password"], input[type="search"], select, textarea {
 
 /* 登出那一列的按鈕也置中在自己的位置 */
 .prof__out button { min-width: 120px; justify-content: center; }
+
+
+/* ============================================================
+   頂欄的兩個方案
+   ------------------------------------------------------------
+   方案一 bar-text：文字 ＋ 抽屜（面板從頂欄下緣整條拉開）
+   方案二 bar-icon：圖示 ＋ 一般下拉（面板貼著按鈕，不佔整條）
+
+   兩種長相都在 DOM 裡，用 class 切換顯示。挑定之後刪掉另一邊。
+   ============================================================ */
+
+/* ---------- 共通：帳本觸發的零件 ---------- */
+.gsw__ic, .gsw__cv { width: 19px; height: 19px; }
+.gsw__cv { width: 13px; height: 13px; opacity: .55; }
+
+/* ---------- 方案一：文字 ＋ 抽屜 ---------- */
+body.bar-text .gsw__ic,
+body.bar-text .ic__d { display: none; }
+body.bar-text .gsw__b {
+  width: auto; padding: 0 18px; gap: 9px;
+  display: flex; align-items: center;
+}
+body.bar-text .gsw__d { width: 8px; height: 8px; flex: 0 0 8px; }
+body.bar-text .gsw__n {
+  font-size: 13px; max-width: 160px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 搜尋回到原本的樣子：一條線上的輸入框，不用先點圖示 */
+body.bar-text #searchBtn { display: none; }
+body.bar-text #searchDrawer {
+  position: static; display: flex !important; padding: 0 16px;
+  border: 0; border-left: 1px solid var(--line); box-shadow: none;
+  animation: none; min-width: 230px; align-self: stretch;
+}
+body.bar-text #searchDrawer input { font-size: 14px; }
+
+/* ---------- 方案二：圖示 ＋ 一般下拉 ---------- */
+body.bar-icon .gsw__d,
+body.bar-icon .gsw__n,
+body.bar-icon .gsw__cv { display: none; }
+body.bar-icon .gsw__b { width: 54px; padding: 0; }
+
+/* 面板不再是整條抽屜，改成貼著按鈕的下拉 */
+body.bar-icon .gsw, body.bar-icon .bell__wrap { position: relative; }
+body.bar-icon .gsw__p {
+  left: auto; right: 0; width: min(300px, calc(100vw - 32px));
+  display: block; border-left: 1px solid var(--line-2);
+  border-right: 1px solid var(--line-2);
+}
+body.bar-icon .gsw__i { border-right: 0; padding: 13px 16px; }
+body.bar-icon .gsw__i:hover { padding-left: 20px; }
+body.bar-icon .gsw__more { padding: 12px 16px; }
+body.bar-icon .bell__panel {
+  left: auto; right: 0; width: min(380px, calc(100vw - 32px));
+  border-left: 1px solid var(--line-2); border-right: 1px solid var(--line-2);
+}
+body.bar-icon .bell__h, body.bar-icon .bell__i { padding-left: 16px; padding-right: 16px; }
+body.bar-icon .bell__i:hover { padding-left: 22px; }
+body.bar-icon .bell__empty { padding: 30px 16px; }
+/* 下拉不遮蔽整頁，所以不要壓暗內容 */
+body.bar-icon.dw-on #view { opacity: 1; pointer-events: auto; }
+
+/* ---------- 個人資料的登出：一顆按鈕，不用一個區塊 ---------- */
+.prof__out {
+  border-top: 1px solid var(--line); margin-top: 26px;
+  padding-top: 26px; display: flex; justify-content: center;
+}
+
+/* ⚠️ #searchDrawer 自己有 display:flex，會蓋過 [hidden] 的 display:none。
+   方案二要靠 hidden 收起來，所以這裡補一條贏過它。 */
+body.bar-icon #searchDrawer[hidden] { display: none !important; }

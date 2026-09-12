@@ -239,7 +239,6 @@
       }).join('') + '</div>';
     }
 
-    h += '<div class="bell__f">監管是<b>唯讀</b>的 —— 你看得到，但不能修改或刪除。</div>';
     panel.innerHTML = h;
   }
 
