@@ -863,18 +863,23 @@
     head('群組', '一個家庭可以開好幾本帳，各自有自己的存款目標');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
-    Promise.all([API.groups(), API.members()]).then(function (r) {
+    Promise.all([API.groups({ includeArchived: true }), API.members()])
+      .then(function (r) {
       var d = r[0], fam = r[1];
+
+      var live = d.groups.filter(function (g) { return !g.archived; });
+      var gone = d.groups.filter(function (g) { return g.archived; });
 
       var h = '<div class="page">' +
         '<p class="hint">每一筆記帳都屬於其中一本帳。' +
         '右上角的切換器可以只看某一本，統計與存款目標都會跟著那本走。<br>' +
-        '<b>你只看得到自己有加入的帳本</b>——別人的帳本連名字都看不到。</p>';
+        '<b>你只看得到自己有加入的帳本</b>——別人的帳本連名字都看不到。<br>' +
+        '「封存」是把一本帳收起來不再使用，<b>記帳不會被刪掉</b>，之後可以復原。</p>';
 
       h += '<div class="sec"><h2 class="sec__t">我的帳本</h2>' +
-        '<span class="sec__n">' + d.groups.length + ' 本</span></div>';
+        '<span class="sec__n">' + live.length + ' 本</span></div>';
 
-      h += '<div class="rows">' + d.groups.map(function (g, i) {
+      h += '<div class="rows">' + live.map(function (g, i) {
         return '<article class="row" style="animation-delay:' + (i * 50) +
           'ms;grid-template-columns:44px 1fr 150px 108px">' +
           '<div class="ava" style="background:' + esc(g.color) + '22;color:' + esc(g.color) +
@@ -896,7 +901,7 @@
           '<div class="row__go2">' +
             '<span class="rowbtn" data-gopen="' + esc(g.id) + '">' + g.count + ' 筆 →</span>' +
             (g.canEdit ? '<button class="gx" data-garch="' + esc(g.id) +
-                         '" title="封存這本帳">封存</button>' : '') +
+                         '" title="收起這本帳。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
           '</div>' +
         '</article>';
       }).join('') + '</div>';
@@ -942,6 +947,26 @@
               : '') +
           '</div>';
         }).join('') + '</div>';
+      }
+
+      // ---- 已封存 ----
+      if (gone.length) {
+        h += '<div class="sec"><h2 class="sec__t">已封存</h2>' +
+          '<span class="sec__n">' + gone.length + ' 本</span></div>';
+        h += '<div class="card arch">' +
+          '<p class="prof__l">封存只是<b>收起來不再使用</b>，' +
+          '裡面的記帳<b>一筆都沒有被刪掉</b>。隨時可以復原。' +
+          '<br><span class="prof__h">封存的帳本不會出現在切換器和統計裡。</span></p>' +
+          '<div class="arch__l">' + gone.map(function (g) {
+            return '<div class="arch__i">' +
+              '<span class="gsw__d" style="background:' + esc(g.color) + '"></span>' +
+              '<span class="arch__n">' + esc(g.name) + '</span>' +
+              '<span class="arch__c">' + g.count + ' 筆紀錄還在</span>' +
+              (g.canEdit
+                ? '<button class="btn btn--sm" data-grestore="' + esc(g.id) + '">復原</button>'
+                : '') +
+            '</div>';
+          }).join('') + '</div></div>';
       }
 
       h += '<div class="note note--warn"><div class="note__k">移出群組會看不到那本帳的所有紀錄</div>' +
@@ -1321,11 +1346,35 @@
     }
     var garch = t.closest('[data-garch]');
     if (garch) {
+      /* 兩段式：第一下先問，第二下才真的做。
+         ⚠️ 封存會讓那本帳從切換器和統計裡消失，看起來跟刪除一樣——
+         使用者按下去之前必須知道會發生什麼。 */
+      if (garch.dataset.sure !== '1') {
+        garch.dataset.sure = '1';
+        garch.textContent = '確定封存？';
+        garch.classList.add('gx--sure');
+        setTimeout(function () {
+          if (!garch.isConnected) return;
+          garch.dataset.sure = '0';
+          garch.textContent = '封存';
+          garch.classList.remove('gx--sure');
+        }, 4000);
+        return;
+      }
       API.archiveGroup(garch.dataset.garch).then(function () {
         if (GROUP === garch.dataset.garch) setGroup('all');
         paintGroups(); vGroups();
-        toast('已封存。紀錄還在，沒有被刪掉', 'ok');
+        toast('已封存。紀錄一筆都沒刪，在下面「已封存」可以復原', 'ok');
       }).catch(function (err) { toast(err.message || '封存失敗', 'err'); });
+      return;
+    }
+
+    var grest = t.closest('[data-grestore]');
+    if (grest) {
+      API.updateGroup(grest.dataset.grestore, { archived: false }).then(function (g) {
+        paintGroups(); vGroups();
+        toast('「' + g.name + '」回來了', 'ok');
+      }).catch(function (err) { toast(err.message || '復原失敗', 'err'); });
       return;
     }
     var gadd = t.closest('[data-gadd]');

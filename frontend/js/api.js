@@ -215,7 +215,7 @@
       });
   }
 
-  function visibleGroups(meId) {
+  function visibleGroups(meId, withArchived) {
     var s = load();
     var extra = (s.newGroups || []).map(function (g) { return g.id; });
     return global.DATA.groupMembers
@@ -227,22 +227,26 @@
       .filter(function (g) {
         return !(s.left || []).some(function (l) { return l.group === g && l.user === meId; });
       })
-      .filter(function (g) { return (s.archived || []).indexOf(g) < 0; });
+      .filter(function (g) { return withArchived || (s.archived || []).indexOf(g) < 0; });
   }
 
   function groupOf(id) {
-    return allGroups().filter(function (g) { return g.id === id; })[0];
+    // 封存的也要找得到，不然「復原」會說找不到這個群組
+    return allGroups(true).filter(function (g) { return g.id === id; })[0];
   }
 
-  /* 種子群組 + 這個瀏覽器建立的群組 */
-  function allGroups() {
+  /* 種子群組 + 這個瀏覽器建立的群組。
+     withArchived = true 時連封存的一起回（管理頁的「已封存」區塊要用）。 */
+  function allGroups(withArchived) {
     var s = load();
     return global.DATA.groups.concat(s.newGroups || [])
-      .filter(function (g) { return !(s.archived || []).some(function (a) { return a === g.id; }); })
       .map(function (g) {
         var p = (s.groupPatch || {})[g.id] || {};
-        return Object.assign({}, g, p);
-      });
+        return Object.assign({}, g, p, {
+          archived: (s.archived || []).indexOf(g.id) >= 0
+        });
+      })
+      .filter(function (g) { return withArchived || !g.archived; });
   }
 
   /* 某個人在某本帳上的每月存款目標。沒設過就是 0。 */
@@ -466,14 +470,14 @@
        群組（帳本）。一個家庭可以開好幾本帳，每一筆記帳都屬於其中一本。
        ⚠️ 只回我加入的——別人的帳本連名字都不該看到。
        --------------------------------------------------------- */
-    groups: function () {
-      var s = load();
+    groups: function (f) {
+      var s = load(); f = f || {};
       return sleep(LATENCY).then(function () {
-        var mine = visibleGroups(s.me);
+        var mine = visibleGroups(s.me, true);
         var vis = visibleUsers(s.me);
         return {
           me: s.me,
-          groups: allGroups()
+          groups: allGroups(!!f.includeArchived)
             .filter(function (g) { return mine.indexOf(g.id) >= 0; })
             .map(function (g) {
               var members = memberIdsOf(g.id);
@@ -538,6 +542,12 @@
         }
         if (p.color !== undefined) q.color = p.color;
         if (p.note !== undefined) q.note = String(p.note);
+        /* 復原：把 id 從封存清單拿掉。
+           ⚠️ 封存從頭到尾都沒有動過任何一筆記帳，所以復原不需要還原資料，
+           只是讓它重新出現在清單上。 */
+        if (p.archived === false) {
+          s.archived = (s.archived || []).filter(function (a) { return a !== gid; });
+        }
         save();
         return clone(groupOf(gid));
       });
@@ -1339,7 +1349,7 @@
     notifications:     function (f)     { return req('/api/notifications' + qs(f)); },
     readNotification:  function (i)     { return req('/api/notifications/' + encodeURIComponent(i), { method: 'PATCH', body: { read: true } }); },
     readNotifications: function (u)     { return req('/api/notifications', { method: 'PATCH', body: { readUntil: u } }); },
-    groups:            function ()      { return req('/api/groups'); },
+    groups:            function (f)     { return req('/api/groups' + qs(f)); },
     createGroup:       function (p)     { return req('/api/groups', { method: 'POST', body: p }); },
     updateGroup:       function (g, p)  { return req('/api/groups/' + encodeURIComponent(g), { method: 'PATCH', body: p }); },
     archiveGroup:      function (g)     { return req('/api/groups/' + encodeURIComponent(g), { method: 'DELETE' }); },
@@ -1382,7 +1392,7 @@
     notifications:     function (f)    { return impl.notifications(f); },
     readNotification:  function (i)    { return impl.readNotification(i); },
     readNotifications: function (u)    { return impl.readNotifications(u); },
-    groups:            function ()     { return impl.groups(); },
+    groups:            function (f)    { return impl.groups(f); },
     createGroup:       function (p)    { return impl.createGroup(p); },
     updateGroup:       function (g, p) { return impl.updateGroup(g, p); },
     archiveGroup:      function (g)    { return impl.archiveGroup(g); },

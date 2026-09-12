@@ -1164,3 +1164,16 @@ body.is-out .main {
 
 /* 提醒通知的第二行：金額 */
 .bell__n2 { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+
+/* 已封存的帳本 */
+.gx--sure { color: var(--down); border-color: rgba(251,138,143,.5); }
+.arch { padding: 20px; }
+.arch__l { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.arch__i {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--r-sm);
+  border: 1px dashed var(--line-2); background: var(--sunk);
+}
+.arch__n { font-size: 13.5px; color: var(--ink-soft); }
+.arch__c { font-size: 11.5px; color: var(--ink-dim); font-family: var(--mono); margin-left: auto; }
+.arch__i .btn { flex: 0 0 auto; }
