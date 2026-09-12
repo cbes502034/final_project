@@ -207,6 +207,8 @@
     btn.classList.toggle('has', state.unread > 0);
 
     panel.hidden = !state.open;
+    btn.classList.toggle('open', state.open);
+    document.body.classList.toggle('dw-on', state.open);
     if (!state.open) {
       // 關起來就把內容清掉。留著的話，換人之後 DOM 裡還躺著
       // 上一個使用者的記帳明細 —— 看不到不等於不在。

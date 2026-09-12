@@ -21,11 +21,11 @@ window.DATA = {
      分類回答「錢花在什麼」，群組回答「這筆屬於哪一份預算」。
      每一本帳可以各自設一個每月存款目標。 */
   groups: [
-    { id: 'G1', name: '家用', icon: '家', color: '#6C9FFB', owner: 'U1',
+    { id: 'G1', name: '家用', icon: '家', color: '#3C5FA0', owner: 'U1',
       created: '2026-01-05', note: '日常開銷，全家共用' },
-    { id: 'G2', name: '旅遊基金', icon: '旅', color: '#8B7CF0', owner: 'U1',
+    { id: 'G2', name: '旅遊基金', icon: '旅', color: '#6A5B9E', owner: 'U1',
       created: '2026-03-01', note: '存暑假出國的錢，花費也記在這裡' },
-    { id: 'G3', name: '宇涵的零用', icon: '涵', color: '#5FB8D9', owner: 'U3',
+    { id: 'G3', name: '宇涵的零用', icon: '涵', color: '#3E8DA8', owner: 'U3',
       created: '2026-02-11', note: '打工收入與自己的開銷' }
   ],
 
@@ -97,18 +97,18 @@ window.DATA = {
 
   /* ---------- 分類體系 ---------- */
   categories: [
-    { id: 'C01', name: '餐飲', kind: 'expense', color: '#FF8A3D', icon: '食' },
-    { id: 'C02', name: '交通', kind: 'expense', color: '#4DA6FF', icon: '行' },
-    { id: 'C03', name: '居住', kind: 'expense', color: '#A78BFA', icon: '住' },
-    { id: 'C04', name: '日用品', kind: 'expense', color: '#2FD98A', icon: '用' },
-    { id: 'C05', name: '娛樂', kind: 'expense', color: '#FF4757', icon: '樂' },
-    { id: 'C06', name: '教育', kind: 'expense', color: '#FFC93C', icon: '學' },
-    { id: 'C07', name: '醫療', kind: 'expense', color: '#5EEAD4', icon: '醫' },
-    { id: 'C08', name: '其他', kind: 'expense', color: '#5B7085', icon: '他' },
-    { id: 'I01', name: '薪資', kind: 'income', color: '#2FD98A', icon: '薪' },
-    { id: 'I02', name: '獎金', kind: 'income', color: '#00D9C0', icon: '獎' },
-    { id: 'I03', name: '零用金', kind: 'income', color: '#4DA6FF', icon: '零' },
-    { id: 'I04', name: '其他收入', kind: 'income', color: '#5B7085', icon: '收' }
+    { id: 'C01', name: '餐飲', kind: 'expense', color: '#C4693C', icon: '食' },
+    { id: 'C02', name: '交通', kind: 'expense', color: '#3C5FA0', icon: '行' },
+    { id: 'C03', name: '居住', kind: 'expense', color: '#6A5B9E', icon: '住' },
+    { id: 'C04', name: '日用品', kind: 'expense', color: '#2C7A56', icon: '用' },
+    { id: 'C05', name: '娛樂', kind: 'expense', color: '#BE4239', icon: '樂' },
+    { id: 'C06', name: '教育', kind: 'expense', color: '#B0741A', icon: '學' },
+    { id: 'C07', name: '醫療', kind: 'expense', color: '#3E8DA8', icon: '醫' },
+    { id: 'C08', name: '其他', kind: 'expense', color: '#8A8E95', icon: '他' },
+    { id: 'I01', name: '薪資', kind: 'income', color: '#2C7A56', icon: '薪' },
+    { id: 'I02', name: '獎金', kind: 'income', color: '#1B6B5A', icon: '獎' },
+    { id: 'I03', name: '零用金', kind: 'income', color: '#3C5FA0', icon: '零' },
+    { id: 'I04', name: '其他收入', kind: 'income', color: '#8A8E95', icon: '收' }
   ],
 
   /* ---------- 交易明細（核心表） ---------- */

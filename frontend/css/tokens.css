@@ -1,85 +1,118 @@
 /* ============================================================
    tokens.css — 設計權杖
-   視覺語言取自 Friends World（inkstone-web.onrender.com）：
-   星空底、藍紫色系、圓角、襯線標題、柔和的玻璃卡片。
+
+   視覺方向：紙本帳冊。
+   米白的紙、乾淨的線、克制的顏色、看得懂的數字。
+   顏色只在「有意義的時候」出現——收入、支出、提醒，
+   其餘一律讓位給內容。
+
+   互動：每一個可以按的東西都要有反應。
+   浮起（hover）、壓下（active）、回彈（transition），
+   讓介面像實體物件一樣可以被「碰」。
    ============================================================ */
 :root {
-  /* -- 底層 -- */
-  --void:        #05060A;
-  --card:        rgba(11, 14, 24, .95);
-  --card-2:      rgba(18, 22, 36, .92);
-  --card-3:      rgba(26, 31, 50, .9);
-  --sunk:        rgba(255, 255, 255, .035);
+  /* -- 紙與面 ------------------------------------------------
+     paper 是整頁的底，card 是浮在上面的紙卡。
+     兩者的差距刻意做得很小，靠陰影和線條分層，不是靠顏色對比。 */
+  --paper:       #F4F1EA;
+  --paper-2:     #EFEBE2;
+  --card:        #FFFFFF;
+  --card-2:      #FCFAF6;
+  --card-3:      #F7F4EE;
+  --sunk:        #F1EEE6;          /* 輸入框、內凹的區塊 */
 
   /* -- 線 -- */
-  --line:        rgba(255, 255, 255, .08);
-  --line-2:      rgba(255, 255, 255, .14);
-  --line-3:      rgba(255, 255, 255, .22);
+  --line:        #E7E2D8;
+  --line-2:      #DAD3C6;
+  --line-3:      #C3BAA9;
 
-  /* -- 文字 -- */
-  --ink:         #ECEEF4;
-  --ink-soft:    #A7ADBD;
-  --ink-faint:   #767D91;
-  --ink-dim:     #565D70;
+  /* -- 字 ----------------------------------------------------
+     不用純黑。純黑配米白會太刺，#1B1D21 讀起來柔和但一樣清楚。 */
+  --ink:         #1B1D21;
+  --ink-soft:    #4E535A;
+  --ink-faint:   #7B8189;
+  --ink-dim:     #9DA2A9;
 
-  /* -- 主色 -- */
-  --accent:      #6C9FFB;
-  --accent-2:    #8B7CF0;          /* 紫向，用於漸層與次要強調 */
-  --accent-hi:   #9BC0FF;
-  --accent-wash: rgba(108, 159, 251, .14);
-  --accent-glow: rgba(108, 159, 251, .35);
+  /* -- 主色：深玉綠 ------------------------------------------
+     錢的顏色。飽和度壓低，跟米白配起來像印刷油墨而不是螢光。 */
+  --accent:      #1B6B5A;
+  --accent-hi:   #14564A;
+  --accent-soft: #4E9585;
+  --accent-wash: #E6F0EC;
+  --accent-line: #BFD9D1;
 
-  /* -- 語意色：刻意柔和，與藍紫底協調，不用螢光 -- */
-  --up:          #6EE7B7;          /* 收入、良好 */
-  --down:        #FB8A8F;          /* 支出、超支 */
-  --warn:        #FBBF6E;          /* 注意 */
-  --info:        #8B9DF7;          /* 參考 */
+  /* -- 副色：陶土橘 ------------------------------------------
+     只用在需要「暖」的地方（歡迎、提示、空狀態），不搶主色。 */
+  --accent-2:      #C4693C;
+  --accent-2-wash: #FBEDE4;
 
-  --up-wash:     rgba(110, 231, 183, .13);
-  --down-wash:   rgba(251, 138, 143, .13);
-  --warn-wash:   rgba(251, 191, 110, .13);
-  --info-wash:   rgba(139, 157, 247, .13);
+  /* -- 語意色 -- */
+  --up:          #2C7A56;          /* 收入、達標 */
+  --down:        #BE4239;          /* 支出、超支 */
+  --warn:        #B0741A;          /* 接近上限 */
+  --info:        #3C5FA0;          /* 參考資訊 */
 
-  /* -- 圓角：這一版全部都是圓的 -- */
-  --r-card:      16px;
-  --r-input:     12px;
-  --r-sm:        10px;
-  --r-xs:        8px;
-  --r-pill:      999px;
+  --up-wash:     #E7F2EC;
+  --down-wash:   #FAEAE8;
+  --warn-wash:   #FBF0DE;
+  --info-wash:   #EAEFF8;
 
-  /* -- 字體 -- */
+  /* -- 圓角：沒有圓角 ----------------------------------------
+     圓角（尤其是膠囊形和大圓角卡片）是這幾年 AI 產品的長相。
+     帳冊不是那樣的東西——它是直線、格線、對齊的欄位。
+     全部收成直角之後，畫面立刻像一份可以拿去報帳的文件，
+     而且細線分區的效果會更乾淨。 */
+  --r-card:      0;
+  --r-input:     0;
+  --r-sm:        0;
+  --r-xs:        0;
+  --r-pill:      0;      /* 連進度條也是平的 */
+  --r-dot:       999px;  /* 只有真正是圓的東西用這個 */
+
+  /* -- 字體 --------------------------------------------------
+     數字用等寬，因為帳目要對得齊。 */
   --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC",
           "Microsoft JhengHei", sans-serif;
   --serif: "Noto Serif TC", "Songti TC", PMingLiU, Georgia, serif;
-  --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "Cascadia Mono",
+  --mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, "Cascadia Mono",
           Consolas, monospace;
 
   /* -- 尺度 -- */
-  --rail: 236px;
+  --rail: 232px;
   --bar: 62px;
-  --ease: cubic-bezier(.22, .8, .28, 1);
 
-  --shadow-card: 0 24px 60px rgba(0, 0, 0, .42), 0 2px 8px rgba(0, 0, 0, .3);
-  --shadow-pop:  0 18px 48px rgba(0, 0, 0, .55);
+  /* -- 動態曲線 ----------------------------------------------
+     ease  一般轉場
+     out   收尾慢，適合「浮起來」
+     back  尾端過衝一點點，按鈕回彈用，這是「手感」的來源 */
+  --ease: cubic-bezier(.3, .7, .3, 1);
+  --out:  cubic-bezier(.16, 1, .3, 1);
+  --back: cubic-bezier(.34, 1.56, .64, 1);
+
+  /* -- 陰影：暖色調的，不是純黑 ------------------------------
+     米白底上用純黑陰影會發灰，帶一點暖色才像紙。 */
+  --shadow-flat: 0 1px 2px rgba(60, 50, 35, .05);
+  --shadow-card: 0 1px 2px rgba(60, 50, 35, .05),
+                 0 8px 24px rgba(60, 50, 35, .055);
+  --shadow-lift: 0 2px 4px rgba(60, 50, 35, .06),
+                 0 14px 34px rgba(60, 50, 35, .10);
+  --shadow-pop:  0 8px 20px rgba(60, 50, 35, .10),
+                 0 28px 64px rgba(60, 50, 35, .16);
+  --shadow-in:   inset 0 1px 2px rgba(60, 50, 35, .06);
 }
 
 * { box-sizing: border-box; }
 
 html {
-  background-color: var(--void);
-  /* Friends World 的六層漸層：一道斜向銀河 + 五團暈光 */
+  background-color: var(--paper);
+  /* 紙的感覺：兩團極淡的暖光，加上幾乎看不見的方格。
+     方格是「帳簿」的暗示，淡到不會干擾閱讀。 */
   background-image:
-    linear-gradient(163deg,
-      rgba(0, 0, 0, 0) 26%,
-      rgba(86, 122, 208, .16) 40%,
-      rgba(126, 108, 214, .20) 50%,
-      rgba(78, 156, 210, .15) 60%,
-      rgba(0, 0, 0, 0) 74%),
-    radial-gradient(832px 608px at 6% -4%,  rgba(58, 104, 214, .55), rgba(0,0,0,0) 60%),
-    radial-gradient(704px 544px at 94% 2%,  rgba(124, 84, 206, .45), rgba(0,0,0,0) 58%),
-    radial-gradient(576px 448px at 72% 34%, rgba(52, 150, 200, .30), rgba(0,0,0,0) 62%),
-    radial-gradient(480px 384px at 22% 58%, rgba(96, 76, 190, .28), rgba(0,0,0,0) 62%),
-    radial-gradient(1024px 672px at 46% 104%, rgba(44, 92, 186, .40), rgba(0,0,0,0) 62%);
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px),
+    radial-gradient(900px 600px at 12% -6%, rgba(196, 105, 60, .05), transparent 62%),
+    radial-gradient(760px 520px at 92% 4%, rgba(27, 107, 90, .05), transparent 60%);
+  background-size: 88px 88px, 88px 88px, auto, auto;
   background-attachment: fixed;
   scroll-behavior: smooth;
 }
@@ -90,52 +123,78 @@ body {
   color: var(--ink);
   font-family: var(--sans);
   font-size: 15px;
-  line-height: 1.75;
-  letter-spacing: .16px;
+  line-height: 1.7;
+  letter-spacing: .1px;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-/* 星空 canvas 疊在漸層之上、內容之下 */
-#stars {
-  position: fixed; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 0;
-}
+/* 舊版的星空 canvas 在紙上沒有意義，收起來 */
+#stars { display: none; }
 
 h1, h2, h3 {
   margin: 0;
   font-family: var(--serif);
   font-weight: 600;
-  letter-spacing: -.02em;
+  letter-spacing: -.015em;
   color: var(--ink);
 }
 h4 { margin: 0; font-weight: 600; letter-spacing: .01em; }
 p { margin: 0; }
 ul { margin: 0; padding: 0; list-style: none; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
-input, select { font: inherit; }
+input, select, textarea { font: inherit; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hi); }
 table { border-collapse: collapse; }
 
-.num { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
 .serif { font-family: var(--serif); }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-xs); }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: var(--r-pill); border: 3px solid transparent; background-clip: content-box; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.22); background-clip: content-box; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: var(--r-pill);
+  border: 4px solid transparent; background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--line-3); background-clip: content-box; }
+
+::selection { background: var(--accent-wash); color: var(--accent-hi); }
+
+/* ============================================================
+   互動的共通語彙
+   ------------------------------------------------------------
+   任何「可以按」的東西都掛上 .tap，就有一致的手感：
+   滑過去浮起來，按下去壓回去。
+   ============================================================ */
+.tap {
+  transition: transform .18s var(--back),
+              box-shadow .18s var(--out),
+              background-color .16s var(--ease),
+              border-color .16s var(--ease),
+              color .16s var(--ease);
+}
+.tap:hover { transform: translateY(-1px); }
+.tap:active { transform: translateY(0) scale(.985); transition-duration: .06s; }
 
 /* ---------- 動態 ---------- */
 @keyframes riseIn {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideL {
-  from { opacity: 0; transform: translateX(30px); }
+  from { opacity: 0; transform: translateX(24px); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes growW { from { width: 0 !important; } }
@@ -145,8 +204,17 @@ table { border-collapse: collapse; }
   to   { background-position: 420px 0; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(14px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes nudge {
+  0%, 100% { transform: none; }
+  30%      { transform: translateX(-3px); }
+  60%      { transform: translateX(3px); }
+}
 
-.rise { animation: riseIn .55s var(--ease) both; }
+.rise { animation: riseIn .5s var(--out) both; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -155,5 +223,5 @@ table { border-collapse: collapse; }
     transition-duration: .01ms !important;
   }
   html { scroll-behavior: auto; }
-  #stars { display: none; }
+  .tap:hover, .tap:active { transform: none; }
 }

@@ -871,13 +871,9 @@
       var gone = d.groups.filter(function (g) { return g.archived; });
 
       var h = '<div class="page">' +
-        '<p class="hint">每一筆記帳都屬於其中一本帳。' +
-        '右上角的切換器可以只看某一本，統計與存款目標都會跟著那本走。<br>' +
-        '<b>你只看得到自己有加入的帳本</b>——別人的帳本連名字都看不到。<br>' +
-        '「封存」是把一本帳收起來不再使用，<b>記帳不會被刪掉</b>，之後可以復原。<br>' +
-        '<b>任何人都可以開自己的帳本</b>，不分角色——開的人就是那本帳的管理者。</p>';
+        '<p class="hint">右上角切換帳本，統計和存款目標都會跟著那一本走。</p>';
 
-      h += '<div class="sec"><h2 class="sec__t">我的帳本</h2>' +
+      h += '<div class="sec"><h2 class="sec__t">我的帳本' + helpBtn('books') + '</h2>' +
         '<span class="sec__n">' + live.length + ' 本</span></div>';
 
       h += '<div class="rows">' + live.map(function (g, i) {
@@ -952,12 +948,9 @@
 
       // ---- 已封存 ----
       if (gone.length) {
-        h += '<div class="sec"><h2 class="sec__t">已封存</h2>' +
+        h += '<div class="sec"><h2 class="sec__t">已封存' + helpBtn('archive') + '</h2>' +
           '<span class="sec__n">' + gone.length + ' 本</span></div>';
         h += '<div class="card arch">' +
-          '<p class="prof__l">封存只是<b>收起來不再使用</b>，' +
-          '裡面的記帳<b>一筆都沒有被刪掉</b>。隨時可以復原。' +
-          '<br><span class="prof__h">封存的帳本不會出現在切換器和統計裡。</span></p>' +
           '<div class="arch__l">' + gone.map(function (g) {
             return '<div class="arch__i">' +
               '<span class="gsw__d" style="background:' + esc(g.color) + '"></span>' +
@@ -970,13 +963,150 @@
           }).join('') + '</div></div>';
       }
 
-      h += '<div class="note note--warn"><div class="note__k">移出群組會看不到那本帳的所有紀錄</div>' +
-        '<p>包含他自己記在那本帳上的那些——<b>紀錄屬於帳本，不屬於人</b>。<br>' +
-        '封存也一樣：封存只是收起來，<b>紀錄不會被刪掉</b>，' +
-        '真的刪了那些紀錄會變成孤兒。</p></div>';
+      h += '<div class="note note--warn"><div class="note__k">把人移出帳本之前</div>' +
+        '<p>他會看不到這本帳的所有紀錄，包含自己記的那些。</p></div>';
 
       $view.innerHTML = h + '</div>';
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+
+  /* ============================================================
+     說明彈窗
+
+     介面上不放長篇解釋——需要解釋的地方，標題旁邊放一個問號，
+     想知道的人自己點。點開時背景模糊並且鎖住，
+     讓注意力只剩下這段說明。
+
+     每一則都用「使用者聽得懂的話」寫，不寫系統怎麼實作。
+     ============================================================ */
+  var HELP = {
+    allowance: {
+      t: '可支配上限是怎麼算的',
+      b: '<p>先看這個月進來多少錢，扣掉你設定的<b>每月存款目標</b>，' +
+         '剩下的就是這個月可以放心花的錢。</p>' +
+         '<p class="hp__f">本月收入　−　每月存款目標　＝　可支配上限</p>' +
+         '<p>舉個例子：這個月收入 68,000，你希望存下 20,000，' +
+         '那可以花的就是 48,000。花超過的話，這個月就存不到原本想存的金額。</p>' +
+         '<p>所以進度條看的不是「你花了多少」，而是' +
+         '<b>「離存不到錢還有多遠」</b>。</p>'
+    },
+    goal: {
+      t: '每月存款目標',
+      b: '<p>你希望每個月存下多少錢。填了之後，系統才知道你還剩多少可以花。</p>' +
+         '<p>這個數字<b>隨時可以改</b>，改了只影響現在和以後。' +
+         '過去的月份會沿用當時設定的數字——否則十月回頭看九月，' +
+         '會用現在的標準去評斷當時的自己，那不公平也不準。</p>' +
+         '<p>未滿 18 歲的成員，這個數字由家裡的管理者代為設定。</p>'
+    },
+    entry: {
+      t: '一句話就能記好幾筆',
+      b: '<p>直接把今天花了什麼打成一段話，例如：</p>' +
+         '<p class="hp__f">早上買早餐 55，中午跟同事吃飯 320，' +
+         '下午在全家買咖啡，晚上加油 1200</p>' +
+         '<p>系統會把它拆成一筆一筆，填好金額和分類讓你確認。' +
+         '<b>確認之前不會存進去</b>，看到不對的地方直接改。</p>' +
+         '<p>有時候會拆錯或猜錯分類——那很正常，改掉就好。' +
+         '你改過的地方會讓它下次更準。</p>'
+    },
+    watch: {
+      t: '誰看得到我的紀錄',
+      b: '<p>預設只有你自己。</p>' +
+         '<p>家裡的管理者可以建立「監管關係」，被指派之後，' +
+         '那個人就看得到你的記帳明細。<b>但他只能看</b>——' +
+         '不能修改、不能刪除，也不能登入你的帳號。</p>' +
+         '<p>這件事<b>不會偷偷發生</b>：只要有人看得到你，' +
+         '你的畫面上就一定看得到是誰。系統不提供隱藏的監管。</p>'
+    },
+    books: {
+      t: '帳本是什麼',
+      b: '<p>同一個家庭可以開好幾本帳，例如「家用」「旅遊基金」「我自己的」。' +
+         '每一筆記帳都會歸到其中一本。</p>' +
+         '<p>分類回答的是「錢花在什麼」，帳本回答的是' +
+         '<b>「這筆算在哪一份預算上」</b>。' +
+         '所以同樣是吃飯，家庭聚餐算家用，出國吃的算旅遊基金。</p>' +
+         '<p>每一本帳可以設<b>自己的每月存款目標</b>，' +
+         '右上角切換帳本之後，統計和進度都會跟著那一本走。</p>' +
+         '<p>任何人都可以開自己的帳本，不分身分。開的人就是那本帳的管理者。</p>'
+    },
+    archive: {
+      t: '封存會發生什麼事',
+      b: '<p>把一本帳收起來不再使用。它會從切換器和統計裡消失，' +
+         '<b>但裡面的記帳一筆都不會被刪掉</b>。</p>' +
+         '<p>在「已封存」那一區隨時可以把它叫回來，' +
+         '回來之後所有紀錄都還在原位。</p>'
+    },
+    alerts: {
+      t: '階段性提醒',
+      b: '<p>自己決定在花到幾成的時候提醒你。' +
+         '例如設 60%、85%、100% 三個門檻，' +
+         '每跨過一個就通知一次。</p>' +
+         '<p>算的是<b>可支配額度的幾成</b>，不是收入的幾成。</p>' +
+         '<p>同一個門檻<b>一個月只會響一次</b>，' +
+         '不會因為你來回記帳就一直被吵。下個月自動重新開始。</p>' +
+         '<p>暫時不想被打擾的話，把它關掉就好，設定會留著。</p>'
+    },
+    budget: {
+      t: '預算怎麼用',
+      b: '<p>針對某一個分類設一個月的上限，例如餐飲不超過 8,000。</p>' +
+         '<p>它跟存款目標是兩件事：<b>存款目標管的是整體</b>' +
+         '（這個月要留下多少），<b>預算管的是單一類別</b>' +
+         '（這一類最多花多少）。兩個一起看，才知道是哪裡超出去的。</p>'
+    },
+    advice: {
+      t: '財務建議是怎麼來的',
+      b: '<p>系統先把你這個月的收支算清楚，' +
+         '再把<b>算好的數字</b>交給模型，請它用人話講出來，' +
+         '並且給幾個具體可做的調整。</p>' +
+         '<p>每一則建議底下都會附上它依據的數字。' +
+         '<b>數字是系統算的，不是模型猜的</b>——' +
+         '你可以自己核對。</p>'
+    },
+    avatar: {
+      t: '大頭貼',
+      b: '<p>選一張圖就好，系統會自動裁成正方形並縮小，' +
+         '不用先處理。</p>' +
+         '<p>沒有上傳的話，會用你名字的最後一個字當頭像。</p>'
+    }
+  };
+
+  function helpBtn(key) {
+    var h = HELP[key];
+    if (!h) return '';
+    return '<button class="q" data-help="' + key + '" ' +
+      'aria-label="關於「' + esc(h.t) + '」的說明" title="這是什麼？">?</button>';
+  }
+
+  var helpOpen = false;
+
+  function openHelp(key) {
+    var h = HELP[key];
+    if (!h || helpOpen) return;
+    helpOpen = true;
+
+    var wrap = el('<div class="hp" id="hp">' +
+      '<div class="hp__c" role="dialog" aria-modal="true" aria-label="' + esc(h.t) + '">' +
+        '<div class="hp__h"><h3>' + esc(h.t) + '</h3>' +
+          '<button class="hp__x" id="hpX" aria-label="關閉">✕</button></div>' +
+        '<div class="hp__b">' + h.b + '</div>' +
+        '<div class="hp__d"><button class="btn btn--go" id="hpOk">知道了</button></div>' +
+      '</div></div>');
+
+    document.body.appendChild(wrap);
+    // 背景鎖住：關掉捲動，內容不可點（.hp 蓋住整頁並吃掉事件）
+    document.body.classList.add('hp-on');
+    requestAnimationFrame(function () { wrap.classList.add('on'); });
+    var x = document.getElementById('hpX');
+    if (x) x.focus();
+  }
+
+  function closeHelp() {
+    var w = document.getElementById('hp');
+    if (!w) return;
+    helpOpen = false;
+    w.classList.remove('on');
+    document.body.classList.remove('hp-on');
+    setTimeout(function () { w.remove(); }, 200);
   }
 
   /* ---------- 共用 ---------- */
@@ -1002,8 +1132,7 @@
     document.body.classList.add('is-out');
     $view.innerHTML =
       '<div class="gate"><div class="gate__c">' +
-        '<div class="gate__b"><span class="brand__m">帳</span>' +
-          '<span class="brand__n">家庭記帳</span></div>' +
+        '<div class="gate__b"><span class="brand__n">家庭記帳</span></div>' +
         '<h1 class="gate__t">' + title + '</h1>' +
         '<p class="gate__s">' + sub + '</p>' +
         inner +
@@ -1057,13 +1186,11 @@
       var u = m.user;
       var h = '<div class="page">' +
 
-        '<div class="sec"><h2 class="sec__t">大頭貼</h2></div>' +
+        '<div class="sec"><h2 class="sec__t">大頭貼' + helpBtn('avatar') + '</h2></div>' +
         '<div class="card prof">' +
           '<div class="prof__a" id="profAva">' + ava(u, 'ava--xl') + '</div>' +
           '<div class="prof__m">' +
-            '<p class="prof__l">上傳一張圖，會自動縮成 256×256。' +
-            '<br><span class="prof__h">縮圖在瀏覽器做，上傳的是縮好的版本 —— ' +
-            '後端不用裝 Pillow，也不會收到 20 MB 的原圖。</span></p>' +
+            '<p class="prof__l">選一張照片就好，系統會自動裁切縮小。</p>' +
             '<div class="prof__do">' +
               '<label class="btn btn--sm btn--go">選一張圖' +
                 '<input type="file" id="avaF" accept="image/png,image/jpeg,image/webp" hidden></label>' +
@@ -1079,27 +1206,25 @@
           '<label class="fld"><span>出生年份</span>' +
             '<input type="number" id="pfYear" min="1900" max="' + new Date().getFullYear() + '" ' +
               'value="' + (u.birthYear || '') + '" placeholder="例如 1974">' +
-            '<em class="fld__h">用來判斷未成年。未滿 18 歲的存款目標由管理者代設</em></label>' +
+            '<em class="fld__h">未滿 18 歲的存款目標會由家裡的管理者代為設定</em></label>' +
           '<label class="fld"><span>Email</span>' +
             '<input type="email" value="' + esc(u.email || '') + '" disabled>' +
-            '<em class="fld__h">email 是登入帳號，改它等於換帳號，這一版不開放</em></label>' +
+            '<em class="fld__h">這是你的登入帳號，目前不能更改</em></label>' +
           '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
         '</form>' +
 
-        '<div class="sec"><h2 class="sec__t">每月存款目標</h2></div>' +
+        '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
         '<div class="card prof__goal">' +
           '<div class="prof__m">' +
-            '<p class="prof__l">收入減掉這個數字，就是你這個月的<b>可支配上限</b>。' +
-            '<br><span class="prof__h">改完立刻生效，不用按儲存。' +
-            '過去月份沿用當時設定的值——否則十月回頭看九月，' +
-            '會用現在的目標去評斷過去的表現。</span></p>' +
+            '<p class="prof__l">這個月希望存下多少錢。' +
+            '<br><span class="prof__h">改完立刻生效，不用按儲存。</span></p>' +
           '</div>' +
           '<span class="goal"><label>每月存款目標</label>' +
             '<input class="goal__i" type="number" min="0" ' +
             'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
         '</div>' +
 
-        '<div class="sec"><h2 class="sec__t">階段性提醒</h2></div>' +
+        '<div class="sec"><h2 class="sec__t">階段性提醒' + helpBtn('alerts') + '</h2></div>' +
         '<div class="card" id="alertBox">' + skeleton(2) + '</div>' +
 
         '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
@@ -1133,10 +1258,8 @@
     Promise.all([API.alerts(), API.savingsGoals()]).then(function (r) {
       var list = r[0].alerts || [], goals = r[1].goals || [];
 
-      var h = '<p class="prof__l">支出佔<b>可支配上限</b>的比例跨過門檻時，' +
-        '會跳一則通知並響一聲。' +
-        '<br><span class="prof__h">可支配上限 = 本月收入 − 每月存款目標。' +
-        '同一個門檻<b>一個月只會響一次</b>，不會因為你來回記帳就一直吵。</span></p>';
+      var h = '<p class="prof__l">花到幾成的時候提醒你。' +
+        '<br><span class="prof__h">同一個門檻一個月只會響一次。</span></p>';
 
       h += list.length
         ? '<div class="alist">' + list.map(function (a) {
@@ -1154,7 +1277,7 @@
       h += '<form class="anew" id="anewF">' +
         '<label class="fld"><span>百分比</span>' +
           '<input type="number" id="anPct" min="1" max="200" value="80" required></label>' +
-        '<label class="fld"><span>針對哪一本帳</span>' +
+        '<label class="fld"><span>哪一本帳</span>' +
           '<select id="anGroup">' + goals.map(function (g) {
             return '<option value="' + (g.groupId || '') + '">' + esc(g.groupName) +
               (g.goal ? '（目標 ' + money(g.goal) + '）' : '（還沒設目標）') + '</option>';
@@ -1225,11 +1348,15 @@
         ? { icon: '全', name: '全部帳本', color: 'var(--ink-faint)' }
         : gs.filter(function (g) { return g.id === GROUP; })[0];
 
+      /* 觸發只是一顆圖示。目前在哪一本帳，用右下角那一點的顏色表示；
+         名字寫在 title 上，滑過去就看得到，不佔版面。 */
       box.innerHTML =
-        '<button class="gsw__b" id="gswBtn">' +
-          '<span class="gsw__d" style="background:' + esc(cur.color) + '"></span>' +
-          '<span class="gsw__n">' + esc(cur.name) + '</span>' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
+        '<button class="ic gsw__b" id="gswBtn" title="帳本：' + esc(cur.name) + '" ' +
+          'aria-label="切換帳本，目前是' + esc(cur.name) + '">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">' +
+            '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>' +
+            '<path d="M10 4h8.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H10"/></svg>' +
+          '<span class="ic__d" style="background:' + esc(cur.color) + '"></span>' +
         '</button>' +
         '<div class="gsw__p" id="gswPanel" hidden>' +
           '<button class="gsw__i' + (GROUP === 'all' ? ' on' : '') + '" data-group="all">' +
@@ -1296,6 +1423,16 @@
     var t = e.target;
     if (!t.closest) return;
 
+    /* 說明彈窗：開著的時候，除了關閉之外什麼都不能點 */
+    if (helpOpen) {
+      if (t.closest('#hpX') || t.closest('#hpOk') || !t.closest('.hp__c')) closeHelp();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    var q = t.closest('[data-help]');
+    if (q) { openHelp(q.dataset.help); return; }
+
     var nav = t.closest('[data-nav]');
     if (nav) { location.hash = '#/' + nav.dataset.nav; return; }
 
@@ -1319,22 +1456,54 @@
       return;
     }
 
+    /* ---- 搜尋抽屜 ---- */
+    if (t.closest('#searchBtn')) {
+      var sd = document.getElementById('searchDrawer');
+      var sb = document.getElementById('searchBtn');
+      if (sd) {
+        sd.hidden = !sd.hidden;
+        sb.classList.toggle('open', !sd.hidden);
+        document.body.classList.toggle('dw-on', !sd.hidden);
+        if (!sd.hidden) document.getElementById('search').focus();
+      }
+      return;
+    }
+    if (!t.closest('#searchDrawer') && !t.closest('#searchBtn')) {
+      var sd2 = document.getElementById('searchDrawer');
+      if (sd2 && !sd2.hidden) {
+        sd2.hidden = true;
+        document.getElementById('searchBtn').classList.remove('open');
+        document.body.classList.remove('dw-on');
+      }
+    }
+
     /* ---- 群組切換器 ---- */
     if (t.closest('#gswBtn')) {
       var gp = document.getElementById('gswPanel');
-      if (gp) gp.hidden = !gp.hidden;
+      if (gp) {
+        gp.hidden = !gp.hidden;
+        // 抽屜拉開時，按鈕本身跟底下的內容都要有反應
+        document.getElementById('gswBtn').classList.toggle('open', !gp.hidden);
+        document.body.classList.toggle('dw-on', !gp.hidden);
+      }
       return;
     }
     var gpick = t.closest('[data-group]');
     if (gpick) {
       setGroup(gpick.dataset.group);
+      document.body.classList.remove('dw-on');
       paintGroups();
       paint();
       return;
     }
     if (!t.closest('#gsw')) {
       var gp2 = document.getElementById('gswPanel');
-      if (gp2 && !gp2.hidden) gp2.hidden = true;
+      if (gp2 && !gp2.hidden) {
+        gp2.hidden = true;
+        var gb = document.getElementById('gswBtn');
+        if (gb) gb.classList.remove('open');
+        document.body.classList.remove('dw-on');
+      }
     }
 
     /* ---- 群組管理 ---- */
@@ -1747,10 +1916,21 @@
     }, 260);
   });
 
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && helpOpen) closeHelp();
+  });
+
+  /* 捲動一點點就讓頂欄浮出陰影，知道自己不在最上面 */
+  window.addEventListener('scroll', function () {
+    document.body.classList.toggle('scrolled', window.scrollY > 4);
+  }, { passive: true });
+
   window.addEventListener('hashchange', paint);
 
-  document.getElementById('mode').textContent =
-    API.mode === 'http' ? 'API ' + API.base : 'API mock';
+  /* 舊版側欄有一個顯示 API 模式的小徽章。那是給開發者看的，
+     介面上已經拿掉——這裡留一個保險，元素不在就不要炸。 */
+  var $mode = document.getElementById('mode');
+  if ($mode) $mode.textContent = API.mode === 'http' ? API.base : '示範資料';
   API.authState().then(function (a) {
     if (a.loggedIn) { paintWho(); paintGroups(); }
     paint();

@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>使用說明</title>
+<meta name="description" content="家庭記帳的使用說明：怎麼記第一筆、怎麼看懂總覽、帳本與提醒怎麼設、誰看得到我的紀錄。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../css/tokens.css?v=52">
+<style>
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 28px 100px; }
+
+  /* 頂端：回系統 + 目錄 */
+  .bar {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--card); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 18px; padding: 0 28px; min-height: 56px;
+    margin: 0 -28px 0;
+  }
+  .bar__b { font-family: var(--serif); font-size: 15px; font-weight: 600; }
+  .bar__x { margin-left: auto; font-size: 13px; color: var(--ink-faint); }
+  .bar__x:hover { color: var(--accent); }
+
+  .sheet { background: var(--card); border-left: 1px solid var(--line); border-right: 1px solid var(--line); min-height: 100vh; }
+
+  .hero { padding: 54px 0 34px; border-bottom: 1px solid var(--line); }
+  .hero h1 { font-size: 34px; line-height: 1.35; margin-bottom: 14px; }
+  .hero p { font-size: 15.5px; color: var(--ink-soft); line-height: 2; }
+
+  /* 目錄 */
+  .toc { padding: 22px 0 26px; border-bottom: 1px solid var(--line); }
+  .toc__t { font-size: 11px; letter-spacing: .14em; color: var(--ink-dim);
+            font-family: var(--mono); text-transform: uppercase; margin-bottom: 12px; }
+  .toc ol { counter-reset: t; display: grid; gap: 2px; }
+  .toc li { counter-increment: t; }
+  .toc a {
+    display: flex; gap: 12px; padding: 8px 10px; margin: 0 -10px;
+    color: var(--ink-soft); font-size: 14.5px;
+    transition: background-color .16s var(--ease), color .16s var(--ease), padding-left .18s var(--out);
+  }
+  .toc a::before {
+    content: counter(t, decimal-leading-zero);
+    font-family: var(--mono); font-size: 12px; color: var(--ink-dim); flex: 0 0 22px;
+  }
+  .toc a:hover { background: var(--card-2); color: var(--ink); padding-left: 16px; }
+
+  section { padding: 44px 0 8px; border-bottom: 1px solid var(--line); scroll-margin-top: 68px; }
+  section:last-of-type { border-bottom: 0; }
+  section > h2 {
+    font-size: 22px; margin-bottom: 8px;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  section > h2 i {
+    font-style: normal; font-family: var(--mono); font-size: 12px;
+    color: var(--ink-dim); flex: 0 0 auto;
+  }
+  .lead { font-size: 15px; color: var(--ink-soft); line-height: 2; margin-bottom: 22px; }
+  section p { font-size: 15px; color: var(--ink-soft); line-height: 2; margin-bottom: 16px; }
+  section b { color: var(--ink); font-weight: 500; }
+  h3 { font-size: 16.5px; margin: 28px 0 10px; }
+
+  /* 步驟 */
+  .steps { counter-reset: s; display: grid; gap: 0; margin: 22px 0; }
+  .step {
+    counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 16px;
+    padding: 18px 0; border-top: 1px solid var(--line);
+  }
+  .step:last-child { border-bottom: 1px solid var(--line); }
+  .step::before {
+    content: counter(s); font-family: var(--mono); font-size: 13px;
+    color: var(--accent); padding-top: 2px;
+  }
+  .step h4 { font-size: 15.5px; margin-bottom: 5px; }
+  .step p { font-size: 14px; margin: 0; line-height: 1.9; }
+
+  /* 範例框 */
+  .eg {
+    background: var(--card-3); border-left: 3px solid var(--accent-line);
+    padding: 16px 18px; margin: 18px 0; font-size: 14.5px; line-height: 2;
+    color: var(--ink-soft);
+  }
+  .eg__k { display: block; font-size: 11px; letter-spacing: .12em; font-family: var(--mono);
+           color: var(--ink-dim); margin-bottom: 8px; text-transform: uppercase; }
+  .eg b { color: var(--accent-hi); }
+
+  .formula {
+    font-family: var(--mono); font-size: 14px; color: var(--accent-hi);
+    background: var(--accent-wash); padding: 14px 18px; margin: 18px 0; line-height: 2;
+  }
+
+  .tip { border-left: 3px solid var(--warn); padding: 4px 0 4px 16px; margin: 18px 0; }
+  .tip__k { font-size: 13px; color: var(--warn); font-weight: 500; margin-bottom: 4px; }
+  .tip p { font-size: 14px; margin: 0; }
+
+  /* 問答 */
+  .qa { border-top: 1px solid var(--line); }
+  .qa details { border-bottom: 1px solid var(--line); }
+  .qa summary {
+    padding: 16px 30px 16px 0; cursor: pointer; list-style: none; position: relative;
+    font-size: 15px; color: var(--ink); transition: color .16s var(--ease);
+  }
+  .qa summary::-webkit-details-marker { display: none; }
+  .qa summary::after {
+    content: ''; position: absolute; right: 6px; top: 22px;
+    width: 7px; height: 7px; border-right: 1.5px solid var(--ink-dim);
+    border-bottom: 1.5px solid var(--ink-dim); transform: rotate(45deg);
+    transition: transform .22s var(--back), border-color .2s var(--ease);
+  }
+  .qa details[open] summary::after { transform: rotate(-135deg); border-color: var(--accent); }
+  .qa summary:hover { color: var(--accent); }
+  .qa .a { padding: 0 0 18px; font-size: 14.5px; color: var(--ink-soft); line-height: 2; }
+
+  .foot { padding: 40px 0 0; font-size: 13px; color: var(--ink-dim); line-height: 2; }
+  .foot a { color: var(--accent); }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 0 18px 70px; }
+    .bar { margin: 0 -18px; padding: 0 18px; }
+    .hero h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+<div class="wrap">
+
+  <div class="bar">
+    <span class="bar__b">家庭記帳</span>
+    <span style="color:var(--ink-dim);font-size:13px">使用說明</span>
+    <a class="bar__x" href="../index.html">← 回到系統</a>
+  </div>
+
+  <header class="hero">
+    <h1>怎麼用這套記帳</h1>
+    <p>
+      這份說明從「第一次打開」講到「看懂每個數字」。<br>
+      不用全部讀完——遇到不懂的地方，回來翻對應的那一節就好。
+    </p>
+  </header>
+
+  <nav class="toc">
+    <div class="toc__t">目錄</div>
+    <ol>
+      <li><a href="#start">三步驟開始用</a></li>
+      <li><a href="#write">記帳：一句話記好幾筆</a></li>
+      <li><a href="#read">看懂我的總覽</a></li>
+      <li><a href="#books">帳本：把不同用途的錢分開</a></li>
+      <li><a href="#alert">提醒：花到幾成通知我</a></li>
+      <li><a href="#family">家人：誰看得到我的紀錄</a></li>
+      <li><a href="#me">個人資料與大頭貼</a></li>
+      <li><a href="#qa">常見問題</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1 -->
+  <section id="start">
+    <h2><i>01</i>三步驟開始用</h2>
+    <p class="lead">花三分鐘設定，之後每天只要記帳就好。</p>
+
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h4>設定這個月想存多少</h4>
+          <p>左邊選「個人資料」，在<b>每月存款目標</b>填一個數字。
+          系統要知道這個，才算得出你這個月還剩多少可以花。填完立刻生效。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h4>記下今天花了什麼</h4>
+          <p>右上角按 <b>＋</b>，把今天的消費打成一段話送出，
+          系統會拆成一筆一筆讓你確認。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h4>回到「我的總覽」看結果</h4>
+          <p>那裡會告訴你這個月還能花多少、離目標還有多遠。
+          看不懂的欄位，旁邊有一個 <b>?</b>，點下去就有說明。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <div class="tip__k">先不用一次設定完</div>
+      <p>預算、提醒、帳本這些都可以之後再說。先把帳記起來，數字才有意義。</p>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section id="write">
+    <h2><i>02</i>記帳：一句話記好幾筆</h2>
+    <p class="lead">
+      不用一筆一筆填表格。把今天花了什麼<b>直接打成一段話</b>，系統會自己拆開。
+    </p>
+
+    <div class="eg">
+      <span class="eg__k">你打</span>
+      早上買早餐 55，中午跟同事吃飯 320，下午在全家買咖啡，晚上加油 1200，今天打工賺了 1500
+    </div>
+
+    <p>送出之後會看到拆好的五筆，每一筆都填好了金額和分類。你要做的只有兩件事：</p>
+
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h4>看一眼有沒有拆錯</h4>
+          <p>每一筆下面會標出它對應原句的哪一段，對不起來的直接改。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h4>補上沒說清楚的</h4>
+          <p>像「下午在全家買咖啡」沒講金額，那一筆會標出來等你填。
+          <b>沒填完不會存進去。</b></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <div class="tip__k">拆錯或猜錯分類是正常的</div>
+      <p>「在全家買飲料」的<b>全家</b>是店名不是家人，這種地方系統有時會猜錯。
+      直接改掉就好，你改過的地方會讓它越用越準。</p>
+    </div>
+
+    <h3>只想記一筆</h3>
+    <p>記帳頁上也有單筆手動的模式，填金額、分類、店家就好，適合金額比較大或需要寫備註的那種。</p>
+  </section>
+
+  <!-- 3 -->
+  <section id="read">
+    <h2><i>03</i>看懂我的總覽</h2>
+    <p class="lead">整頁只在回答一件事：<b>這個月還能花多少，才不會影響到想存的錢。</b></p>
+
+    <h3>可再支出</h3>
+    <p>最重要的數字。它是這樣算出來的：</p>
+    <div class="formula">本月收入　−　每月存款目標　＝　可支配上限<br>可支配上限　−　本月已支出　＝　可再支出</div>
+    <p>
+      舉例：這個月收入 68,000，你想存 20,000，那可以花的是 48,000。
+      已經花了 41,230，所以還能花 6,770。
+      <b>再花超過這個數字，這個月就存不到原本想存的金額。</b>
+    </p>
+
+    <h3>那條進度條</h3>
+    <p>
+      看的不是「你花了多少錢」，而是<b>「離存不到錢還有多遠」</b>。
+      過半會提醒你，接近滿的時候會變色，超過就是紅的。
+    </p>
+
+    <h3>預算使用狀況</h3>
+    <p>
+      存款目標管的是<b>整體</b>（這個月要留下多少），
+      預算管的是<b>單一類別</b>（餐飲最多花多少）。
+      兩個一起看，才知道是哪一類把錢吃掉的。
+    </p>
+  </section>
+
+  <!-- 4 -->
+  <section id="books">
+    <h2><i>04</i>帳本：把不同用途的錢分開</h2>
+    <p class="lead">
+      同一個家可以開好幾本帳，例如<b>家用</b>、<b>旅遊基金</b>、<b>自己的零用</b>。
+      每一筆記帳都會歸到其中一本。
+    </p>
+
+    <div class="eg">
+      <span class="eg__k">分類和帳本差在哪</span>
+      <b>分類</b>回答「錢花在什麼」——餐飲、交通、居住。<br>
+      <b>帳本</b>回答「這筆算在哪一份預算」——同樣是吃飯，
+      家庭聚餐算家用，出國吃的算旅遊基金。
+    </div>
+
+    <p>
+      右上角的圖示可以切換帳本。切過去之後，<b>統計、進度、存款目標都會跟著那一本走</b>，
+      所以「旅遊基金這個月花超了沒」可以單獨看，不會被家用的數字蓋過去。
+    </p>
+
+    <h3>每一本可以有自己的存款目標</h3>
+    <p>
+      在「群組」頁面，每一本帳旁邊都能填一個月目標。
+      例如整體想存 20,000，其中旅遊基金要另外存 10,000——兩個並存，各算各的。
+    </p>
+
+    <h3>誰可以開帳本</h3>
+    <p>
+      <b>任何人都可以</b>，不分身分。開的人就是那本帳的管理者，
+      可以改名字、把家人加進來、或是把它封存。
+    </p>
+
+    <div class="tip">
+      <div class="tip__k">封存不是刪除</div>
+      <p>
+        封存只是把一本帳收起來不再使用，它會從切換器和統計裡消失，
+        但<b>裡面的記帳一筆都不會被刪掉</b>。
+        在「已封存」那一區隨時可以把它叫回來，所有紀錄都還在。
+      </p>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section id="alert">
+    <h2><i>05</i>提醒：花到幾成通知我</h2>
+    <p class="lead">
+      與其月底才發現超支，不如在半路就知道。你可以自己決定在花到幾成的時候被提醒。
+    </p>
+
+    <p>
+      在「個人資料」的<b>階段性提醒</b>可以加幾個門檻，例如 60%、85%、100%。
+      每跨過一個，右上角的鈴鐺就會響一聲、跳一則通知。
+    </p>
+
+    <div class="eg">
+      <span class="eg__k">通知長這樣</span>
+      旅遊基金 已用掉可支配額度的 <b>103%</b>（超過你設的 100%）<br>
+      NT$ 5,150 / 可支配 NT$ 5,000
+    </div>
+
+    <p>
+      算的是<b>可支配額度的幾成</b>，不是收入的幾成。
+      每一個門檻也可以只針對某一本帳，例如「旅遊基金花到九成就叫我」。
+    </p>
+
+    <div class="tip">
+      <div class="tip__k">不會一直吵你</div>
+      <p>
+        同一個門檻<b>一個月只會響一次</b>，不會因為你來回記帳、刪除、再記就被連環通知。
+        下個月自動重新開始。<br>
+        暫時不想被打擾，把它<b>關掉</b>就好，設定會留著，想開回來隨時開。
+      </p>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section id="family">
+    <h2><i>06</i>家人：誰看得到我的紀錄</h2>
+    <p class="lead">預設<b>只有你自己</b>看得到。</p>
+
+    <p>
+      家裡的管理者可以建立「監管關係」。被指派之後，那個人就看得到你的記帳明細——
+      <b>但他只能看</b>。不能修改、不能刪除，也不能登入你的帳號。
+    </p>
+
+    <div class="tip">
+      <div class="tip__k">這件事不會偷偷發生</div>
+      <p>
+        只要有人看得到你，<b>你的畫面上就一定看得到是誰</b>。
+        系統沒有「隱藏監管」這個選項，也不會有。
+      </p>
+    </div>
+
+    <h3>反過來，我監管別人的時候</h3>
+    <p>
+      在「成員與權限」裡，有「看紀錄」的那幾位就是指派給你的。
+      點進去可以看他的每一筆，但每一列都沒有刪除鈕——你只是在看。
+    </p>
+    <p>
+      他新增一筆的時候，你會收到通知。點通知會直接跳到那一筆，
+      <b>那一列會被標起來</b>，不用自己在一長串紀錄裡找。
+    </p>
+  </section>
+
+  <!-- 7 -->
+  <section id="me">
+    <h2><i>07</i>個人資料與大頭貼</h2>
+    <p>
+      在「個人資料」可以改名字、生日、大頭貼和密碼。
+    </p>
+    <p>
+      大頭貼<b>選一張照片就好</b>，系統會自動裁成正方形並縮小，不用先自己處理。
+      沒有上傳的話，會用你名字的最後一個字當頭像。
+    </p>
+    <p>
+      Email 是你的登入帳號，目前不能更改。
+    </p>
+    <p>
+      未滿 18 歲的成員，每月存款目標會由家裡的管理者代為設定。
+    </p>
+  </section>
+
+  <!-- 8 -->
+  <section id="qa">
+    <h2><i>08</i>常見問題</h2>
+    <div class="qa">
+      <details>
+        <summary>記錯了可以改嗎？</summary>
+        <div class="a">可以。自己的紀錄可以隨時刪除重記。別人的紀錄你只能看，不能改。</div>
+      </details>
+      <details>
+        <summary>改了存款目標，之前的月份會跟著變嗎？</summary>
+        <div class="a">
+          不會。過去的月份會沿用<b>當時</b>設定的數字。
+          否則十月回頭看九月，會用現在的標準去評斷當時的自己——那既不準也不公平。
+        </div>
+      </details>
+      <details>
+        <summary>為什麼我看不到某個家人的紀錄？</summary>
+        <div class="a">
+          因為他沒有被指派給你監管。可見範圍只由監管關係決定，
+          <b>就算是家裡的管理者也一樣</b>——沒有指派，就只看得到自己。
+        </div>
+      </details>
+      <details>
+        <summary>把人移出帳本會怎樣？</summary>
+        <div class="a">
+          他會看不到那本帳的所有紀錄，<b>包含他自己記在那本帳上的那些</b>。
+          紀錄是屬於帳本的。
+        </div>
+      </details>
+      <details>
+        <summary>財務建議的數字可靠嗎？</summary>
+        <div class="a">
+          每一則建議底下都附著它依據的算式，你可以自己核對。
+          <b>數字是系統算的</b>，模型只負責把它講成人話。
+        </div>
+      </details>
+      <details>
+        <summary>手機可以用嗎？</summary>
+        <div class="a">可以。用瀏覽器打開同一個網址就好，版面會自動調整。</div>
+      </details>
+    </div>
+
+    <div class="foot">
+      還是找不到答案？畫面上大部分的標題旁邊都有一個 <b>?</b>，點下去會有那個欄位的說明。<br>
+      <a href="../index.html">← 回到系統</a>
+    </div>
+  </section>
+
+</div>
+</div>
+
+</body>
+</html>

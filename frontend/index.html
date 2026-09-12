@@ -19,8 +19,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/tokens.css?v=44">
-<link rel="stylesheet" href="css/app.css?v=44">
+<link rel="stylesheet" href="css/tokens.css?v=52">
+<link rel="stylesheet" href="css/app.css?v=52">
 </head>
 <body>
 
@@ -30,9 +30,7 @@
 
   <nav class="rail">
     <div class="brand">
-      <span class="brand__m" aria-hidden="true">帳</span>
       <span class="brand__n">家庭記帳</span>
-      <span class="brand__v" id="mode"></span>
     </div>
 
     <div class="nav">
@@ -76,25 +74,14 @@
     </div>
 
     <div class="docs">
-      <div class="docs__lb">文件</div>
-      <a class="docs__i" href="docs/fastapi.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5V6a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 1.5z"/><path d="M8 8h7M8 12h7"/></svg>
-        <span>FastAPI 說明書</span>
-        <i>↗</i>
+      <div class="docs__lb">說明</div>
+      <a class="docs__i docs__i--main" href="docs/guide.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 6.5S10 5 7 5H4v13h3c3 0 5 1.5 5 1.5S14 18 17 18h3V5h-3c-3 0-5 1.5-5 1.5z"/><path d="M12 6.5v13"/></svg>
+        <span>使用說明</span>
       </a>
-      <a class="docs__i" href="docs/restful.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h10M4 17h13"/><circle cx="19" cy="12" r="2"/></svg>
-        <span>RESTful 說明書</span>
-        <i>↗</i>
-      </a>
-      <a class="docs__i" href="docs/files.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        <span>檔案系統說明書</span>
-        <i>↗</i>
-      </a>
-      <a class="docs__i docs__i--main" href="docs/index.html">
+      <a class="docs__i" href="docs/index.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>
-        <span>專題說明文件</span>
+        <span>專題文件</span>
         <i>↗</i>
       </a>
     </div>
@@ -112,9 +99,12 @@
       <div class="top__s" id="psub"></div>
       <span class="top__sp"></span>
       <div class="gsw" id="gsw" hidden></div>
-      <div class="search">
-        <svg class="search__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="search" type="search" placeholder="搜尋店家、備註…" autocomplete="off">
+      <button class="ic" id="searchBtn" title="搜尋" aria-label="搜尋">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+      <div class="search" id="searchDrawer" hidden>
+        <svg class="search__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="search" type="search" placeholder="搜尋店家或備註" autocomplete="off">
       </div>
       <div class="bell__wrap">
         <button class="bell" id="bell" title="監管通知" aria-label="監管通知">
@@ -123,23 +113,25 @@
         </button>
         <div class="bell__panel" id="bellPanel" hidden></div>
       </div>
-      <button class="btn btn--go" data-nav="entry">＋ 記一筆</button>
+      <button class="ic ic--go" data-nav="entry" title="記一筆" aria-label="記一筆">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
     </header>
 
     <div id="view"></div>
 
     <footer style="padding:24px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-dim);line-height:1.8">
-      家庭記帳與財務控管系統｜示範資料為虛構樣本。
+      家庭記帳　·　目前顯示的是示範資料
     </footer>
   </main>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=44"></script>
-<script src="js/data.js?v=44"></script>
-<script src="js/api.js?v=44"></script>
-<script src="js/notify.js?v=44"></script>
-<script src="js/app.js?v=44"></script>
+<script src="js/stars.js?v=52"></script>
+<script src="js/data.js?v=52"></script>
+<script src="js/api.js?v=52"></script>
+<script src="js/notify.js?v=52"></script>
+<script src="js/app.js?v=52"></script>
 </body>
 </html>
