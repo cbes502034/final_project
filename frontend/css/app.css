@@ -1908,3 +1908,71 @@ body.bar-icon #searchDrawer[hidden] { display: none !important; }
   .anew { gap: 10px; }
   .anew select { min-width: 0; flex: 1 1 140px; }
 }
+
+
+/* ============================================================
+   記帳方式：抽屜
+   ------------------------------------------------------------
+   本來是兩張帶說明和範例的大卡片並排。但「要用哪一種寫法」
+   是常態性的選擇——選好之後幾乎不會再動，不值得一直佔著版面。
+   收成一條，點開才展開。
+   ============================================================ */
+.mbar { position: relative; border-bottom: 1px solid var(--line); }
+.mbar__b {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 15px 28px; text-align: left; background: transparent;
+  transition: background-color .16s var(--ease);
+}
+.mbar__b:hover { background: var(--card-2); }
+.mbar__b.open { background: var(--accent-wash); }
+.mbar__n { font-size: 15px; color: var(--ink); font-weight: 500; }
+.mbar__b > svg {
+  width: 14px; height: 14px; color: var(--ink-dim); margin-left: auto;
+  transition: transform .22s var(--back);
+}
+.mbar__b.open > svg { transform: rotate(180deg); color: var(--accent); }
+
+.mbar__p {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 25;
+  background: var(--card); border-bottom: 1px solid var(--line-2);
+  box-shadow: 0 14px 28px rgba(60, 50, 35, .09);
+  animation: drawer .24s var(--out) both;
+}
+.mbar__i {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: 14px 28px; text-align: left; background: transparent;
+  border-bottom: 1px solid var(--line);
+  transition: background-color .16s var(--ease), padding-left .18s var(--out);
+}
+.mbar__i:last-child { border-bottom: 0; }
+.mbar__i:hover { background: var(--card-2); padding-left: 34px; }
+.mbar__i.on { background: var(--accent-wash); box-shadow: inset 3px 0 0 var(--accent); }
+.mbar__t { font-size: 14.5px; color: var(--ink); }
+.mbar__d { font-size: 12px; color: var(--ink-dim); }
+
+@media (max-width: 900px) {
+  .mbar__b, .mbar__i { padding-left: 18px; padding-right: 18px; }
+}
+
+
+/* ============================================================
+   兩欄
+   ------------------------------------------------------------
+   有些內容只需要半欄的寬度——一張頭像、一個數字欄位、
+   兩格密碼。讓它們各自獨佔一整條，整頁會被拉得又長又空。
+
+   兩欄之間用一條直線分開，跟整體的「細線分區」一致。
+   窄螢幕自動疊回一欄。
+   ============================================================ */
+.cols { display: grid; grid-template-columns: 1fr 1fr; }
+.cols > .col { min-width: 0; }
+.cols > .col + .col { border-left: 1px solid var(--line); }
+/* 兩欄裡第一個區塊的上緣線要對齊，所以都保留 */
+.cols > .col > .sec:first-child { border-top: 0; padding-top: 24px; }
+
+@media (max-width: 1080px) {
+  .cols { grid-template-columns: 1fr; }
+  .cols > .col + .col { border-left: 0; }
+  .cols > .col + .col > .sec:first-child { border-top: 1px solid var(--line); }
+}
+

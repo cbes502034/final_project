@@ -275,18 +275,24 @@
   var batch = null;           // 段落解析結果，尚未寫入
 
   function vEntry() {
-    head('記帳', '兩種寫入方式，一次只能用一種');
+    head('記帳', '');
     var h = '<div class="page">';
 
-    /* ---- 模式切換：選一種，另一種停用 ---- */
-    h += '<div class="modes">' +
-      modeCard('para', '段落記帳',
-        '一次寫一整段，系統自動切成好幾筆',
-        '「早上買早餐55，中午吃飯320，今天打工賺了1500」') +
-      modeCard('single', '單筆手動',
-        '一次填一筆，欄位自己選',
-        '傳統表單，不經過模型') +
-      '</div>';
+    /* ---- 模式切換：抽屜 ----
+       兩張帶說明的大卡片收成一條。要用哪一種是常態性的選擇，
+       選好之後幾乎不會再動，不值得一直佔著版面。 */
+    h += '<div class="mbar">' +
+      '<button class="mbar__b" id="modeBtn">' +
+        '<span class="mbar__n">' + (MODE === 'para' ? '段落記帳' : '單筆手動') + '</span>' +
+        helpBtn(MODE === 'para' ? 'entry' : '') +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          '<path d="m6 9 6 6 6-6"/></svg>' +
+      '</button>' +
+      '<div class="mbar__p" id="modePanel" hidden>' +
+        modeRow('para', '段落記帳', '一次寫一整段，自動切成好幾筆') +
+        modeRow('single', '單筆手動', '一次填一筆，欄位自己選') +
+      '</div>' +
+    '</div>';
 
 
     h += '<div id="entryBox"></div>';
@@ -299,21 +305,28 @@
     loadTx();
   }
 
-  function modeCard(id, title, desc, eg) {
-    var on = MODE === id;
-    return '<button class="mode' + (on ? ' on' : '') + '" data-mode="' + id + '">' +
-      '<span class="mode__r"><i></i></span>' +
-      '<span class="mode__m"><span class="mode__t">' + esc(title) + '</span>' +
-      '<span class="mode__d">' + esc(desc) + '</span>' +
-      '<span class="mode__e">' + esc(eg) + '</span></span>' +
-      (on ? '<span class="tag tag--info">使用中</span>'
-          : '<span class="tag tag--na">已停用</span>') + '</button>';
+  function modeRow(id, title, desc) {
+    return '<button class="mbar__i' + (MODE === id ? ' on' : '') +
+      '" data-mode="' + id + '">' +
+      '<span class="mbar__t">' + esc(title) + '</span>' +
+      '<span class="mbar__d">' + esc(desc) + '</span></button>';
   }
 
   function renderMode() {
     var box = document.getElementById('entryBox');
     if (!box) return;
     box.innerHTML = MODE === 'para' ? paraHTML() : singleHTML();
+
+    // 抽屜上的標籤與選中狀態也要跟著換，不然按了看起來沒反應
+    var n = document.querySelector('.mbar__n');
+    if (n) n.textContent = MODE === 'para' ? '段落記帳' : '單筆手動';
+    Array.prototype.forEach.call(document.querySelectorAll('.mbar__i'), function (b) {
+      b.classList.toggle('on', b.dataset.mode === MODE);
+    });
+    var mp = document.getElementById('modePanel');
+    if (mp) mp.hidden = true;
+    var mb = document.getElementById('modeBtn');
+    if (mb) mb.classList.remove('open');
   }
 
   /* ============================================================
@@ -1167,11 +1180,15 @@
   }
 
   function vProfile() {
-    head('個人資料', '名字、大頭貼、密碼');
+    head('個人資料', '');
     $view.innerHTML = '<div class="page">' + skeleton(3) + '</div>';
     API.me().then(function (m) {
       var u = m.user;
+      /* 左右兩欄。大頭貼、存款目標、密碼都只需要半欄的寬度，
+         各自獨佔一整條的話，整頁會被拉得很長而且空空的。
+         階段性提醒有清單又有新增列，需要整欄，所以放在下面。 */
       var h = '<div class="page">' +
+        '<div class="cols"><div class="col">' +
 
         '<div class="sec"><h2 class="sec__t">大頭貼' + helpBtn('avatar') + '</h2></div>' +
         '<div class="card prof">' +
@@ -1184,6 +1201,14 @@
             '</div>' +
           '</div>' +
         '</div>' +
+
+        '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
+        '<div class="card prof__goal">' +
+          '<input class="goal__i" type="number" min="0" ' +
+            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '">' +
+        '</div>' +
+
+        '</div><div class="col">' +
 
         '<div class="sec"><h2 class="sec__t">基本資料</h2></div>' +
         '<form class="card prof__form" id="profF">' +
@@ -1199,15 +1224,6 @@
           '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
         '</form>' +
 
-        '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
-        '<div class="card prof__goal">' +
-          '<input class="goal__i" type="number" min="0" ' +
-            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '">' +
-        '</div>' +
-
-        '<div class="sec"><h2 class="sec__t">階段性提醒' + helpBtn('alerts') + '</h2></div>' +
-        '<div class="card" id="alertBox">' + skeleton(2) + '</div>' +
-
         '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
         '<form class="card prof__form" id="pwF">' +
           '<label class="fld"><span>目前的密碼</span>' +
@@ -1217,6 +1233,11 @@
             '<em class="fld__h">至少 8 個字</em></label>' +
           '<div><button class="btn" type="submit">更改密碼</button></div>' +
         '</form>' +
+
+        '</div></div>' +
+
+        '<div class="sec"><h2 class="sec__t">階段性提醒' + helpBtn('alerts') + '</h2></div>' +
+        '<div class="card" id="alertBox">' + skeleton(2) + '</div>' +
 
       '</div>';
       $view.innerHTML = h;
@@ -1432,6 +1453,23 @@
         toast('已登出', 'ok');
       });
       return;
+    }
+
+    /* ---- 記帳方式的抽屜 ---- */
+    if (t.closest('#modeBtn') && !t.closest('[data-help]')) {
+      var mp = document.getElementById('modePanel');
+      if (mp) {
+        mp.hidden = !mp.hidden;
+        document.getElementById('modeBtn').classList.toggle('open', !mp.hidden);
+      }
+      return;
+    }
+    if (!t.closest('.mbar')) {
+      var mp2 = document.getElementById('modePanel');
+      if (mp2 && !mp2.hidden) {
+        mp2.hidden = true;
+        document.getElementById('modeBtn').classList.remove('open');
+      }
     }
 
     /* ---- 搜尋抽屜 ---- */
