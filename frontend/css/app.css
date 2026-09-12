@@ -1499,7 +1499,8 @@ body.hp-on { overflow: hidden; }
   background: var(--accent-wash); padding: 12px 16px; border-radius: 0;
   line-height: 1.9 !important;
 }
-.hp__d { padding: 12px 22px 20px; display: flex; justify-content: flex-end; }
+.hp__d { padding: 12px 22px 20px; display: flex; justify-content: center; }
+.hp__d .btn { min-width: 132px; justify-content: center; }
 
 @media (max-width: 560px) {
   .hp { padding: 16px; align-items: flex-end; }
