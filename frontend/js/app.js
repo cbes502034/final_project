@@ -460,7 +460,7 @@
      03 家庭總覽
      ============================================================ */
   function vFamily() {
-    head('家庭總覽', '管理者看得到全家；家長看得到被指派監管的成員');
+    head('家庭總覽', '你自己 ＋ 被指派給你監管的成員。唯讀');
     $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
     Promise.all([API.summary({ scope: 'family' }), API.me(), API.budgets()])
       .then(function (r) {

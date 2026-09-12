@@ -387,6 +387,6 @@ window.DATA = {
     { action: '邀請／移除成員', master: 'Y', parent: 'N', member: 'N' },
     { action: '建立監管關係', master: 'Y', parent: 'N', member: 'N' },
     { action: '查看「誰看得到我」', master: 'Y', parent: 'Y', member: 'Y（強制可見）' },
-    { action: '匯出全家資料', master: 'Y', parent: 'N', member: 'N' }
+    { action: '匯出資料', master: 'Y（限可見範圍）', parent: 'Y（限可見範圍）', member: 'Y（只有自己）' }
   ]
 };
