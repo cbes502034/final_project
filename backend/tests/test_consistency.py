@@ -142,13 +142,12 @@ def test_已建立的檔案都標了負責人():
 
 def test_前端沒有呼叫不存在的後端路由():
     """
-    frontend/js/api.js 的 http 轉接器打的每一支路由，
-    後端都必須有（或明確列在 FRONTEND_ONLY 裡）。
+    frontend/js/api.js 的 http 轉接器打的每一支路由，後端都必須有。
 
     這是「資訊沒對接上」最常見的形式：前端寫了一支後端從來沒做的 API，
     等到接上去才發現 404。
     """
-    from app.ownership import FRONTEND_ONLY, all_routes
+    from app.ownership import all_routes
 
     js = read("frontend/js/api.js")
     called = set(re.findall(r"req\('(/api/[^']*)'", js))
@@ -156,12 +155,9 @@ def test_前端沒有呼叫不存在的後端路由():
     called = {c.rstrip("/") for c in called}
 
     backend_paths = {p.split("{")[0].rstrip("/") for _, p in all_routes()}
-    allowed = {a.split(" ", 1)[1].rstrip("/") for a, _ in FRONTEND_ONLY}
 
-    orphans = sorted(c for c in called if c not in backend_paths and c not in allowed)
-    assert not orphans, (
-        "前端會打、但後端沒有也沒列在 FRONTEND_ONLY 的路由：" + "、".join(orphans)
-    )
+    orphans = sorted(c for c in called if c not in backend_paths)
+    assert not orphans, "前端會打、但後端沒有的路由：" + "、".join(orphans)
 
 
 def test_畫面數在程式與手冊之間一致():
@@ -242,3 +238,39 @@ def test_資料表張數在三份文件裡一致():
     for stale in range(10, n):
         assert "%d 張表" % stale not in handbook, "手冊還留著「%d 張表」" % stale
         assert "%d 張表" % stale not in spec, "規格文件還留著「%d 張表」" % stale
+
+
+def test_不可實作的路由在任何一端都不存在():
+    """NEVER_IMPLEMENT 列的路由，前端不可以打、後端不可以做。
+
+    這一條擋的是 POST /api/auth/switch——管理者登入子女帳號。
+    它曾經以「示範模式的切換身分鈕」存在於前端，已經拿掉了。
+    功能被拿掉之後最容易發生的事，是過幾週有人覺得方便又加回來，
+    所以用測試把它釘死。
+    """
+    from app.ownership import NEVER_IMPLEMENT, all_routes
+
+    backend = {"%s %s" % (v, p) for v, p in all_routes()}
+    api_js = read("frontend/js/api.js")
+    app_js = read("frontend/js/app.js")
+
+    for route, why in NEVER_IMPLEMENT:
+        assert route not in backend, "後端實作了不該實作的 %s\n%s" % (route, why)
+
+        path = route.split(" ", 1)[1]
+        assert path not in api_js, "前端的 api.js 還在打 %s\n%s" % (path, why)
+        assert path not in app_js, "前端的 app.js 還在打 %s\n%s" % (path, why)
+
+
+def test_切換身分已經從前端絕跡():
+    """有了真的登入登出，「切換身分」就是一顆後門形狀的按鈕。"""
+    for rel in ("frontend/js/api.js", "frontend/js/app.js", "frontend/index.html"):
+        src = read(rel)
+        for bad in ("switchUser", "data-switch", "切換身分"):
+            assert bad not in src, "%s 還留著「%s」" % (rel, bad)
+
+    # 文件也不可以還把它講成「前端專用、之後要拿掉」——已經拿掉了
+    for rel in ("README.md", "backend/README.md", "docs/02-前後端串接契約.md"):
+        src = read(rel)
+        assert "前端專用、後端不實作" not in src, "%s 的說法過時了" % rel
+        assert "示範模式專用" not in src, "%s 的說法過時了" % rel

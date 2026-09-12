@@ -217,6 +217,12 @@
       '<span><i style="background:var(--warn)"></i>支出</span></div>';
   }
 
+  /* 這筆是不是我自己的。ME 還沒載入時一律當成別人的 ——
+     寧可少一顆按鈕，也不要讓人對別人的紀錄按下刪除。 */
+  function isMine(t) {
+    return !!(ME && ME.user && t.user === ME.user.id);
+  }
+
   function txRow(t) {
     return '<div class="tx">' +
       '<div class="tx__c" style="background:' + t.catColor + '22;color:' + t.catColor +
@@ -228,7 +234,9 @@
         (t.raw ? '<br><span class="tx__raw">原句「' + esc(t.raw) + '」</span>' : '') + '</div></div>' +
       '<div class="tx__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
         (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</div>' +
-      '<button class="btn btn--sm" data-del="' + esc(t.id) + '">刪除</button>' +
+      (isMine(t)
+        ? '<button class="btn btn--sm" data-del="' + esc(t.id) + '">刪除</button>'
+        : '<span class="tag tag--na" title="監管是唯讀的">唯讀</span>') +
       '</div>';
   }
 
@@ -459,7 +467,7 @@
           h += '<div class="note note--warn"><div class="note__k">權限不足</div><p>' +
             '你目前的角色是<b>成員</b>，只看得到自己的紀錄。' +
             '若要檢視家庭總覽，需要管理者調整角色。<br>' +
-            '（可以用右上角切換身分，體驗不同角色看到的畫面。）</p></div></div>';
+            '（想看不同角色的畫面，登出後用登入頁下面的展示帳號登入。）</p></div></div>';
           $view.innerHTML = h;
           return;
         }
@@ -619,6 +627,14 @@
   /* ============================================================
      06 成員與權限
      ============================================================ */
+  /* 誰的存款目標我能改：我自己；未成年的由 master 代設。
+     監管者看得到子女的數字，但不能替成年的子女決定要存多少。 */
+  function canSetGoal(u, d) {
+    if (u.id === d.me) return true;
+    var me = d.members.filter(function (x) { return x.id === d.me; })[0];
+    return !!(me && me.role === 'master' && u.age !== null && u.age < 18);
+  }
+
   function vMembers() {
     head('成員與權限', '角色、監管關係、以及每個角色看得到什麼');
     $view.innerHTML = '<div class="page">' + skeleton(5) + '</div>';
@@ -647,9 +663,8 @@
           '<div class="row__do">' +
             '<span class="goal"><label>每月存款目標</label>' +
             '<input class="goal__i" type="number" data-goal="' + esc(u.id) + '" value="' +
-            (u.savingsGoal || 0) + '"></span>' +
-            (u.id === d.me ? '' :
-            '<button class="btn btn--sm" data-switch="' + esc(u.id) + '">切換身分</button>') +
+            (u.savingsGoal || 0) + '"' + (canSetGoal(u, d) ? '' : ' disabled') + '></span>' +
+            (canSetGoal(u, d) ? '' : '<span class="tag tag--na">唯讀</span>') +
           '</div></article>';
       }).join('') + '</div>';
 
@@ -1022,17 +1037,6 @@
       API.deleteTransaction(del.dataset.del).then(function () {
         loadTx(); toast('已刪除', 'ok');
       }).catch(function (err) { toast('刪除失敗：' + err.message, 'err'); });
-      return;
-    }
-
-    var sw = t.closest('[data-switch]');
-    if (sw) {
-      API.switchUser(sw.dataset.switch).then(function () {
-        paintWho(); paint();
-        // 換人 = 換通知收件匣，先清掉上一個人的
-        if (global.Notify) { global.Notify.reset(); global.Notify.refresh(); }
-        toast('已切換身分', 'ok');
-      });
       return;
     }
 

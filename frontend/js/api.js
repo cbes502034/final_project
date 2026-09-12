@@ -338,14 +338,6 @@
       });
     },
 
-    switchUser: function (id) {
-      var s = load();
-      return sleep(160).then(function () {
-        s.me = id; save();
-        return { me: id };
-      });
-    },
-
     summary: function (f) {
       f = f || {};
       var s = load(), D = global.DATA;
@@ -548,7 +540,14 @@
     deleteTransaction: function (id) {
       var s = load();
       return sleep(180).then(function () {
-        s.transactions = s.transactions.filter(function (t) { return t.id !== id; });
+        var t = s.transactions.filter(function (x) { return x.id === id; })[0];
+        if (!t) throw new Error('找不到這筆紀錄');
+        /* 監管是唯讀的。看得到不等於改得動 ——
+           前端已經不畫刪除鈕了，這裡再擋一次：
+           按鈕藏起來不是權限控制，任何人都能自己呼叫這支。
+           真後端必須做同樣的檢查（403），不可以只靠前端。 */
+        if (t.user !== s.me) throw new Error('這是別人的紀錄，你只能檢視');
+        s.transactions = s.transactions.filter(function (x) { return x.id !== id; });
         save();
         return { deleted: id };
       });
@@ -559,6 +558,14 @@
       return sleep(240).then(function () {
         var m = D.members.filter(function (x) { return x.id === userId; })[0];
         if (!m) throw new Error('not found: ' + userId);
+
+        /* 誰能設誰的目標：本人；未成年者可由 master 代設。
+           家長看得到子女的數字，但不能替成年子女決定要存多少。 */
+        var me = memberOf(st.me) || {};
+        var mine = userId === st.me;
+        var proxy = me.role === 'master' && m.age !== null && m.age < 18;
+        if (!mine && !proxy) throw new Error('只能設定自己的存款目標');
+
         var v = Number(goal);
         if (isNaN(v) || v < 0) throw new Error('存款目標要是 0 以上的數字');
         st.goals[userId] = v;
@@ -877,10 +884,6 @@
     deleteAvatar:      function ()      { return req('/api/auth/me/avatar', { method: 'DELETE' }); },
     changePassword:    function (p)     { return req('/api/auth/password', { method: 'PATCH', body: p }); },
 
-    /* ⚠️ 後端沒有這支，也絕對不可以實作。
-       讓任何人任意切換身分等於把整套權限系統作廢。
-       接上真後端之後，「切換身分」這個鈕要換成正常的登入登出。 */
-    switchUser:        function (id)    { return Promise.reject(new Error('真後端不提供切換身分，請改用登入')); },
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
     transactions:      function (f)     { return req('/api/transactions' + qs(f)); },
     nlpParse:          function (t)     { return req('/api/nlp/parse', { method: 'POST', body: { text: t } }); },
@@ -913,7 +916,6 @@
     uploadAvatar:      function (d)    { return impl.uploadAvatar(d); },
     deleteAvatar:      function ()     { return impl.deleteAvatar(); },
     changePassword:    function (p)    { return impl.changePassword(p); },
-    switchUser:        function (i)    { return impl.switchUser(i); },
     summary:           function (f)    { return impl.summary(f); },
     transactions:      function (f)    { return impl.transactions(f); },
     nlpParse:          function (t)    { return impl.nlpParse(t); },
