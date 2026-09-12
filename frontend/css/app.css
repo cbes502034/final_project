@@ -1547,7 +1547,7 @@ input[type="password"], input[type="search"], select, textarea {
 .tag, .chip { border-radius: 0; }
 .gsw__d { border-radius: 0; }
 .bell__n { border-radius: 0; min-width: 16px; }
-.q { border-radius: 0; }                    /* 問號也是方的，跟整體一致 */
+.q { border-radius: 50%; }                  /* 問號是圓的——這是約定俗成的說明標記 */
 .bell__dot, .ai__p::before { border-radius: 0; }
 .hp__x { border-radius: 0; }
 .fl__n, .rail__mark { border-radius: 0; }
