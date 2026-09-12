@@ -12,6 +12,11 @@
    POST   /api/auth/login             登入 → { accessToken, refreshToken, user }
    POST   /api/auth/refresh           換新 token
    POST   /api/auth/logout            登出（撤銷 refresh token）
+   POST   /api/auth/refresh           access token 過期時換新的
+   PATCH  /api/auth/me                改個人資料（displayName / birthYear）
+   PUT    /api/auth/me/avatar         上傳大頭貼（body: { image: dataUri }）
+   DELETE /api/auth/me/avatar         移除大頭貼
+   PATCH  /api/auth/password          改密碼
    GET    /api/auth/me                目前登入者 + 家庭角色
 
    家庭與權限
@@ -92,7 +97,10 @@
       transactions: clone(global.DATA.transactions),
       budgets: clone(global.DATA.budgets),
       goals: {},
-      readNotify: []
+      readNotify: [],
+      auth: { loggedIn: true },   // mock 預設已登入，不然一打開就被擋在登入頁
+      patch: {},                  // 個人資料的改動（名字、大頭貼）
+      newUsers: []                // 註冊進來的人
     };
     try {
       var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -101,9 +109,14 @@
         if (saved.extra) base.transactions = saved.extra.concat(base.transactions);
         if (saved.goals) base.goals = saved.goals;
         if (saved.readNotify) base.readNotify = saved.readNotify;
+        if (saved.auth) base.auth = saved.auth;
+        if (saved.patch) base.patch = saved.patch;
+        if (saved.newUsers) base.newUsers = saved.newUsers;
       }
     } catch (e) {}
     applyGoals(base.goals);
+    applyUsers(base.newUsers);
+    applyPatch(base.patch);
     state = base;
     return state;
   }
@@ -112,9 +125,33 @@
       var extra = state.transactions.filter(function (t) { return t.id.indexOf('N') === 0; });
       localStorage.setItem(KEY, JSON.stringify({
         me: state.me, extra: extra, goals: state.goals || {},
-        readNotify: state.readNotify || []
+        readNotify: state.readNotify || [],
+        auth: state.auth || { loggedIn: true },
+        patch: state.patch || {},
+        newUsers: state.newUsers || []
       }));
     } catch (e) {}
+  }
+
+  /* 註冊進來的人補回 DATA.members，不然重新整理就不見了 */
+  function applyUsers(list) {
+    (list || []).forEach(function (u) {
+      if (!global.DATA.members.some(function (m) { return m.id === u.id; })) {
+        global.DATA.members.push(clone(u));
+      }
+    });
+  }
+  /* 個人資料的改動蓋回去（名字、大頭貼） */
+  function applyPatch(p) {
+    Object.keys(p || {}).forEach(function (id) {
+      var m = global.DATA.members.filter(function (x) { return x.id === id; })[0];
+      if (m) Object.keys(p[id]).forEach(function (k) { m[k] = p[id][k]; });
+    });
+  }
+  function patchOf(st, id) {
+    st.patch = st.patch || {};
+    st.patch[id] = st.patch[id] || {};
+    return st.patch[id];
   }
 
   function memberOf(id) {
@@ -153,6 +190,151 @@
             .filter(function (g) { return g.ward === s.me; })
             .map(function (g) { return clone(memberOf(g.guardian)); })
         };
+      });
+    },
+
+    /* ---------------------------------------------------------
+       認證。mock 沒有真的密碼雜湊，只檢查「email 存在」＋「長度夠」，
+       目的是把登入 → 拿 token → 登出這個流程跑給前端看。
+       真的驗證在後端，用 toolkit.passwords。
+       --------------------------------------------------------- */
+    authState: function () {
+      var s = load();
+      return Promise.resolve({ loggedIn: !!(s.auth && s.auth.loggedIn) });
+    },
+
+    login: function (c) {
+      var s = load(); c = c || {};
+      return sleep(260).then(function () {
+        var mail = String(c.email || '').trim().toLowerCase();
+        var u = global.DATA.members.filter(function (m) {
+          return String(m.email || '').toLowerCase() === mail;
+        })[0];
+        /* 真後端這兩種情況要回同一句話。
+           分開講等於送給攻擊者一支帳號列舉工具：
+           「這個 email 沒有註冊過」就是在確認哪些 email 有註冊。
+           這裡分開只是為了 demo 時看得懂自己打錯什麼。 */
+        if (!u) throw new Error('這個 email 沒有註冊過');
+        if (String(c.password || '').length < 8) throw new Error('密碼至少 8 個字');
+        s.me = u.id;
+        s.auth = { loggedIn: true };
+        save();
+        return {
+          accessToken: 'mock.access.' + u.id,
+          refreshToken: 'mock.refresh.' + u.id,
+          expiresIn: 1800,
+          user: clone(u)
+        };
+      });
+    },
+
+    register: function (p) {
+      var s = load(); p = p || {};
+      return sleep(320).then(function () {
+        var name = String(p.name || '').trim();
+        var mail = String(p.email || '').trim().toLowerCase();
+        if (!name) throw new Error('請填名字');
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw new Error('email 格式看起來不對');
+        if (global.DATA.members.some(function (m) {
+          return String(m.email || '').toLowerCase() === mail;
+        })) throw new Error('這個 email 已經註冊過了');
+        if (String(p.password || '').length < 8) throw new Error('密碼至少 8 個字');
+
+        var n = global.DATA.members.reduce(function (mx, m) {
+          return Math.max(mx, Number(String(m.id).replace(/\D/g, '')) || 0);
+        }, 0) + 1;
+        var u = {
+          id: 'U' + n, name: name, email: mail, role: 'member',
+          avatar: name.slice(-1), age: null,
+          joined: new Date().toISOString().slice(0, 10),
+          income: 0, expense: 0, budget: 0,
+          savingsGoal: Number(p.savingsGoal) || 0
+        };
+        global.DATA.members.push(u);
+        s.newUsers = (s.newUsers || []).concat([clone(u)]);
+        s.me = u.id;
+        s.auth = { loggedIn: true };
+        save();
+        return {
+          accessToken: 'mock.access.' + u.id,
+          refreshToken: 'mock.refresh.' + u.id,
+          expiresIn: 1800,
+          user: clone(u)
+        };
+      });
+    },
+
+    logout: function () {
+      var s = load();
+      return sleep(150).then(function () {
+        s.auth = { loggedIn: false };
+        save();
+        return { ok: true };
+      });
+    },
+
+    updateProfile: function (p) {
+      var s = load(); p = p || {};
+      return sleep(200).then(function () {
+        var m = memberOf(s.me);
+        var q = patchOf(s, s.me);
+        if (p.displayName !== undefined) {
+          var name = String(p.displayName).trim();
+          if (!name) throw new Error('名字不能空白');
+          q.name = name;
+          // 沒有上傳大頭貼的人，頭像字跟著名字走
+          if (!m.avatarUrl) q.avatar = name.slice(-1);
+        }
+        if (p.birthYear !== undefined) {
+          var y = Number(p.birthYear);
+          var now = new Date().getFullYear();
+          if (p.birthYear !== null && (!y || y < 1900 || y > now)) {
+            throw new Error('出生年份不合理');
+          }
+          q.birthYear = y || null;
+          q.age = y ? now - y : null;
+        }
+        applyPatch(s.patch);
+        save();
+        return clone(memberOf(s.me));
+      });
+    },
+
+    uploadAvatar: function (dataUri) {
+      var s = load();
+      return sleep(420).then(function () {
+        if (!/^data:image\/(png|jpeg|webp);base64,/.test(String(dataUri || ''))) {
+          throw new Error('只收 PNG / JPEG / WebP');
+        }
+        // 粗估 base64 解出來的大小，跟後端的 200 KB 上限對齊
+        var bytes = Math.floor(String(dataUri).split(',')[1].length * 3 / 4);
+        if (bytes > 200 * 1024) throw new Error('圖片太大了（上限 200 KB）');
+        patchOf(s, s.me).avatarUrl = dataUri;
+        applyPatch(s.patch);
+        save();
+        var m = memberOf(s.me);
+        return { avatarUrl: m.avatarUrl, avatar: m.avatar };
+      });
+    },
+
+    deleteAvatar: function () {
+      var s = load();
+      return sleep(180).then(function () {
+        patchOf(s, s.me).avatarUrl = null;
+        applyPatch(s.patch);
+        save();
+        var m = memberOf(s.me);
+        return { avatarUrl: null, avatar: m.avatar };
+      });
+    },
+
+    changePassword: function (p) {
+      p = p || {};
+      return sleep(260).then(function () {
+        if (String(p.oldPassword || '').length < 8) throw new Error('目前的密碼不對');
+        if (String(p.newPassword || '').length < 8) throw new Error('新密碼至少 8 個字');
+        if (p.oldPassword === p.newPassword) throw new Error('新密碼不能跟舊的一樣');
+        return { ok: true };
       });
     },
 
@@ -553,17 +735,101 @@
   /* ============================================================
      http 轉接器
      ============================================================ */
-  function req(path, opt) {
+  /* ------------------------------------------------------------
+     token 保管
+     ------------------------------------------------------------
+     放 localStorage：重新整理不會掉，而且我們的 API 吃 Bearer 標頭，
+     不吃 cookie —— 所以不需要處理 CSRF，也不用送 credentials。
+
+     ⚠️ localStorage 擋不住 XSS。真正的防線是「不要有 XSS」：
+        所有使用者輸入都要 esc() 過再塞進 innerHTML。
+     ------------------------------------------------------------ */
+  var TOK = 'fambudget.auth';
+
+  function tokens() {
+    try { return JSON.parse(localStorage.getItem(TOK) || 'null'); } catch (e) { return null; }
+  }
+  function setTokens(t) {
+    try {
+      if (t) localStorage.setItem(TOK, JSON.stringify(t));
+      else localStorage.removeItem(TOK);
+    } catch (e) {}
+  }
+
+  var refreshing = null;          // 同時只跑一次續期，見 doRefresh()
+
+  function send(path, opt) {
     opt = opt || {};
+    var h = { 'Content-Type': 'application/json' };
+    var t = tokens();
+    if (t && t.accessToken) h.Authorization = 'Bearer ' + t.accessToken;
     return fetch(BASE + path, {
       method: opt.method || 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: h,
       body: opt.body ? JSON.stringify(opt.body) : undefined
-    }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + path);
+    });
+  }
+
+  /* 後端寫的錯誤訊息比「HTTP 422」有用得多，盡量把它挖出來給使用者看 */
+  function fail(r, path) {
+    return r.text().then(function (txt) {
+      var msg = '';
+      try {
+        var j = JSON.parse(txt);
+        msg = j.detail || j.message || '';
+        // FastAPI 的 422 會回一個陣列，直接顯示不好看，取第一條就好
+        if (msg && typeof msg !== 'string') {
+          msg = (msg[0] && (msg[0].msg || msg[0].detail)) || JSON.stringify(msg);
+        }
+      } catch (e) {}
+      var err = new Error(msg || ('HTTP ' + r.status + ' ' + path));
+      err.status = r.status;
+      throw err;
+    });
+  }
+
+  var NO_RETRY = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
+
+  function req(path, opt, retried) {
+    return send(path, opt).then(function (r) {
+      /* 401 → 自動換新的 access token，再把剛才那個請求重送一次。
+         沒有這段的話，access token 30 分鐘一到，使用者就被踢出去一次。 */
+      if (r.status === 401 && !retried && NO_RETRY.indexOf(path.split('?')[0]) < 0) {
+        return doRefresh().then(function () { return req(path, opt, true); });
+      }
+      if (!r.ok) return fail(r, path);
       return r.status === 204 ? null : r.json();
     });
+  }
+
+  function doRefresh() {
+    /* 一次載入會同時發好幾個請求，token 過期時它們會一起收到 401。
+       沒有這個閘的話會同時打好幾次 /refresh —— 而 refresh token 是
+       一次性的（後端換發新的、撤銷舊的），慢的那幾個就會拿著被撤銷的
+       token 去換，全部失敗，使用者被登出。 */
+    if (refreshing) return refreshing;
+
+    var t = tokens();
+    if (!t || !t.refreshToken) return Promise.reject(new Error('尚未登入'));
+
+    refreshing = send('/api/auth/refresh', {
+      method: 'POST', body: { refreshToken: t.refreshToken }
+    }).then(function (r) {
+      if (!r.ok) { setTokens(null); return fail(r, '/api/auth/refresh'); }
+      return r.json();
+    }).then(function (d) {
+      setTokens({
+        accessToken: d.accessToken,
+        refreshToken: d.refreshToken || t.refreshToken
+      });
+      refreshing = null;
+      return d;
+    }, function (e) {
+      refreshing = null;
+      setTokens(null);
+      throw e;
+    });
+    return refreshing;
   }
   function qs(f) {
     var p = Object.keys(f || {})
@@ -572,8 +838,45 @@
     return p.length ? '?' + p.join('&') : '';
   }
 
+  function keep(d) {
+    if (d && d.accessToken) {
+      setTokens({ accessToken: d.accessToken, refreshToken: d.refreshToken });
+    }
+    return d;
+  }
+
   var http = {
     me:                function ()      { return req('/api/auth/me'); },
+
+    /* ---- 認證 ---------------------------------------------------
+       login／register 成功之後要把 token 存起來，
+       之後每個請求由 send() 自動帶上 Authorization 標頭。
+       ------------------------------------------------------------ */
+    authState:         function ()      {
+      var t = tokens();
+      return Promise.resolve({ loggedIn: !!(t && t.accessToken) });
+    },
+    login:             function (c)     {
+      return req('/api/auth/login', { method: 'POST', body: c }).then(keep);
+    },
+    register:          function (p)     {
+      return req('/api/auth/register', { method: 'POST', body: p }).then(keep);
+    },
+    logout:            function ()      {
+      var t = tokens();
+      // 先叫後端撤銷 refresh token，不管成不成功，本機的一定要清掉
+      return req('/api/auth/logout', {
+        method: 'POST', body: { refreshToken: t && t.refreshToken }
+      }).catch(function () {}).then(function () {
+        setTokens(null);
+        return { ok: true };
+      });
+    },
+    updateProfile:     function (p)     { return req('/api/auth/me', { method: 'PATCH', body: p }); },
+    uploadAvatar:      function (d)     { return req('/api/auth/me/avatar', { method: 'PUT', body: { image: d } }); },
+    deleteAvatar:      function ()      { return req('/api/auth/me/avatar', { method: 'DELETE' }); },
+    changePassword:    function (p)     { return req('/api/auth/password', { method: 'PATCH', body: p }); },
+
     /* ⚠️ 後端沒有這支，也絕對不可以實作。
        讓任何人任意切換身分等於把整套權限系統作廢。
        接上真後端之後，「切換身分」這個鈕要換成正常的登入登出。 */
@@ -602,6 +905,14 @@
   global.API = {
     mode: MODE, base: BASE,
     me:                function ()     { return impl.me(); },
+    authState:         function ()     { return impl.authState(); },
+    login:             function (c)    { return impl.login(c); },
+    register:          function (p)    { return impl.register(p); },
+    logout:            function ()     { return impl.logout(); },
+    updateProfile:     function (p)    { return impl.updateProfile(p); },
+    uploadAvatar:      function (d)    { return impl.uploadAvatar(d); },
+    deleteAvatar:      function ()     { return impl.deleteAvatar(); },
+    changePassword:    function (p)    { return impl.changePassword(p); },
     switchUser:        function (i)    { return impl.switchUser(i); },
     summary:           function (f)    { return impl.summary(f); },
     transactions:      function (f)    { return impl.transactions(f); },

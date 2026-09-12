@@ -162,3 +162,83 @@ def test_前端沒有呼叫不存在的後端路由():
     assert not orphans, (
         "前端會打、但後端沒有也沒列在 FRONTEND_ONLY 的路由：" + "、".join(orphans)
     )
+
+
+def test_畫面數在程式與手冊之間一致():
+    """app.js 的 ROUTES 有幾個畫面，手冊就要寫幾個。
+
+    這種數字最會飄：加一個畫面，程式改了、文件沒改，
+    報告上就留著一個不存在的數字。讓測試去數，人不要數。
+    """
+    app = read("frontend/js/app.js")
+    m = re.search(r"var ROUTES = \{(.*?)\};", app, re.S)
+    assert m, "app.js 裡找不到 ROUTES"
+    n = len(re.findall(r"[\w']+\s*:", m.group(1)))
+
+    handbook = read("frontend/docs/index.html")
+    assert "%d SCREENS" % n in handbook, \
+        "手冊角標的畫面數對不上，app.js 有 %d 個" % n
+
+    CH = "零一二三四五六七八九十"
+    assert "%s個畫面" % CH[n] in handbook, \
+        "手冊內文沒寫「%s個畫面」" % CH[n]
+
+
+def test_前端有登入畫面而且不再說自己沒有():
+    """契約文件曾經寫著「前端目前還沒有」登入畫面。做好了就不能再這樣寫。"""
+    app = read("frontend/js/app.js")
+    for f in ("vLogin", "vRegister", "vProfile"):
+        assert "function %s(" % f in app, "app.js 少了 %s" % f
+
+    api = read("frontend/js/api.js")
+    for fn in ("login:", "register:", "logout:", "uploadAvatar:", "authState:"):
+        assert api.count(fn) >= 3, \
+            "%s 要在 mock、http、facade 三層都有，現在只有 %d 個" % (fn, api.count(fn))
+
+    contract = read("docs/02-前後端串接契約.md")
+    for stale in ("前端目前還沒有", "前端現在沒有登入畫面"):
+        assert stale not in contract, "契約還寫著「%s」，但已經做好了" % stale
+
+
+def test_心智圖的路由數也要對():
+    """手冊底部的心智圖用另一種寫法標路由數（api: '8 支'），
+    上面那條測試的正規表達式抓不到它——所以它真的飄掉過。
+    """
+    from app.ownership import MEMBERS
+
+    handbook = read("frontend/docs/index.html")
+    for m in MEMBERS:
+        want = "{ dom: '%s'" % m.domain
+        i = handbook.find(want)
+        assert i >= 0, "心智圖裡找不到 %s" % m.domain
+        node = handbook[i:i + 200]
+        mo = re.search(r"api: '(\d+) 支'", node)
+        assert mo, "%s 的節點沒寫路由數" % m.domain
+        assert int(mo.group(1)) == len(m.routes), \
+            "心智圖說 %s 有 %s 支，ownership.py 說 %d 支" % (
+                m.domain, mo.group(1), len(m.routes))
+
+
+def test_資料表張數在三份文件裡一致():
+    """手冊的資料庫那節列了幾張表，其他地方就要寫幾張。
+
+    這一項真的走散過，而且是三種數字：
+    規格文件寫 12 張、手冊內文寫 13 張、手冊角標寫 14 TABLES。
+    原因是加了 notifications 之後只改了角標。所以改成用數的。
+    """
+    handbook = read("frontend/docs/index.html")
+    spec = read("docs/01-tech-stack-and-api.md")
+
+    tables = re.findall(r'acc__code">([a-z_]+)</code>', handbook)
+    n = len(tables)
+    assert n >= 10, "資料庫那節只抓到 %d 張表，選擇器大概壞了" % n
+    assert "notifications" in tables, "監管通知要有自己的資料表"
+
+    assert "%d TABLES" % n in handbook, "手冊角標的表數不是 %d" % n
+    assert "%d 張表" % n in handbook, "手冊內文沒寫「%d 張表」" % n
+    assert "%d 張表" % n in spec, "規格文件沒寫「%d 張表」" % n
+
+    # 舊的數字不可以還留著
+    for stale in range(10, n):
+        assert "%d 張表" % stale not in handbook, "手冊還留著「%d 張表」" % stale
+        assert "%d 張表" % stale not in spec, "規格文件還留著「%d 張表」" % stale

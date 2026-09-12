@@ -25,16 +25,16 @@ window.DATA = {
   /* savingsGoal 是註冊時就要填的「每月想存多少」。
      可支配上限 = 收入 − 存款目標，支出超過就代表這個月存不到目標。 */
   members: [
-    { id: 'U1', name: '林建國', role: 'master', avatar: '國', age: 52,
+    { id: 'U1', name: '林建國', email: 'jianguo@lin.tw', role: 'master', avatar: '國', age: 52,
       joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000,
       savingsGoal: 20000 },
-    { id: 'U2', name: '陳淑芬', role: 'parent', avatar: '芬', age: 49,
+    { id: 'U2', name: '陳淑芬', email: 'shufen@lin.tw', role: 'parent', avatar: '芬', age: 49,
       joined: '2026-01-05', income: 52000, expense: 38900, budget: 40000,
       savingsGoal: 15000 },
-    { id: 'U3', name: '林宇涵', role: 'member', avatar: '涵', age: 19,
+    { id: 'U3', name: '林宇涵', email: 'yuhan@lin.tw', role: 'member', avatar: '涵', age: 19,
       joined: '2026-02-11', income: 8000, expense: 11450, budget: 10000,
       savingsGoal: 2000 },
-    { id: 'U4', name: '林宇軒', role: 'member', avatar: '軒', age: 16,
+    { id: 'U4', name: '林宇軒', email: 'yuxuan@lin.tw', role: 'member', avatar: '軒', age: 16,
       joined: '2026-02-11', income: 3000, expense: 4820, budget: 4000,
       savingsGoal: 500 }
   ],

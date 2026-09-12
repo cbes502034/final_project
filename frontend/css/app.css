@@ -837,3 +837,105 @@
 @media (max-width: 560px) {
   .bell__panel { right: -8px; width: calc(100vw - 24px); }
 }
+
+/* ============================================================
+   登入 / 註冊 / 個人資料
+   ============================================================ */
+
+/* 沒登入的時候把整個工作區收起來，只留登入卡片 */
+body.is-out .rail,
+body.is-out .top { display: none; }
+body.is-out .app { grid-template-columns: 1fr; }
+body.is-out .main { padding: 0; }
+
+.gate {
+  min-height: 100vh; display: grid; place-items: center; padding: 32px 20px;
+}
+.gate__c {
+  width: min(400px, 100%);
+  background: var(--card); border: 1px solid var(--line-2);
+  border-radius: var(--r-card); box-shadow: var(--shadow-pop);
+  padding: 34px 30px 28px;
+}
+.gate__b { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; }
+.gate__b .brand__m {
+  width: 26px; height: 26px; display: grid; place-items: center;
+  background: var(--accent); color: #05060A; border-radius: var(--r-sm);
+  font-family: var(--serif); font-weight: 700; font-size: 14px;
+}
+.gate__b .brand__n {
+  font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink);
+}
+.gate__t {
+  font-family: var(--serif); font-size: 24px; font-weight: 600;
+  color: var(--ink); margin: 0 0 6px;
+}
+.gate__s { font-size: 12.5px; color: var(--ink-faint); line-height: 1.75; margin: 0 0 22px; }
+
+.gate__f { display: flex; flex-direction: column; gap: 15px; }
+.gate__go { width: 100%; justify-content: center; margin-top: 4px; }
+.gate__alt { font-size: 12px; color: var(--ink-dim); text-align: center; margin: 2px 0 0; }
+.gate__alt a { color: var(--accent-hi); text-decoration: none; }
+.gate__alt a:hover { text-decoration: underline; }
+
+.gate__demo {
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--ink-dim);
+}
+.gate__demo b { color: var(--ink-faint); font-weight: 500; margin-right: 6px; }
+.gate__accs { display: grid; gap: 6px; margin-top: 11px; }
+.gate__acc {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 8px 11px; cursor: pointer; text-align: left;
+  background: var(--sunk); border: 1px solid var(--line);
+  border-radius: var(--r-sm); color: var(--ink-soft); font-size: 12px;
+  transition: border-color .18s var(--ease), color .18s var(--ease);
+}
+.gate__acc span { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim); }
+.gate__acc:hover { border-color: var(--line-3); color: var(--ink); }
+
+/* ---- 表單欄位（登入頁與個人資料共用） ---- */
+.fld { display: flex; flex-direction: column; gap: 6px; }
+.fld > span { font-size: 12px; color: var(--ink-faint); }
+.fld input {
+  width: 100%; padding: 10px 12px;
+  background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-sm); color: var(--ink);
+  font-family: var(--sans); font-size: 13.5px;
+  transition: border-color .18s var(--ease);
+}
+.fld input:focus { outline: none; border-color: var(--accent); }
+.fld input:disabled { color: var(--ink-dim); cursor: not-allowed; }
+.fld__h { font-size: 11px; color: var(--ink-dim); font-style: normal; line-height: 1.6; }
+
+/* ---- 個人資料 ---- */
+.prof { display: flex; gap: 20px; align-items: center; padding: 20px; }
+.prof__m { min-width: 0; }
+.prof__l { font-size: 13px; color: var(--ink-soft); line-height: 1.75; margin: 0 0 12px; }
+.prof__h { font-size: 11.5px; color: var(--ink-dim); }
+.prof__do { display: flex; gap: 8px; flex-wrap: wrap; }
+.prof__do label { cursor: pointer; }
+.prof__form { display: flex; flex-direction: column; gap: 16px; padding: 20px; max-width: 460px; }
+.prof__out { display: flex; align-items: center; gap: 20px; padding: 20px; }
+.prof__out button { margin-left: auto; flex: 0 0 auto; }
+
+/* ---- 頭像：有圖就放圖 ---- */
+.ava--img { padding: 0; overflow: hidden; }
+.ava--img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ava--xl { width: 84px; height: 84px; font-size: 30px; flex: 0 0 84px; }
+
+/* ---- 側邊欄的登出 ---- */
+.who__out {
+  margin-left: auto; flex: 0 0 auto; cursor: pointer;
+  padding: 3px 8px; border-radius: var(--r-pill);
+  border: 1px solid var(--line-2); background: transparent;
+  color: var(--ink-dim); font-family: var(--sans); font-size: 11px;
+  transition: color .18s var(--ease), border-color .18s var(--ease);
+}
+.who__out:hover { color: var(--ink); border-color: var(--line-3); }
+
+@media (max-width: 560px) {
+  .prof { flex-direction: column; align-items: flex-start; }
+  .prof__out { flex-direction: column; align-items: flex-start; }
+  .prof__out button { margin-left: 0; }
+}

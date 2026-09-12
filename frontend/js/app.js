@@ -8,6 +8,15 @@
 
   var API = global.API;
   var $view = document.getElementById('view');
+
+  /* 展示用帳號。mock 模式的登入頁會列出來，免得評審還要猜 email。
+     接上真後端（API.mode === 'http'）之後就不顯示了。 */
+  var DEMO = [
+    { name: '林建國 · 管理者', email: 'jianguo@lin.tw' },
+    { name: '陳淑芬 · 家長',   email: 'shufen@lin.tw' },
+    { name: '林宇涵 · 成員',   email: 'yuhan@lin.tw' },
+    { name: '林宇軒 · 成員',   email: 'yuxuan@lin.tw' }
+  ];
   var $title = document.getElementById('ptitle');
   var $sub = document.getElementById('psub');
   var $search = document.getElementById('search');
@@ -479,7 +488,7 @@
           var bs = b.budgets.filter(function (x) { return x.user === u.id && x.over; });
           return '<article class="row" style="animation-delay:' + (i * 50) + 'ms;' +
             'grid-template-columns:44px 1fr 150px 110px">' +
-            '<div class="ava">' + esc(u.avatar) + '</div>' +
+            ava(u) +
             '<div class="row__m"><div class="row__top">' +
               '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
               '<span class="tag tag--' + (u.role === 'master' ? 'done' : 'soft') + '">' +
@@ -683,14 +692,172 @@
     });
   }
 
+
+  /* ============================================================
+     登入 / 註冊 / 個人資料
+     ============================================================ */
+
+  function authShell(title, sub, inner) {
+    document.body.classList.add('is-out');
+    $view.innerHTML =
+      '<div class="gate"><div class="gate__c">' +
+        '<div class="gate__b"><span class="brand__m">帳</span>' +
+          '<span class="brand__n">家庭記帳</span></div>' +
+        '<h1 class="gate__t">' + title + '</h1>' +
+        '<p class="gate__s">' + sub + '</p>' +
+        inner +
+      '</div></div>';
+  }
+
+  function vLogin() {
+    head('登入', '');
+    authShell('登入', '記一句話就記一筆帳，家人的支出一起看得見。',
+      '<form class="gate__f" id="loginF">' +
+        '<label class="fld"><span>Email</span>' +
+          '<input type="email" id="lgEmail" autocomplete="username" required></label>' +
+        '<label class="fld"><span>密碼</span>' +
+          '<input type="password" id="lgPw" autocomplete="current-password" required></label>' +
+        '<button class="btn btn--go gate__go" type="submit">登入</button>' +
+        '<p class="gate__alt">還沒有帳號？<a href="#/register">建立一個</a></p>' +
+      '</form>' +
+      (API.mode === 'http' ? '' :
+        '<div class="gate__demo"><b>展示資料</b>　密碼隨便打，滿 8 個字就好' +
+        '<div class="gate__accs">' +
+          DEMO.map(function (d) {
+            return '<button class="gate__acc" data-demo="' + esc(d.email) + '">' +
+              esc(d.name) + '<span>' + esc(d.email) + '</span></button>';
+          }).join('') +
+        '</div></div>'));
+  }
+
+  function vRegister() {
+    head('註冊', '');
+    authShell('建立帳號', '註冊之後可以自己記帳，也可以加入家庭一起看。',
+      '<form class="gate__f" id="regF">' +
+        '<label class="fld"><span>名字</span>' +
+          '<input type="text" id="rgName" autocomplete="name" required></label>' +
+        '<label class="fld"><span>Email</span>' +
+          '<input type="email" id="rgEmail" autocomplete="username" required></label>' +
+        '<label class="fld"><span>密碼</span>' +
+          '<input type="password" id="rgPw" autocomplete="new-password" required>' +
+          '<em class="fld__h">至少 8 個字</em></label>' +
+        '<label class="fld"><span>每月存款目標</span>' +
+          '<input type="number" id="rgGoal" min="0" step="1000" value="0">' +
+          '<em class="fld__h">之後可以改。收入減掉這個數字就是可支配上限</em></label>' +
+        '<button class="btn btn--go gate__go" type="submit">建立帳號</button>' +
+        '<p class="gate__alt">已經有帳號了？<a href="#/login">回去登入</a></p>' +
+      '</form>');
+  }
+
+  function vProfile() {
+    head('個人資料', '名字、大頭貼、密碼');
+    $view.innerHTML = '<div class="page">' + skeleton(3) + '</div>';
+    API.me().then(function (m) {
+      var u = m.user;
+      var h = '<div class="page">' +
+
+        '<div class="sec"><h2 class="sec__t">大頭貼</h2></div>' +
+        '<div class="card prof">' +
+          '<div class="prof__a" id="profAva">' + ava(u, 'ava--xl') + '</div>' +
+          '<div class="prof__m">' +
+            '<p class="prof__l">上傳一張圖，會自動縮成 256×256。' +
+            '<br><span class="prof__h">縮圖在瀏覽器做，上傳的是縮好的版本 —— ' +
+            '後端不用裝 Pillow，也不會收到 20 MB 的原圖。</span></p>' +
+            '<div class="prof__do">' +
+              '<label class="btn btn--sm btn--go">選一張圖' +
+                '<input type="file" id="avaF" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+              (u.avatarUrl ? '<button class="btn btn--sm" id="avaDel">移除，改用文字</button>' : '') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="sec"><h2 class="sec__t">基本資料</h2></div>' +
+        '<form class="card prof__form" id="profF">' +
+          '<label class="fld"><span>名字</span>' +
+            '<input type="text" id="pfName" value="' + esc(u.name) + '" required></label>' +
+          '<label class="fld"><span>出生年份</span>' +
+            '<input type="number" id="pfYear" min="1900" max="' + new Date().getFullYear() + '" ' +
+              'value="' + (u.birthYear || '') + '" placeholder="例如 1974">' +
+            '<em class="fld__h">用來判斷未成年。未滿 18 歲的存款目標由管理者代設</em></label>' +
+          '<label class="fld"><span>Email</span>' +
+            '<input type="email" value="' + esc(u.email || '') + '" disabled>' +
+            '<em class="fld__h">email 是登入帳號，改它等於換帳號，這一版不開放</em></label>' +
+          '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
+        '</form>' +
+
+        '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
+        '<form class="card prof__form" id="pwF">' +
+          '<label class="fld"><span>目前的密碼</span>' +
+            '<input type="password" id="pwOld" autocomplete="current-password" required></label>' +
+          '<label class="fld"><span>新密碼</span>' +
+            '<input type="password" id="pwNew" autocomplete="new-password" required>' +
+            '<em class="fld__h">至少 8 個字</em></label>' +
+          '<div><button class="btn" type="submit">更改密碼</button></div>' +
+        '</form>' +
+
+        '<div class="sec"><h2 class="sec__t">登出</h2></div>' +
+        '<div class="card prof__out">' +
+          '<p class="prof__l">登出會把這台裝置的登入狀態清掉。' +
+          '<br><span class="prof__h">其他裝置不受影響</span></p>' +
+          '<button class="btn btn--sm" id="logout2">登出</button>' +
+        '</div>' +
+      '</div>';
+      $view.innerHTML = h;
+    });
+  }
+
+  /* 縮圖：置中裁成正方形再縮到 256，超過 200 KB 就降畫質重來。
+     後端的上限是 200 KB，在這裡先擋掉比讓使用者送出去再被打回來好。 */
+  function shrink(file) {
+    return new Promise(function (ok, no) {
+      var fr = new FileReader();
+      fr.onerror = function () { no(new Error('讀不到這個檔案')); };
+      fr.onload = function () {
+        var img = new Image();
+        img.onerror = function () { no(new Error('這不是一張能顯示的圖片')); };
+        img.onload = function () {
+          var side = Math.min(img.width, img.height);
+          var cv = document.createElement('canvas');
+          cv.width = cv.height = 256;
+          cv.getContext('2d').drawImage(
+            img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
+          var q = 0.85, out = cv.toDataURL('image/jpeg', q);
+          while (out.length * 3 / 4 > 200 * 1024 && q > 0.4) {
+            q -= 0.15;
+            out = cv.toDataURL('image/jpeg', q);
+          }
+          ok(out);
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  /* ---------------------------------------------------------
+     頭像。沒上傳大頭貼的人顯示名字的最後一個字，
+     上傳過的人顯示圖片 —— 契約裡 avatarUrl 為 null 就退回文字。
+     --------------------------------------------------------- */
+  function ava(u, cls) {
+    cls = cls ? ' ' + cls : '';
+    var url = u && u.avatarUrl;
+    // 只認 data:image，其他一律退回文字。頭像網址是後端給的，
+    // 但「後端給的」不等於「可以直接塞進 src」——擋一手成本很低。
+    if (url && /^data:image\//.test(url)) {
+      return '<span class="ava ava--img' + cls + '"><img src="' + esc(url) + '" alt=""></span>';
+    }
+    return '<span class="ava' + cls + '">' + esc((u && u.avatar) || '') + '</span>';
+  }
+
   function paintWho() {
     API.me().then(function (m) {
       ME = m;
       var w = document.getElementById('who');
       if (w) {
-        w.innerHTML = '<span class="ava ava--sm">' + esc(m.user.avatar) + '</span>' +
+        w.innerHTML = ava(m.user, 'ava--sm') +
           '<span class="who__n">' + esc(m.user.name) + '</span>' +
-          '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>';
+          '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>' +
+          '<button class="who__out" id="logout" title="登出">登出</button>';
       }
       var f = document.getElementById('famName');
       if (f) f.textContent = m.family.family + '　' + m.family.period;
@@ -699,13 +866,24 @@
 
   /* ---------- 路由 ---------- */
   var ROUTES = { '': vHome, entry: vEntry, family: vFamily, stats: vStats,
-                 advice: vAdvice, members: vMembers };
+                 advice: vAdvice, members: vMembers,
+                 login: vLogin, register: vRegister, profile: vProfile };
+
+  var OPEN = ['login', 'register'];      // 沒登入也能看的頁
 
   function paint() {
     var page = (location.hash || '#/').replace(/^#\/?/, '').split('/')[0];
-    (ROUTES[page] || vHome)();
-    Array.prototype.forEach.call(document.querySelectorAll('.nav__i'), function (b) {
-      b.classList.toggle('on', b.dataset.nav === page);
+    API.authState().then(function (a) {
+      /* 登入閘。沒登入只能待在 login／register，
+         登入了就別再讓他看登入頁。 */
+      if (!a.loggedIn && OPEN.indexOf(page) < 0) { location.hash = '#/login'; return; }
+      if (a.loggedIn && OPEN.indexOf(page) >= 0) { location.hash = '#/'; return; }
+
+      if (a.loggedIn) document.body.classList.remove('is-out');
+      (ROUTES[page] || vHome)();
+      Array.prototype.forEach.call(document.querySelectorAll('.nav__i'), function (b) {
+        b.classList.toggle('on', b.dataset.nav === page);
+      });
     });
   }
 
@@ -716,6 +894,33 @@
 
     var nav = t.closest('[data-nav]');
     if (nav) { location.hash = '#/' + nav.dataset.nav; return; }
+
+    if (t.closest('#logout') || t.closest('#logout2')) {
+      API.logout().then(function () {
+        // 先把通知收件匣清掉，不然登出後 DOM 裡還躺著上一個人的明細
+        if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
+        document.body.classList.add('is-out');
+        location.hash = '#/login';
+        paint();
+        toast('已登出', 'ok');
+      });
+      return;
+    }
+
+    var demo = t.closest('[data-demo]');
+    if (demo) {
+      document.getElementById('lgEmail').value = demo.dataset.demo;
+      document.getElementById('lgPw').value = 'demo1234';
+      document.getElementById('lgPw').focus();
+      return;
+    }
+
+    if (t.closest('#avaDel')) {
+      API.deleteAvatar().then(function () {
+        paintWho(); vProfile(); toast('已改回文字頭像', 'ok');
+      }).catch(function (err) { toast(err.message || '移除失敗', 'err'); });
+      return;
+    }
 
     /* ---- 模式切換：兩者互斥 ---- */
     var md = t.closest('[data-mode]');
@@ -851,6 +1056,114 @@
     }
   });
 
+  /* ============================================================
+     登入 / 註冊 / 個人資料 的事件
+     ============================================================ */
+  function busy(form, on, label) {
+    var b = form.querySelector('button[type=submit]');
+    if (!b) return;
+    if (on) { b.dataset.t = b.textContent; b.textContent = label; b.disabled = true; }
+    else { b.textContent = b.dataset.t || b.textContent; b.disabled = false; }
+  }
+
+  /* 登入成功之後要做的事都一樣：重畫身分、開通知、回總覽 */
+  function afterLogin(d) {
+    document.body.classList.remove('is-out');
+    paintWho();
+    if (global.Notify) { global.Notify.reset(); global.Notify.start(); }
+    location.hash = '#/';
+    paint();
+    toast('歡迎回來，' + (d && d.user ? d.user.name : ''), 'ok');
+  }
+
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+
+    if (f.id === 'loginF') {
+      e.preventDefault();
+      busy(f, true, '登入中…');
+      API.login({
+        email: document.getElementById('lgEmail').value,
+        password: document.getElementById('lgPw').value
+      }).then(afterLogin).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '登入失敗', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'regF') {
+      e.preventDefault();
+      busy(f, true, '建立中…');
+      API.register({
+        name: document.getElementById('rgName').value,
+        email: document.getElementById('rgEmail').value,
+        password: document.getElementById('rgPw').value,
+        savingsGoal: Number(document.getElementById('rgGoal').value) || 0
+      }).then(function (d) {
+        afterLogin(d);
+        toast('帳號建好了', 'ok');
+      }).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '註冊失敗', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'profF') {
+      e.preventDefault();
+      var y = document.getElementById('pfYear').value;
+      busy(f, true, '儲存中…');
+      API.updateProfile({
+        displayName: document.getElementById('pfName').value,
+        birthYear: y === '' ? null : Number(y)
+      }).then(function () {
+        busy(f, false);
+        paintWho();
+        vProfile();
+        toast('已儲存', 'ok');
+      }).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '存不起來', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'pwF') {
+      e.preventDefault();
+      busy(f, true, '更改中…');
+      API.changePassword({
+        oldPassword: document.getElementById('pwOld').value,
+        newPassword: document.getElementById('pwNew').value
+      }).then(function () {
+        busy(f, false);
+        f.reset();
+        toast('密碼已更改', 'ok');
+      }).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '改不了', 'err');
+      });
+      return;
+    }
+  });
+
+  /* 大頭貼：選檔 → 瀏覽器縮圖 → 送 data URI */
+  document.addEventListener('change', function (e) {
+    if (e.target.id !== 'avaF') return;
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    toast('處理圖片中…', 'info');
+    shrink(file).then(function (uri) {
+      return API.uploadAvatar(uri);
+    }).then(function () {
+      paintWho();
+      vProfile();
+      toast('大頭貼換好了', 'ok');
+    }).catch(function (err) {
+      toast(err.message || '上傳失敗', 'err');
+    });
+  });
+
   document.addEventListener('change', function (e) {
     var g = e.target.closest ? e.target.closest('[data-goal]') : null;
     if (g) {
@@ -898,9 +1211,14 @@
 
   document.getElementById('mode').textContent =
     API.mode === 'http' ? 'API ' + API.base : 'API mock';
-  paintWho();
-  paint();
+  API.authState().then(function (a) {
+    if (a.loggedIn) paintWho();
+    paint();
+  });
 
-  /* 監管通知：輪詢 + 音效 + 鈴鐺。實作在 js/notify.js */
-  if (global.Notify) global.Notify.start();
+  /* 監管通知：輪詢 + 音效 + 鈴鐺。實作在 js/notify.js
+     沒登入的時候不要輪詢——會一路 401，還會在登入頁叮一聲。 */
+  API.authState().then(function (a) {
+    if (a.loggedIn && global.Notify) global.Notify.start();
+  });
 })(window);
