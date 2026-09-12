@@ -29,6 +29,15 @@
   .hero h1 { font-size: 34px; line-height: 1.35; margin-bottom: 14px; }
   .hero p { font-size: 15.5px; color: var(--ink-soft); line-height: 2; }
 
+  /* 再看一次導覽。導覽走完的提示說「隨時可以從使用說明再看一次」，
+     所以這個入口一定要真的在這裡。 */
+  .again {
+    display: inline-block; margin-top: 22px; padding: 11px 18px;
+    border: 1px solid var(--accent-line); color: var(--accent); font-size: 14px;
+    transition: background-color .16s var(--ease), color .16s var(--ease);
+  }
+  .again:hover { background: var(--accent); color: var(--paper); }
+
   /* 目錄 */
   .toc { padding: 22px 0 26px; border-bottom: 1px solid var(--line); }
   .toc__t { font-size: 11px; letter-spacing: .14em; color: var(--ink-dim);
@@ -139,6 +148,7 @@
       這份說明從「第一次打開」講到「看懂每個數字」。<br>
       不用全部讀完——遇到不懂的地方，回來翻對應的那一節就好。
     </p>
+    <a class="again" href="../index.html?tour=1">再走一次系統導覽</a>
   </header>
 
   <nav class="toc">
@@ -171,7 +181,7 @@
       <div class="step">
         <div>
           <h4>記下今天花了什麼</h4>
-          <p>右上角按 <b>＋</b>，把今天的消費打成一段話送出，
+          <p>左邊選「<b>記帳</b>」，把今天的消費打成一段話送出，
           系統會拆成一筆一筆讓你確認。</p>
         </div>
       </div>
@@ -188,6 +198,11 @@
       <div class="tip__k">先不用一次設定完</div>
       <p>預算、提醒、帳本這些都可以之後再說。先把帳記起來，數字才有意義。</p>
     </div>
+
+    <p>
+      第一次打開系統時，它會問你要不要<b>帶你走一遍</b>。
+      當時跳過也沒關係，這頁最上面有「再走一次系統導覽」可以隨時重看。
+    </p>
   </section>
 
   <!-- 2 -->
