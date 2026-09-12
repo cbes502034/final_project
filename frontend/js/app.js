@@ -212,7 +212,7 @@
       }).then(function (d) {
         var box = document.getElementById('recent');
         if (!box || !d) return;
-        box.innerHTML = d.transactions.slice(0, 6).map(function (t) { return txRow(t); }).join('') ||
+        box.innerHTML = txTable(d.transactions.slice(0, 6), null, '') ||
           emptyState('還沒有紀錄', '到「記帳」頁用一句話記下第一筆。');
       }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -272,24 +272,37 @@
   /* hit = 要標起來的那一筆 id（從通知點進來時用）。
      ⚠️ 不要寫成 .map(txRow)——map 會把索引值當成第二個參數傳進來。
      所以呼叫端一律包一層 function。 */
+  /* 明細是表格。
+     帳目本來就是一欄一欄對齊的東西——日期對日期、金額對金額。
+     卡片式的排版每一筆的資訊位置都不一樣，掃過去很累。 */
   function txRow(t, hit) {
-    return '<div class="tx' + (hit && hit === t.id ? ' is-hit' : '') + '">' +
-      '<div class="tx__c" style="background:' + t.catColor + '22;color:' + t.catColor +
-        ';border-color:' + t.catColor + '55">' + esc(t.catName.slice(0, 2)) + '</div>' +
-      '<div class="tx__m"><div class="tx__t">' + esc(t.merchant || t.catName) +
-        (t.source === 'nlp' ? ' <span class="tag tag--soft">段落記帳</span>' : '') + '</div>' +
-        '<div class="tx__s">' + esc(t.date) + '　' + esc(t.userName) +
-        (t.note ? '　' + esc(t.note) : '') +
-        (t.raw ? '<br><span class="tx__raw">原句「' + esc(t.raw) + '」</span>' : '') + '</div></div>' +
-      '<div class="tx__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
-        (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</div>' +
-      /* 別人的紀錄就是不給刪除鈕，不用再掛一個「唯讀」標籤。
-         同一句話在一頁上重複十次不會更清楚，只會變成雜訊——
-         該講的在抬頭講一次就好。 */
-      (isMine(t)
-        ? '<button class="btn btn--sm" data-del="' + esc(t.id) + '">刪除</button>'
-        : '') +
-      '</div>';
+    return '<tr class="txr' + (hit && hit === t.id ? ' is-hit' : '') + '">' +
+      '<td class="txr__d">' + esc(t.date) + '</td>' +
+      '<td class="txr__c"><span style="color:' + t.catColor + '">' +
+        esc(t.catName) + '</span></td>' +
+      '<td class="txr__t">' + esc(t.merchant || t.catName) +
+        (t.note ? ' <em>' + esc(t.note) + '</em>' : '') +
+        (t.raw ? '<br><span class="txr__raw">「' + esc(t.raw) + '」</span>' : '') +
+      '</td>' +
+      '<td class="txr__u">' + esc(t.userName) + '</td>' +
+      '<td class="txr__s">' + (t.source === 'nlp' ? '段落' : '手動') + '</td>' +
+      '<td class="txr__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
+        (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</td>' +
+      '<td class="txr__x">' +
+        (isMine(t) ? '<button class="del" data-del="' + esc(t.id) + '">刪除</button>' : '') +
+      '</td></tr>';
+  }
+
+  /* 表頭 ＋ 表身。空的時候不要畫一個只有表頭的空表格。 */
+  function txTable(rows, hit, empty) {
+    if (!rows.length) return empty;
+    return '<div class="txw"><table class="txt">' +
+      '<thead><tr>' +
+        '<th>日期</th><th>分類</th><th>項目</th><th>記錄者</th><th>來源</th>' +
+        '<th class="rt">金額</th><th></th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function (t) { return txRow(t, hit); }).join('') +
+      '</tbody></table></div>';
   }
 
   /* ============================================================
@@ -494,27 +507,29 @@
       '<button class="btn" id="singleClear">清空</button></div></div>';
   }
 
+  /* 篩選一律用「標題 ＋ 下拉」。
+     本來收支方向是三顆並排的按鈕，跟旁邊的下拉長得不一樣，
+     而且沒有標題——看得到選項卻不知道那一排在篩什麼。 */
   function filterBar() {
-    var ks = [['all', '全部'], ['expense', '支出'], ['income', '收入']];
-    var ss = [['all', '不分來源'], ['nlp', '段落記帳'], ['manual', '手動輸入']];
-    return '<div class="bar"><div class="chips">' + ks.map(function (k) {
-        return '<button class="chip' + (F.kind === k[0] ? ' on' : '') +
-          '" data-f="kind" data-v="' + k[0] + '">' + k[1] + '</button>';
-      }).join('') + '</div>' +
-      '<select class="sel" data-f="source">' + ss.map(function (s) {
-        return '<option value="' + s[0] + '"' + (F.source === s[0] ? ' selected' : '') + '>' + s[1] + '</option>';
-      }).join('') + '</select>' +
-      '<span style="flex:1"></span>' +
-      '<button class="btn btn--sm" id="reset">重置示範資料</button></div>';
+    function sel(key, label, opts) {
+      return '<label class="fsel"><span>' + label + '</span>' +
+        '<select data-f="' + key + '">' + opts.map(function (o) {
+          return '<option value="' + o[0] + '"' +
+            (F[key] === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') + '</select></label>';
+    }
+    return '<div class="bar">' +
+      sel('kind', '收支', [['all', '全部'], ['expense', '支出'], ['income', '收入']]) +
+      sel('source', '來源', [['all', '全部'], ['nlp', '段落記帳'], ['manual', '手動輸入']]) +
+      '</div>';
   }
 
   function loadTx() {
     var box = document.getElementById('txList');
     if (!box) return;
     API.transactions(Object.assign({}, F, { groupId: GROUP })).then(function (d) {
-      box.innerHTML = d.transactions.length
-        ? d.transactions.map(function (t) { return txRow(t); }).join('')
-        : emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。');
+      box.innerHTML = txTable(d.transactions, null,
+        emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。'));
     }).catch(function (e) { box.innerHTML = errState(e); });
   }
 
@@ -528,8 +543,15 @@
       .then(function (r) {
         var d = r[0], m = r[1], b = r[2];
         var h = '<div class="page">';
-        /* 門檻不是角色，是「有沒有人被指派給你看」。
-           一個沒有監管對象的管理者，家庭總覽上也只有自己，沒有意義。 */
+        /* 第一道：這個功能只有管理者與家長有。 */
+        if (m.user.role === 'member') {
+          h += '<div class="note note--warn"><div class="note__k">沒有這個功能</div>' +
+            '<p>家庭總覽是給管理者與家長看的。</p></div></div>';
+          $view.innerHTML = h;
+          return;
+        }
+
+        /* 第二道：有這個功能，但沒有人被指派給你看。 */
         if ((m.visible || []).length <= 1) {
           h += '<div class="note note--warn"><div class="note__k">你只看得到自己</div>' +
             '<p>目前沒有成員指派給你。</p></div></div>';
@@ -839,9 +861,8 @@
       h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
         '<span class="sec__n">' + tx.total + ' 筆</span></div>';
 
-      h += '<div class="txs" id="mtx">' + (tx.transactions.length
-        ? tx.transactions.map(function (t) { return txRow(t, hit); }).join('')
-        : emptyState('還沒有紀錄', esc(u.name) + '這個月還沒有記過帳。')) + '</div></div>';
+      h += '<div id="mtx">' + txTable(tx.transactions, hit,
+        emptyState('還沒有紀錄', esc(u.name) + '這個月還沒有記過帳。')) + '</div></div>';
 
       $view.innerHTML = h;
 
@@ -1408,6 +1429,13 @@
           '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>' +
           '<button class="who__out" id="logout">登出</button>';
       }
+      /* 家庭總覽是給管理者與家長的功能。
+         ⚠️ 這跟「可見範圍」是兩件事：
+           角色  決定「有沒有這個功能」
+           監管  決定「看得到誰的資料」
+         兩道都要過——家長也只看得到被指派給他的那幾個人。 */
+      document.body.classList.toggle('role-member', m.user.role === 'member');
+
       var f = document.getElementById('famName');
       if (f) f.textContent = m.family.family + '　' + m.family.period;
     });
@@ -1752,12 +1780,6 @@
     var sp = t.closest('[data-sp]');
     if (sp) { STAT.period = sp.dataset.sp; vStats(); return; }
 
-    if (t.closest('#reset')) {
-      API.reset().then(function (r) {
-        if (r.reset === false) { toast(r.note || '此模式不支援重置', 'err'); return; }
-        paintWho(); paint(); toast('已還原成示範資料', 'ok');
-      });
-    }
   });
 
   /* ============================================================

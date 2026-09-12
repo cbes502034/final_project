@@ -2029,3 +2029,136 @@ body.rail-min .nav__i:hover, body.rail-min .docs__i:hover { background: var(--su
   body.rail-min .docs__lb, body.rail-min .docs__i span,
   body.rail-min .who__n, body.rail-min .who__r, body.rail-min .who__out { display: inline; }
 }
+
+
+/* ============================================================
+   篩選：標題 ＋ 下拉
+   ------------------------------------------------------------
+   一排沒有標題的按鈕，使用者看得到選項卻不知道在篩什麼。
+   加上標題之後，「收支：全部」「來源：段落記帳」一眼就懂。
+   ============================================================ */
+.bar {
+  display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
+  padding: 16px 28px; border-bottom: 1px solid var(--line); margin: 0;
+}
+.fsel { display: flex; flex-direction: column; gap: 5px; }
+.fsel > span {
+  font-size: 11px; letter-spacing: .1em; color: var(--ink-dim);
+  font-family: var(--mono); text-transform: uppercase;
+}
+.fsel select {
+  appearance: none; padding: 8px 30px 8px 12px; min-width: 132px;
+  background-color: var(--sunk); border: 1px solid var(--line-2);
+  color: var(--ink); font-size: 13.5px; cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 52%, calc(100% - 12px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color .16s var(--ease), background-color .16s var(--ease);
+}
+.fsel select:hover { border-color: var(--line-3); }
+.fsel select:focus { border-color: var(--accent); background-color: var(--card); }
+
+/* 重置是示範用的，讓它安靜一點 */
+.bar #reset {
+  align-self: flex-end; border: 0; background: transparent;
+  color: var(--ink-dim); font-size: 12px; padding: 8px 0;
+  box-shadow: none;
+}
+.bar #reset:hover { color: var(--accent); transform: none; box-shadow: none; }
+
+@media (max-width: 900px) { .bar { padding-left: 18px; padding-right: 18px; } }
+@media (max-width: 560px) { .fsel { flex: 1 1 140px; } .fsel select { min-width: 0; width: 100%; } }
+
+
+/* ============================================================
+   收支明細：表格
+   ------------------------------------------------------------
+   帳目本來就是一欄一欄對齊的東西——日期對日期、金額對金額。
+   卡片式的排版每一筆資訊的位置都不一樣，一眼掃過去很累。
+   ============================================================ */
+.txw { overflow-x: auto; border-top: 1px solid var(--line); }
+.txt { width: 100%; border-collapse: collapse; }
+
+.txt thead th {
+  position: sticky; top: 58px; z-index: 5;
+  padding: 10px 14px; text-align: left; white-space: nowrap;
+  background: var(--card-3); border-bottom: 1px solid var(--line-2);
+  font-size: 11px; font-weight: 500; letter-spacing: .08em;
+  color: var(--ink-dim); font-family: var(--mono);
+}
+.txt thead th.rt { text-align: right; }
+
+.txr { border-bottom: 1px solid var(--line); transition: background-color .14s var(--ease); }
+.txr:hover { background: var(--card-2); }
+.txr td { padding: 11px 14px; vertical-align: top; }
+
+.txr__d { font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; }
+.txr__c { white-space: nowrap; font-size: 13px; }
+.txr__t { font-size: 14px; color: var(--ink); min-width: 180px; }
+.txr__t em { font-style: normal; color: var(--ink-dim); font-size: 12.5px; }
+.txr__raw { font-size: 11.5px; color: var(--ink-dim); }
+.txr__u { font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+.txr__s { font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+.txr__a {
+  font-family: var(--mono); font-size: 14.5px; font-weight: 500;
+  text-align: right; white-space: nowrap; color: var(--down);
+}
+.txr__a.is-in { color: var(--up); }
+.txr__x { text-align: right; white-space: nowrap; width: 1%; }
+
+/* 被通知指到的那一筆 */
+.txr.is-hit { background: var(--accent-wash); box-shadow: inset 3px 0 0 var(--accent); }
+.txr.is-hit:hover { background: var(--accent-wash); }
+
+/* 刪除：紅字，沒有框。破壞性的動作用顏色表示就夠，不用再畫一個按鈕。 */
+.del {
+  padding: 2px 0; background: transparent; border: 0; box-shadow: none;
+  color: var(--down); font-size: 12.5px; opacity: .7;
+  text-decoration: underline; text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: opacity .16s var(--ease), text-decoration-color .16s var(--ease);
+}
+.del:hover { opacity: 1; text-decoration-color: var(--down); }
+
+/* ---------- 篩選：標題 ＋ 下拉 ---------- */
+.bar {
+  display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
+  padding: 16px 28px; margin: 0;
+}
+.fsel { display: flex; flex-direction: column; gap: 5px; }
+.fsel > span {
+  font-size: 11px; letter-spacing: .08em; color: var(--ink-dim);
+  font-family: var(--mono);
+}
+.fsel select {
+  appearance: none; padding: 8px 30px 8px 12px; min-width: 132px;
+  background-color: var(--sunk); border: 1px solid var(--line-2);
+  color: var(--ink); font-size: 13.5px; cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 52%, calc(100% - 12px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color .16s var(--ease), background-color .16s var(--ease);
+}
+.fsel select:hover { border-color: var(--line-3); }
+.fsel select:focus { border-color: var(--accent); background-color: var(--card); }
+
+@media (max-width: 900px) {
+  .bar { padding-left: 18px; padding-right: 18px; }
+  .txr td, .txt thead th { padding-left: 10px; padding-right: 10px; }
+}
+@media (max-width: 640px) {
+  .txr__u, .txr__s, .txt thead th:nth-child(4), .txt thead th:nth-child(5) { display: none; }
+}
+
+/* 搜尋欄位不放裝飾用的放大鏡——placeholder 已經說明它是什麼了 */
+.search__ic { display: none; }
+#searchDrawer input { padding-left: 0; }
+
+/* 成員沒有家庭總覽這個功能，側欄就不要留一個點不進去的項目 */
+body.role-member .nav__i[data-nav="family"] { display: none; }
