@@ -15,6 +15,48 @@ window.DATA = {
     currency: 'TWD'
   },
 
+
+  /* ---------- 群組（一個家庭可以開好幾本帳） ----------
+     仿家族群組的做法：記帳除了有「分類」，還有「這筆算在哪一本帳上」。
+     分類回答「錢花在什麼」，群組回答「這筆屬於哪一份預算」。
+     每一本帳可以各自設一個每月存款目標。 */
+  groups: [
+    { id: 'G1', name: '家用', icon: '家', color: '#6C9FFB', owner: 'U1',
+      created: '2026-01-05', note: '日常開銷，全家共用' },
+    { id: 'G2', name: '旅遊基金', icon: '旅', color: '#8B7CF0', owner: 'U1',
+      created: '2026-03-01', note: '存暑假出國的錢，花費也記在這裡' },
+    { id: 'G3', name: '宇涵的零用', icon: '涵', color: '#5FB8D9', owner: 'U3',
+      created: '2026-02-11', note: '打工收入與自己的開銷' }
+  ],
+
+  /* 誰在哪個群組裡。這是可見範圍的第二道篩選——
+     ⚠️ 監管關係決定「誰的紀錄」，群組決定「哪一本帳」，兩道都要過。 */
+  groupMembers: [
+    { group: 'G1', user: 'U1' }, { group: 'G1', user: 'U2' },
+    { group: 'G1', user: 'U3' }, { group: 'G1', user: 'U4' },
+    { group: 'G2', user: 'U1' }, { group: 'G2', user: 'U2' },
+    { group: 'G3', user: 'U3' }, { group: 'G3', user: 'U1' }
+  ],
+
+  /* 每月存款目標可以分群組設。group 為 null = 不分群組的整體目標。
+     整體目標仍然是 members[].savingsGoal，這裡放的是「額外針對某一本帳」的。 */
+  groupGoals: [
+    { user: 'U1', group: 'G2', goal: 10000 },
+    { user: 'U2', group: 'G2', goal: 6000 },
+    { user: 'U3', group: 'G3', goal: 1500 }
+  ],
+
+  /* 階段性提醒：使用者自己設幾個百分比門檻。
+     支出佔可支配上限的比例跨過門檻，就發一則通知（走既有的通知鈴鐺）。
+     ⚠️ 同一個門檻一個月只會響一次，靠 firedPeriod 記住。 */
+  alerts: [
+    { id: 'AL1', user: 'U1', group: null, percent: 60,  enabled: true,  firedPeriod: null },
+    { id: 'AL2', user: 'U1', group: null, percent: 85,  enabled: true,  firedPeriod: null },
+    { id: 'AL3', user: 'U1', group: null, percent: 100, enabled: true,  firedPeriod: null },
+    { id: 'AL4', user: 'U1', group: 'G2', percent: 90,  enabled: true,  firedPeriod: null },
+    { id: 'AL5', user: 'U3', group: null, percent: 80,  enabled: true,  firedPeriod: null }
+  ],
+
   /* ---------- 家庭成員與角色 ---------- */
   roles: [
     { id: 'master', name: '管理者', desc: '家庭最高權限：管成員、設預算、指派監管關係。看得到誰一樣要看監管關係——沒指派就只看得到自己' },
@@ -71,40 +113,46 @@ window.DATA = {
 
   /* ---------- 交易明細（核心表） ---------- */
   transactions: [
-    { id: 'T1041', user: 'U3', date: '2026-09-10', amount: 1280, kind: 'expense',
+    { id: 'T1044', group: 'G2', user: 'U1', date: '2026-09-09', amount: 12800, kind: 'expense',
+      cat: 'C02', merchant: '訂機票（訂金）', note: '暑假沖繩', source: 'manual' },
+    { id: 'T1043', group: 'G2', user: 'U2', date: '2026-09-06', amount: 4800, kind: 'expense',
+      cat: 'C08', merchant: '訂房訂金', note: '', source: 'manual' },
+    { id: 'T1042', group: 'G2', user: 'U1', date: '2026-09-01', amount: 15000, kind: 'income',
+      cat: 'I04', merchant: '旅遊基金轉入', note: '每月提撥', source: 'manual' },
+    { id: 'T1041', group: 'G3', user: 'U3', date: '2026-09-10', amount: 1280, kind: 'expense',
       cat: 'C05', merchant: '遊戲點數儲值', note: '', source: 'nlp',
       raw: '剛剛儲值遊戲1280', parsed: { conf: 0.93, catConf: 0.88 } },
-    { id: 'T1040', user: 'U1', date: '2026-09-10', amount: 320, kind: 'expense',
+    { id: 'T1040', group: 'G1', user: 'U1', date: '2026-09-10', amount: 320, kind: 'expense',
       cat: 'C01', merchant: '公司附近自助餐', note: '午餐', source: 'nlp',
       raw: '中午自助餐320', parsed: { conf: 0.97, catConf: 0.95 } },
-    { id: 'T1039', user: 'U4', date: '2026-09-09', amount: 165, kind: 'expense',
+    { id: 'T1039', group: 'G1', user: 'U4', date: '2026-09-09', amount: 165, kind: 'expense',
       cat: 'C01', merchant: '全家便利商店', note: '', source: 'nlp',
       raw: '全家買了飲料跟麵包165', parsed: { conf: 0.96, catConf: 0.72 } },
-    { id: 'T1038', user: 'U2', date: '2026-09-09', amount: 2450, kind: 'expense',
+    { id: 'T1038', group: 'G1', user: 'U2', date: '2026-09-09', amount: 2450, kind: 'expense',
       cat: 'C04', merchant: '家樂福', note: '週採買', source: 'manual' },
-    { id: 'T1037', user: 'U3', date: '2026-09-08', amount: 890, kind: 'expense',
+    { id: 'T1037', group: 'G3', user: 'U3', date: '2026-09-08', amount: 890, kind: 'expense',
       cat: 'C01', merchant: '燒烤店', note: '同學聚餐', source: 'manual' },
-    { id: 'T1036', user: 'U1', date: '2026-09-08', amount: 1150, kind: 'expense',
+    { id: 'T1036', group: 'G1', user: 'U1', date: '2026-09-08', amount: 1150, kind: 'expense',
       cat: 'C02', merchant: '加油站', note: '', source: 'nlp',
       raw: '加油1150', parsed: { conf: 0.98, catConf: 0.96 } },
-    { id: 'T1035', user: 'U4', date: '2026-09-07', amount: 450, kind: 'expense',
+    { id: 'T1035', group: 'G1', user: 'U4', date: '2026-09-07', amount: 450, kind: 'expense',
       cat: 'C06', merchant: '文具行', note: '參考書', source: 'manual' },
-    { id: 'T1034', user: 'U3', date: '2026-09-06', amount: 2200, kind: 'expense',
+    { id: 'T1034', group: 'G3', user: 'U3', date: '2026-09-06', amount: 2200, kind: 'expense',
       cat: 'C05', merchant: '演唱會票', note: '', source: 'manual' },
-    { id: 'T1033', user: 'U2', date: '2026-09-05', amount: 52000, kind: 'income',
+    { id: 'T1033', group: 'G1', user: 'U2', date: '2026-09-05', amount: 52000, kind: 'income',
       cat: 'I01', merchant: '公司薪轉', note: '9月薪資', source: 'manual' },
-    { id: 'T1032', user: 'U1', date: '2026-09-05', amount: 68000, kind: 'income',
+    { id: 'T1032', group: 'G1', user: 'U1', date: '2026-09-05', amount: 68000, kind: 'income',
       cat: 'I01', merchant: '公司薪轉', note: '9月薪資', source: 'manual' },
-    { id: 'T1031', user: 'U1', date: '2026-09-05', amount: 18500, kind: 'expense',
+    { id: 'T1031', group: 'G1', user: 'U1', date: '2026-09-05', amount: 18500, kind: 'expense',
       cat: 'C03', merchant: '房貸', note: '', source: 'manual' },
-    { id: 'T1030', user: 'U4', date: '2026-09-04', amount: 3000, kind: 'income',
+    { id: 'T1030', group: 'G1', user: 'U4', date: '2026-09-04', amount: 3000, kind: 'income',
       cat: 'I03', merchant: '零用錢', note: '', source: 'manual' },
-    { id: 'T1029', user: 'U3', date: '2026-09-03', amount: 8000, kind: 'income',
+    { id: 'T1029', group: 'G3', user: 'U3', date: '2026-09-03', amount: 8000, kind: 'income',
       cat: 'I03', merchant: '打工薪資', note: '', source: 'manual' },
-    { id: 'T1028', user: 'U3', date: '2026-09-02', amount: 3400, kind: 'expense',
+    { id: 'T1028', group: 'G3', user: 'U3', date: '2026-09-02', amount: 3400, kind: 'expense',
       cat: 'C05', merchant: '線上訂閱', note: '三個平台', source: 'nlp',
       raw: '訂閱費三個平台3400', parsed: { conf: 0.91, catConf: 0.84 } },
-    { id: 'T1027', user: 'U2', date: '2026-09-02', amount: 6800, kind: 'expense',
+    { id: 'T1027', group: 'G1', user: 'U2', date: '2026-09-02', amount: 6800, kind: 'expense',
       cat: 'C07', merchant: '牙醫診所', note: '植牙分期', source: 'manual' }
   ],
 
@@ -260,6 +308,7 @@ window.DATA = {
 
     { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊時就要填。改過的值保留歷史，不覆蓋',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['group_id', 'BIGINT', 'FK → groups。NULL = 不分群組的整體目標'],
              ['period_key', 'TEXT', "'2026-09'。NULL = 預設值，套用到所有未指定的月份"],
              ['goal_amount', 'NUMERIC(14,2)', '每月想存多少'],
              ['warn_ratio', 'NUMERIC', '達可支配上限的幾成時提醒，預設 0.8'],
@@ -308,6 +357,7 @@ window.DATA = {
 
     { t: 'transactions', label: '收支明細', note: '核心表。所有統計都從這裡算',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['group_id', 'BIGINT', 'FK → groups，這筆算在哪一本帳上。INDEX'],
              ['family_id', 'BIGINT', 'FK → families，INDEX'],
              ['account_id', 'BIGINT', 'FK → accounts'],
              ['category_id', 'BIGINT', 'FK → categories'],
@@ -349,6 +399,39 @@ window.DATA = {
              ['suggestions_json', 'JSONB', 'LLM 生成'],
              ['model_ver', 'TEXT', ''], ['generated_at', 'TIMESTAMPTZ', '']] },
 
+    { t: 'notifications', label: '通知', note: '★ 監管對象記帳、或支出跨過提醒門檻時寫一列',
+      cols: [['id', 'BIGSERIAL', 'PK'],
+             ['recipient_id', 'BIGINT', 'FK → users，收件人。查詢一律 WHERE recipient_id = 我'],
+             ['actor_id', 'BIGINT', 'FK → users，做這件事的人。系統發的為 NULL'],
+             ['type', 'TEXT', "'ward_transaction' / 'budget_alert'"],
+             ['transaction_id', 'BIGINT', 'FK → transactions，非記帳類通知為 NULL'],
+             ['payload_json', 'JSONB', '提醒類通知放門檻百分比、群組、金額'],
+             ['read_at', 'TIMESTAMPTZ', 'NULL = 未讀。紅點數字就是數這個'],
+             ['created_at', 'TIMESTAMPTZ', '與 recipient_id 做複合索引，輪詢查得快']] },
+
+    { t: 'groups', label: '群組（帳本）', note: '★ 一個家庭可以開好幾本帳，各自有自己的存款目標',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['family_id', 'BIGINT', 'FK → families'],
+             ['name', 'TEXT', '例如「家用」「旅遊基金」'],
+             ['icon', 'TEXT', '一個字，畫面上的圓標'],
+             ['color', 'TEXT', '圖表與標籤的顏色'],
+             ['created_by', 'BIGINT', 'FK → users'],
+             ['created_at', 'TIMESTAMPTZ', ''],
+             ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著']] },
+
+    { t: 'group_members', label: '群組成員', note: '可見範圍的第二道篩選：我在不在這本帳裡',
+      cols: [['group_id', 'BIGINT', 'PK, FK → groups'],
+             ['user_id', 'BIGINT', 'PK, FK → users'],
+             ['joined_at', 'TIMESTAMPTZ', ''],
+             ['can_write', 'BOOLEAN', 'false = 只能看這本帳，不能往裡面記']] },
+
+    { t: 'alert_rules', label: '階段性提醒門檻', note: '★ 使用者自己設幾個百分比，跨過就通知',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['group_id', 'BIGINT', 'FK → groups。NULL = 針對整體目標'],
+             ['percent', 'INT', '支出佔可支配上限的百分比，1~200'],
+             ['enabled', 'BOOLEAN', '關掉但不刪除，使用者常常只是暫時不想被吵'],
+             ['fired_period', 'TEXT', "'2026-09'。⚠️ 同一個門檻一個月只響一次，靠這欄擋"],
+             ['created_at', 'TIMESTAMPTZ', '']] },
+
     { t: 'audit_logs', label: '稽核紀錄', note: '誰看了誰的資料、誰改了權限',
       cols: [['id', 'BIGSERIAL', 'PK'], ['actor_id', 'BIGINT', 'FK → users'],
              ['action', 'TEXT', "'view_ward' / 'grant_guardianship' / 'change_role' …"],
@@ -358,6 +441,15 @@ window.DATA = {
 
   relations: [
     ['sessions', 'users', 'N:1', ''],
+    ['notifications', 'users', 'N:1', '收件人'],
+    ['notifications', 'transactions', 'N:1', '記帳類通知指到那一筆'],
+    ['groups', 'families', 'N:1', ''],
+    ['group_members', 'groups', 'N:1', ''],
+    ['group_members', 'users', 'N:1', ''],
+    ['transactions', 'groups', 'N:1', '★每一筆都屬於一本帳'],
+    ['savings_goals', 'groups', 'N:1', 'NULL = 整體目標'],
+    ['alert_rules', 'users', 'N:1', ''],
+    ['alert_rules', 'groups', 'N:1', 'NULL = 針對整體目標'],
     ['savings_goals', 'users', 'N:1', '★存款目標'],
     ['family_members', 'users', 'N:1', ''],
     ['family_members', 'families', 'N:1', ''],

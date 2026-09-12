@@ -163,6 +163,10 @@ MEMBERS: list[Member] = [
             "負責所有「算出來的東西」，以及把那些數字講成人話。\n"
             "屬於他的：分類體系、月年統計、預算、每月存款目標、財務建議。\n"
             "**整個系統只有這裡算錢** —— 路由不算、前端不算、模型更不算。\n"
+            "每月存款目標可以**分群組設定**：不帶 groupId 是整體目標，帶了就是那個群組自己的目標。\n"
+            "階段性提醒也在這裡：使用者自己設幾個百分比門檻（例如 50%／80%／100%），"
+            "支出跨過門檻就發一則通知。\n"
+            "⚠️ **算出要發通知是成員3，真的寫進 notifications 是成員4。**\n"
             "不屬於他的：明細的寫入（那是成員2）；決定要算哪些人（那是成員4 的 permission）。"
         ),
         routes=[
@@ -174,6 +178,11 @@ MEMBERS: list[Member] = [
             ("PUT", "/api/budgets"),
             ("GET", "/api/savings-goal"),
             ("PUT", "/api/savings-goal"),
+            ("GET", "/api/savings-goals"),
+            ("GET", "/api/alerts"),
+            ("POST", "/api/alerts"),
+            ("PATCH", "/api/alerts/{aid}"),
+            ("DELETE", "/api/alerts/{aid}"),
             ("GET", "/api/advices"),
             ("POST", "/api/advices/generate"),
         ],
@@ -208,6 +217,11 @@ MEMBERS: list[Member] = [
             "唯讀監管檢視與即時通知、稽核紀錄、評測。\n"
             "⚠️ 監管是**唯讀**的：看得到，但不能改、不能刪，"
             "更不能登入對方的帳號。\n"
+            "群組也在這裡：一個家庭可以開好幾本帳（家用、旅遊基金、我自己的），每一筆記帳都屬於某一個群組。\n"
+            "⚠️ **可見範圍是兩道獨立的篩選，兩道都要過**：\n"
+            "  1. 這筆是誰記的 → 看 guardianships（自己 ＋ 我監管的人）\n"
+            "  2. 這筆在哪個群組 → 看 group_members（我在不在那個群組裡）\n"
+            "只做一道的話會漏：我監管的小孩在一個我沒加入的群組記帳，那筆不該出現在我的清單上。\n"
             "不屬於他的：登入本身（那是成員1）。"
             "成員1 回答「你是誰」，成員4 回答「你能看到什麼」。"
         ),
@@ -224,6 +238,12 @@ MEMBERS: list[Member] = [
             ("GET", "/api/notifications"),
             ("PATCH", "/api/notifications/{nid}"),
             ("PATCH", "/api/notifications"),
+            ("GET", "/api/groups"),
+            ("POST", "/api/groups"),
+            ("PATCH", "/api/groups/{gid}"),
+            ("DELETE", "/api/groups/{gid}"),
+            ("POST", "/api/groups/{gid}/members"),
+            ("DELETE", "/api/groups/{gid}/members/{user_id}"),
         ],
         files=[
             "app/routers/family.py",

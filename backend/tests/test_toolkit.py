@@ -20,7 +20,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-at-least-32-
 
 import pytest  # noqa: E402
 
-from app.toolkit import images, money, passwords, period, tokens  # noqa: E402
+from app.toolkit import alerts, scope, images, money, passwords, period, tokens  # noqa: E402
 
 
 # ===========================================================================
@@ -199,3 +199,126 @@ def test_data_uri裡宣告的型別不可信():
     evil = "data:image/jpeg;base64," + base64.b64encode(b"import os").decode()
     with pytest.raises(images.InvalidImage):
         images.from_data_uri(evil)
+
+
+# ===========================================================================
+# alerts —— 階段性提醒的門檻
+# ===========================================================================
+def test_百分比是捨去不是四捨五入():
+    """79.9% 還沒到 80%，不可以提前響。"""
+    assert alerts.usage_percent(3995, 5000) == 79
+    assert alerts.usage_percent(4000, 5000) == 80
+
+
+def test_可支配上限是零的時候不會炸():
+    """收入還沒入帳、或存款目標比收入高的月份，上限會是 0 或負數。"""
+    assert alerts.usage_percent(100, 0) == alerts.MAX_PERCENT
+    assert alerts.usage_percent(0, 0) == 0
+    assert alerts.usage_percent(500, -200) == alerts.MAX_PERCENT
+
+
+def test_一次跨過好幾個門檻要全部回傳():
+    """80% 的時候記一筆大的直接跳到 105%，85 和 100 都該通知。"""
+    assert alerts.crossed(78, 105, [60, 85, 100]) == [85, 100]
+
+
+def test_本來就在門檻以上不會重複觸發():
+    """90% 再記一筆變 92%，`92 >= 85` 還是成立——但那不算新跨過。"""
+    assert alerts.crossed(90, 92, [60, 85, 100]) == []
+
+
+def test_剛好踩到門檻算跨過():
+    assert alerts.crossed(79, 80, [80]) == [80]
+
+
+def test_同一個月只響一次():
+    """使用者在 80% 附近來回記帳、刪除、再記，不該被連環轟炸。"""
+    assert alerts.should_fire(80, 78, 90, None, "2026-09") is True
+    assert alerts.should_fire(80, 78, 90, "2026-09", "2026-09") is False
+    # 下個月重新開始
+    assert alerts.should_fire(80, 78, 90, "2026-08", "2026-09") is True
+
+
+def test_門檻要在合理範圍():
+    assert alerts.validate_percent("80") == 80
+    for bad in (0, 201, -5, "八十", None):
+        with pytest.raises(alerts.InvalidThreshold):
+            alerts.validate_percent(bad)
+
+
+def test_重複的門檻會被去掉():
+    """留著的話同一次跨越會發兩則一模一樣的通知。"""
+    assert alerts.normalize(["100", 60, 85, 60, 100]) == [60, 85, 100]
+
+
+def test_下一個門檻():
+    assert alerts.next_threshold(72, [60, 85, 100]) == 85
+    assert alerts.next_threshold(100, [60, 85, 100]) is None
+
+
+# ===========================================================================
+# scope —— 可見範圍的兩道篩選
+# ===========================================================================
+_G = [
+    {"guardian_id": "U1", "ward_id": "U3"},
+    {"guardian_id": "U1", "ward_id": "U4"},
+    {"guardian_id": "U2", "ward_id": "U4"},
+]
+_M = [
+    {"group_id": "G1", "user_id": "U1"},
+    {"group_id": "G1", "user_id": "U3"},
+    {"group_id": "G3", "user_id": "U3"},
+]
+
+
+def test_可見範圍只看監管關係不看角色():
+    """master 沒有例外：沒指派監管誰，就只看得到自己。"""
+    assert scope.visible_users("U1", _G) == {"U1", "U3", "U4"}
+    assert scope.visible_users("U2", _G) == {"U2", "U4"}
+
+
+def test_被監管的人看不到任何別人():
+    """監管是單向的——你看得到我，不代表我看得到你。"""
+    assert scope.visible_users("U3", _G) == {"U3"}
+
+
+def test_沒有任何監管關係時只看得到自己():
+    assert scope.visible_users("U9", []) == {"U9"}
+
+
+def test_群組是第二道獨立的篩選():
+    assert scope.visible_groups("U1", _M) == {"G1"}
+    assert scope.visible_groups("U3", _M) == {"G1", "G3"}
+
+
+def test_兩道都要過才看得到():
+    """
+    我監管 U3，但 U3 在 G3（我沒加入）記的帳不該出現在我的清單上。
+    只做一道篩選就會漏掉這種情況。
+    """
+    rows = [
+        {"user_id": "U3", "group_id": "G1"},   # 兩道都過
+        {"user_id": "U3", "group_id": "G3"},   # 人可以，帳本不行
+        {"user_id": "U2", "group_id": "G1"},   # 帳本可以，人不行
+    ]
+    users = scope.visible_users("U1", _G)
+    groups = scope.visible_groups("U1", _M)
+    assert scope.filter_rows(rows, users, groups) == [
+        {"user_id": "U3", "group_id": "G1"}
+    ]
+
+
+def test_沒權限要丟例外不是回空的():
+    """回空陣列的話，前端分不出「這個人沒記帳」和「你不能看」。"""
+    users = scope.visible_users("U3", _G)
+    scope.require_user("U3", users)                 # 自己，不該丟
+    with pytest.raises(scope.Forbidden):
+        scope.require_user("U1", users)
+    with pytest.raises(scope.Forbidden):
+        scope.require_group("G2", scope.visible_groups("U3", _M))
+
+
+def test_欄位名稱長短都吃得下():
+    """ORM 是 guardian_id，mock 是 guardian，測試不該為此寫兩套。"""
+    short = [{"guardian": "U1", "ward": "U3"}]
+    assert scope.visible_users("U1", short) == {"U1", "U3"}

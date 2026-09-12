@@ -21,6 +21,7 @@
 路由數對不對、歸屬對不對、有沒有引用到不存在的檔案。
 """
 
+import glob
 import io
 import os
 import re
@@ -88,10 +89,32 @@ def test_工具箱的檔案都在():
         "app/toolkit/errors.py",
         "app/toolkit/period.py",
         "app/toolkit/money.py",
+        "app/toolkit/images.py",
+        "app/toolkit/alerts.py",
+        "app/toolkit/scope.py",
     ]
     missing = [f for f in expected
                if not os.path.exists(os.path.join(REPO, "backend", f))]
     assert not missing, "工具箱少了這些檔案：" + "、".join(missing)
+
+
+def test_每個工具都要寫在索引裡():
+    """toolkit/__init__.py 的那張表要列出每一個模組。
+
+    這份索引就是成員找工具的入口。漏掉一個，那個工具等於不存在——
+    images 就這樣被漏了很久：檔案在、測試也過，但沒人知道它存在。
+    所以改成讓測試去數資料夾，不要靠人維護清單。
+    """
+    index = read("backend/app/toolkit/__init__.py")
+    names = sorted(
+        os.path.basename(p)[:-3]
+        for p in glob.glob(os.path.join(REPO, "backend", "app", "toolkit", "*.py"))
+        if not os.path.basename(p).startswith("__")
+    )
+    undocumented = [n for n in names if ("    %s " % n) not in index]
+    assert not undocumented, (
+        "這些工具沒有寫進 __init__.py 的索引：" + "、".join(undocumented)
+    )
 
 
 def test_工具箱沒有留下未完成的東西():
@@ -102,7 +125,6 @@ def test_工具箱沒有留下未完成的東西():
     留下 TODO 的話，成員 import 進來用到一半才發現是空的，
     那比一開始就沒有這個工具還糟。
     """
-    import glob
 
     bad = []
     for path in glob.glob(os.path.join(REPO, "backend", "app", "toolkit", "*.py")):
@@ -310,3 +332,22 @@ def test_可見範圍不可以用角色判斷():
     assert "role" not in body, \
         "visibleUsers 又用角色判斷了：\n" + body
     assert "guardianships" in body, "visibleUsers 沒有看 guardianships"
+
+
+def test_檔案系統說明書要跟得上實際的檔案():
+    """toolkit/ 多一個檔案，說明書就要多一列。
+
+    說明書是別人找工具的入口，落後一版等於那個工具不存在。
+    所以不靠人記得去改，讓測試去比對資料夾。
+    """
+    doc = read("frontend/docs/files.html")
+    names = sorted(
+        os.path.basename(p)
+        for p in glob.glob(os.path.join(REPO, "backend", "app", "toolkit", "*.py"))
+        if not os.path.basename(p).startswith("__")
+    )
+    missing = [n for n in names
+               if '<span class="fname">%s</span>' % n not in doc]
+    assert not missing, (
+        "檔案系統說明書的工具箱表格少了：" + "、".join(missing)
+    )
