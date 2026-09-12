@@ -1788,3 +1788,29 @@ input[type="password"], input[type="search"], select, textarea {
 .bell svg { width: 19px; height: 19px; }
 .top .gsw, .top .bell__wrap { border-left: 1px solid var(--line); }
 .top .gsw .ic { border-left: 0; }
+
+
+/* ============================================================
+   單一動作一律置中
+   ------------------------------------------------------------
+   表單最後那一排如果只有一顆按鈕，就把它擺中間。
+   靠左會讓它看起來像還沒排完；置中才像「這一段到此為止，按這裡」。
+   ============================================================ */
+.prof__form > div:last-child,
+.gnew > div:last-child,
+.anew > div:last-child,
+.gate__f > div:last-child {
+  display: flex; justify-content: center; width: 100%;
+}
+.prof__form > div:last-child .btn,
+.gnew > div:last-child .btn,
+.anew > div:last-child .btn {
+  min-width: 148px; justify-content: center;
+}
+
+/* 表單本身也置中對齊，按鈕才不會孤零零地偏一邊 */
+.prof__form { align-items: stretch; }
+.gnew, .anew { align-items: flex-end; }
+
+/* 登出那一列的按鈕也置中在自己的位置 */
+.prof__out button { min-width: 120px; justify-content: center; }
