@@ -92,9 +92,9 @@
   /* 展示用帳號。mock 模式的登入頁會列出來，免得評審還要猜 email。
      接上真後端（API.mode === 'http'）之後就不顯示了。 */
   var DEMO = [
-    { name: '林建國 · 管理者', email: 'jianguo@lin.tw' },
+    { name: '林建國 · 家長',   email: 'jianguo@lin.tw' },
     { name: '陳淑芬 · 家長',   email: 'shufen@lin.tw' },
-    { name: '林宇涵 · 成員',   email: 'yuhan@lin.tw' },
+    { name: '林宇涵 · 子女',   email: 'yuhan@lin.tw' },
     { name: '林宇軒 · 成員',   email: 'yuxuan@lin.tw' }
   ];
   var $title = document.getElementById('ptitle');
@@ -127,7 +127,7 @@
   function money(n) { return 'NT$ ' + Number(n || 0).toLocaleString('en-US'); }
   function pct(x) { return Math.round((x || 0) * 100) + '%'; }
 
-  var ROLE_TW = { master: '管理者', parent: '家長', member: '成員' };
+  var ROLE_TW = { master: '平台管理員', parent: '家長', child: '子女' };
 
   function toast(msg, kind, undo) {
     var t = el('<div class="toast' + (kind ? ' toast--' + kind : '') + '">' +
@@ -596,10 +596,10 @@
       .then(function (r) {
         var d = r[0], m = r[1], b = r[2];
         var h = '<div class="page">';
-        /* 第一道：這個功能只有管理者與家長有。 */
-        if (m.user.role === 'member') {
+        /* 第一道：這個功能只有家長有。 */
+        if (m.user.role !== 'parent') {
           h += '<div class="note note--warn"><div class="note__k">沒有這個功能</div>' +
-            '<p>家庭總覽是給管理者與家長看的。</p></div></div>';
+            '<p>家庭總覽是給家長看的。</p></div></div>';
           $view.innerHTML = h;
           return;
         }
@@ -640,7 +640,7 @@
             ava(u) +
             '<div class="row__m"><div class="row__top">' +
               '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
-              '<span class="tag tag--' + (u.role === 'master' ? 'done' : 'soft') + '">' +
+              '<span class="tag tag--' + (u.role === 'parent' ? 'MEDIUM' : 'soft') + '">' +
               ROLE_TW[u.role] + '</span>' +
               (u.savingsLevel === 'over'
                 ? '<span class="tag tag--down">存不到目標 · 短少 ' + money(u.shortfall) + '</span>'
@@ -810,12 +810,13 @@
   /* ============================================================
      06 成員與權限
      ============================================================ */
-  /* 誰的存款目標我能改：我自己；未成年的由 master 代設。
-     監管者看得到子女的數字，但不能替成年的子女決定要存多少。 */
+  /* 誰的存款目標我能改：我自己，或我監管的人。
+     ⚠️ 不看年齡、也不看角色——有沒有監管關係是那一家自己決定的。 */
   function canSetGoal(u, d) {
     if (u.id === d.me) return true;
-    var me = d.members.filter(function (x) { return x.id === d.me; })[0];
-    return !!(me && me.role === 'master' && u.age !== null && u.age < 18);
+    return (d.guardianships || []).some(function (g) {
+      return g.guardian === d.me && g.ward === u.id;
+    });
   }
 
   function vMembers() {
@@ -838,10 +839,11 @@
           ava(u) +
           '<div class="row__m"><div class="row__top">' +
             '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
-            '<span class="tag tag--' + (u.role === 'master' ? 'done' :
-              (u.role === 'parent' ? 'MEDIUM' : 'soft')) + '">' + ROLE_TW[u.role] + '</span>' +
+            '<span class="tag tag--' + (u.role === 'parent' ? 'MEDIUM' : 'soft') + '">' +
+              ROLE_TW[u.role] + '</span>' +
             (u.id === d.me ? '<span class="tag tag--na">目前登入</span>' : '') +
-            (u.age < 18 ? '<span class="tag tag--info">未成年 · 目標由管理者代設</span>' : '') +
+            (canSetGoal(u, d) && u.id !== d.me
+              ? '<span class="tag tag--info">目標由你代設</span>' : '') +
           '</div><div class="row__sub">' +
             (wards.length ? '監管：' + wards.map(function (g) { return esc(g.wardName); }).join('、') : '') +
             (wards.length && by.length ? '　｜　' : '') +
@@ -851,7 +853,7 @@
           '</div></div>' +
           /* 這一列只講身分：誰、什麼角色、跟誰有監管關係。
              存款目標是財務設定，不屬於這裡——自己的在「個人資料」，
-             代未成年設的在那個人的紀錄頁。擠在這裡又醜又難按。
+             代監管對象設的在那個人的紀錄頁。擠在這裡又醜又難按。
 
              看得到才給按鈕，而且一直看得到。
              ⚠️ 之前這顆是 hover 才浮出來的，於是「哪幾列點得下去」
@@ -908,7 +910,7 @@
           $view.innerHTML = '<div class="page"><div class="note note--warn">' +
             '<div class="note__k">看不到這個人的紀錄</div>' +
             '<p>你沒有被指派監管 <b>' + esc(u.name) + '</b>。<br>' +
-            '監管關係由管理者建立，而且雙方都看得到——系統不提供隱藏監管。</p>' +
+            '監管關係由家長建立，而且雙方都看得到——系統不提供隱藏監管。</p>' +
             '</div>' + backLink() + '</div>';
           return;
         }
@@ -934,8 +936,7 @@
         '<div class="mhead__m">' +
           '<div class="mhead__top">' +
             '<span class="mhead__n">' + esc(u.name) + '</span>' +
-            '<span class="tag tag--' + (u.role === 'master' ? 'done' :
-              (u.role === 'parent' ? 'MEDIUM' : 'soft')) + '">' +
+            '<span class="tag tag--' + (u.role === 'parent' ? 'MEDIUM' : 'soft') + '">' +
               ROLE_TW[u.role] + '</span>' +
             (mine ? '<span class="tag tag--na">這是你自己</span>' : '') +
           '</div>' +
@@ -948,7 +949,7 @@
         '<div class="mhead__n2"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
       '</div>';
 
-      /* 未成年的存款目標由管理者代設——設定的地方就放在
+      /* 監管對象的存款目標可由監管者代設——設定的地方就放在
          看得到他紀錄的這一頁，不要塞回成員名冊那張表。 */
       if (!mine) {
         /* 我給他多少零用金。這是設定，不是一筆支出紀錄——
@@ -1132,7 +1133,7 @@
          '<p>這個數字<b>隨時可以改</b>，改了只影響現在和以後。' +
          '過去的月份會沿用當時設定的數字——否則十月回頭看九月，' +
          '會用現在的標準去評斷當時的自己，那不公平也不準。</p>' +
-         '<p>未滿 18 歲的成員，這個數字由家裡的管理者代為設定。</p>'
+         '<p>如果有人監管你，他也可以幫你設定這個數字。</p>'
     },
     entry: {
       t: '一句話就能記好幾筆',
@@ -1147,7 +1148,7 @@
     watch: {
       t: '誰看得到我的紀錄',
       b: '<p>預設只有你自己。</p>' +
-         '<p>家裡的管理者可以建立「監管關係」，被指派之後，' +
+         '<p>家裡的家長可以建立「監管關係」，被指派之後，' +
          '那個人就看得到你的記帳明細。<b>但他只能看</b>——' +
          '不能修改、不能刪除，也不能登入你的帳號。</p>' +
          '<p>這件事<b>不會偷偷發生</b>：只要有人看得到你，' +
@@ -1207,10 +1208,10 @@
           return '<td>' + esc(v) + '</td>';
         }
         return '<div class="hp__t"><table><thead><tr><th>　</th>' +
-          '<th>管理者</th><th>家長</th><th>成員</th></tr></thead><tbody>' +
+          '<th>家長</th><th>子女</th></tr></thead><tbody>' +
           PERMS.permissions.map(function (p) {
             return '<tr><td>' + esc(p.action) + '</td>' +
-              cell(p.master) + cell(p.parent) + cell(p.member) + '</tr>';
+              cell(p.parent) + cell(p.child) + '</tr>';
           }).join('') + '</tbody></table></div>';
       }
     },
@@ -1840,12 +1841,12 @@
           '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>' +
           '<button class="who__out" id="logout">登出</button>';
       }
-      /* 家庭總覽是給管理者與家長的功能。
+      /* 家庭總覽是給家長的功能。
          ⚠️ 這跟「可見範圍」是兩件事：
            角色  決定「有沒有這個功能」
            監管  決定「看得到誰的資料」
          兩道都要過——家長也只看得到被指派給他的那幾個人。 */
-      document.body.classList.toggle('role-member', m.user.role === 'member');
+      document.body.classList.toggle('role-child', m.user.role !== 'parent');
 
       var f = document.getElementById('famName');
       if (f) f.textContent = m.family.family + '　' + m.family.period;

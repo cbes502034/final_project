@@ -2172,7 +2172,7 @@ body.rail-min .nav__i:hover, body.rail-min .docs__i:hover { background: var(--su
 #searchDrawer input { padding-left: 0; }
 
 /* 成員沒有家庭總覽這個功能，側欄就不要留一個點不進去的項目 */
-body.role-member .nav__i[data-nav="family"] { display: none; }
+body.role-child .nav__i[data-nav="family"] { display: none; }
 
 
 /* ============================================================

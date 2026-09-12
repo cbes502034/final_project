@@ -20,7 +20,9 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-at-least-32-
 
 import pytest  # noqa: E402
 
-from app.toolkit import alerts, scope, images, money, passwords, period, tokens  # noqa: E402
+from app.toolkit import (  # noqa: E402
+    alerts, scope, roles, images, money, passwords, period, tokens,
+)
 
 
 # ===========================================================================
@@ -272,7 +274,7 @@ _M = [
 
 
 def test_可見範圍只看監管關係不看角色():
-    """master 沒有例外：沒指派監管誰，就只看得到自己。"""
+    """家長沒有例外：沒指派監管誰，就只看得到自己。"""
     assert scope.visible_users("U1", _G) == {"U1", "U3", "U4"}
     assert scope.visible_users("U2", _G) == {"U2", "U4"}
 
@@ -322,3 +324,107 @@ def test_欄位名稱長短都吃得下():
     """ORM 是 guardian_id，mock 是 guardian，測試不該為此寫兩套。"""
     short = [{"guardian": "U1", "ward": "U3"}]
     assert scope.visible_users("U1", short) == {"U1", "U3"}
+
+
+# ===========================================================================
+# roles —— 角色能做哪些治理動作
+# ===========================================================================
+#
+# 這個模組的全部重點是一句話：
+# 角色決定「能做什麼」，監管關係決定「看得到誰」，兩者不交叉。
+
+
+def test_master_不是家庭角色():
+    """家庭裡只有家長與子女。
+
+    早期版本把「家裡權限最高的人」也叫 master，於是一個家庭有三種角色。
+    但 master 現在是平台管理員——混在一起的話，
+    任何一個家長都會變成能停權別人家使用者的人。
+    """
+    assert roles.FAMILY_ROLES == ("parent", "child")
+    assert roles.is_family_role("parent")
+    assert roles.is_family_role("child")
+    assert not roles.is_family_role("master")
+    assert not roles.is_family_role("member")
+
+
+def test_治理動作只有家長能做():
+    assert roles.can_govern("parent", "invite_member")
+    assert not roles.can_govern("child", "invite_member")
+    assert roles.can_govern("parent", "create_guardianship")
+    assert not roles.can_govern("child", "create_guardianship")
+
+
+def test_開帳本不分角色():
+    """記帳的分類方式是個人的事，不該由家裡的階級決定。"""
+    assert roles.can_govern("parent", "create_group")
+    assert roles.can_govern("child", "create_group")
+
+
+def test_不認得的動作一律擋掉():
+    """寧可擋掉打錯字的呼叫，也不要查不到就放行。
+
+    放行的那種寫法會讓漏掉的權限檢查看起來像正常運作——
+    那是最難發現的一種壞法。
+    """
+    assert not roles.can_govern("parent", "invite_membre")
+    assert not roles.can_govern("parent", "")
+    with pytest.raises(scope.Forbidden):
+        roles.require_govern("parent", "delete_everything")
+
+
+def test_治理動作裡沒有任何一項是看資料():
+    """可見範圍只能來自 guardianships，不然「誰看得到我」就列不出來了。"""
+    for action in roles.GOVERN_ACTIONS:
+        for bad in ("view_transactions", "read_ledger", "see_user"):
+            assert action != bad
+    # view_family_overview 是「有沒有這個功能」，不是「看得到誰」——
+    # 進去之後看得到哪幾個人，仍然要過 scope 那一關
+    assert roles.can_govern("parent", "view_family_overview")
+
+
+def test_代設存款目標看的是監管關係不是年齡():
+    """系統只提供功能，幾歲該被管是那一家自己的事。
+
+    而且年齡會變——用它當權限依據，權限就會在某個生日當天自己改變。
+    """
+    assert roles.can_set_goal_for("U1", "U1", _G)      # 自己一定可以
+    assert roles.can_set_goal_for("U1", "U3", _G)      # U1 監管 U3
+    assert roles.can_set_goal_for("U1", "U4", _G)
+    assert not roles.can_set_goal_for("U1", "U2", _G)  # 沒監管關係就不行
+    assert not roles.can_set_goal_for("U3", "U4", _G)
+
+    with pytest.raises(scope.Forbidden):
+        roles.require_set_goal("U3", "U4", _G)
+
+
+def test_家長身分本身不給代設的權力():
+    """是家長也不能改任何人的目標——要先有那條監管關係。"""
+    assert not roles.can_set_goal_for("U2", "U3", _G)
+
+
+def test_平台管理員只能停權與查稽核():
+    assert roles.can_platform("suspend_user", True)
+    assert roles.can_platform("unsuspend_user", True)
+    assert roles.can_platform("read_audit_log", True)
+
+
+def test_平台管理員讀不到任何財務資料():
+    """停權是關門，不是配鑰匙。
+
+    跟「管理人員不可以進入子女的帳號」是同一條原則。一個能讀全系統
+    消費明細的帳號，比家長越權嚴重得多——家長至少還在 guardianships
+    表上留下痕跡、被監管的人看得到。
+    """
+    for action in ("read_transactions", "view_ledger", "impersonate_user",
+                   "read_user", "join_family"):
+        assert not roles.can_platform(action, True)
+        with pytest.raises(scope.Forbidden):
+            roles.require_platform(action, True)
+
+
+def test_不是平台管理員就什麼都不能做():
+    assert not roles.can_platform("suspend_user", False)
+    assert not roles.can_platform("suspend_user", None)
+    with pytest.raises(scope.Forbidden):
+        roles.require_platform("suspend_user", False)

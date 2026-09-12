@@ -177,7 +177,8 @@ final_project/
 
 共 **55 條路由**。標示說明：
 
-- **權限**：`公開` / `登入` / `master` / `監管者`
+- **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
+- ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
 - ★ 記號代表與 LLM 直接相關
 
 ## 4-1　身分認證 `/api/auth`
@@ -204,7 +205,7 @@ final_project/
   "accessToken": "eyJhbGciOi...",
   "refreshToken": "eyJhbGciOi...",
   "expiresIn": 1800,
-  "user": { "id": 1, "displayName": "林建國", "role": "master" }
+  "user": { "id": 1, "displayName": "林建國", "role": "parent" }
 }
 ```
 
@@ -213,14 +214,14 @@ final_project/
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
 | 36 | GET | `/api/family` | 成員4 | 登入 | 家庭資訊、成員清單、角色 |
-| 37 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立者成為 master |
-| 38 | POST | `/api/family/invite` | 成員4 | master | 產生邀請碼 |
+| 37 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立者成為家長（僅記於 `created_by`，不給額外權限） |
+| 38 | POST | `/api/family/invite` | 成員4 | 家長 | 產生邀請碼 |
 | 39 | POST | `/api/family/join` | 成員4 | 登入 | 用邀請碼加入家庭 |
 | 40 | PATCH | `/api/family/members/{userId}` | 成員4 | master | 修改成員角色 |
 | 41 | DELETE | `/api/family/members/{userId}` | 成員4 | master | 移除成員（標記 removed，不刪資料） |
 | 42 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
-| 43 | POST | `/api/guardianships` | 成員4 | master | 建立監管關係 |
-| 44 | DELETE | `/api/guardianships/{id}` | 成員4 | master | 解除監管（設 `ended_at`，不刪除） |
+| 43 | POST | `/api/guardianships` | 成員4 | 家長 | 建立監管關係 |
+| 44 | DELETE | `/api/guardianships/{id}` | 成員4 | 家長 | 解除監管（設 `ended_at`，不刪除） |
 | 45 | GET | `/api/notifications` | 成員4 | 登入 | 通知清單。帶 since 只拿新的 |
 | 46 | PATCH | `/api/notifications/{nid}` | 成員4 | 本人 | 把一則標記成已讀 |
 | 47 | PATCH | `/api/notifications` | 成員4 | 本人 | 整批標記已讀 |
@@ -242,7 +243,7 @@ final_project/
 | 15 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改 |
 | 16 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除 |
 | 21 | GET | `/api/categories` | 成員3 | 登入 | 分類體系（系統預設 + 家庭自訂） |
-| 22 | POST | `/api/categories` | 成員3 | master | 新增家庭自訂分類 |
+| 22 | POST | `/api/categories` | 成員3 | 家長 | 新增家庭自訂分類 |
 
 **查詢參數的權限行為**：不帶 `userId` 時回傳「你看得到的所有人」；
 帶 `userId` 但你沒有權限看那個人 → **回 403 而不是空陣列**（空陣列會讓人以為對方沒記帳）。
@@ -310,9 +311,9 @@ final_project/
 | 23 | GET | `/api/summary` | 成員3 | 登入 | 摘要。`scope=me\|family`、`period=2026-09` |
 | 24 | GET | `/api/stats` | 成員3 | 登入 | 統計。`periodType=month\|year`、`from`、`to` |
 | 25 | GET | `/api/budgets` | 成員3 | 登入 | 預算與使用率 |
-| 26 | PUT | `/api/budgets` | 成員3 | 本人或 master | 設定預算 |
+| 26 | PUT | `/api/budgets` | 成員3 | 本人 | 設定預算 |
 | 27 | GET | `/api/savings-goal` | 成員3 | 登入 | **每月存款目標與達成狀態** |
-| 28 | PUT | `/api/savings-goal` | 成員3 | 本人；未成年由 master | **設定每月存款目標**（註冊時也走這支） |
+| 28 | PUT | `/api/savings-goal` | 成員3 | 本人或監管者 | **設定每月存款目標**（註冊時也走這支）。⚠️ 依監管關係，不看年齡 |
 | 29 | GET | `/api/savings-goals` | 成員3 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
 | 30 | GET | `/api/alerts` | 成員3 | 登入 | 我設定的階段性提醒門檻 |
 | 31 | POST | `/api/alerts` | 成員3 | 本人 | 新增一個門檻（百分比 1~200） |
@@ -338,7 +339,7 @@ final_project/
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
 | 34 | GET | `/api/advices` | 成員3 | 登入 | 建議清單。`scope`、`period` |
-| 35 | POST | `/api/advices/generate` | 成員3 ★ | master | 重新產生。**後端先算好數字再餵給模型** |
+| 35 | POST | `/api/advices/generate` | 成員3 ★ | 家長 | 重新產生。**後端先算好數字再餵給模型** |
 
 **產生流程（順序不能顛倒）**
 
@@ -556,7 +557,7 @@ DELETE  /api/guardianships/{gid}
 
 第 5 週要走過的清單：
 
-1. 四個角色各走一遍：master / parent / member / 未成年
+1. 三個層級各走一遍：平台 master / 家長 parent / 子女 child
 2. **權限的反向測試** —— 成員去打家庭總覽要被擋，這比正向測試重要
 3. 段落記帳的邊界：缺欄位、低信心、切分錯誤、空輸入、超長輸入
 4. 金額邊界：0、負數、小數、很大的數字

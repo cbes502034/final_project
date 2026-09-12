@@ -50,8 +50,8 @@
       <div class="hero__eyebrow">四人 × 一個月 · 期末專題</div>
       <h1>家庭記帳與財務控管系統</h1>
       <p class="hero__lead">
-        以家庭為單位的記帳系統：每個人有自己的帳本，父母看得到未成年子女的消費，
-        一個 master 帳號做集中管理。LLM 的位置不在「產生建議」，而在
+        以家庭為單位的記帳系統：每個人有自己的帳本，監管關係決定誰看得到誰，
+        家長負責家庭治理。LLM 的位置不在「產生建議」，而在
         <b>把一段話拆成好幾筆帳</b>——那是這個系統最容易被放棄的環節，也是規則寫不完的地方。
       </p>
       <div class="hero__meta">
@@ -136,7 +136,7 @@
           <h4 class="sub2" style="margin-top:0">系統要做到的四件事</h4>
           <ul class="mvc__l">
             <li>每個人有自己的帳本，資料互不混雜</li>
-            <li>子女的消費同步給監管者，由 master 集中管理</li>
+            <li>子女的消費同步給監管者——依監管關係，不依頭銜</li>
             <li>月、年兩個時間準據做統整</li>
             <li>LLM 抓出收支狀況，產生財務控管建議</li>
           </ul>
@@ -232,7 +232,7 @@
         <div class="note__k">測試不能留到第 5 週</div>
         <p>不到一週的測試週只夠「全系統走一遍 + 修小 bug」。
         真正的測試要<b>邊做邊測</b>：每支路由寫完當下就用 <code>/docs</code> 試打，不要累積。<br>
-        第 5 週要走過的清單：四個角色各走一遍：master / parent / member / 未成年、權限的<b>反向測試</b> —— 成員去打家庭總覽要被擋，這比正向測試重要、段落記帳的邊界：缺欄位、低信心、切分錯誤、空輸入、超長輸入、金額邊界：0、負數、小數、很大的數字、年度統計的「未完整」標示有沒有出現、帳號不存在與密碼錯誤，回的訊息要一樣、批次寫入寫到一半失敗，要全部不寫（不可以留下半筆）</p>
+        第 5 週要走過的清單：三個層級各走一遍：平台 master / 家長 parent / 子女 child、權限的<b>反向測試</b> —— 成員去打家庭總覽要被擋，這比正向測試重要、段落記帳的邊界：缺欄位、低信心、切分錯誤、空輸入、超長輸入、金額邊界：0、負數、小數、很大的數字、年度統計的「未完整」標示有沒有出現、帳號不存在與密碼錯誤，回的訊息要一樣、批次寫入寫到一半失敗，要全部不寫（不可以留下半筆）</p>
       </div>
 
       <div class="note note--warn">
@@ -287,11 +287,11 @@
         <table>
           <thead><tr><th class="num">#</th><th>功能</th><th>說明</th><th class="tight">優先</th></tr></thead>
           <tbody>
-            <tr><td class="num">B1</td><td>建立家庭</td><td>建立者自動成為 <b>master</b></td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B1</td><td>建立家庭</td><td>建立者記在 <code>created_by</code>，不給額外權限</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B2</td><td>邀請成員</td><td>產生邀請碼，對方輸入後加入</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B3</td><td>角色指派</td><td>master / parent / member 三種</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B4</td><td>移除成員</td><td>只有 master 可以。資料保留，標記 removed</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B5</td><td>建立監管關係</td><td>指定「誰看得到誰」，只有 master 可設</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B3</td><td>角色指派</td><td>parent / child 兩種</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B4</td><td>移除成員</td><td>只有家長可以。資料保留，標記 removed</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B5</td><td>建立監管關係</td><td>指定「誰看得到誰」，只有家長可設</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B6</td><td>解除監管</td><td>設 <code>ended_at</code> 而非刪除，稽核要看得到歷史</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B7</td><td>查看「誰看得到我」</td><td><b>被監管者強制可見，不可隱藏</b></td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B8</td><td>稽核紀錄</td><td>誰看了誰的資料、誰改了權限</td><td><span class="tag tag--s">S</span></td></tr>
@@ -299,39 +299,64 @@
         </table>
       </div>
 
-      <h4 class="sub2">權限矩陣</h4>
+      <h4 class="sub2">權限矩陣（家庭內）</h4>
+      <p class="p" style="margin-bottom:12px">
+        只有兩層。<b>角色決定「能做什麼治理動作」，不決定「能看到誰」</b>——
+        可見範圍一律只看監管關係。所以下面好幾列兩欄一模一樣，那正是重點。
+      </p>
       <div class="tw">
         <table>
-          <thead><tr><th>動作</th><th class="tight">master 管理者</th><th class="tight">parent 家長</th><th class="tight">member 成員</th></tr></thead>
+          <thead><tr><th>動作</th><th class="tight">parent 家長</th><th class="tight">child 子女</th></tr></thead>
           <tbody>
-            <tr><td>記錄自己的收支</td><td>✓</td><td>✓</td><td>✓</td></tr>
-            <tr><td>查看自己的統計</td><td>✓</td><td>✓</td><td>✓</td></tr>
-            <tr><td>設定自己的預算</td><td>✓</td><td>✓</td><td>需管理者核准</td></tr>
-            <tr><td>設定每月存款目標</td><td>✓</td><td>✓</td><td>未成年由管理者代設</td></tr>
-            <tr><td>查看被監管者的明細</td><td>Y（被指派的）</td><td>Y（被指派的）</td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td><b>查看沒有指派給自己的人</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td><b>修改／刪除被監管者的紀錄</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td><b>登入被監管者的帳號</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td>收到被監管者新增紀錄的通知</td><td>Y（被指派的）</td><td>Y（被指派的）</td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td>查看家庭總覽</td><td>✓</td><td>僅摘要</td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td>設定家庭預算</td><td>✓</td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td>邀請／移除成員</td><td>✓</td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td>建立監管關係</td><td>✓</td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td>建立群組（帳本）</td><td>✓</td><td>✓</td><td>✓</td></tr>
-            <tr><td>管理自己建的群組</td><td>✓</td><td>✓</td><td>✓</td></tr>
-            <tr><td><b>管理別人建的群組</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
-            <tr><td>設定自己的階段性提醒</td><td>✓</td><td>✓</td><td>✓</td></tr>
-            <tr><td>查看「誰看得到我」</td><td>✓</td><td>✓</td><td>Y（強制可見）</td></tr>
-            <tr><td>匯出資料</td><td>Y（限可見範圍）</td><td>Y（限可見範圍）</td><td>Y（只有自己）</td></tr>
+            <tr><td>記錄自己的收支</td><td>✓</td><td>✓</td></tr>
+            <tr><td>查看自己的統計</td><td>✓</td><td>✓</td></tr>
+            <tr><td>設定自己的預算</td><td>✓</td><td>✓</td></tr>
+            <tr><td>設定每月存款目標</td><td>✓</td><td>Y（監管者可代設）</td></tr>
+            <tr><td>查看被監管者的明細</td><td>Y（被指派的）</td><td>Y（被指派的）</td></tr>
+            <tr><td><b>查看沒有指派給自己的人</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td><b>修改／刪除被監管者的紀錄</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td><b>登入被監管者的帳號</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>收到被監管者新增紀錄的通知</td><td>Y（被指派的）</td><td>Y（被指派的）</td></tr>
+            <tr><td>查看家庭總覽</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>設定家庭預算</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>邀請／移除成員</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>建立監管關係</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>建立群組（帳本）</td><td>✓</td><td>✓</td></tr>
+            <tr><td>管理自己建的群組</td><td>✓</td><td>✓</td></tr>
+            <tr><td><b>管理別人建的群組</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>設定自己的階段性提醒</td><td>✓</td><td>✓</td></tr>
+            <tr><td>查看「誰看得到我」</td><td>Y（強制可見）</td><td>Y（強制可見）</td></tr>
+            <tr><td>匯出資料</td><td>Y（限可見範圍）</td><td>Y（限可見範圍）</td></tr>
           </tbody>
         </table>
       </div>
+
+      <h4 class="sub2">平台管理員（master）</h4>
+      <p class="p" style="margin-bottom:12px">
+        系統層級，<b>不屬於任何家庭</b>。能停權，但讀不到任何一筆帳——
+        停權是關門，不是配鑰匙。
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>動作</th><th class="tight">master 平台管理員</th></tr></thead>
+          <tbody>
+            <tr><td>停權違規帳號</td><td>✓</td></tr>
+            <tr><td>解除停權</td><td>✓</td></tr>
+            <tr><td>查看稽核紀錄</td><td>✓</td></tr>
+            <tr><td><b>查看任何人的收支明細</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td><b>修改任何人的資料</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td><b>登入他人帳號</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td><b>加入或干預任何家庭</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="note">
         <div class="note__k">監管必須雙向可見</div>
         <p>系統不提供「隱藏監管」的選項。<b>偷偷監看家人的消費會破壞信任</b>，
         而信任正是家庭記帳能持續下去的前提。</p>
-        <p style="margin-top:8px"><b>可見範圍來自監管關係，不是頭銜。</b>管理者是家裡權限最高的人，但他能看誰的明細，一樣要看 <code>guardianships</code> 這張表——<b>沒有被指派監管誰，就只看得到自己</b>。<br>這條界線讓「誰看得到我」永遠是一個可以查、可以列出來的清單，而不是一句「管理者本來就看得到」。</p>
-        <p style="margin-top:8px"><b>而且監管是唯讀的。</b>管理者看得到子女的記帳明細，但<b>不能改、不能刪，更不能登入對方的帳號</b>。<br>        這條界線讓監管站得住腳：被監管的人知道自己的紀錄<b>不會被動手腳</b>。能登入對方帳號的話，這份信任就沒了。</p>
+        <p style="margin-top:8px"><b>可見範圍來自監管關係，不是頭銜。</b>家長能做家庭治理，但他能看誰的明細，一樣要看 <code>guardianships</code> 這張表——<b>沒有被指派監管誰，就只看得到自己</b>。<br>這條界線讓「誰看得到我」永遠是一個可以查、可以列出來的清單，而不是一句「家長本來就看得到」。</p>
+        <p style="margin-top:8px"><b>而且監管是唯讀的。</b>監管者看得到對方的記帳明細，但<b>不能改、不能刪，更不能登入對方的帳號</b>。<br>        這條界線讓監管站得住腳：被監管的人知道自己的紀錄<b>不會被動手腳</b>。能登入對方帳號的話，這份信任就沒了。</p>
       </div>
 
       <h3 class="sub">C · 記帳（核心）</h3>
@@ -403,7 +428,7 @@
             <tr><td class="num">E1</td><td>月度建議</td><td>結算後產生，個人 + 家庭兩個層級</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">E2</td><td><b>附依據</b></td><td>每條建議都要列出可驗算的數字</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">E3</td><td>分級</td><td>良好 / 參考 / 需注意</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">E4</td><td>未成年建議同步</td><td>同時送給監管者</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">E4</td><td>受監管者建議同步</td><td>同時送給監管者</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">E5</td><td>年度建議</td><td>年結分析</td><td><span class="tag tag--s">S</span></td></tr>
           </tbody>
         </table>
@@ -418,7 +443,7 @@
             <tr><td><b>每條建議都要附依據</b></td><td>使用者要能自己驗算，不能是黑盒子</td></tr>
             <tr><td>不提供投資／保險／稅務建議</td><td>這些是受規範的專業意見，超出系統範圍</td></tr>
             <tr><td>不對個人做價值判斷</td><td>只描述數字與趨勢，不說「你太浪費」</td></tr>
-            <tr><td>未成年建議同時送監管者</td><td>監管是設計目的，但必須雙方都看得到</td></tr>
+            <tr><td>受監管者的建議同時送監管者</td><td>監管是設計目的，但必須雙方都看得到</td></tr>
           </tbody>
         </table>
       </div>
@@ -513,7 +538,7 @@
     <section class="sec" id="api">
       <div class="sec__h"><span class="sec__n">05</span><h2>API 目錄：按人員分類</h2></div>
       <p class="sec__lead">
-        共 <b>55 支路由</b>。權限標示：公開 / 登入 / master / 監管者。
+        共 <b>55 支路由</b>。權限標示：公開 / 登入 / 家長 / 監管者 / 平台。
         <span class="tag tag--llm">★</span> 代表與 LLM 直接相關。
       </p>
 
@@ -598,15 +623,15 @@
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
           <tbody>
             <tr><td class="num">21</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約</td></tr>
-            <tr><td class="num">22</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">master</td><td>新增家庭自訂分類</td></tr>
+            <tr><td class="num">22</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">家長</td><td>新增家庭自訂分類</td></tr>
             <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/summary</td><td class="tight">登入</td><td>摘要。<code>scope=me|family</code>、<code>period=2026-09</code></td></tr>
             <tr><td class="num">24</td><td class="tight">GET</td><td class="rt">/api/stats</td><td class="tight">登入</td><td>統計。<code>periodType=month|year</code>。當年度要標「未完整」</td></tr>
             <tr><td class="num">25</td><td class="tight">GET</td><td class="rt">/api/budgets</td><td class="tight">登入</td><td>預算與使用率</td></tr>
-            <tr><td class="num">26</td><td class="tight">PUT</td><td class="rt">/api/budgets</td><td class="tight">本人或 master</td><td>設定預算</td></tr>
+            <tr><td class="num">26</td><td class="tight">PUT</td><td class="rt">/api/budgets</td><td class="tight">本人</td><td>設定預算</td></tr>
             <tr><td class="num">27</td><td class="tight">GET</td><td class="rt">/api/savings-goal</td><td class="tight">登入</td><td><b>每月存款目標與達成狀態</b></td></tr>
-            <tr><td class="num">28</td><td class="tight">PUT</td><td class="rt">/api/savings-goal</td><td class="tight">本人；未成年由 master</td><td><b>設定每月存款目標</b>（註冊時也走這支）</td></tr>
+            <tr><td class="num">28</td><td class="tight">PUT</td><td class="rt">/api/savings-goal</td><td class="tight">本人或監管者</td><td><b>設定每月存款目標</b>（註冊時也走這支）</td></tr>
             <tr><td class="num">34</td><td class="tight">GET</td><td class="rt">/api/advices</td><td class="tight">登入</td><td>建議清單。每條都帶 <code>basis_json</code> 讓使用者驗算</td></tr>
-            <tr><td class="num">35</td><td class="tight">POST</td><td class="rt">/api/advices/generate <span class="tag tag--llm">★</span></td><td class="tight">master</td><td>重新產生。<b>後端先算好數字再餵給模型</b></td></tr>
+            <tr><td class="num">35</td><td class="tight">POST</td><td class="rt">/api/advices/generate <span class="tag tag--llm">★</span></td><td class="tight">家長</td><td>重新產生。<b>後端先算好數字再餵給模型</b></td></tr>
             <tr><td class="num">29</td><td class="tight">GET</td><td class="rt">/api/savings-goals</td><td class="tight">登入</td><td>我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的</td></tr>
             <tr><td class="num">30</td><td class="tight">GET</td><td class="rt">/api/alerts</td><td class="tight">登入</td><td>我設定的階段性提醒門檻</td></tr>
             <tr><td class="num">31</td><td class="tight">POST</td><td class="rt">/api/alerts</td><td class="tight">本人</td><td>新增一個門檻（百分比 1~200）</td></tr>
@@ -623,13 +648,13 @@
           <tbody>
             <tr><td class="num">36</td><td class="tight">GET</td><td class="rt">/api/family</td><td class="tight">登入</td><td>家庭資訊、成員清單、角色</td></tr>
             <tr><td class="num">37</td><td class="tight">POST</td><td class="rt">/api/family</td><td class="tight">登入</td><td>建立家庭，建立者成為 master</td></tr>
-            <tr><td class="num">38</td><td class="tight">POST</td><td class="rt">/api/family/invite</td><td class="tight">master</td><td>產生邀請碼</td></tr>
+            <tr><td class="num">38</td><td class="tight">POST</td><td class="rt">/api/family/invite</td><td class="tight">家長</td><td>產生邀請碼</td></tr>
             <tr><td class="num">39</td><td class="tight">POST</td><td class="rt">/api/family/join</td><td class="tight">登入</td><td>用邀請碼加入家庭</td></tr>
-            <tr><td class="num">40</td><td class="tight">PATCH</td><td class="rt">/api/family/members/{userId}</td><td class="tight">master</td><td>修改成員角色</td></tr>
-            <tr><td class="num">41</td><td class="tight">DELETE</td><td class="rt">/api/family/members/{userId}</td><td class="tight">master</td><td>移除成員（標記 removed，不刪資料）</td></tr>
+            <tr><td class="num">40</td><td class="tight">PATCH</td><td class="rt">/api/family/members/{userId}</td><td class="tight">家長</td><td>修改成員角色</td></tr>
+            <tr><td class="num">41</td><td class="tight">DELETE</td><td class="rt">/api/family/members/{userId}</td><td class="tight">家長</td><td>移除成員（標記 removed，不刪資料）</td></tr>
             <tr><td class="num">42</td><td class="tight">GET</td><td class="rt">/api/guardianships</td><td class="tight">登入</td><td>監管關係。<b>被監管者也看得到</b></td></tr>
-            <tr><td class="num">43</td><td class="tight">POST</td><td class="rt">/api/guardianships</td><td class="tight">master</td><td>建立監管關係</td></tr>
-            <tr><td class="num">44</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{id}</td><td class="tight">master</td><td>解除監管（設 <code>ended_at</code>，不刪除）</td></tr>
+            <tr><td class="num">43</td><td class="tight">POST</td><td class="rt">/api/guardianships</td><td class="tight">家長</td><td>建立監管關係</td></tr>
+            <tr><td class="num">44</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{id}</td><td class="tight">家長</td><td>解除監管（設 <code>ended_at</code>，不刪除）</td></tr>
             <tr><td class="num">45</td><td class="tight">GET</td><td class="rt">/api/notifications</td><td class="tight">登入</td><td>通知清單。帶 <code>since</code> 只拿新的</td></tr>
             <tr><td class="num">46</td><td class="tight">PATCH</td><td class="rt">/api/notifications/{nid}</td><td class="tight">本人</td><td>把一則標記成已讀</td></tr>
             <tr><td class="num">47</td><td class="tight">PATCH</td><td class="rt">/api/notifications</td><td class="tight">本人</td><td>整批標記已讀</td></tr>

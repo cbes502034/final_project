@@ -148,7 +148,7 @@ td .fname { font-family: var(--mono); font-size: 12px; color: var(--up); }
             </tr>
             <tr>
               <td><b>擋不住作弊</b></td>
-              <td>前端的程式碼使用者全都看得到、也改得動。「只有管理者能刪除」這種規則寫在前端等於沒寫——<b>權限檢查一定要在後端做</b>。</td>
+              <td>前端的程式碼使用者全都看得到、也改得動。「只有家長能刪除」這種規則寫在前端等於沒寫——<b>權限檢查一定要在後端做</b>。</td>
             </tr>
           </tbody>
         </table>
@@ -505,21 +505,21 @@ page: int = Query(<span class="tk-nm">1</span>, <b class="hi">ge=<span class="tk
       </p>
 
       <h3 class="sub">依賴可以疊起來</h3>
-      <pre class="py"><span class="tk-kw">def</span> <span class="tk-fn">require_master</span>(<b class="hi">me = Depends(get_current_user)</b>):
+      <pre class="py"><span class="tk-kw">def</span> <span class="tk-fn">require_parent</span>(<b class="hi">me = Depends(get_current_user)</b>):
     <span class="tk-cm"># 這個依賴自己也用了另一個依賴</span>
-    <span class="tk-kw">if</span> me.role != <span class="tk-st">"master"</span>:
-        <span class="tk-kw">raise</span> HTTPException(<span class="tk-nm">403</span>, <span class="tk-st">"只有管理者可以"</span>)
+    <span class="tk-kw">if</span> me.role != <span class="tk-st">"parent"</span>:
+        <span class="tk-kw">raise</span> HTTPException(<span class="tk-nm">403</span>, <span class="tk-st">"只有家長可以"</span>)
     <span class="tk-kw">return</span> me
 
 <span class="tk-dc">@router.post</span>(<span class="tk-st">"/family/invite"</span>)
-<span class="tk-kw">def</span> <span class="tk-fn">invite</span>(me = Depends(require_master)):
-    <span class="tk-cm"># 「要登入」和「要是管理者」兩層檢查都做完了</span>
+<span class="tk-kw">def</span> <span class="tk-fn">invite</span>(me = Depends(require_parent)):
+    <span class="tk-cm"># 「要登入」和「要是家長」兩層檢查都做完了</span>
     ...</pre>
 
       <div class="note">
         <div class="note__k">這在我們專案的哪裡</div>
         <p><code class="fname">backend/app/core/deps.py</code> ——
-        <code>get_current_user</code> 和 <code>require_master</code> 都在這個檔案。
+        <code>get_current_user</code> 和 <code>require_parent</code> 都在這個檔案。
         你寫路由時只要 import 進來用就好，<b>不用理解裡面怎麼實作的</b>。</p>
       </div>
     </section>

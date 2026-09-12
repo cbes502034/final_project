@@ -22,12 +22,12 @@
 
    家庭與權限
    GET    /api/family                 家庭資訊與成員清單
-   POST   /api/family/invite          產生邀請碼（master）
-   PATCH  /api/family/members/{id}    改角色（master）
-   DELETE /api/family/members/{id}    移除成員（master）
+   POST   /api/family/invite          產生邀請碼（家長）
+   PATCH  /api/family/members/{id}    改角色（家長）
+   DELETE /api/family/members/{id}    移除成員（家長）
    GET    /api/guardianships          監管關係（雙方都看得到）
-   POST   /api/guardianships          建立監管（master）
-   DELETE /api/guardianships/{id}     解除監管（master）
+   POST   /api/guardianships          建立監管（家長）
+   DELETE /api/guardianships/{id}     解除監管（家長）
 
    記帳
    GET    /api/transactions           明細（可帶 user / from / to / cat / kind / q）
@@ -193,15 +193,17 @@
   }
   /* 我看得到誰的資料：自己 ＋ 我監管的人。就這樣。
      ------------------------------------------------------------
-     ⚠️ 角色不給可見範圍。master 也一樣——沒有被指派監管誰，
+     ⚠️ 角色不給可見範圍。家長也一樣——沒有被指派監管誰，
         就只看得到自己。可見範圍來自 guardianships 這張表，不是頭銜。
 
      ⚠️ 被監管的人看不到任何別人，包含監管他的人。
         監管是單向的：你看得到我，不代表我看得到你。
 
-     （原本 master 是看全家的。改掉是因為「家裡最高權限」和
+     （早期版本讓家裡權限最高的人直接看全家。改掉是因為「家裡的階級」和
        「可以看某個人的消費明細」是兩件事——後者要有明確的監管關係，
-       這樣被監管的人才知道自己被誰看著。） */
+       這樣被監管的人才知道自己被誰看著。
+
+       平台管理員更是完全看不到：他能停權，但讀不到任何一筆帳。） */
   /* 我看得到哪幾本帳：我有加入的群組。
      ⚠️ 這是跟 visibleUsers 完全獨立的第二道篩選，**兩道都要過**。
      只做一道會漏：我監管的小孩在一個我沒加入的群組記帳，
@@ -1039,12 +1041,12 @@
         var m = D.members.filter(function (x) { return x.id === userId; })[0];
         if (!m) throw new Error('not found: ' + userId);
 
-        /* 誰能設誰的目標：本人；未成年者可由 master 代設。
-           家長看得到子女的數字，但不能替成年子女決定要存多少。 */
-        var me = memberOf(st.me) || {};
+        /* 誰能設誰的目標：本人，或監管他的人。
+           ⚠️ 不看年齡、也不看角色。系統只提供功能，要不要建立監管關係
+              是那一家自己的事——我們不替任何家庭決定幾歲該被管。 */
         var mine = userId === st.me;
-        var proxy = me.role === 'master' && m.age !== null && m.age < 18;
-        if (!mine && !proxy) throw new Error('只能設定自己的存款目標');
+        var proxy = wardsOf(st.me).indexOf(userId) >= 0;
+        if (!mine && !proxy) throw new Error('只能設定自己、或你監管對象的存款目標');
         if (groupId && !mine) throw new Error('群組目標只能設自己的');
 
         var v = Number(goal);

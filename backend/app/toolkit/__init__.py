@@ -24,6 +24,7 @@
     images      大頭貼驗證              validate_avatar / to_data_uri
     alerts      階段性提醒的門檻計算    usage_percent / crossed / should_fire
     scope       可見範圍的兩道篩選      visible_users / visible_groups
+    roles       角色能做哪些治理動作    can_govern / require_govern
 
 ===========================================================================
 怎麼查一個工具怎麼用

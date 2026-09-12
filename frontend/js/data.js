@@ -68,24 +68,27 @@ window.DATA = {
 
   /* ---------- 家庭成員與角色 ---------- */
   roles: [
-    { id: 'master', name: '管理者', desc: '家庭最高權限：管成員、設預算、指派監管關係。看得到誰一樣要看監管關係——沒指派就只看得到自己' },
-    { id: 'parent', name: '家長', desc: '看自己 + 被指派監管的成員' },
-    { id: 'member', name: '成員', desc: '只看自己。被監管時會明確顯示「誰看得到你」' }
+    { id: 'master', name: '平台管理員', layer: '平台',
+      desc: '系統層級，不屬於任何家庭。只能停權與查稽核——看不到任何人的收支明細' },
+    { id: 'parent', name: '家長', layer: '家庭',
+      desc: '家庭治理：邀請成員、設家庭預算、建立監管關係。看得到誰仍然只看監管關係' },
+    { id: 'child', name: '子女', layer: '家庭',
+      desc: '記自己的帳。被監管時，畫面上一定看得到是誰在看' }
   ],
 
   /* savingsGoal 是註冊時就要填的「每月想存多少」。
      可支配上限 = 收入 − 存款目標，支出超過就代表這個月存不到目標。 */
   members: [
-    { id: 'U1', name: '林建國', email: 'jianguo@lin.tw', role: 'master', avatar: '國', age: 52,
+    { id: 'U1', name: '林建國', email: 'jianguo@lin.tw', role: 'parent', avatar: '國', age: 52,
       joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000,
       savingsGoal: 20000 },
     { id: 'U2', name: '陳淑芬', email: 'shufen@lin.tw', role: 'parent', avatar: '芬', age: 49,
       joined: '2026-01-05', income: 52000, expense: 38900, budget: 40000,
       savingsGoal: 15000 },
-    { id: 'U3', name: '林宇涵', email: 'yuhan@lin.tw', role: 'member', avatar: '涵', age: 19,
+    { id: 'U3', name: '林宇涵', email: 'yuhan@lin.tw', role: 'child', avatar: '涵', age: 19,
       joined: '2026-02-11', income: 8000, expense: 11450, budget: 10000,
       savingsGoal: 2000 },
-    { id: 'U4', name: '林宇軒', email: 'yuxuan@lin.tw', role: 'member', avatar: '軒', age: 16,
+    { id: 'U4', name: '林宇軒', email: 'yuxuan@lin.tw', role: 'child', avatar: '軒', age: 16,
       joined: '2026-02-11', income: 3000, expense: 4820, budget: 4000,
       savingsGoal: 500 }
   ],
@@ -294,7 +297,7 @@ window.DATA = {
     { rule: '每一條建議都要附「依據」', why: '使用者要能自己驗算，不能是黑盒子結論' },
     { rule: '不提供投資、保險、稅務建議', why: '這些屬於受規範的專業意見，超出本系統範圍' },
     { rule: '不對個人做價值判斷', why: '只描述數字與趨勢，不說「你太浪費」這類評價' },
-    { rule: '未成年成員的建議同時送給監管者', why: '監管是本系統的設計目的，但必須雙方都看得到' }
+    { rule: '受監管者的建議同時送給監管者', why: '監管是本系統的設計目的，但必須雙方都看得到' }
   ],
 
   /* ---------- 自然語言記帳的評測（明樺的工作） ---------- */
@@ -312,7 +315,9 @@ window.DATA = {
     { t: 'users', label: '使用者帳號', note: '登入身分，與家庭角色分開',
       cols: [['id', 'BIGSERIAL', 'PK'], ['email', 'TEXT', 'UNIQUE'],
              ['password_hash', 'TEXT', 'bcrypt / argon2，絕不存明碼'],
-             ['display_name', 'TEXT', ''], ['birth_year', 'INT', '判斷是否未成年'],
+             ['display_name', 'TEXT', ''],
+             ['birth_year', 'INT', '個人資料。⚠️ 不參與任何權限判斷'],
+             ['is_platform_admin', 'BOOLEAN', '平台管理員。與家庭角色無關，且看不到任何財務資料'],
              ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', '']] },
 
     { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊時就要填。改過的值保留歷史，不覆蓋',
@@ -322,7 +327,7 @@ window.DATA = {
              ['goal_amount', 'NUMERIC(14,2)', '每月想存多少'],
              ['warn_ratio', 'NUMERIC', '達可支配上限的幾成時提醒，預設 0.8'],
              ['created_at', 'TIMESTAMPTZ', ''],
-             ['created_by', 'BIGINT', '本人；未成年者可由 master 代設']] },
+             ['created_by', 'BIGINT', '本人，或監管我的人代設']] },
 
     { t: 'sessions', label: '登入工作階段', note: '支援登出與強制下線',
       cols: [['id', 'UUID', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
@@ -333,7 +338,7 @@ window.DATA = {
 
     { t: 'families', label: '家庭', note: '一個家庭一列',
       cols: [['id', 'BIGSERIAL', 'PK'], ['name', 'TEXT', '例如「林家」'],
-             ['master_id', 'BIGINT', 'FK → users，最高權限'],
+             ['created_by', 'BIGINT', 'FK → users，開這個家的人。⚠️ 僅供稽核，不給任何額外權限'],
              ['currency', 'TEXT', "預設 'TWD'"],
              ['invite_code', 'TEXT', '邀請碼，可重新產生'],
              ['created_at', 'TIMESTAMPTZ', '']] },
@@ -341,7 +346,7 @@ window.DATA = {
     { t: 'family_members', label: '家庭成員與角色', note: '一人可屬於多個家庭',
       cols: [['family_id', 'BIGINT', 'PK, FK → families'],
              ['user_id', 'BIGINT', 'PK, FK → users'],
-             ['role', 'TEXT', "'master' / 'parent' / 'member'"],
+             ['role', 'TEXT', "'parent' / 'child'。只決定治理動作，不決定可見度"],
              ['joined_at', 'TIMESTAMPTZ', ''],
              ['status', 'TEXT', "'active' / 'invited' / 'removed'"]] },
 
@@ -350,7 +355,7 @@ window.DATA = {
              ['guardian_id', 'BIGINT', 'FK → users'],
              ['ward_id', 'BIGINT', 'FK → users'],
              ['scope', 'TEXT', "'all' / 'summary_only'"],
-             ['created_by', 'BIGINT', 'FK → users，只有 master 能建立'],
+             ['created_by', 'BIGINT', 'FK → users，只有家長能建立'],
              ['since', 'TIMESTAMPTZ', ''], ['ended_at', 'TIMESTAMPTZ', '']] },
 
     { t: 'accounts', label: '帳戶／錢包', note: '現金、銀行、悠遊卡、信用卡',
@@ -484,28 +489,48 @@ window.DATA = {
     ['audit_logs', 'users', 'N:1', '']
   ],
 
-  /* ---------- 權限矩陣 ---------- */
+  /* ---------- 權限矩陣（家庭內） ----------
+     只有兩層：家長、子女。
+
+     ⚠️ 角色決定的是「能做什麼治理動作」，不是「能看到誰」。
+     可見度一律只看監管關係——所以下面有好幾列兩欄一模一樣，
+     那正是重點：那些事情跟你在家裡的階級無關。 */
   permissions: [
-    { action: '記錄自己的收支', master: 'Y', parent: 'Y', member: 'Y' },
-    { action: '查看自己的統計', master: 'Y', parent: 'Y', member: 'Y' },
-    { action: '設定自己的預算', master: 'Y', parent: 'Y', member: '需管理者核准' },
-    { action: '設定每月存款目標', master: 'Y', parent: 'Y', member: '未成年由管理者代設' },
-    { action: '查看被監管者的明細', master: 'Y（被指派的）', parent: 'Y（被指派的）', member: 'N' },
-    { action: '查看沒有指派給自己的人', master: 'N', parent: 'N', member: 'N' },
-    { action: '修改／刪除被監管者的紀錄', master: 'N', parent: 'N', member: 'N' },
-    { action: '登入被監管者的帳號', master: 'N', parent: 'N', member: 'N' },
-    { action: '收到被監管者新增紀錄的通知', master: 'Y（被指派的）', parent: 'Y（被指派的）', member: 'N' },
-    { action: '查看家庭總覽', master: 'Y', parent: '僅摘要', member: 'N' },
-    { action: '設定家庭預算', master: 'Y', parent: 'N', member: 'N' },
-    { action: '邀請／移除成員', master: 'Y', parent: 'N', member: 'N' },
-    { action: '建立監管關係', master: 'Y', parent: 'N', member: 'N' },
+    { action: '記錄自己的收支', parent: 'Y', child: 'Y' },
+    { action: '查看自己的統計', parent: 'Y', child: 'Y' },
+    { action: '設定自己的預算', parent: 'Y', child: 'Y' },
+    { action: '設定每月存款目標', parent: 'Y', child: 'Y（監管者可代設）' },
+    { action: '查看被監管者的明細', parent: 'Y（被指派的）', child: 'Y（被指派的）' },
+    { action: '查看沒有指派給自己的人', parent: 'N', child: 'N' },
+    { action: '修改／刪除被監管者的紀錄', parent: 'N', child: 'N' },
+    { action: '登入被監管者的帳號', parent: 'N', child: 'N' },
+    { action: '收到被監管者新增紀錄的通知', parent: 'Y（被指派的）', child: 'Y（被指派的）' },
+    { action: '查看家庭總覽', parent: 'Y', child: 'N' },
+    { action: '設定家庭預算', parent: 'Y', child: 'N' },
+    { action: '邀請／移除成員', parent: 'Y', child: 'N' },
+    { action: '建立監管關係', parent: 'Y', child: 'N' },
     /* 群組不看角色：誰都可以開自己的帳本。
        ⚠️ 這是刻意的——記帳的分類方式是個人的事，不該由家裡的階級決定。 */
-    { action: '建立群組（帳本）', master: 'Y', parent: 'Y', member: 'Y' },
-    { action: '管理自己建的群組', master: 'Y', parent: 'Y', member: 'Y' },
-    { action: '管理別人建的群組', master: 'N', parent: 'N', member: 'N' },
-    { action: '設定自己的階段性提醒', master: 'Y', parent: 'Y', member: 'Y' },
-    { action: '查看「誰看得到我」', master: 'Y', parent: 'Y', member: 'Y（強制可見）' },
-    { action: '匯出資料', master: 'Y（限可見範圍）', parent: 'Y（限可見範圍）', member: 'Y（只有自己）' }
+    { action: '建立群組（帳本）', parent: 'Y', child: 'Y' },
+    { action: '管理自己建的群組', parent: 'Y', child: 'Y' },
+    { action: '管理別人建的群組', parent: 'N', child: 'N' },
+    { action: '設定自己的階段性提醒', parent: 'Y', child: 'Y' },
+    { action: '查看「誰看得到我」', parent: 'Y（強制可見）', child: 'Y（強制可見）' },
+    { action: '匯出資料', parent: 'Y（限可見範圍）', child: 'Y（限可見範圍）' }
+  ],
+
+  /* ---------- 平台管理員能做什麼 ----------
+     ⚠️ 全部不碰任何人的財務資料。
+
+     停權是關門，不是配鑰匙——這跟「管理人員不可以進入子女的帳號」
+     是同一條原則。一個能讀全系統消費明細的帳號，比家長越權嚴重得多。 */
+  platformPermissions: [
+    { action: '停權違規帳號', master: 'Y' },
+    { action: '解除停權', master: 'Y' },
+    { action: '查看稽核紀錄', master: 'Y' },
+    { action: '查看任何人的收支明細', master: 'N' },
+    { action: '修改任何人的資料', master: 'N' },
+    { action: '登入他人帳號', master: 'N' },
+    { action: '加入或干預任何家庭', master: 'N' }
   ]
 };

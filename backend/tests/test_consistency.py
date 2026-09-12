@@ -412,7 +412,8 @@ def test_權限矩陣要跟_data_js_一致():
     assert not missing, "手冊的權限矩陣少了：" + "、".join(missing)
 
     # 建立群組不分角色，這是刻意的設計，不可以被悄悄改掉
-    assert "{ action: '建立群組（帳本）', master: 'Y', parent: 'Y', member: 'Y' }" in data,         "建立群組應該三個角色都可以——記帳的分類方式不該由家裡的階級決定"
+    assert "{ action: '建立群組（帳本）', parent: 'Y', child: 'Y' }" in data, \
+        "建立群組應該兩種角色都可以——記帳的分類方式不該由家裡的階級決定"
 
 
 def test_每一條建立紀錄的路徑都要帶群組():
@@ -583,3 +584,66 @@ def test_前端沒有呼叫不存在的函式():
             problems.append("%s:%d 呼叫了沒有宣告的 %s()" % (path, line, mo.group(1)))
 
     assert not problems, "\n".join(problems)
+
+
+def test_家庭角色只有兩層():
+    """master 不是家庭角色。
+
+    早期版本把「家裡權限最高的人」也叫 master，於是一個家庭有三種角色。
+    但 master 現在是**平台管理員**——系統層級，不屬於任何家庭。
+    混在一起的話，任何一個家長都會變成能停權別人家使用者的人。
+    """
+    data = read("frontend/js/data.js")
+
+    roles = re.findall(r"\{ id: '(\w+)', name: '([^']+)', layer: '([^']+)'", data)
+    assert roles, "data.js 裡找不到 roles"
+    layers = {r[0]: r[2] for r in roles}
+    assert layers.get("master") == "平台", "master 必須是平台層級"
+    assert layers.get("parent") == "家庭"
+    assert layers.get("child") == "家庭"
+
+    # 沒有人的 role 還掛著 master
+    assert "role: 'master'" not in data, \
+        "還有成員掛著 role: 'master'——master 不是家庭角色"
+    assert "role: 'member'" not in data, \
+        "member 已經改名為 child，還有地方沒改"
+
+
+def test_平台管理員不可以讀任何人的財務資料():
+    """停權是關門，不是配鑰匙。
+
+    這跟「管理人員不可以進入子女的帳號」是同一條原則。
+    一個能讀全系統消費明細的帳號，比家長越權嚴重得多——
+    家長至少還在 guardianships 表上留下痕跡、被監管的人看得到；
+    平台管理員如果能看，那是一個沒有人看得見的視角。
+    """
+    data = read("frontend/js/data.js")
+    must_be_no = [
+        "查看任何人的收支明細",
+        "修改任何人的資料",
+        "登入他人帳號",
+    ]
+    for action in must_be_no:
+        assert "{ action: '%s', master: 'N' }" % action in data, \
+            "平台權限表裡「%s」必須是 N" % action
+
+    # 後端工具也要擋
+    roles_py = read("backend/app/toolkit/roles.py")
+    mo = re.search(r"PLATFORM_ACTIONS[^=]*=\s*frozenset\(\s*\{([^}]*)\}", roles_py)
+    assert mo, "roles.py 裡找不到 PLATFORM_ACTIONS"
+    allowed = mo.group(1)
+    for bad in ("transaction", "ledger", "read_user", "impersonate"):
+        assert bad not in allowed, \
+            "PLATFORM_ACTIONS 混進了會碰到財務資料的動作：" + bad
+
+
+def test_年齡不可以參與任何權限判斷():
+    """系統只提供功能，幾歲該被管是那一家自己的事。
+
+    一旦寫了 `if age < 18`，系統就開始替別人的家庭做價值判斷了。
+    而且年齡是會變的——用它當權限依據，權限就會在某個生日當天自己改變。
+    """
+    for path in ("frontend/js/api.js", "frontend/js/app.js"):
+        src = read(path)
+        for bad in ("age < 18", "age >= 18", "age<18", "未成年"):
+            assert bad not in src, "%s 還在用年齡判斷權限：%s" % (path, bad)
