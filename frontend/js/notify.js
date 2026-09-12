@@ -162,6 +162,21 @@
   }
 
   function line(n) {
+    /* 兩種通知：子女記帳、支出跨過門檻。
+       ⚠️ 型別要用 type 判斷，不要靠「有沒有 actorName」猜——
+       之後多一種通知，猜的那套就會壞。 */
+    if (n.type === 'budget_alert') {
+      /* percent 是「你設的門檻」，reached 是「實際用掉幾成」。
+         ⚠️ 兩個一起顯示時要講清楚誰是誰——
+         只寫門檻再附上金額，讀起來會像「12,800 是 5,000 的 90%」。 */
+      var hit = n.reached != null ? n.reached : n.percent;
+      return esc(n.groupName || '整體') + ' 已用掉可支配額度的 <b>' + esc(hit) + '%</b>' +
+        '（超過你設的 ' + esc(n.percent) + '%）' +
+        (n.spent != null
+          ? '<br><span class="bell__n2">' + money(n.spent) + ' / 可支配 ' +
+            money(n.allowance) + '</span>'
+          : '');
+    }
     var who = esc(n.actorName || '家人');
     var what = esc(n.catName || '一筆');
     var where = n.merchant ? '（' + esc(n.merchant) + '）' : '';
@@ -170,9 +185,10 @@
 
   function toastNew(n, count) {
     if (!global.toast) return;
-    global.toast(count > 1
-      ? line(n) + '　等 ' + count + ' 筆新紀錄'
-      : line(n), 'ok');
+    // toast 會把訊息 esc 過，所以這裡要把 line() 的標籤去掉，
+    // 不然畫面上會出現 <b> 這種字樣
+    var txt = line(n).replace(/<br>/g, '　').replace(/<[^>]+>/g, '');
+    global.toast(count > 1 ? txt + '　等 ' + count + ' 筆新紀錄' : txt, 'ok');
   }
 
   function render() {
@@ -215,7 +231,8 @@
           '<span class="bell__dot"></span>' +
           '<span class="bell__m">' +
             '<span class="bell__l">' + line(n) + '</span>' +
-            '<span class="bell__s">' + ago(n.createdAt) + '　·　唯讀檢視</span>' +
+            '<span class="bell__s">' + ago(n.createdAt) + '　·　' +
+              (n.type === 'budget_alert' ? '階段性提醒' : '唯讀檢視') + '</span>' +
           '</span></button>';
       }).join('') + '</div>';
     }
@@ -269,7 +286,10 @@
       render();
       /* 跳到那個人的記帳表單，並把這一筆標起來。
          只跳到家庭總覽的話，使用者還要自己在一堆紀錄裡找是哪一筆。 */
-      if (n && n.actorId) {
+      if (n && n.type === 'budget_alert') {
+        // 提醒點下去看自己的總覽，不是別人的紀錄
+        location.hash = '#/';
+      } else if (n && n.actorId) {
         location.hash = '#/member/' + n.actorId + (n.txId ? '/' + n.txId : '');
       }
       return;

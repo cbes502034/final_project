@@ -24,6 +24,17 @@
 
   var ME = null;
   var F = { userId: 'all', kind: 'all', source: 'all', q: '' };
+
+  /* 目前在看哪一本帳。'all' = 全部（我看得到的所有群組合起來）。
+     存在 localStorage，重新整理不會跳回去。 */
+  var GKEY = 'fambudget.group';
+  var GROUP = (function () {
+    try { return localStorage.getItem(GKEY) || 'all'; } catch (e) { return 'all'; }
+  })();
+  function setGroup(id) {
+    GROUP = id || 'all';
+    try { localStorage.setItem(GKEY, GROUP); } catch (e) {}
+  }
   var STAT = { period: 'month' };
   var draft = null;                       // 自然語言解析後、尚未確認的暫存
 
@@ -115,7 +126,7 @@
     head('我的總覽', '本月收支、預算使用狀況、最近幾筆');
     $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
 
-    Promise.all([API.summary({ scope: 'me' }), API.budgets(), API.me()])
+    Promise.all([API.summary({ scope: 'me', groupId: GROUP }), API.budgets(), API.me()])
       .then(function (r) {
         var d = r[0], b = r[1], m = r[2];
         var h = '<div class="page"><div class="kpis">';
@@ -452,7 +463,7 @@
   function loadTx() {
     var box = document.getElementById('txList');
     if (!box) return;
-    API.transactions(Object.assign({}, F)).then(function (d) {
+    API.transactions(Object.assign({}, F, { groupId: GROUP })).then(function (d) {
       box.innerHTML = d.transactions.length
         ? d.transactions.map(function (t) { return txRow(t); }).join('')
         : emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。');
@@ -465,7 +476,7 @@
   function vFamily() {
     head('家庭總覽', '你自己 ＋ 被指派給你監管的成員');
     $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
-    Promise.all([API.summary({ scope: 'family' }), API.me(), API.budgets()])
+    Promise.all([API.summary({ scope: 'family', groupId: GROUP }), API.me(), API.budgets()])
       .then(function (r) {
         var d = r[0], m = r[1], b = r[2];
         var h = '<div class="page">';
@@ -549,7 +560,7 @@
   function vStats() {
     head('統計', '月與年兩個時間基準');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
-    API.summary({ scope: 'family' }).then(function (d) {
+    API.summary({ scope: 'family', groupId: GROUP }).then(function (d) {
       var h = '<div class="page"><div class="bar"><div class="chips">' +
         [['month', '按月'], ['year', '按年']].map(function (p) {
           return '<button class="chip' + (STAT.period === p[0] ? ' on' : '') +
@@ -809,7 +820,7 @@
             '<br><span class="prof__h">改完立刻生效。他本人看得到這個數字。</span></p>' +
           '</div>' +
           '<span class="goal"><label>每月存款目標</label>' +
-            '<input class="goal__i" type="number" min="0" step="500" ' +
+            '<input class="goal__i" type="number" min="0" ' +
             'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
         '</div>';
       }
@@ -838,6 +849,108 @@
 
   function backLink() {
     return '<a class="back" href="#/members">← 回成員與權限</a>';
+  }
+
+
+  /* ============================================================
+     群組（帳本）
+
+     記帳除了有「分類」，還有「這筆算在哪一本帳上」。
+     分類回答錢花在什麼，群組回答這筆屬於哪一份預算。
+     每一本帳可以各自設一個每月存款目標。
+     ============================================================ */
+  function vGroups() {
+    head('群組', '一個家庭可以開好幾本帳，各自有自己的存款目標');
+    $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
+
+    Promise.all([API.groups(), API.members()]).then(function (r) {
+      var d = r[0], fam = r[1];
+
+      var h = '<div class="page">' +
+        '<p class="hint">每一筆記帳都屬於其中一本帳。' +
+        '右上角的切換器可以只看某一本，統計與存款目標都會跟著那本走。<br>' +
+        '<b>你只看得到自己有加入的帳本</b>——別人的帳本連名字都看不到。</p>';
+
+      h += '<div class="sec"><h2 class="sec__t">我的帳本</h2>' +
+        '<span class="sec__n">' + d.groups.length + ' 本</span></div>';
+
+      h += '<div class="rows">' + d.groups.map(function (g, i) {
+        return '<article class="row" style="animation-delay:' + (i * 50) +
+          'ms;grid-template-columns:44px 1fr 150px 108px">' +
+          '<div class="ava" style="background:' + esc(g.color) + '22;color:' + esc(g.color) +
+            ';border-color:' + esc(g.color) + '55">' + esc(g.icon) + '</div>' +
+          '<div class="row__m"><div class="row__top">' +
+            '<span class="row__act" style="font-size:15px">' + esc(g.name) + '</span>' +
+            (g.canEdit ? '<span class="tag tag--done">你建立的</span>'
+                       : '<span class="tag tag--soft">你是成員</span>') +
+            (g.id === GROUP ? '<span class="tag tag--na">目前在看</span>' : '') +
+          '</div><div class="row__sub">' +
+            esc(g.memberNames.join('、')) +
+            (g.note ? '　｜　' + esc(g.note) : '') +
+          '</div></div>' +
+          '<div class="row__do">' +
+            '<span class="goal"><label>這本帳的月目標</label>' +
+            '<input class="goal__i" type="number" min="0" ' +
+              'data-ggoal="' + esc(g.id) + '" value="' + (g.goal || 0) + '"></span>' +
+          '</div>' +
+          '<div class="row__go2">' +
+            '<span class="rowbtn" data-gopen="' + esc(g.id) + '">' + g.count + ' 筆 →</span>' +
+            (g.canEdit ? '<button class="gx" data-garch="' + esc(g.id) +
+                         '" title="封存這本帳">封存</button>' : '') +
+          '</div>' +
+        '</article>';
+      }).join('') + '</div>';
+
+      // ---- 建立 ----
+      h += '<div class="sec"><h2 class="sec__t">開一本新的</h2></div>' +
+        '<form class="card gnew" id="gnewF">' +
+          '<label class="fld"><span>名字</span>' +
+            '<input type="text" id="gnName" placeholder="例如 旅遊基金、寵物開銷" required></label>' +
+          '<label class="fld"><span>顏色</span>' +
+            '<select id="gnColor">' +
+              ['#6C9FFB:藍', '#8B7CF0:紫', '#5FB8D9:青', '#6EE7B7:綠',
+               '#FBBF6E:橙', '#FB8A8F:紅'].map(function (c) {
+                var p = c.split(':');
+                return '<option value="' + p[0] + '">' + p[1] + '</option>';
+              }).join('') +
+            '</select></label>' +
+          '<div><button class="btn btn--go" type="submit">建立</button></div>' +
+        '</form>';
+
+      // ---- 成員 ----
+      var editable = d.groups.filter(function (g) { return g.canEdit; });
+      if (editable.length) {
+        h += '<div class="sec"><h2 class="sec__t">誰在哪一本帳裡</h2></div>';
+        h += '<div class="card gmem">' + editable.map(function (g) {
+          var inside = g.members;
+          var outside = fam.members.filter(function (u) { return inside.indexOf(u.id) < 0; });
+          return '<div class="gmem__g">' +
+            '<div class="gmem__t"><span class="gsw__d" style="background:' + esc(g.color) +
+              '"></span>' + esc(g.name) + '</div>' +
+            '<div class="gmem__l">' + inside.map(function (u) {
+              var m = fam.members.filter(function (x) { return x.id === u; })[0] || {};
+              return '<span class="chip">' + esc(m.name || u) +
+                (u === g.owner ? '' :
+                  '<button data-gdel="' + esc(g.id) + '|' + esc(u) + '" title="移出">×</button>') +
+                '</span>';
+            }).join('') + '</div>' +
+            (outside.length
+              ? '<div class="gmem__add">加人：' + outside.map(function (u) {
+                  return '<button class="chip chip--add" data-gadd="' + esc(g.id) + '|' +
+                    esc(u.id) + '">＋ ' + esc(u.name) + '</button>';
+                }).join('') + '</div>'
+              : '') +
+          '</div>';
+        }).join('') + '</div>';
+      }
+
+      h += '<div class="note note--warn"><div class="note__k">移出群組會看不到那本帳的所有紀錄</div>' +
+        '<p>包含他自己記在那本帳上的那些——<b>紀錄屬於帳本，不屬於人</b>。<br>' +
+        '封存也一樣：封存只是收起來，<b>紀錄不會被刪掉</b>，' +
+        '真的刪了那些紀錄會變成孤兒。</p></div>';
+
+      $view.innerHTML = h + '</div>';
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
   /* ---------- 共用 ---------- */
@@ -904,7 +1017,7 @@
           '<input type="password" id="rgPw" autocomplete="new-password" required>' +
           '<em class="fld__h">至少 8 個字</em></label>' +
         '<label class="fld"><span>每月存款目標</span>' +
-          '<input type="number" id="rgGoal" min="0" step="1000" value="0">' +
+          '<input type="number" id="rgGoal" min="0" value="0">' +
           '<em class="fld__h">之後可以改。收入減掉這個數字就是可支配上限</em></label>' +
         '<button class="btn btn--go gate__go" type="submit">建立帳號</button>' +
         '<p class="gate__alt">已經有帳號了？<a href="#/login">回去登入</a></p>' +
@@ -956,9 +1069,12 @@
             '會用現在的目標去評斷過去的表現。</span></p>' +
           '</div>' +
           '<span class="goal"><label>每月存款目標</label>' +
-            '<input class="goal__i" type="number" min="0" step="1000" ' +
+            '<input class="goal__i" type="number" min="0" ' +
             'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
         '</div>' +
+
+        '<div class="sec"><h2 class="sec__t">階段性提醒</h2></div>' +
+        '<div class="card" id="alertBox">' + skeleton(2) + '</div>' +
 
         '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
         '<form class="card prof__form" id="pwF">' +
@@ -978,7 +1094,50 @@
         '</div>' +
       '</div>';
       $view.innerHTML = h;
+      paintAlerts();
     });
+  }
+
+  /* ---------------------------------------------------------
+     階段性提醒：使用者自己設幾個百分比門檻
+     --------------------------------------------------------- */
+  function paintAlerts() {
+    var box = document.getElementById('alertBox');
+    if (!box) return;
+    Promise.all([API.alerts(), API.savingsGoals()]).then(function (r) {
+      var list = r[0].alerts || [], goals = r[1].goals || [];
+
+      var h = '<p class="prof__l">支出佔<b>可支配上限</b>的比例跨過門檻時，' +
+        '會跳一則通知並響一聲。' +
+        '<br><span class="prof__h">可支配上限 = 本月收入 − 每月存款目標。' +
+        '同一個門檻<b>一個月只會響一次</b>，不會因為你來回記帳就一直吵。</span></p>';
+
+      h += list.length
+        ? '<div class="alist">' + list.map(function (a) {
+            return '<div class="ai' + (a.enabled ? '' : ' off') + '">' +
+              '<span class="ai__p">' + esc(a.percent) + '%</span>' +
+              '<span class="ai__s">' + esc(a.groupName) + '</span>' +
+              '<button class="ai__t" data-atoggle="' + esc(a.id) + '|' +
+                (a.enabled ? '0' : '1') + '">' +
+                (a.enabled ? '開著' : '關掉了') + '</button>' +
+              '<button class="ai__x" data-adel="' + esc(a.id) + '" title="刪掉">×</button>' +
+            '</div>';
+          }).join('') + '</div>'
+        : '<p class="prof__h">還沒設任何門檻。</p>';
+
+      h += '<form class="anew" id="anewF">' +
+        '<label class="fld"><span>百分比</span>' +
+          '<input type="number" id="anPct" min="1" max="200" value="80" required></label>' +
+        '<label class="fld"><span>針對哪一本帳</span>' +
+          '<select id="anGroup">' + goals.map(function (g) {
+            return '<option value="' + (g.groupId || '') + '">' + esc(g.groupName) +
+              (g.goal ? '（目標 ' + money(g.goal) + '）' : '（還沒設目標）') + '</option>';
+          }).join('') + '</select></label>' +
+        '<div><button class="btn btn--sm btn--go" type="submit">加一個門檻</button></div>' +
+      '</form>';
+
+      box.innerHTML = h;
+    }).catch(function (e) { box.innerHTML = errState(e); });
   }
 
   /* 縮圖：置中裁成正方形再縮到 256，超過 200 KB 就降畫質重來。
@@ -1024,6 +1183,45 @@
     return '<span class="ava' + cls + '">' + esc((u && u.avatar) || '') + '</span>';
   }
 
+  /* 群組切換器。只有一本帳的時候不顯示——一個只有一個選項的下拉是雜訊。 */
+  function paintGroups() {
+    var box = document.getElementById('gsw');
+    if (!box) return;
+    API.groups().then(function (d) {
+      var gs = d.groups || [];
+      box.hidden = gs.length < 2;
+      if (box.hidden) { setGroup('all'); return; }
+
+      // 選到的群組如果已經看不到了（被移出或封存），退回全部
+      if (GROUP !== 'all' && !gs.some(function (g) { return g.id === GROUP; })) setGroup('all');
+
+      var cur = GROUP === 'all'
+        ? { icon: '全', name: '全部帳本', color: 'var(--ink-faint)' }
+        : gs.filter(function (g) { return g.id === GROUP; })[0];
+
+      box.innerHTML =
+        '<button class="gsw__b" id="gswBtn">' +
+          '<span class="gsw__d" style="background:' + esc(cur.color) + '"></span>' +
+          '<span class="gsw__n">' + esc(cur.name) + '</span>' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
+        '</button>' +
+        '<div class="gsw__p" id="gswPanel" hidden>' +
+          '<button class="gsw__i' + (GROUP === 'all' ? ' on' : '') + '" data-group="all">' +
+            '<span class="gsw__d" style="background:var(--ink-faint)"></span>' +
+            '<span class="gsw__m"><b>全部帳本</b><i>我看得到的全部合起來</i></span></button>' +
+          gs.map(function (g) {
+            return '<button class="gsw__i' + (g.id === GROUP ? ' on' : '') +
+              '" data-group="' + esc(g.id) + '">' +
+              '<span class="gsw__d" style="background:' + esc(g.color) + '"></span>' +
+              '<span class="gsw__m"><b>' + esc(g.name) + '</b><i>' +
+                g.count + ' 筆' + (g.goal ? '　目標 ' + money(g.goal) : '') +
+              '</i></span></button>';
+          }).join('') +
+          '<a class="gsw__more" href="#/groups">管理群組 →</a>' +
+        '</div>';
+    }).catch(function () { box.hidden = true; });
+  }
+
   function paintWho() {
     API.me().then(function (m) {
       ME = m;
@@ -1043,7 +1241,7 @@
   var ROUTES = { '': vHome, entry: vEntry, family: vFamily, stats: vStats,
                  advice: vAdvice, members: vMembers,
                  login: vLogin, register: vRegister, profile: vProfile,
-                 member: vMember };
+                 member: vMember, groups: vGroups };
 
   var OPEN = ['login', 'register'];      // 沒登入也能看的頁
 
@@ -1092,6 +1290,76 @@
         paint();
         toast('已登出', 'ok');
       });
+      return;
+    }
+
+    /* ---- 群組切換器 ---- */
+    if (t.closest('#gswBtn')) {
+      var gp = document.getElementById('gswPanel');
+      if (gp) gp.hidden = !gp.hidden;
+      return;
+    }
+    var gpick = t.closest('[data-group]');
+    if (gpick) {
+      setGroup(gpick.dataset.group);
+      paintGroups();
+      paint();
+      return;
+    }
+    if (!t.closest('#gsw')) {
+      var gp2 = document.getElementById('gswPanel');
+      if (gp2 && !gp2.hidden) gp2.hidden = true;
+    }
+
+    /* ---- 群組管理 ---- */
+    var gopen = t.closest('[data-gopen]');
+    if (gopen) {
+      setGroup(gopen.dataset.gopen);
+      paintGroups();
+      location.hash = '#/entry';
+      return;
+    }
+    var garch = t.closest('[data-garch]');
+    if (garch) {
+      API.archiveGroup(garch.dataset.garch).then(function () {
+        if (GROUP === garch.dataset.garch) setGroup('all');
+        paintGroups(); vGroups();
+        toast('已封存。紀錄還在，沒有被刪掉', 'ok');
+      }).catch(function (err) { toast(err.message || '封存失敗', 'err'); });
+      return;
+    }
+    var gadd = t.closest('[data-gadd]');
+    if (gadd) {
+      var a = gadd.dataset.gadd.split('|');
+      API.addGroupMember(a[0], a[1]).then(function () {
+        vGroups(); toast('加進去了', 'ok');
+      }).catch(function (err) { toast(err.message || '加不進去', 'err'); });
+      return;
+    }
+    var gdel = t.closest('[data-gdel]');
+    if (gdel) {
+      var b = gdel.dataset.gdel.split('|');
+      API.removeGroupMember(b[0], b[1]).then(function () {
+        paintGroups(); vGroups();
+        toast('已移出。他看不到這本帳的紀錄了', 'ok');
+      }).catch(function (err) { toast(err.message || '移不出去', 'err'); });
+      return;
+    }
+
+    /* ---- 階段性提醒 ---- */
+    var atg = t.closest('[data-atoggle]');
+    if (atg) {
+      var c = atg.dataset.atoggle.split('|');
+      API.updateAlert(c[0], { enabled: c[1] === '1' }).then(function () {
+        paintAlerts();
+      }).catch(function (err) { toast(err.message || '改不了', 'err'); });
+      return;
+    }
+    var adel = t.closest('[data-adel]');
+    if (adel) {
+      API.deleteAlert(adel.dataset.adel).then(function () {
+        paintAlerts(); toast('門檻刪掉了', 'ok');
+      }).catch(function (err) { toast(err.message || '刪不掉', 'err'); });
       return;
     }
 
@@ -1287,6 +1555,40 @@
       return;
     }
 
+    if (f.id === 'gnewF') {
+      e.preventDefault();
+      busy(f, true, '建立中…');
+      API.createGroup({
+        name: document.getElementById('gnName').value,
+        color: document.getElementById('gnColor').value
+      }).then(function (g) {
+        busy(f, false);
+        paintGroups(); vGroups();
+        toast('「' + g.name + '」開好了', 'ok');
+      }).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '建立失敗', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'anewF') {
+      e.preventDefault();
+      busy(f, true, '加入中…');
+      API.createAlert({
+        percent: Number(document.getElementById('anPct').value),
+        groupId: document.getElementById('anGroup').value || null
+      }).then(function () {
+        busy(f, false);
+        paintAlerts();
+        toast('門檻加好了', 'ok');
+      }).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '加不了', 'err');
+      });
+      return;
+    }
+
     if (f.id === 'profF') {
       e.preventDefault();
       var y = document.getElementById('pfYear').value;
@@ -1342,6 +1644,17 @@
   });
 
   document.addEventListener('change', function (e) {
+    var gg = e.target.closest ? e.target.closest('[data-ggoal]') : null;
+    if (gg) {
+      var gv = Number(gg.value);
+      if (isNaN(gv) || gv < 0) { toast('目標要是 0 以上的數字', 'err'); return; }
+      API.setSavingsGoal(null, gv, gg.dataset.ggoal).then(function (r) {
+        toast('「' + (r.groupName || '這本帳') + '」的月目標改為 ' + money(gv), 'ok');
+        paintGroups();
+      }).catch(function (err) { toast('設定失敗：' + err.message, 'err'); });
+      return;
+    }
+
     var g = e.target.closest ? e.target.closest('[data-goal]') : null;
     if (g) {
       var v = Number(g.value);
@@ -1389,12 +1702,17 @@
   document.getElementById('mode').textContent =
     API.mode === 'http' ? 'API ' + API.base : 'API mock';
   API.authState().then(function (a) {
-    if (a.loggedIn) paintWho();
+    if (a.loggedIn) { paintWho(); paintGroups(); }
     paint();
   });
 
   /* 監管通知：輪詢 + 音效 + 鈴鐺。實作在 js/notify.js
      沒登入的時候不要輪詢——會一路 401，還會在登入頁叮一聲。 */
+  /* notify.js 需要它來跳提示。
+     ⚠️ 沒掛出去的話 notify.js 的 `if (!global.toast) return;` 會靜靜地跳過——
+     不會報錯，只是提示永遠不出現，很難發現。 */
+  global.toast = toast;
+
   API.authState().then(function (a) {
     if (a.loggedIn && global.Notify) global.Notify.start();
   });

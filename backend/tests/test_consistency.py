@@ -33,6 +33,16 @@ def read(rel: str) -> str:
     return io.open(os.path.join(REPO, rel), encoding="utf-8").read()
 
 
+def _cn(n: int) -> str:
+    """把數字寫成中文：11 → 十一。手冊內文用中文數字，測試要能比對。"""
+    d = "零一二三四五六七八九"
+    if n < 10:
+        return d[n]
+    if n < 20:
+        return "十" + (d[n - 10] if n > 10 else "")
+    return d[n // 10] + "十" + (d[n % 10] if n % 10 else "")
+
+
 def test_每位成員的路由數在四份文件裡一致():
     """
     ownership.py 說成員3 有 10 支，那另外三個地方也必須說 10 支。
@@ -197,9 +207,8 @@ def test_畫面數在程式與手冊之間一致():
     assert "%d SCREENS" % n in handbook, \
         "手冊角標的畫面數對不上，app.js 有 %d 個" % n
 
-    CH = "零一二三四五六七八九十"
-    assert "%s個畫面" % CH[n] in handbook, \
-        "手冊內文沒寫「%s個畫面」" % CH[n]
+    assert "%s個畫面" % _cn(n) in handbook, \
+        "手冊內文沒寫「%s個畫面」" % _cn(n)
 
 
 def test_前端有登入畫面而且不再說自己沒有():
@@ -351,3 +360,34 @@ def test_檔案系統說明書要跟得上實際的檔案():
     assert not missing, (
         "檔案系統說明書的工具箱表格少了：" + "、".join(missing)
     )
+
+
+def test_手冊的資料表區塊要跟_data_js_一致():
+    """手冊那一大段資料表是從 frontend/js/data.js 的 schema 生出來的。
+
+    這兩邊本來是各寫各的，所以加了 notifications 只改到一邊。
+    現在改成生成，這條測試確保沒有人再手改 HTML 讓它們分岔。
+    """
+    data = read("frontend/js/data.js")
+    handbook = read("frontend/docs/index.html")
+
+    in_data = re.findall(r"\{ t: '([a-z_]+)'", data)
+    in_doc = re.findall(r'acc__code">([a-z_]+)</code>', handbook)
+
+    assert in_data, "data.js 裡找不到 schema"
+    assert in_data == in_doc, (
+        "手冊的資料表跟 data.js 對不上。"
+        "　data.js：%s　／　手冊：%s" % ("、".join(in_data), "、".join(in_doc))
+    )
+
+
+def test_群組與提醒的前端三層都有():
+    """新功能的 mock、http、facade 三層簽名要一致，缺一層就會在切換時壞掉。"""
+    api = read("frontend/js/api.js")
+    for fn in ("groups:", "createGroup:", "archiveGroup:",
+               "alerts:", "createAlert:", "deleteAlert:", "savingsGoals:"):
+        assert api.count(fn) >= 3,             "%s 要在 mock、http、facade 三層都有，現在只有 %d 個" % (fn, api.count(fn))
+
+    app = read("frontend/js/app.js")
+    assert "function vGroups(" in app, "app.js 少了群組頁"
+    assert "function paintAlerts(" in app, "app.js 少了提醒設定"

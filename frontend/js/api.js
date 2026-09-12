@@ -52,6 +52,21 @@
    PATCH  /api/notifications/{id}     標記單則已讀
    PATCH  /api/notifications          整批已讀（帶 readUntil）
 
+   群組（帳本）
+   GET    /api/groups                 我加入的群組
+   POST   /api/groups                 建立
+   PATCH  /api/groups/{gid}           改名稱／圖示／顏色
+   DELETE /api/groups/{gid}           封存（不刪除）
+   POST   /api/groups/{gid}/members   把家人加進這本帳
+   DELETE /api/groups/{gid}/members/{uid}  移出
+
+   階段性提醒
+   GET    /api/savings-goals          整體 + 各群組的每月存款目標
+   GET    /api/alerts                 我設的百分比門檻
+   POST   /api/alerts                 新增門檻
+   PATCH  /api/alerts/{aid}           改百分比或開關
+   DELETE /api/alerts/{aid}           刪掉
+
    建議
    GET    /api/advices                LLM 財務建議（帶 scope / period）
    POST   /api/advices/generate       重新產生（後端先算好數字再餵給模型）
@@ -112,6 +127,10 @@
         if (saved.auth) base.auth = saved.auth;
         if (saved.patch) base.patch = saved.patch;
         if (saved.newUsers) base.newUsers = saved.newUsers;
+        ['newGroups', 'groupPatch', 'joined', 'left', 'archived',
+         'goalPatch', 'newAlerts', 'alertPatch', 'alertGone'].forEach(function (k) {
+          if (saved[k]) base[k] = saved[k];
+        });
       }
     } catch (e) {}
     applyGoals(base.goals);
@@ -128,7 +147,16 @@
         readNotify: state.readNotify || [],
         auth: state.auth || { loggedIn: true },
         patch: state.patch || {},
-        newUsers: state.newUsers || []
+        newUsers: state.newUsers || [],
+        newGroups: state.newGroups || [],
+        groupPatch: state.groupPatch || {},
+        joined: state.joined || [],
+        left: state.left || [],
+        archived: state.archived || [],
+        goalPatch: state.goalPatch || [],
+        newAlerts: state.newAlerts || [],
+        alertPatch: state.alertPatch || {},
+        alertGone: state.alertGone || []
       }));
     } catch (e) {}
   }
@@ -168,6 +196,94 @@
      （原本 master 是看全家的。改掉是因為「家裡最高權限」和
        「可以看某個人的消費明細」是兩件事——後者要有明確的監管關係，
        這樣被監管的人才知道自己被誰看著。） */
+  /* 我看得到哪幾本帳：我有加入的群組。
+     ⚠️ 這是跟 visibleUsers 完全獨立的第二道篩選，**兩道都要過**。
+     只做一道會漏：我監管的小孩在一個我沒加入的群組記帳，
+     那筆不該出現在我的清單上。 */
+  /* 某本帳裡有誰 */
+  function memberIdsOf(gid) {
+    var s = load();
+    var left = (s.left || []);
+    return global.DATA.groupMembers
+      .filter(function (m) { return m.group === gid; })
+      .map(function (m) { return m.user; })
+      .concat((s.joined || []).filter(function (j) { return j.group === gid; })
+        .map(function (j) { return j.user; }))
+      .filter(function (u, i, a) { return a.indexOf(u) === i; })
+      .filter(function (u) {
+        return !left.some(function (l) { return l.group === gid && l.user === u; });
+      });
+  }
+
+  function visibleGroups(meId) {
+    var s = load();
+    var extra = (s.newGroups || []).map(function (g) { return g.id; });
+    return global.DATA.groupMembers
+      .filter(function (m) { return m.user === meId; })
+      .map(function (m) { return m.group; })
+      .concat((s.joined || []).filter(function (j) { return j.user === meId; })
+        .map(function (j) { return j.group; }))
+      .filter(function (g, i, a) { return a.indexOf(g) === i; })
+      .filter(function (g) {
+        return !(s.left || []).some(function (l) { return l.group === g && l.user === meId; });
+      })
+      .filter(function (g) { return (s.archived || []).indexOf(g) < 0; });
+  }
+
+  function groupOf(id) {
+    return allGroups().filter(function (g) { return g.id === id; })[0];
+  }
+
+  /* 種子群組 + 這個瀏覽器建立的群組 */
+  function allGroups() {
+    var s = load();
+    return global.DATA.groups.concat(s.newGroups || [])
+      .filter(function (g) { return !(s.archived || []).some(function (a) { return a === g.id; }); })
+      .map(function (g) {
+        var p = (s.groupPatch || {})[g.id] || {};
+        return Object.assign({}, g, p);
+      });
+  }
+
+  /* 某個人在某本帳上的每月存款目標。沒設過就是 0。 */
+  function goalOf(userId, groupId) {
+    var s = load();
+    var extra = (s.goalPatch || []).filter(function (g) {
+      return g.user === userId && g.group === groupId;
+    });
+    if (extra.length) return Number(extra[extra.length - 1].goal) || 0;
+    var seed = global.DATA.groupGoals.filter(function (g) {
+      return g.user === userId && g.group === groupId;
+    })[0];
+    return seed ? seed.goal : 0;
+  }
+
+  /* 提醒通知的排序時間。
+     ⚠️ 一開始我用「期間 + 百分比」當排序鍵，結果新加一個低百分比的門檻，
+     它會排在既有門檻前面 → 被 since 濾掉 → 紅點加了卻不會叮。
+     真後端是「跨過門檻的當下寫一列」，所以要用建立時間。
+     這個瀏覽器加的門檻 id 是 ALN<毫秒>，種子的就用期間當近似值。 */
+  function alertTs(a) {
+    var m = /^ALN(\d+)$/.exec(String(a.id));
+    if (m) return Number(m[1]);
+    // ⚠️ 用月初不是月底——月底那個日期還在未來，
+    // 新加的門檻（時間是「現在」）會排在它前面，於是永遠不算「新的」。
+    return Date.parse(global.DATA.meta.period + '-01T09:00:00') + a.percent;
+  }
+
+  /* 我設的門檻。種子 + 這個瀏覽器加的，扣掉刪掉的。 */
+  function myAlerts(meId) {
+    var s = load();
+    var gone = s.alertGone || [];
+    return global.DATA.alerts.concat(s.newAlerts || [])
+      .filter(function (a) { return a.user === meId && gone.indexOf(a.id) < 0; })
+      .map(function (a) {
+        var p = (s.alertPatch || {})[a.id] || {};
+        return Object.assign({}, a, p);
+      })
+      .sort(function (a, b) { return a.percent - b.percent; });
+  }
+
   function visibleUsers(meId) {
     if (!memberOf(meId)) return [meId];
     var wards = global.DATA.guardianships
@@ -346,12 +462,213 @@
       });
     },
 
+    /* ---------------------------------------------------------
+       群組（帳本）。一個家庭可以開好幾本帳，每一筆記帳都屬於其中一本。
+       ⚠️ 只回我加入的——別人的帳本連名字都不該看到。
+       --------------------------------------------------------- */
+    groups: function () {
+      var s = load();
+      return sleep(LATENCY).then(function () {
+        var mine = visibleGroups(s.me);
+        var vis = visibleUsers(s.me);
+        return {
+          me: s.me,
+          groups: allGroups()
+            .filter(function (g) { return mine.indexOf(g.id) >= 0; })
+            .map(function (g) {
+              var members = memberIdsOf(g.id);
+              return Object.assign(clone(g), {
+                members: members,
+                memberNames: members.map(function (u) {
+                  return (memberOf(u) || {}).name || u;
+                }),
+                /* ⚠️ 筆數要跟「點進去真的看得到的」一致。
+                   只用群組篩的話，面板寫 10 筆、點進去只有 7 筆——
+                   因為裡面有 3 筆是我不能看的那個人記的。 */
+                count: s.transactions.filter(function (t) {
+                  return t.group === g.id && vis.indexOf(t.user) >= 0;
+                }).length,
+                goal: goalOf(s.me, g.id),
+                canEdit: g.owner === s.me
+              });
+            })
+        };
+      });
+    },
+
+    createGroup: function (p) {
+      var s = load(); p = p || {};
+      return sleep(300).then(function () {
+        var name = String(p.name || '').trim();
+        if (!name) throw new Error('群組要有名字');
+        if (allGroups().some(function (g) { return g.name === name; })) {
+          throw new Error('已經有一本叫「' + name + '」的帳了');
+        }
+        var n = allGroups().reduce(function (mx, g) {
+          return Math.max(mx, Number(String(g.id).replace(/\D/g, '')) || 0);
+        }, 0) + 1;
+        var g = {
+          id: 'G' + n, name: name,
+          icon: (p.icon || name).slice(-1),
+          color: p.color || '#6C9FFB',
+          owner: s.me,
+          created: new Date().toISOString().slice(0, 10),
+          note: String(p.note || '')
+        };
+        s.newGroups = (s.newGroups || []).concat([g]);
+        // ⚠️ 建立者要自動加入，不然他自己也看不到剛建的帳本
+        s.joined = (s.joined || []).concat([{ group: g.id, user: s.me }]);
+        save();
+        return clone(g);
+      });
+    },
+
+    updateGroup: function (gid, p) {
+      var s = load(); p = p || {};
+      return sleep(220).then(function () {
+        var g = groupOf(gid);
+        if (!g) throw new Error('找不到這個群組');
+        if (g.owner !== s.me) { var e = new Error('只有建立者可以改'); e.status = 403; throw e; }
+        s.groupPatch = s.groupPatch || {};
+        var q = s.groupPatch[gid] = s.groupPatch[gid] || {};
+        if (p.name !== undefined) {
+          var nm = String(p.name).trim();
+          if (!nm) throw new Error('群組要有名字');
+          q.name = nm; q.icon = nm.slice(-1);
+        }
+        if (p.color !== undefined) q.color = p.color;
+        if (p.note !== undefined) q.note = String(p.note);
+        save();
+        return clone(groupOf(gid));
+      });
+    },
+
+    archiveGroup: function (gid) {
+      var s = load();
+      return sleep(240).then(function () {
+        var g = groupOf(gid);
+        if (!g) throw new Error('找不到這個群組');
+        if (g.owner !== s.me) { var e = new Error('只有建立者可以封存'); e.status = 403; throw e; }
+        /* ⚠️ 封存不是刪除。裡面的記帳紀錄還在——真刪了那些紀錄會變成孤兒。 */
+        s.archived = (s.archived || []).concat([gid]);
+        save();
+        return { id: gid, archived: true };
+      });
+    },
+
+    addGroupMember: function (gid, userId) {
+      var s = load();
+      return sleep(240).then(function () {
+        var g = groupOf(gid);
+        if (!g) throw new Error('找不到這個群組');
+        if (g.owner !== s.me) { var e = new Error('只有建立者可以加人'); e.status = 403; throw e; }
+        if (!memberOf(userId)) throw new Error('這個家庭裡沒有這個人');
+        if (memberIdsOf(gid).indexOf(userId) >= 0) throw new Error('他已經在這本帳裡了');
+        s.joined = (s.joined || []).concat([{ group: gid, user: userId }]);
+        save();
+        return { group: gid, user: userId };
+      });
+    },
+
+    removeGroupMember: function (gid, userId) {
+      var s = load();
+      return sleep(240).then(function () {
+        var g = groupOf(gid);
+        if (!g) throw new Error('找不到這個群組');
+        if (g.owner !== s.me) { var e = new Error('只有建立者可以移除'); e.status = 403; throw e; }
+        if (userId === g.owner) throw new Error('建立者不能把自己移出去');
+        s.left = (s.left || []).concat([{ group: gid, user: userId }]);
+        save();
+        return { group: gid, user: userId, removed: true };
+      });
+    },
+
+    /* ---------------------------------------------------------
+       階段性提醒
+       --------------------------------------------------------- */
+    savingsGoals: function () {
+      var s = load();
+      return sleep(160).then(function () {
+        var me = memberOf(s.me) || {};
+        var rows = [{ groupId: null, groupName: '整體', goal: me.savingsGoal || 0 }];
+        visibleGroups(s.me).forEach(function (gid) {
+          var g = groupOf(gid);
+          if (g) rows.push({ groupId: gid, groupName: g.name, goal: goalOf(s.me, gid) });
+        });
+        return { goals: rows };
+      });
+    },
+
+    alerts: function () {
+      var s = load();
+      return sleep(160).then(function () {
+        return {
+          alerts: myAlerts(s.me).map(function (a) {
+            var g = a.group ? groupOf(a.group) : null;
+            return Object.assign(clone(a), {
+              groupId: a.group,
+              groupName: g ? g.name : '整體'
+            });
+          })
+        };
+      });
+    },
+
+    createAlert: function (p) {
+      var s = load(); p = p || {};
+      return sleep(240).then(function () {
+        var pct = Number(p.percent);
+        if (!pct || pct < 1 || pct > 200) throw new Error('門檻要在 1 到 200 之間');
+        var gid = p.groupId || null;
+        /* ⚠️ 同一個（人、帳本、百分比）只能有一筆。
+           重複的話同一次跨越會發兩則一模一樣的通知。 */
+        if (myAlerts(s.me).some(function (a) {
+          return a.percent === pct && (a.group || null) === gid;
+        })) throw new Error('這個門檻已經設過了');
+        var n = Date.now();
+        var a = { id: 'ALN' + n, user: s.me, group: gid, percent: pct,
+                  enabled: true, firedPeriod: null };
+        s.newAlerts = (s.newAlerts || []).concat([a]);
+        save();
+        return clone(a);
+      });
+    },
+
+    updateAlert: function (aid, p) {
+      var s = load(); p = p || {};
+      return sleep(200).then(function () {
+        s.alertPatch = s.alertPatch || {};
+        var q = s.alertPatch[aid] = s.alertPatch[aid] || {};
+        if (p.percent !== undefined) {
+          var pct = Number(p.percent);
+          if (!pct || pct < 1 || pct > 200) throw new Error('門檻要在 1 到 200 之間');
+          q.percent = pct;
+        }
+        // 關掉但不刪除——使用者常常只是這個月不想被吵
+        if (p.enabled !== undefined) q.enabled = !!p.enabled;
+        save();
+        return { id: aid };
+      });
+    },
+
+    deleteAlert: function (aid) {
+      var s = load();
+      return sleep(200).then(function () {
+        s.alertGone = (s.alertGone || []).concat([aid]);
+        save();
+        return { id: aid, deleted: true };
+      });
+    },
+
     summary: function (f) {
       f = f || {};
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
         var users = f.scope === 'family' ? visibleUsers(s.me) : [s.me];
+        var vgs = visibleGroups(s.me);
         var tx = s.transactions.filter(function (t) {
+          if (vgs.indexOf(t.group) < 0) return false;            // 第二道篩選
+          if (f.groupId && f.groupId !== 'all' && t.group !== f.groupId) return false;
           return users.indexOf(t.user) >= 0 && t.date.indexOf(D.meta.period) === 0;
         });
         // 成員表上的 income / expense 是本月至今的合計（示範明細已含在內）；
@@ -368,7 +685,10 @@
           byCat[t.cat] = (byCat[t.cat] || 0) + t.amount;
         });
         // 存款目標：可支配上限 = 收入 − 目標，支出超過就存不到
+        /* 選了某一本帳 → 用那本帳自己的目標；沒選 → 用整體目標。
+           這就是「每個月的存錢目標可以有好幾個設定」的意思。 */
         var goal = users.reduce(function (n, u) {
+          if (f.groupId && f.groupId !== 'all') return n + goalOf(u, f.groupId);
           var m = memberOf(u);
           return n + (m && m.savingsGoal ? m.savingsGoal : 0);
         }, 0);
@@ -423,7 +743,7 @@
            ⚠️ 這一段是有來由的：前端曾經送 user=U3，而契約寫的是 userId。
            mock 當時默默忽略不認得的參數，所以「篩選沒生效」在 mock 下
            看起來完全正常——直到接上真後端才會發現。寧可現在就吵。 */
-        var OK = ['userId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page'];
+        var OK = ['userId', 'groupId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page'];
         Object.keys(f).forEach(function (k) {
           if (OK.indexOf(k) < 0) {
             throw new Error('不認得的篩選參數「' + k + '」，契約上只有：' + OK.join('、'));
@@ -431,6 +751,7 @@
         });
 
         var vis = visibleUsers(s.me);
+        var vgs = visibleGroups(s.me);
 
         /* 帶了 userId 但沒權限看那個人 → 擋下來，不要回空陣列。
            回空陣列的話前端分不出「這個人沒記帳」和「你不能看」。 */
@@ -439,9 +760,17 @@
           err.status = 403;
           throw err;
         }
+        if (f.groupId && f.groupId !== 'all' && vgs.indexOf(f.groupId) < 0) {
+          var e2 = new Error('你不在這個群組裡');
+          e2.status = 403;
+          throw e2;
+        }
 
         var rows = s.transactions.filter(function (t) {
           if (vis.indexOf(t.user) < 0) return false;
+          // ⚠️ 第二道：這本帳我有沒有加入
+          if (vgs.indexOf(t.group) < 0) return false;
+          if (f.groupId && f.groupId !== 'all' && t.group !== f.groupId) return false;
           if (f.userId && f.userId !== 'all' && t.user !== f.userId) return false;
           if (f.kind && f.kind !== 'all' && t.kind !== f.kind) return false;
           if (f.source && f.source !== 'all' && (t.source || 'manual') !== f.source) return false;
@@ -581,9 +910,11 @@
       });
     },
 
-    setSavingsGoal: function (userId, goal) {
+    setSavingsGoal: function (userId, goal, groupId) {
       var st = load(), D = global.DATA;
       return sleep(240).then(function () {
+        // 設群組目標時不用指定人——設的一定是自己的
+        if (!userId) userId = st.me;
         var m = D.members.filter(function (x) { return x.id === userId; })[0];
         if (!m) throw new Error('not found: ' + userId);
 
@@ -593,9 +924,25 @@
         var mine = userId === st.me;
         var proxy = me.role === 'master' && m.age !== null && m.age < 18;
         if (!mine && !proxy) throw new Error('只能設定自己的存款目標');
+        if (groupId && !mine) throw new Error('群組目標只能設自己的');
 
         var v = Number(goal);
         if (isNaN(v) || v < 0) throw new Error('存款目標要是 0 以上的數字');
+
+        /* 帶了 groupId = 只設那一本帳的目標；不帶 = 不分群組的整體目標。
+           兩者並存：整體目標管全部，群組目標管那本帳自己。 */
+        if (groupId) {
+          if (visibleGroups(st.me).indexOf(groupId) < 0) {
+            var e = new Error('你不在這個群組裡'); e.status = 403; throw e;
+          }
+          st.goalPatch = (st.goalPatch || []).concat([
+            { user: userId, group: groupId, goal: v }
+          ]);
+          save();
+          var g = groupOf(groupId) || {};
+          return { userId: userId, groupId: groupId, groupName: g.name, goal: v };
+        }
+
         st.goals[userId] = v;
         applyGoals(st.goals);
         save();
@@ -626,6 +973,48 @@
           return Date.parse(t.date + 'T12:00:00') + (Number(id.replace(/\D/g, '')) || 0);
         }
 
+        /* ---- 提醒型通知 ----------------------------------------
+           真後端是「記帳寫入時算一次，跨過門檻就寫一列 notifications」。
+           mock 沒有寫入時機，所以這裡用現況反推：
+           已經跨過而且還開著的門檻，就算成一則通知。
+           形狀跟真的一樣，前端不用改。 */
+        var alertRows = myAlerts(s.me)
+          .filter(function (a) { return a.enabled; })
+          .map(function (a) {
+            var scopeTx = s.transactions.filter(function (t) {
+              if (t.user !== s.me) return false;
+              if (t.date.indexOf(D.meta.period) !== 0) return false;
+              return a.group ? t.group === a.group : true;
+            });
+            var spent = scopeTx.filter(function (t) { return t.kind === 'expense'; })
+              .reduce(function (n, t) { return n + t.amount; }, 0);
+            var income = scopeTx.filter(function (t) { return t.kind === 'income'; })
+              .reduce(function (n, t) { return n + t.amount; }, 0);
+            var me = memberOf(s.me) || {};
+            var goal = a.group ? goalOf(s.me, a.group) : (me.savingsGoal || 0);
+            var allow = income - goal;
+            var pct = allow > 0 ? Math.floor(spent / allow * 100) : (spent > 0 ? 200 : 0);
+            if (pct < a.percent) return null;               // 還沒跨過
+            var g = a.group ? groupOf(a.group) : null;
+            return {
+              id: 'NA' + a.id + D.meta.period,
+              type: 'budget_alert',
+              actorId: null,
+              actorName: null,
+              percent: a.percent,
+              reached: pct,
+              groupId: a.group,
+              groupName: g ? g.name : '整體',
+              spent: spent,
+              allowance: allow,
+              createdAt: new Date(alertTs(a)).toISOString(),
+              readAt: (s.readNotify || []).indexOf('NA' + a.id + D.meta.period) >= 0
+                ? new Date().toISOString() : null,
+              _ts: alertTs(a)
+            };
+          })
+          .filter(Boolean);
+
         var rows = s.transactions
           .filter(function (t) { return wards.indexOf(t.user) >= 0; })
           .map(function (t) {
@@ -648,6 +1037,7 @@
               _ts: ts
             };
           })
+          .concat(alertRows)
           .sort(function (a, b) { return a._ts - b._ts; })   // 由舊到新
           .slice(-20);                                       // 只留最近 20 筆
 
@@ -938,8 +1328,19 @@
     notifications:     function (f)     { return req('/api/notifications' + qs(f)); },
     readNotification:  function (i)     { return req('/api/notifications/' + encodeURIComponent(i), { method: 'PATCH', body: { read: true } }); },
     readNotifications: function (u)     { return req('/api/notifications', { method: 'PATCH', body: { readUntil: u } }); },
+    groups:            function ()      { return req('/api/groups'); },
+    createGroup:       function (p)     { return req('/api/groups', { method: 'POST', body: p }); },
+    updateGroup:       function (g, p)  { return req('/api/groups/' + encodeURIComponent(g), { method: 'PATCH', body: p }); },
+    archiveGroup:      function (g)     { return req('/api/groups/' + encodeURIComponent(g), { method: 'DELETE' }); },
+    addGroupMember:    function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members', { method: 'POST', body: { userId: u } }); },
+    removeGroupMember: function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members/' + encodeURIComponent(u), { method: 'DELETE' }); },
+    savingsGoals:      function ()      { return req('/api/savings-goals'); },
+    alerts:            function ()      { return req('/api/alerts'); },
+    createAlert:       function (p)     { return req('/api/alerts', { method: 'POST', body: p }); },
+    updateAlert:       function (a, p)  { return req('/api/alerts/' + encodeURIComponent(a), { method: 'PATCH', body: p }); },
+    deleteAlert:       function (a)     { return req('/api/alerts/' + encodeURIComponent(a), { method: 'DELETE' }); },
     budgets:           function ()      { return req('/api/budgets'); },
-    setSavingsGoal:    function (u, g)  { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g } }); },
+    setSavingsGoal:    function (u, g, gid) { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g, groupId: gid || null } }); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
     members:           function ()      { return req('/api/family'); },
     categories:        function ()      { return req('/api/categories'); },
@@ -970,8 +1371,19 @@
     notifications:     function (f)    { return impl.notifications(f); },
     readNotification:  function (i)    { return impl.readNotification(i); },
     readNotifications: function (u)    { return impl.readNotifications(u); },
+    groups:            function ()     { return impl.groups(); },
+    createGroup:       function (p)    { return impl.createGroup(p); },
+    updateGroup:       function (g, p) { return impl.updateGroup(g, p); },
+    archiveGroup:      function (g)    { return impl.archiveGroup(g); },
+    addGroupMember:    function (g, u) { return impl.addGroupMember(g, u); },
+    removeGroupMember: function (g, u) { return impl.removeGroupMember(g, u); },
+    savingsGoals:      function ()     { return impl.savingsGoals(); },
+    alerts:            function ()     { return impl.alerts(); },
+    createAlert:       function (p)    { return impl.createAlert(p); },
+    updateAlert:       function (a, p) { return impl.updateAlert(a, p); },
+    deleteAlert:       function (a)    { return impl.deleteAlert(a); },
     budgets:           function ()     { return impl.budgets(); },
-    setSavingsGoal:    function (u, g) { return impl.setSavingsGoal(u, g); },
+    setSavingsGoal:    function (u, g, gid) { return impl.setSavingsGoal(u, g, gid); },
     advices:           function (f)    { return impl.advices(f); },
     members:           function ()     { return impl.members(); },
     categories:        function ()     { return impl.categories(); },
