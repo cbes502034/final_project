@@ -8,6 +8,7 @@
 
   var API = global.API;
   var $view = document.getElementById('view');
+  var DATA_CATS = {};   // 分類 id → 名稱，確認訊息要用
 
   /* 側欄收合。記在 localStorage，下次打開維持上次的樣子。 */
   (function () {
@@ -350,6 +351,10 @@
   }
 
   function renderMode() {
+    // 確認訊息要顯示分類名稱，先把對照表備好
+    if (!Object.keys(DATA_CATS).length && global.DATA) {
+      (global.DATA.categories || []).forEach(function (c) { DATA_CATS[c.id] = c.name; });
+    }
     var box = document.getElementById('entryBox');
     if (!box) return;
     box.innerHTML = MODE === 'para' ? paraHTML() : singleHTML();
@@ -676,40 +681,82 @@
   /* ============================================================
      05 AI 財務建議
      ============================================================ */
+  /* ============================================================
+     財務建議
+
+     原本每一則都整個攤開：標題、內文、依據、建議四段全部展開。
+     五六則排下來就是一大片文字，還沒讀就先累了。
+
+     改成一則一行——等級、標題、日期。想看細節才點開。
+     ============================================================ */
+  var ADV = [];          // 目前這一頁的建議，搜尋時用
+  var ADVQ = '';         // 搜尋字串
+  var ADVOPEN = null;    // 展開中的那一則
+
   function vAdvice() {
-    head('財務建議', '每月結算後由模型產生，每一條都附可驗算的依據');
+    head('財務建議', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
     API.advices().then(function (d) {
-      var h = '<div class="page">';
-      h += d.advices.map(function (a, i) {
-        var cls = a.level === 'warn' ? 'crit' : (a.level === 'ok' ? '' : 'warn');
-        return '<div class="adv adv--' + a.level + '" style="animation-delay:' + (i * 70) + 'ms">' +
-          '<div class="adv__h">' +
-            '<span class="tag tag--' + (a.level === 'warn' ? 'CRITICAL' :
-              (a.level === 'ok' ? 'done' : 'MEDIUM')) + '">' +
-            (a.level === 'warn' ? '需注意' : (a.level === 'ok' ? '良好' : '參考')) + '</span>' +
-            '<span class="adv__t">' + esc(a.title) + '</span>' +
-            '<span class="adv__m">' + esc(a.scope === 'family' ? '家庭' : a.userName) +
-            '　' + esc(a.period) + '</span></div>' +
-          '<p class="adv__b">' + esc(a.body) + '</p>' +
-          '<div class="adv__basis"><div class="adv__bk">依據（可自行驗算）</div><ul>' +
-            a.basis.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></div>' +
-          '<div class="adv__sug"><div class="adv__bk">建議</div><ul>' +
-            a.suggest.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></div>' +
-          '</div>';
-      }).join('');
-
-      h += '<div class="sec"><h2 class="sec__t">建議的邊界規則</h2>' +
-        '<span class="sec__n">GUARDRAILS</span></div>';
-      h += '<div class="tbl"><table><thead><tr><th>規則</th><th>為什麼</th></tr></thead><tbody>' +
-        d.rules.map(function (r) {
-          return '<tr><td><b>' + esc(r.rule) + '</b></td><td>' + esc(r.why) + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
-
-      h += '</div>';
-      $view.innerHTML = h;
+      ADV = d.advices || [];
+      $view.innerHTML =
+        '<div class="page">' +
+          '<div class="bar">' +
+            '<label class="fsel"><span>搜尋</span>' +
+              '<input type="search" id="advq" placeholder="標題、內容或依據" ' +
+                'value="' + esc(ADVQ) + '" autocomplete="off"></label>' +
+          '</div>' +
+          '<div id="advList"></div>' +
+        '</div>';
+      paintAdvices();
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
+
+  function advLevel(a) {
+    return a.level === 'warn' ? '需注意' : (a.level === 'ok' ? '良好' : '參考');
+  }
+
+  function paintAdvices() {
+    var box = document.getElementById('advList');
+    if (!box) return;
+
+    var q = ADVQ.trim().toLowerCase();
+    var rows = !q ? ADV : ADV.filter(function (a) {
+      var hay = [a.title, a.body, (a.basis || []).join(' '), (a.suggest || []).join(' ')]
+        .join(' ').toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+
+    if (!rows.length) {
+      box.innerHTML = emptyState('沒有符合的建議', '換個關鍵字試試。');
+      return;
+    }
+
+    box.innerHTML = rows.map(function (a) {
+      var open = ADVOPEN === a.id;
+      return '<div class="ad' + (open ? ' on' : '') + '">' +
+        '<button class="ad__h" data-adv="' + esc(a.id) + '">' +
+          '<span class="ad__lv ad__lv--' + esc(a.level) + '">' + advLevel(a) + '</span>' +
+          '<span class="ad__t">' + esc(a.title) + '</span>' +
+          '<span class="ad__m">' + esc(a.scope === 'family' ? '家庭' : a.userName) + '</span>' +
+          '<span class="ad__p">' + esc(a.period) + '</span>' +
+          '<svg class="ad__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
+        '</button>' +
+        (open
+          ? '<div class="ad__b">' +
+              '<p>' + esc(a.body) + '</p>' +
+              '<div class="ad__k">依據</div><ul>' +
+                (a.basis || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') +
+              '</ul>' +
+              '<div class="ad__k">建議</div><ul>' +
+                (a.suggest || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') +
+              '</ul>' +
+            '</div>'
+          : '') +
+      '</div>';
+    }).join('');
+  }
+
 
   /* ============================================================
      06 成員與權限
@@ -1154,6 +1201,107 @@
     setTimeout(function () { w.remove(); }, 200);
   }
 
+
+  /* ============================================================
+     重大操作的確認
+
+     兩種強度：
+       'password'  只要密碼。用在「刪一筆紀錄」這種救不回來但範圍小的。
+       'full'      密碼 ＋ 一段 64 碼。用在影響很大的，例如把人移出帳本
+                   （他會失去那本帳所有紀錄的存取，包含自己記的）。
+
+     那段 64 碼**故意不給複製按鈕**。要使用者自己用滑鼠圈起來複製，
+     這個動作本身就是一道減速帶——手滑點下去的人不會剛好完成它。
+     ============================================================ */
+  var dangerOn = false;
+  var dangerFn = null;
+  var dangerCode = '';
+
+  function randomCode() {
+    var hex = '0123456789abcdef', out = '';
+    var buf = new Uint8Array(64);
+    if (global.crypto && global.crypto.getRandomValues) global.crypto.getRandomValues(buf);
+    else for (var i = 0; i < 64; i++) buf[i] = Math.floor(Math.random() * 256);
+    for (var j = 0; j < 64; j++) out += hex[buf[j] % 16];
+    return out;
+  }
+
+  function danger(opt) {
+    if (dangerOn) return;
+    dangerOn = true;
+    dangerFn = opt.onOk;
+    dangerCode = opt.level === 'full' ? randomCode() : '';
+
+    var w = el('<div class="hp dg" id="dg">' +
+      '<div class="hp__c" role="dialog" aria-modal="true">' +
+        '<div class="hp__h"><h3>' + esc(opt.title) + '</h3>' +
+          '<button class="hp__x" id="dgX" aria-label="取消">✕</button></div>' +
+        '<div class="hp__b">' +
+          '<p class="dg__w">' + opt.detail + '</p>' +
+          '<label class="fld"><span>輸入密碼</span>' +
+            '<input type="password" id="dgPw" autocomplete="current-password"></label>' +
+          (dangerCode
+            ? '<div class="dg__code"><span>把下面這段複製貼到欄位裡</span>' +
+                '<b id="dgSrc">' + dangerCode + '</b></div>' +
+              '<label class="fld"><span>貼在這裡</span>' +
+                '<input type="text" id="dgCode" autocomplete="off" spellcheck="false"></label>'
+            : '') +
+          '<p class="dg__err" id="dgErr" hidden></p>' +
+        '</div>' +
+        '<div class="hp__d">' +
+          '<button class="btn" id="dgNo">取消</button>' +
+          '<button class="btn btn--danger" id="dgYes">' + esc(opt.ok || '確定刪除') + '</button>' +
+        '</div>' +
+      '</div></div>');
+
+    document.body.appendChild(w);
+    document.body.classList.add('hp-on');
+    requestAnimationFrame(function () { w.classList.add('on'); });
+    var p = document.getElementById('dgPw');
+    if (p) p.focus();
+  }
+
+  function dangerClose() {
+    var w = document.getElementById('dg');
+    if (!w) return;
+    dangerOn = false;
+    dangerFn = null;
+    w.classList.remove('on');
+    document.body.classList.remove('hp-on');
+    setTimeout(function () { w.remove(); }, 200);
+  }
+
+  function dangerErr(msg) {
+    var e = document.getElementById('dgErr');
+    if (!e) return;
+    e.textContent = msg;
+    e.hidden = false;
+    var c = document.querySelector('#dg .hp__c');
+    if (c) { c.style.animation = 'nudge .3s'; setTimeout(function () { c.style.animation = ''; }, 320); }
+  }
+
+  function dangerGo() {
+    var pw = (document.getElementById('dgPw') || {}).value || '';
+    if (!pw) { dangerErr('請先輸入密碼'); return; }
+
+    if (dangerCode) {
+      var typed = ((document.getElementById('dgCode') || {}).value || '').trim();
+      if (typed !== dangerCode) { dangerErr('那段代碼跟上面不一樣'); return; }
+    }
+
+    var btn = document.getElementById('dgYes');
+    if (btn) { btn.disabled = true; btn.textContent = '確認中…'; }
+
+    API.verifyPassword(pw).then(function () {
+      var fn = dangerFn;
+      dangerClose();
+      if (fn) fn();
+    }).catch(function (err) {
+      if (btn) { btn.disabled = false; btn.textContent = '確定刪除'; }
+      dangerErr(err.message || '密碼不正確');
+    });
+  }
+
   /* ---------- 共用 ---------- */
   function head(t, s) { $title.textContent = t; $sub.textContent = s; }
 
@@ -1474,6 +1622,15 @@
     var t = e.target;
     if (!t.closest) return;
 
+    /* 確認視窗開著的時候，底下什麼都不能點 */
+    if (dangerOn) {
+      if (t.closest('#dgYes')) dangerGo();
+      else if (t.closest('#dgX') || t.closest('#dgNo') || !t.closest('.hp__c')) dangerClose();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     /* 說明彈窗：開著的時候，除了關閉之外什麼都不能點 */
     if (helpOpen) {
       if (t.closest('#hpX') || t.closest('#hpOk') || !t.closest('.hp__c')) closeHelp();
@@ -1504,6 +1661,14 @@
         paint();
         toast('已登出', 'ok');
       });
+      return;
+    }
+
+    /* ---- 財務建議：點一則展開，再點收起 ---- */
+    var adv = t.closest('[data-adv]');
+    if (adv) {
+      ADVOPEN = (ADVOPEN === adv.dataset.adv) ? null : adv.dataset.adv;
+      paintAdvices();
       return;
     }
 
@@ -1626,10 +1791,19 @@
     var gdel = t.closest('[data-gdel]');
     if (gdel) {
       var b = gdel.dataset.gdel.split('|');
-      API.removeGroupMember(b[0], b[1]).then(function () {
-        paintGroups(); vGroups();
-        toast('已移出。他看不到這本帳的紀錄了', 'ok');
-      }).catch(function (err) { toast(err.message || '移不出去', 'err'); });
+      danger({
+        title: '把這個人移出帳本',
+        detail: '他會失去這本帳<b>所有紀錄</b>的存取，' +
+                '<b>包含他自己記的那些</b>——紀錄是屬於帳本的。',
+        level: 'full',
+        ok: '確定移出',
+        onOk: function () {
+          API.removeGroupMember(b[0], b[1]).then(function () {
+            paintGroups(); vGroups();
+            toast('已移出', 'ok');
+          }).catch(function (err) { toast(err.message || '移不出去', 'err'); });
+        }
+      });
       return;
     }
 
@@ -1725,6 +1899,8 @@
       var bad = batch.filter(function (x) { return x.missing && x.missing.length; }).length;
       if (bad) { toast('還有 ' + bad + ' 筆缺欄位', 'err'); return; }
       var n = batch.length;
+      // 記進目前正在看的那一本帳
+      if (GROUP !== 'all' && batch.length) batch[0].groupId = GROUP;
       API.nlpConfirmBatch(batch).then(function () {
         document.getElementById('paraOut').innerHTML = '';
         document.getElementById('paraText').value = '';
@@ -1743,15 +1919,37 @@
 
     /* ---- 單筆手動 ---- */
     if (t.closest('#singleSave')) {
+      var btn = t.closest('#singleSave');
       var box = document.getElementById('entryBox');
       var v = {};
       Array.prototype.forEach.call(box.querySelectorAll('[data-s]'), function (i) {
         v[i.dataset.s] = i.value;
       });
       if (!v.amount) { toast('金額是必填的', 'err'); return; }
+
+      /* 存進去之後要刪掉得驗密碼，所以寫入前先讓人看一眼。
+         把要寫的內容放在按鈕上，再按一次才真的寫——
+         段落記帳本來就有確認步驟，單筆手動不該比它更容易出錯。 */
+      if (btn.dataset.sure !== '1') {
+        var cn = (DATA_CATS[v.cat] || v.cat);
+        btn.dataset.sure = '1';
+        btn.textContent = '再按一次寫入　' +
+          (v.kind === 'income' ? '+' : '−') + money(Number(v.amount)) + '・' + cn;
+        btn.classList.add('btn--sure');
+        setTimeout(function () {
+          if (!btn.isConnected) return;
+          btn.dataset.sure = '0';
+          btn.textContent = '寫入這一筆';
+          btn.classList.remove('btn--sure');
+        }, 4000);
+        return;
+      }
+
       API.createTransaction({
         date: v.date, amount: Number(v.amount), kind: v.kind, cat: v.cat,
-        merchant: v.merchant, note: v.note
+        merchant: v.merchant, note: v.note,
+        // 記進目前正在看的那一本帳；看「全部」就交給後端決定
+        groupId: GROUP === 'all' ? null : GROUP
       }).then(function () {
         renderMode(); loadTx(); toast('已寫入一筆', 'ok');
       }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); });
@@ -1762,9 +1960,17 @@
 
     var del = t.closest('[data-del]');
     if (del) {
-      API.deleteTransaction(del.dataset.del).then(function () {
-        loadTx(); toast('已刪除', 'ok');
-      }).catch(function (err) { toast('刪除失敗：' + err.message, 'err'); });
+      var did = del.dataset.del;
+      danger({
+        title: '刪除這筆紀錄',
+        detail: '刪掉就<b>救不回來</b>了。輸入密碼確認這是你本人。',
+        level: 'password',
+        onOk: function () {
+          API.deleteTransaction(did).then(function () {
+            loadTx(); toast('已刪除', 'ok');
+          }).catch(function (err) { toast('刪除失敗：' + err.message, 'err'); });
+        }
+      });
       return;
     }
 
@@ -1801,6 +2007,15 @@
     paint();
     toast('歡迎回來，' + (d && d.user ? d.user.name : ''), 'ok');
   }
+
+  /* 建議的搜尋：邊打邊篩。 */
+  var advTimer = null;
+  document.addEventListener('input', function (e) {
+    if (e.target.id !== 'advq') return;
+    var v = e.target.value;
+    clearTimeout(advTimer);
+    advTimer = setTimeout(function () { ADVQ = v; paintAdvices(); }, 220);
+  });
 
   document.addEventListener('submit', function (e) {
     var f = e.target;
@@ -1980,6 +2195,7 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && helpOpen) closeHelp();
+    if (e.key === 'Escape' && dangerOn) dangerClose();
   });
 
   /* 捲動一點點就讓頂欄浮出陰影，知道自己不在最上面 */

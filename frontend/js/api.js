@@ -17,6 +17,7 @@
    PUT    /api/auth/me/avatar         上傳大頭貼（body: { image: dataUri }）
    DELETE /api/auth/me/avatar         移除大頭貼
    PATCH  /api/auth/password          改密碼
+   POST   /api/auth/verify-password   重大操作前再確認一次（不發新 token）
    GET    /api/auth/me                目前登入者 + 家庭角色
 
    家庭與權限
@@ -59,6 +60,10 @@
    DELETE /api/groups/{gid}           封存（不刪除）
    POST   /api/groups/{gid}/members   把家人加進這本帳
    DELETE /api/groups/{gid}/members/{uid}  移出
+
+   零用金
+   GET    /api/allowances            我每月給每個被監管者多少
+   PUT    /api/allowance             設定 { wardId, amount }
 
    階段性提醒
    GET    /api/savings-goals          整體 + 各群組的每月存款目標
@@ -128,7 +133,7 @@
         if (saved.patch) base.patch = saved.patch;
         if (saved.newUsers) base.newUsers = saved.newUsers;
         ['newGroups', 'groupPatch', 'joined', 'left', 'archived',
-         'goalPatch', 'newAlerts', 'alertPatch', 'alertGone'].forEach(function (k) {
+         'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
         });
       }
@@ -154,6 +159,7 @@
         left: state.left || [],
         archived: state.archived || [],
         goalPatch: state.goalPatch || [],
+        allowancePatch: state.allowancePatch || [],
         newAlerts: state.newAlerts || [],
         alertPatch: state.alertPatch || {},
         alertGone: state.alertGone || []
@@ -286,6 +292,36 @@
         return Object.assign({}, a, p);
       })
       .sort(function (a, b) { return a.percent - b.percent; });
+  }
+
+  /* 我每月給某個被監管者多少零用金。種子 + 這個瀏覽器改過的。 */
+  function allowanceOf(payer, ward) {
+    var st = load();
+    var mine = (st.allowancePatch || []).filter(function (a) {
+      return a.payer === payer && a.ward === ward;
+    });
+    if (mine.length) return Number(mine[mine.length - 1].amount) || 0;
+    var seed = global.DATA.allowances.filter(function (a) {
+      return a.payer === payer && a.ward === ward;
+    })[0];
+    return seed ? seed.amount : 0;
+  }
+
+  /* 誰是我監管的人（不含我自己）。家庭總覽要靠它把收入分開算。 */
+  function wardsOf(meId) {
+    return global.DATA.guardianships
+      .filter(function (g) { return g.guardian === meId; })
+      .map(function (g) { return g.ward; });
+  }
+
+  /* 新記的一筆要進哪一本帳。
+     ⚠️ 沒有 group 的紀錄會被群組篩選擋掉，使用者記了卻找不到。
+     所以每一條建立路徑都要走這裡，不要各自寫。 */
+  function groupFor(meId, wanted) {
+    var mine = visibleGroups(meId);
+    if (wanted && mine.indexOf(wanted) >= 0) return wanted;
+    if (!mine.length) throw new Error('你還沒有任何帳本，先去「群組」開一本');
+    return mine[0];
   }
 
   function visibleUsers(meId) {
@@ -456,6 +492,16 @@
       });
     },
 
+    /* 重大操作前的密碼確認。
+       ⚠️ 它跟登入不一樣：驗證通過也**不換發 token**。
+       真後端一定要做速率限制，否則這支就是免費的密碼嘗試器。 */
+    verifyPassword: function (pw) {
+      return sleep(320).then(function () {
+        if (String(pw || '').length < 8) throw new Error('密碼不正確');
+        return { ok: true };
+      });
+    },
+
     changePassword: function (p) {
       p = p || {};
       return sleep(260).then(function () {
@@ -596,6 +642,39 @@
     /* ---------------------------------------------------------
        階段性提醒
        --------------------------------------------------------- */
+    allowances: function () {
+      var st = load();
+      return sleep(160).then(function () {
+        return {
+          allowances: wardsOf(st.me).map(function (w) {
+            var m = memberOf(w) || {};
+            return {
+              wardId: w, wardName: m.name || w,
+              amount: allowanceOf(st.me, w),
+              spent: m.expense || 0
+            };
+          })
+        };
+      });
+    },
+
+    setAllowance: function (wardId, amount) {
+      var st = load();
+      return sleep(220).then(function () {
+        if (wardsOf(st.me).indexOf(wardId) < 0) {
+          var e = new Error('你沒有監管這個人'); e.status = 403; throw e;
+        }
+        var v = Number(amount);
+        if (isNaN(v) || v < 0) throw new Error('零用金要是 0 以上的數字');
+        st.allowancePatch = (st.allowancePatch || []).concat([
+          { payer: st.me, ward: wardId, amount: v }
+        ]);
+        save();
+        var m = memberOf(wardId) || {};
+        return { wardId: wardId, wardName: m.name, amount: v };
+      });
+    },
+
     savingsGoals: function () {
       var s = load();
       return sleep(160).then(function () {
@@ -684,9 +763,28 @@
         // 成員表上的 income / expense 是本月至今的合計（示範明細已含在內）；
         // 使用者新記的（id 以 N 開頭）才另外加上去，這樣兩個畫面的數字才會一致
         var added = tx.filter(function (t) { return String(t.id).indexOf('N') === 0; });
-        var income = users.reduce(function (n, u) {
+
+        /* ⚠️ 家庭總覽不把被監管者的收入算進家庭收入。
+           他們的收入主要來自零用錢——那是家裡給的，
+           算進來等於同一筆錢先當成家庭支出、再當成家庭收入，憑空多一筆。
+           支出則要算：那筆錢確實離開了這個家。
+
+           他們自己的收入另外回一個 wardIncome，畫面上分開顯示。 */
+        var wards = f.scope === 'family' ? wardsOf(s.me) : [];
+        var earners = users.filter(function (u) { return wards.indexOf(u) < 0; });
+
+        var income = earners.reduce(function (n, u) {
           var m = memberOf(u); return n + (m ? m.income : 0);
-        }, 0) + sum(added, 'income');
+        }, 0) + sum(added.filter(function (t) {
+          return earners.indexOf(t.user) >= 0;
+        }), 'income');
+
+        var wardIncome = wards.reduce(function (n, u) {
+          var m = memberOf(u); return n + (m ? m.income : 0);
+        }, 0) + sum(added.filter(function (t) {
+          return wards.indexOf(t.user) >= 0;
+        }), 'income');
+
         var expense = users.reduce(function (n, u) {
           var m = memberOf(u); return n + (m ? m.expense : 0);
         }, 0) + sum(added, 'expense');
@@ -711,6 +809,15 @@
           period: D.meta.period,
           scope: f.scope || 'me',
           income: income, expense: expense, net: income - expense,
+          wardIncome: wardIncome,
+          allowance: wards.reduce(function (n, u) {
+            return n + allowanceOf(s.me, u);
+          }, 0),
+          wardSpend: wards.reduce(function (n, u) {
+            var m = memberOf(u); return n + (m ? m.expense : 0);
+          }, 0) + sum(added.filter(function (t) {
+            return wards.indexOf(t.user) >= 0;
+          }), 'expense'),
           rate: income ? (income - expense) / income : 0,
           count: tx.length,
           savings: {
@@ -860,10 +967,12 @@
     nlpConfirmBatch: function (items) {
       var s = load();
       return sleep(420).then(function () {
+        var g = groupFor(s.me, items[0] && items[0].groupId);
         var made = items.map(function (p, i) {
           return {
             id: 'N' + (Date.now() + i), user: s.me, date: p.date,
             amount: Number(p.amount), kind: p.kind, cat: p.cat,
+            group: g,
             merchant: p.merchant || '', note: p.note || '',
             source: 'nlp', raw: p.span || '',
             parsed: { conf: (p.conf && p.conf.amount) || 0, catConf: (p.conf && p.conf.cat) || 0 }
@@ -882,6 +991,7 @@
       return sleep(260).then(function () {
         var t = {
           id: 'N' + Date.now(), user: s.me, date: p.date, amount: Number(p.amount),
+          group: groupFor(s.me, p.groupId),
           kind: p.kind, cat: p.cat, merchant: p.merchant || '',
           note: p.note || '', source: 'manual', raw: ''
         };
@@ -895,6 +1005,7 @@
       return sleep(260).then(function () {
         var t = {
           id: 'N' + Date.now(), user: s.me, date: parsed.date, amount: Number(parsed.amount),
+          group: groupFor(s.me, parsed.groupId),
           kind: parsed.kind, cat: parsed.cat, merchant: parsed.merchant || '',
           note: parsed.note || '', source: 'nlp', raw: parsed.raw || '',
           parsed: { conf: parsed.conf || 0, catConf: parsed.catConf || 0 }
@@ -1337,6 +1448,7 @@
     uploadAvatar:      function (d)     { return req('/api/auth/me/avatar', { method: 'PUT', body: { image: d } }); },
     deleteAvatar:      function ()      { return req('/api/auth/me/avatar', { method: 'DELETE' }); },
     changePassword:    function (p)     { return req('/api/auth/password', { method: 'PATCH', body: p }); },
+    verifyPassword:    function (pw)    { return req('/api/auth/verify-password', { method: 'POST', body: { password: pw } }); },
 
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
     transactions:      function (f)     { return req('/api/transactions' + qs(f)); },
@@ -1355,6 +1467,8 @@
     archiveGroup:      function (g)     { return req('/api/groups/' + encodeURIComponent(g), { method: 'DELETE' }); },
     addGroupMember:    function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members', { method: 'POST', body: { userId: u } }); },
     removeGroupMember: function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members/' + encodeURIComponent(u), { method: 'DELETE' }); },
+    allowances:        function ()      { return req('/api/allowances'); },
+    setAllowance:      function (w, a)  { return req('/api/allowance', { method: 'PUT', body: { wardId: w, amount: a } }); },
     savingsGoals:      function ()      { return req('/api/savings-goals'); },
     alerts:            function ()      { return req('/api/alerts'); },
     createAlert:       function (p)     { return req('/api/alerts', { method: 'POST', body: p }); },
@@ -1381,6 +1495,7 @@
     uploadAvatar:      function (d)    { return impl.uploadAvatar(d); },
     deleteAvatar:      function ()     { return impl.deleteAvatar(); },
     changePassword:    function (p)    { return impl.changePassword(p); },
+    verifyPassword:    function (pw)   { return impl.verifyPassword(pw); },
     summary:           function (f)    { return impl.summary(f); },
     transactions:      function (f)    { return impl.transactions(f); },
     nlpParse:          function (t)    { return impl.nlpParse(t); },
@@ -1398,6 +1513,8 @@
     archiveGroup:      function (g)    { return impl.archiveGroup(g); },
     addGroupMember:    function (g, u) { return impl.addGroupMember(g, u); },
     removeGroupMember: function (g, u) { return impl.removeGroupMember(g, u); },
+    allowances:        function ()     { return impl.allowances(); },
+    setAllowance:      function (w, a) { return impl.setAllowance(w, a); },
     savingsGoals:      function ()     { return impl.savingsGoals(); },
     alerts:            function ()     { return impl.alerts(); },
     createAlert:       function (p)    { return impl.createAlert(p); },

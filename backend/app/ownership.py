@@ -85,6 +85,9 @@ MEMBERS: list[Member] = [
         scope=(
             "負責「你是誰」以及整個後端的地基。\n"
             "屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層。\n"
+            "verify-password 給「重大操作前再確認一次」用："
+            "驗證密碼但不發新的 token。⚠️ 一定要做速率限制，"
+            "否則它就是一支免費的密碼嘗試器。\n"
             "不屬於他的：家庭角色與監管關係（那是成員4）。"
             "users 表存的是登入身分，family_members 表才是家庭角色，兩者刻意分開。"
         ),
@@ -96,6 +99,7 @@ MEMBERS: list[Member] = [
             ("POST", "/api/auth/logout-all"),
             ("GET", "/api/auth/me"),
             ("PATCH", "/api/auth/password"),
+            ("POST", "/api/auth/verify-password"),
             ("GET", "/api/auth/sessions"),
             ("PATCH", "/api/auth/me"),
             ("PUT", "/api/auth/me/avatar"),
@@ -225,6 +229,12 @@ MEMBERS: list[Member] = [
             "家裡的階級管的是「誰看得到誰的錢」，"
             "不是「你能不能替自己的開銷分類」。\n"
             "只做一道的話會漏：我監管的小孩在一個我沒加入的群組記帳，那筆不該出現在我的清單上。\n"
+            "零用金也在這裡：家長每個月給某個被監管者多少錢。\n"
+            "⚠️ **零用金是設定，不是一筆支出紀錄。**\n"
+            "  家長記一筆「給小孩 3000」，小孩再把那 3000 花掉記成支出，\n"
+            "  家庭總支出就會變成 6000——同一筆錢被算了兩次。\n"
+            "  正確的算法是：**子女的支出算進家庭支出，子女的收入不算進家庭收入**，\n"
+            "  零用金只拿來跟「他實際花了多少」做對照。\n"
             "不屬於他的：登入本身（那是成員1）。"
             "成員1 回答「你是誰」，成員4 回答「你能看到什麼」。"
         ),
@@ -247,6 +257,8 @@ MEMBERS: list[Member] = [
             ("DELETE", "/api/groups/{gid}"),
             ("POST", "/api/groups/{gid}/members"),
             ("DELETE", "/api/groups/{gid}/members/{user_id}"),
+            ("GET", "/api/allowances"),
+            ("PUT", "/api/allowance"),
         ],
         files=[
             "app/routers/family.py",

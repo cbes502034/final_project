@@ -2162,3 +2162,131 @@ body.rail-min .nav__i:hover, body.rail-min .docs__i:hover { background: var(--su
 
 /* 成員沒有家庭總覽這個功能，側欄就不要留一個點不進去的項目 */
 body.role-member .nav__i[data-nav="family"] { display: none; }
+
+
+/* ============================================================
+   財務建議：可收合的條列
+   ------------------------------------------------------------
+   原本每一則都整個攤開，五六則排下來就是一大片文字。
+   改成一則一行，想看細節才點開。
+   ============================================================ */
+.ad { border-bottom: 1px solid var(--line); }
+.ad__h {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 14px 28px; text-align: left; background: transparent;
+  transition: background-color .16s var(--ease);
+}
+.ad__h:hover { background: var(--card-2); }
+.ad.on .ad__h { background: var(--card-3); }
+
+.ad__lv {
+  flex: 0 0 auto; min-width: 44px; font-size: 11.5px; font-weight: 500;
+}
+.ad__lv--warn { color: var(--down); }
+.ad__lv--ok   { color: var(--up); }
+.ad__lv--info { color: var(--info); }
+
+.ad__t {
+  flex: 1 1 auto; min-width: 0; font-size: 14.5px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ad__m { flex: 0 0 auto; font-size: 12px; color: var(--ink-faint); }
+.ad__p {
+  flex: 0 0 auto; font-family: var(--mono); font-size: 12px; color: var(--ink-dim);
+}
+.ad__cv {
+  flex: 0 0 auto; width: 14px; height: 14px; color: var(--ink-dim);
+  transition: transform .22s var(--back);
+}
+.ad.on .ad__cv { transform: rotate(180deg); color: var(--accent); }
+
+.ad__b {
+  padding: 4px 28px 22px 86px; animation: riseIn .3s var(--out) both;
+}
+.ad__b p { font-size: 14.5px; color: var(--ink-soft); line-height: 2; margin-bottom: 18px; }
+.ad__k {
+  font-size: 11px; letter-spacing: .08em; color: var(--ink-dim);
+  font-family: var(--mono); margin-bottom: 6px;
+}
+.ad__b ul { margin-bottom: 18px; }
+.ad__b li {
+  font-size: 13.5px; color: var(--ink-soft); line-height: 1.95;
+  padding-left: 14px; position: relative;
+}
+.ad__b li::before {
+  content: ''; position: absolute; left: 0; top: 12px;
+  width: 4px; height: 1px; background: var(--line-3);
+}
+.ad__b ul:last-child { margin-bottom: 0; }
+
+/* 搜尋框長得跟其他篩選一樣 */
+.fsel input[type="search"] {
+  padding: 8px 12px; min-width: 240px;
+  background-color: var(--sunk); border: 1px solid var(--line-2);
+  color: var(--ink); font-size: 13.5px;
+}
+
+@media (max-width: 900px) {
+  .ad__h { padding-left: 18px; padding-right: 18px; }
+  .ad__b { padding-left: 18px; padding-right: 18px; }
+  .ad__m { display: none; }
+}
+
+/* 刪除按下第一次：變成確認狀態 */
+.del--sure { opacity: 1; font-weight: 600; text-decoration-color: var(--down); }
+
+
+/* ============================================================
+   圖示模式：一律用下拉，不用抽屜
+   ------------------------------------------------------------
+   規則是「圖示 ⇒ 下拉」「文字 ⇒ 抽屜」。
+   帳本和通知已經處理了，搜尋先前漏掉——它在圖示模式下
+   還是整條拉開，跟旁邊兩個不一致。
+   ============================================================ */
+body.bar-icon #searchDrawer {
+  left: auto; right: 0; width: min(340px, calc(100vw - 32px));
+  border-left: 1px solid var(--line-2); border-right: 1px solid var(--line-2);
+  padding: 14px 18px;
+}
+/* ⚠️ 不要把 .search 也設成 relative——#searchDrawer 本身就是 .search，
+   那樣會把它自己的 absolute 蓋掉，下拉就定位不了。
+   它靠 .top（sticky，算是定位過的祖先）來對齊右緣就好。 */
+body.bar-icon .bell__wrap, body.bar-icon .gsw { position: relative; }
+
+
+/* ============================================================
+   重大操作的確認視窗
+   ============================================================ */
+.dg__w { font-size: 14.5px; color: var(--ink-soft); line-height: 1.95; margin-bottom: 20px; }
+.dg__w b { color: var(--down); font-weight: 600; }
+
+.dg .fld { margin-bottom: 16px; }
+
+/* 那段 64 碼：粗體、可選取。故意不給複製按鈕——
+   要使用者自己圈起來複製，那個動作本身就是一道減速帶。 */
+.dg__code {
+  background: var(--card-3); border-left: 3px solid var(--warn);
+  padding: 14px 16px; margin-bottom: 16px;
+}
+.dg__code > span {
+  display: block; font-size: 12px; color: var(--ink-faint); margin-bottom: 8px;
+}
+.dg__code b {
+  display: block; font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+  color: var(--ink); line-height: 1.8; word-break: break-all;
+  user-select: all; cursor: text;
+}
+.dg #dgCode { font-family: var(--mono); font-size: 12.5px; }
+
+.dg__err { color: var(--down); font-size: 13px; margin-top: 4px; }
+.dg .hp__d { justify-content: flex-end; gap: 10px; }
+.btn--danger {
+  background: var(--down); border-color: var(--down); color: var(--card);
+}
+.btn--danger:hover { background: #a83a32; border-color: #a83a32; color: var(--card); }
+
+/* 寫入前的二次確認：按鈕上直接顯示要寫什麼 */
+.btn--sure {
+  background: var(--warn); border-color: var(--warn); color: var(--card);
+}
+.btn--sure:hover { background: var(--warn); border-color: var(--warn); color: var(--card); }

@@ -413,3 +413,22 @@ def test_權限矩陣要跟_data_js_一致():
 
     # 建立群組不分角色，這是刻意的設計，不可以被悄悄改掉
     assert "{ action: '建立群組（帳本）', master: 'Y', parent: 'Y', member: 'Y' }" in data,         "建立群組應該三個角色都可以——記帳的分類方式不該由家裡的階級決定"
+
+
+def test_每一條建立紀錄的路徑都要帶群組():
+    """新記的一筆沒有 group，就會被群組篩選擋掉——記了卻找不到。
+
+    這是真的發生過的：加了群組之後，createTransaction、nlpConfirm、
+    nlpConfirmBatch 三條路徑都沒補上 group，於是記帳功能整個失效，
+    畫面上卻沒有任何錯誤訊息。
+
+    所以規定：**每一條建立路徑都要走 groupFor()**，不要各自寫。
+    """
+    api = read("frontend/js/api.js")
+    assert "function groupFor(" in api, "api.js 少了 groupFor()"
+
+    for fn in ("createTransaction: function", "nlpConfirm: function",
+               "nlpConfirmBatch: function"):
+        i = api.index(fn)
+        body = api[i:i + 1400]
+        assert "groupFor(" in body, "%s 沒有走 groupFor()，新紀錄會沒有群組" % fn

@@ -57,6 +57,15 @@ window.DATA = {
     { id: 'AL5', user: 'U3', group: null, percent: 80,  enabled: true,  firedPeriod: null }
   ],
 
+  /* 每月給被監管者多少零用金。
+     ⚠️ 這是設定，不是支出紀錄——家長不要另外記一筆「給小孩 3000」，
+     否則小孩把那 3000 花掉之後，同一筆錢會被算兩次。 */
+  allowances: [
+    { payer: 'U1', ward: 'U3', amount: 4000 },
+    { payer: 'U1', ward: 'U4', amount: 3000 },
+    { payer: 'U2', ward: 'U4', amount: 0 }
+  ],
+
   /* ---------- 家庭成員與角色 ---------- */
   roles: [
     { id: 'master', name: '管理者', desc: '家庭最高權限：管成員、設預算、指派監管關係。看得到誰一樣要看監管關係——沒指派就只看得到自己' },
@@ -432,6 +441,14 @@ window.DATA = {
              ['fired_period', 'TEXT', "'2026-09'。⚠️ 同一個門檻一個月只響一次，靠這欄擋"],
              ['created_at', 'TIMESTAMPTZ', '']] },
 
+    { t: 'allowances', label: '每月零用金', note: '★ 設定，不是支出紀錄。家長每月給某個被監管者多少',
+      cols: [['id', 'BIGSERIAL', 'PK'],
+             ['payer_id', 'BIGINT', 'FK → users，給錢的人'],
+             ['ward_id', 'BIGINT', 'FK → users，收錢的人'],
+             ['amount', 'NUMERIC(14,2)', '每月金額'],
+             ['period_key', 'TEXT', "'2026-09'。NULL = 預設值，套用到未指定的月份"],
+             ['created_at', 'TIMESTAMPTZ', '']] },
+
     { t: 'audit_logs', label: '稽核紀錄', note: '誰看了誰的資料、誰改了權限',
       cols: [['id', 'BIGSERIAL', 'PK'], ['actor_id', 'BIGINT', 'FK → users'],
              ['action', 'TEXT', "'view_ward' / 'grant_guardianship' / 'change_role' …"],
@@ -441,6 +458,7 @@ window.DATA = {
 
   relations: [
     ['sessions', 'users', 'N:1', ''],
+    ['allowances', 'users', 'N:1', '給錢的人與收錢的人'],
     ['notifications', 'users', 'N:1', '收件人'],
     ['notifications', 'transactions', 'N:1', '記帳類通知指到那一筆'],
     ['groups', 'families', 'N:1', ''],
