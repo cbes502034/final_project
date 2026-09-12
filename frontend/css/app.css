@@ -2333,3 +2333,19 @@ body.bar-icon .bell__wrap, body.bar-icon .gsw { position: relative; }
   .toasts { max-width: calc(100vw - 24px); right: 12px; left: auto; }
   .toast { max-width: 100%; }
 }
+
+
+/* ============================================================
+   抽屜是推開，不是蓋住
+   ------------------------------------------------------------
+   面板絕對定位貼在頂欄下緣，本來會浮在內容上面，
+   把下面那一列切掉一半——看起來像壞掉。
+
+   改成把內容區往下推出同樣的高度（--dw-h 由 JS 量好），
+   抽屜拉開時下面的東西整個讓開，一列都不會被遮到。
+   ============================================================ */
+body.dw-push #view { padding-top: var(--dw-h, 0px); }
+#view { transition: padding-top .24s var(--out); }
+
+/* 推開之後就不需要壓暗了——沒有東西被蓋住 */
+body.dw-on #view { opacity: 1; pointer-events: auto; }

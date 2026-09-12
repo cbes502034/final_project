@@ -10,6 +10,21 @@
   var $view = document.getElementById('view');
   var DATA_CATS = {};   // 分類 id → 名稱，確認訊息要用
 
+  /* 抽屜拉開時把下面的內容往下推，不要蓋住它。
+     檔案櫃的抽屜是把東西推開，不是壓在上面——
+     蓋住的話，被遮的那一列會被切掉一半，看起來像壞掉。
+
+     面板是絕對定位的（貼著頂欄），所以用內容區的 padding 把位置讓出來。 */
+  function pushForDrawer() {
+    var open = ['#gswPanel', '#bellPanel', '#searchDrawer']
+      .map(function (sel) { return document.querySelector(sel); })
+      .filter(function (e) { return e && !e.hidden && getComputedStyle(e).position === 'absolute'; })[0];
+    var h = open ? Math.ceil(open.getBoundingClientRect().height) : 0;
+    document.body.style.setProperty('--dw-h', h + 'px');
+    document.body.classList.toggle('dw-push', h > 0);
+  }
+  global.__pushForDrawer = pushForDrawer;   // notify.js 開關鈴鐺時也要叫
+
   /* 側欄收合。記在 localStorage，下次打開維持上次的樣子。 */
   (function () {
     var K = 'fambudget.rail';
@@ -205,7 +220,7 @@
           barChart(d.monthly) + '</div></div>';
 
         h += '<div class="sec"><h2 class="sec__t">最近的紀錄</h2>' +
-             '<button class="btn btn--sm" data-nav="entry" style="margin-left:auto">去記帳 ▸</button></div>' +
+             '</div>' +
              '<div id="recent">' + skeleton(4) + '</div></div>';
         $view.innerHTML = h;
         animate();
@@ -1726,6 +1741,7 @@
         sd.hidden = !sd.hidden;
         sb.classList.toggle('open', !sd.hidden);
         document.body.classList.toggle('dw-on', !sd.hidden);
+        setTimeout(pushForDrawer, 0);
         if (!sd.hidden) document.getElementById('search').focus();
       }
       return;
@@ -1736,6 +1752,7 @@
         sd2.hidden = true;
         document.getElementById('searchBtn').classList.remove('open');
         document.body.classList.remove('dw-on');
+        pushForDrawer();
       }
     }
 
@@ -1747,6 +1764,7 @@
         // 抽屜拉開時，按鈕本身跟底下的內容都要有反應
         document.getElementById('gswBtn').classList.toggle('open', !gp.hidden);
         document.body.classList.toggle('dw-on', !gp.hidden);
+        setTimeout(pushForDrawer, 0);
       }
       return;
     }
@@ -1754,6 +1772,7 @@
     if (gpick) {
       setGroup(gpick.dataset.group);
       document.body.classList.remove('dw-on');
+      pushForDrawer();
       paintGroups();
       paint();
       return;
@@ -1765,6 +1784,7 @@
         var gb = document.getElementById('gswBtn');
         if (gb) gb.classList.remove('open');
         document.body.classList.remove('dw-on');
+        pushForDrawer();
       }
     }
 
