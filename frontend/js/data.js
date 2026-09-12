@@ -29,8 +29,12 @@ window.DATA = {
       created: '2026-02-11', note: '打工收入與自己的開銷' }
   ],
 
-  /* 誰在哪個群組裡。這是可見範圍的第二道篩選——
-     ⚠️ 監管關係決定「誰的紀錄」，群組決定「哪一本帳」，兩道都要過。 */
+  /* 誰在哪個群組裡。這是可見範圍的**另一條路**，不是第二道關卡——
+     ⚠️ 跟監管關係是**聯集**：
+          A 我監管的人記的，跨所有帳本都看得到（監管不該被帳本切斷）
+          B 我有加入的帳本裡的，那本帳的成員彼此看得到（加進來就是給看）
+        過一條就看得到。早期版本用交集，那讓監管一鍵可繞：
+        被監管的人只要另外開一本不加監管者的帳就躲掉了。 */
   groupMembers: [
     { group: 'G1', user: 'U1' }, { group: 'G1', user: 'U2' },
     { group: 'G1', user: 'U3' }, { group: 'G1', user: 'U4' },
@@ -432,7 +436,7 @@ window.DATA = {
              ['created_at', 'TIMESTAMPTZ', ''],
              ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著']] },
 
-    { t: 'group_members', label: '群組成員', note: '可見範圍的第二道篩選：我在不在這本帳裡',
+    { t: 'group_members', label: '群組成員', note: '可見範圍的另一條路：我在這本帳裡就看得到這本帳',
       cols: [['group_id', 'BIGINT', 'PK, FK → groups'],
              ['user_id', 'BIGINT', 'PK, FK → users'],
              ['joined_at', 'TIMESTAMPTZ', ''],

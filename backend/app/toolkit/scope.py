@@ -1,21 +1,26 @@
 """
-可見範圍：把「誰的紀錄」和「哪一本帳」兩道篩選合起來。
+可見範圍：看得到一筆紀錄的兩條路。
 
 負責人：成員4（家庭與可見範圍）
 
 ===========================================================================
 一句話
 ===========================================================================
-一筆紀錄要同時通過兩道門，你才看得到：
+一筆紀錄只要通過**其中一條**，你就看得到：
 
-    1. 這筆是誰記的  → 監管關係（自己 ＋ 我監管的人）
-    2. 這筆在哪本帳  → 群組成員（我在不在那個群組裡）
+    A. 這筆是誰記的  → 我自己，或我監管的人（**跨所有帳本，無條件**）
+    B. 這筆在哪本帳  → 我有加入的帳本（那本帳的成員彼此看得到）
 
-**兩道是獨立的，而且都要過。** 只做一道會漏：
+**兩條是聯集，不是交集。** 兩者各自回答一個不同的問題：
 
-* 只看監管關係 → 我監管的小孩在一個我沒加入的群組（例如他自己的零用帳）
-  記帳，那筆會跑到我的清單上。
-* 只看群組 → 同一個群組裡別人的私人紀錄我也看得到。
+* A 是**監管**。家長對子女的可見度不該被帳本切斷——否則子女只要另外
+  開一本不加家長的帳，就完全躲開了監管。鎖住「離開群組」也堵不住，
+  因為他根本不用離開，另外開一本就好。
+* B 是**分享**。把誰加進帳本，就是選擇讓他看到那本帳——這是記帳的人
+  自己的行為，不需要誰核准。
+
+⚠️ 早期版本用的是交集（兩道都要過），那是錯的：它讓監管有一個
+   一鍵可繞的破口，同時又讓「把人加進帳本」什麼也不代表。
 
 ===========================================================================
 為什麼可見範圍不看角色
@@ -42,15 +47,26 @@
 
     rows = (
         db.query(Transaction)
-          .filter(Transaction.user_id.in_(users))
-          .filter(Transaction.group_id.in_(groups))
+          .filter(or_(                       # ⚠️ or_，不是兩個 filter
+              Transaction.user_id.in_(users),
+              Transaction.group_id.in_(groups),
+          ))
           .all()
     )
 
+⚠️ 串成兩個 `.filter()` 是 AND，那就變回交集了。一定要 `or_`。
+
+算某個人的統計時只走 A（`user_id.in_(users)`），不要加 B——
+B 會把帳本裡別人的錢算進這個人的總額。
+
 要擋單一目標（例如 `GET /api/transactions?userId=U3`）：
 
-    scope.require_user(target_id, users)     # 沒權限就丟 Forbidden
+    scope.require_user(target_id, scope.queryable_users(
+        me_id, guardianships, group_members))
     scope.require_group(group_id, groups)
+
+`queryable_users` 比 `visible_users` 寬：跟我同帳本的人，我看得到他在
+那本帳裡的紀錄，所以「查他」是合理的——只是查到的會是那一部分。
 
 ⚠️ **沒權限要回 403，不要回空陣列。**
 回空的話，前端分不出「這個人沒記帳」和「你不能看」。
@@ -63,6 +79,9 @@ from typing import Iterable, Protocol, Sequence
 __all__ = [
     "Forbidden",
     "visible_users",
+    "co_members",
+    "queryable_users",
+    "can_see_row",
     "visible_groups",
     "can_see_user",
     "can_see_group",
@@ -135,6 +154,57 @@ def visible_groups(me: object, group_members: Iterable[object]) -> set:
     }
 
 
+def co_members(me: object, group_members: Iterable[object]) -> set:
+    """跟我同帳本的人（含我自己）。
+
+    這些人我看得到他們**在共用帳本裡**的紀錄——但看不到他們記在別處的。
+    這跟監管不一樣：監管是整個人，共用帳本只是那一本。
+
+    >>> gm = [{"group_id": "G1", "user_id": "U1"},
+    ...       {"group_id": "G1", "user_id": "U2"},
+    ...       {"group_id": "G9", "user_id": "U7"}]
+    >>> co_members("U1", gm) == {"U1", "U2"}
+    True
+    """
+    mine = visible_groups(me, group_members)
+    out = {me}
+    for m in group_members:
+        if _attr(m, "group_id", "group") in mine:
+            out.add(_attr(m, "user_id", "user"))
+    return out
+
+
+def queryable_users(
+    me: object,
+    guardianships: Iterable[object],
+    group_members: Iterable[object],
+) -> set:
+    """我可以拿誰的 id 來查：我監管的人 ＋ 跟我同帳本的人。
+
+    ⚠️ 「查得到」不等於「看得到全部」。同帳本的人只會查到共用帳本那部分，
+    這由 :func:`can_see_row` 逐筆決定——這裡只負責擋掉完全無關的人。
+    """
+    return visible_users(me, guardianships) | co_members(me, group_members)
+
+
+def can_see_row(
+    row: object, users: Iterable[object], groups: Iterable[object]
+) -> bool:
+    """這一筆我看不看得到：A 或 B，過一條就算。
+
+    >>> can_see_row({"user_id": "U3", "group_id": "G9"}, {"U1", "U3"}, {"G1"})
+    True
+    >>> can_see_row({"user_id": "U9", "group_id": "G1"}, {"U1"}, {"G1"})
+    True
+    >>> can_see_row({"user_id": "U9", "group_id": "G9"}, {"U1"}, {"G1"})
+    False
+    """
+    return (
+        _attr(row, "user_id", "user") in set(users)
+        or _attr(row, "group_id", "group") in set(groups)
+    )
+
+
 def can_see_user(target: object, users: Iterable[object]) -> bool:
     return target in set(users)
 
@@ -159,7 +229,7 @@ def filter_rows(
     users: Iterable[object],
     groups: Iterable[object],
 ) -> list:
-    """兩道篩選都套上。
+    """留下看得到的：A 或 B，過一條就留。
 
     這是給「已經在記憶體裡的資料」用的（例如測試、或算統計時的中間結果）。
     ⚠️ 正式查詢請把條件下到 SQL 的 WHERE，不要整張表撈出來再篩——
@@ -167,13 +237,12 @@ def filter_rows(
 
     >>> rows = [{"user_id": "U3", "group_id": "G1"},
     ...         {"user_id": "U3", "group_id": "G3"},
-    ...         {"user_id": "U2", "group_id": "G1"}]
-    >>> filter_rows(rows, {"U1", "U3"}, {"G1"})
-    [{'user_id': 'U3', 'group_id': 'G1'}]
+    ...         {"user_id": "U2", "group_id": "G1"},
+    ...         {"user_id": "U9", "group_id": "G9"}]
+    >>> filter_rows(rows, {"U1", "U3"}, {"G1"})  # doctest: +NORMALIZE_WHITESPACE
+    [{'user_id': 'U3', 'group_id': 'G1'},
+     {'user_id': 'U3', 'group_id': 'G3'},
+     {'user_id': 'U2', 'group_id': 'G1'}]
     """
     us, gs = set(users), set(groups)
-    return [
-        r
-        for r in rows
-        if _attr(r, "user_id", "user") in us and _attr(r, "group_id", "group") in gs
-    ]
+    return [r for r in rows if can_see_row(r, us, gs)]

@@ -906,30 +906,46 @@
            前端這裡擋一次是為了給一句人話，並且不要去發一個註定被拒絕的請求。
            真正的把關在 API：帶了沒權限的 userId 會回 403（不是空陣列——
            回空的話，前端分不出「這個人沒記帳」和「你不能看」）。 */
-        if ((me.visible || []).indexOf(id) < 0) {
+        /* 兩種看得到的方式，能看到的範圍不一樣，要講清楚是哪一種：
+             監管    → 這個人的全部紀錄，跨所有帳本
+             同帳本  → 只有你們共用的那幾本裡的紀錄 */
+        var supervised = (me.visible || []).indexOf(id) >= 0;
+        var shared = (me.queryable || []).indexOf(id) >= 0;
+
+        if (!supervised && !shared) {
           $view.innerHTML = '<div class="page"><div class="note note--warn">' +
             '<div class="note__k">看不到這個人的紀錄</div>' +
-            '<p>你沒有被指派監管 <b>' + esc(u.name) + '</b>。<br>' +
+            '<p>你沒有監管 <b>' + esc(u.name) + '</b>，也沒有跟他共用的帳本。<br>' +
             '監管關係由家長建立，而且雙方都看得到——系統不提供隱藏監管。</p>' +
             '</div>' + backLink() + '</div>';
           return;
         }
+        var partial = !supervised;
 
         var a = (al.allowances || []).filter(function (x) { return x.wardId === id; })[0];
         u.allowance = a ? a.amount : 0;
         return API.transactions({ userId: id }).then(function (tx) {
-          render(me, d, u, tx);
+          render(me, d, u, tx, partial);
         });
       })
       .catch(function (e) {
         $view.innerHTML = '<div class="page">' + errState(e) + '</div>';
       });
 
-    function render(me, d, u, tx) {
+    function render(me, d, u, tx, partial) {
       var mine = id === d.me;
       var by = d.guardianships.filter(function (g) { return g.ward === id; });
 
       var h = '<div class="page">' + backLink();
+
+      /* 只因為共用帳本才看得到的話，一定要說清楚這不是全部——
+         不然使用者會把「他這個月只花了 800」當成事實，
+         而那其實只是他記在這幾本帳裡的部分。 */
+      if (partial) {
+        h += '<div class="note"><div class="note__k">這不是他的全部紀錄</div>' +
+          '<p>你沒有監管 ' + esc(u.name) + '，看得到的只有你們<b>共用帳本</b>裡的紀錄。' +
+          '他記在其他帳本的不會出現在這裡。</p></div>';
+      }
 
       h += '<div class="card mhead">' +
         ava(u, 'ava--xl') +
@@ -951,7 +967,9 @@
 
       /* 監管對象的存款目標可由監管者代設——設定的地方就放在
          看得到他紀錄的這一頁，不要塞回成員名冊那張表。 */
-      if (!mine) {
+      /* ⚠️ 只有監管他的人才看得到零用金——那是監管者對監管對象的設定。
+         只是跟他共用一本帳的人不該看到，更不該改。 */
+      if (!mine && !partial) {
         /* 我給他多少零用金。這是設定，不是一筆支出紀錄——
            不要另外記一筆「給小孩 3000」，否則他花掉之後同一筆錢會被算兩次。 */
         h += '<div class="sec"><h2 class="sec__t">每月零用金' + helpBtn('allowance') + '</h2></div>' +

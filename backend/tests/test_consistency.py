@@ -647,3 +647,82 @@ def test_年齡不可以參與任何權限判斷():
         src = read(path)
         for bad in ("age < 18", "age >= 18", "age<18", "未成年"):
             assert bad not in src, "%s 還在用年齡判斷權限：%s" % (path, bad)
+
+
+def test_可見範圍是聯集不是交集():
+    """監管不可以被帳本切斷。
+
+    早期版本用交集（人 AND 帳本），那讓監管有一個一鍵可繞的破口：
+    被監管的人只要另外開一本不加監管者的帳，記在那裡就完全看不到了。
+    他甚至不用離開任何群組。
+
+    所以改成聯集：
+        A 我或我監管的人記的 —— 跨所有帳本
+        B 記在我有加入的帳本裡 —— 那本帳的成員彼此看得到
+    """
+    api = read("frontend/js/api.js")
+
+    mo = re.search(r"function canSeeRow\(([^)]*)\) \{(.*?)\n  \}", api, re.S)
+    assert mo, "api.js 裡找不到 canSeeRow"
+    body = mo.group(2)
+    assert "||" in body, "canSeeRow 必須是聯集（||），不可以改回 &&"
+    assert "&&" not in body, "canSeeRow 出現了 &&，那會變回交集"
+
+    # 明細的篩選必須走 canSeeRow，不可以自己再寫一次兩道判斷
+    assert "if (!canSeeRow(t, vis, vgs)) return false;" in api, \
+        "listTransactions 沒有走 canSeeRow"
+
+    # 統計只能走 A，不可以把帳本裡別人的錢算進某個人的總額
+    mo2 = re.search(r"summary: function \(f\) \{(.*?)\n    \},", api, re.S)
+    assert mo2, "api.js 裡找不到 summary"
+    assert "canSeeRow" not in mo2.group(1), \
+        "統計不可以走聯集——B 會把共用帳本裡別人的錢算進這個人的總額"
+
+
+def test_通知與明細的可見範圍必須一致():
+    """一則點進去卻看不到東西的通知，比沒有通知更糟。
+
+    監管的通知只看監管關係（跨帳本），明細也必須看得到同一批紀錄。
+    兩邊用不同規則的話，使用者會收到自己打不開的通知。
+    """
+    api = read("frontend/js/api.js")
+    mo = re.search(r"type: 'ward_transaction'", api)
+    assert mo, "找不到 ward_transaction"
+
+    # 產生通知的那段不可以加上帳本篩選
+    head = api[max(0, mo.start() - 1200):mo.start()]
+    assert "wards.indexOf(t.user) >= 0" in head, \
+        "監管通知應該只看監管關係"
+    assert "vgs.indexOf(t.group)" not in head, \
+        "監管通知不可以再加帳本篩選——那會跟明細對不起來"
+
+
+def test_手冊的資料表要逐欄跟得上_data_js():
+    """表名對得上還不夠，**欄位說明也會走散**。
+
+    實際發生過：data.js 的 users 表加了 is_platform_admin、
+    families 把 master_id 換成 created_by，但手冊那一大塊 HTML 是手寫的，
+    整整落後一版——上面還寫著 master_id 和「判斷是否未成年」。
+
+    表格數對得上，所以舊測試沒抓到。這支逐欄比對。
+    """
+    data = read("frontend/js/data.js")
+    handbook = read("frontend/docs/index.html")
+
+    block = data[data.index("  schema: ["):data.index("  relations:")]
+    # [['欄位名', '型別', '說明'], ...]
+    cols = re.findall(r"\['([a-z_]+)', '([A-Z][A-Za-z0-9(),. ]*)', '([^']*)'\]", block)
+    assert len(cols) > 80, "解析到的欄位太少：%d" % len(cols)
+
+    missing = []
+    for name, typ, note in cols:
+        cell = "<td class=\"mono\"><b>%s</b></td>" % name
+        if cell not in handbook:
+            missing.append("%s（欄位沒出現）" % name)
+        elif note and ("<td>%s</td>" % note.replace("&", "&amp;")) not in handbook:
+            missing.append("%s 的說明「%s」" % (name, note[:24]))
+
+    assert not missing, (
+        "手冊的資料表落後 data.js：" + "、".join(missing[:8])
+        + "\n重新產生那一段，不要手改"
+    )

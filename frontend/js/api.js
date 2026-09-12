@@ -205,7 +205,7 @@
 
        平台管理員更是完全看不到：他能停權，但讀不到任何一筆帳。） */
   /* 我看得到哪幾本帳：我有加入的群組。
-     ⚠️ 這是跟 visibleUsers 完全獨立的第二道篩選，**兩道都要過**。
+     ⚠️ 這跟 visibleUsers 是**聯集**，不是交集——過一條就看得到。
      只做一道會漏：我監管的小孩在一個我沒加入的群組記帳，
      那筆不該出現在我的清單上。 */
   /* 某本帳裡有誰 */
@@ -326,6 +326,33 @@
     return mine[0];
   }
 
+  /* 跟我同帳本的人。我看得到他們**在共用帳本裡**的紀錄，
+     但看不到他們記在別處的——這跟監管不一樣，監管是整個人。 */
+  function coMembers(meId) {
+    var mine = visibleGroups(meId);
+    var out = [meId];
+    global.DATA.groupMembers.forEach(function (m) {
+      if (mine.indexOf(m.group) >= 0 && out.indexOf(m.user) < 0) out.push(m.user);
+    });
+    return out;
+  }
+
+  /* 這一筆看不看得到：A 我或我監管的人記的（跨所有帳本）
+                       B 記在我有加入的帳本裡
+     過一條就算。 */
+  function canSeeRow(t, vis, vgs) {
+    return vis.indexOf(t.user) >= 0 || vgs.indexOf(t.group) >= 0;
+  }
+
+  /* 我可以點開誰：我監管的人（看得到全貌）＋ 跟我同帳本的人（只看得到那幾本）。
+     ⚠️ 比 visibleUsers 寬。兩者不可以混用——
+        存款目標那種個人財務資料只給 visibleUsers，不給同帳本的人。 */
+  function queryableUsers(meId) {
+    var out = visibleUsers(meId).slice();
+    coMembers(meId).forEach(function (u) { if (out.indexOf(u) < 0) out.push(u); });
+    return out;
+  }
+
   function visibleUsers(meId) {
     if (!memberOf(meId)) return [meId];
     var wards = global.DATA.guardianships
@@ -352,6 +379,7 @@
           user: clone(m),
           family: clone(global.DATA.meta),
           visible: visibleUsers(s.me),
+          queryable: queryableUsers(s.me),
           guardedBy: global.DATA.guardianships
             .filter(function (g) { return g.ward === s.me; })
             .map(function (g) { return clone(memberOf(g.guardian)); })
@@ -756,9 +784,10 @@
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
         var users = f.scope === 'family' ? visibleUsers(s.me) : [s.me];
-        var vgs = visibleGroups(s.me);
+        /* ⚠️ 統計只走 A（這些人記的），不走 B。
+           B 會把共用帳本裡「別人的錢」算進這個人的總額——
+           家用帳本裡配偶花的錢，不該出現在我的支出裡。 */
         var tx = s.transactions.filter(function (t) {
-          if (vgs.indexOf(t.group) < 0) return false;            // 第二道篩選
           if (f.groupId && f.groupId !== 'all' && t.group !== f.groupId) return false;
           return users.indexOf(t.user) >= 0 && t.date.indexOf(D.meta.period) === 0;
         });
@@ -871,10 +900,15 @@
 
         var vis = visibleUsers(s.me);
         var vgs = visibleGroups(s.me);
+        var askable = coMembers(s.me).concat(vis);
 
         /* 帶了 userId 但沒權限看那個人 → 擋下來，不要回空陣列。
-           回空陣列的話前端分不出「這個人沒記帳」和「你不能看」。 */
-        if (f.userId && f.userId !== 'all' && vis.indexOf(f.userId) < 0) {
+           回空陣列的話前端分不出「這個人沒記帳」和「你不能看」。
+
+           ⚠️ 這裡用 askable（監管 ∪ 同帳本）而不是 vis：同帳本的人
+              我看得到他在那本帳裡的紀錄，所以查他是合理的——
+              只是查到的會只有那一部分，那由 canSeeRow 逐筆決定。 */
+        if (f.userId && f.userId !== 'all' && askable.indexOf(f.userId) < 0) {
           var err = new Error('你沒有權限看這個人的紀錄');
           err.status = 403;
           throw err;
@@ -886,9 +920,7 @@
         }
 
         var rows = s.transactions.filter(function (t) {
-          if (vis.indexOf(t.user) < 0) return false;
-          // ⚠️ 第二道：這本帳我有沒有加入
-          if (vgs.indexOf(t.group) < 0) return false;
+          if (!canSeeRow(t, vis, vgs)) return false;
           if (f.groupId && f.groupId !== 'all' && t.group !== f.groupId) return false;
           if (f.userId && f.userId !== 'all' && t.user !== f.userId) return false;
           if (f.kind && f.kind !== 'all' && t.kind !== f.kind) return false;
@@ -1149,6 +1181,10 @@
           })
           .filter(Boolean);
 
+        /* ⚠️ 這裡**故意只看監管關係，不看帳本**——監管是跨帳本無條件的。
+           以前明細是交集、通知是單軸，兩邊對不起來：監管對象記在一本
+           我沒加入的帳，我會收到一則點進去卻看不到東西的通知。
+           現在明細也是聯集，兩邊一致了。 */
         var rows = s.transactions
           .filter(function (t) { return wards.indexOf(t.user) >= 0; })
           .map(function (t) {
@@ -1270,6 +1306,7 @@
         return {
           me: s.me,
           visible: vis,
+          queryable: queryableUsers(s.me),
           members: D.members.map(function (m) {
             var o = clone(m);
             if (vis.indexOf(m.id) < 0) {

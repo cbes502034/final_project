@@ -288,26 +288,65 @@ def test_沒有任何監管關係時只看得到自己():
     assert scope.visible_users("U9", []) == {"U9"}
 
 
-def test_群組是第二道獨立的篩選():
+def test_群組是另外一條路不是第二道關卡():
     assert scope.visible_groups("U1", _M) == {"G1"}
     assert scope.visible_groups("U3", _M) == {"G1", "G3"}
 
 
-def test_兩道都要過才看得到():
-    """
-    我監管 U3，但 U3 在 G3（我沒加入）記的帳不該出現在我的清單上。
-    只做一道篩選就會漏掉這種情況。
+def test_過一條就看得到():
+    """兩條路是聯集，不是交集。
+
+    早期版本用交集，那讓監管有一個一鍵可繞的破口：我監管 U3，但 U3 只要
+    另外開一本我沒加入的帳，記在那裡我就看不到了。他根本不用離開群組。
     """
     rows = [
-        {"user_id": "U3", "group_id": "G1"},   # 兩道都過
-        {"user_id": "U3", "group_id": "G3"},   # 人可以，帳本不行
-        {"user_id": "U2", "group_id": "G1"},   # 帳本可以，人不行
+        {"user_id": "U3", "group_id": "G1"},   # A、B 都過
+        {"user_id": "U3", "group_id": "G3"},   # A 過：我監管 U3，跨帳本也看得到
+        {"user_id": "U2", "group_id": "G1"},   # B 過：同一本帳，彼此看得到
+        {"user_id": "U9", "group_id": "G9"},   # 兩條都不過
     ]
     users = scope.visible_users("U1", _G)
     groups = scope.visible_groups("U1", _M)
-    assert scope.filter_rows(rows, users, groups) == [
-        {"user_id": "U3", "group_id": "G1"}
+    assert scope.filter_rows(rows, users, groups) == rows[:3]
+
+
+def test_監管跨帳本沒有死角():
+    """被監管的人另外開一本帳也躲不掉——這是監管存在的意義。"""
+    users = scope.visible_users("U1", _G)
+    groups = scope.visible_groups("U1", _M)
+    hidden = {"user_id": "U3", "group_id": "一本U1沒加入的帳"}
+    assert scope.can_see_row(hidden, users, groups)
+
+
+def test_同帳本只看得到那一本():
+    """共用帳本是分享那一本，不是分享整個人。"""
+    users = scope.visible_users("U1", _G)      # U1 沒有監管 U2
+    groups = scope.visible_groups("U1", _M)    # {G1}
+    assert scope.can_see_row({"user_id": "U2", "group_id": "G1"}, users, groups)
+    assert not scope.can_see_row({"user_id": "U2", "group_id": "G2"}, users, groups)
+
+
+def test_同帳本的人查得到但只查得到那一部分():
+    """queryable_users 比 visible_users 寬，這是刻意的。
+
+    用一份區域資料把情境寫清楚：U1 和 U2 同在 G1，但 U1 沒有監管 U2。
+    """
+    gm = [
+        {"group_id": "G1", "user_id": "U1"},
+        {"group_id": "G1", "user_id": "U2"},
+        {"group_id": "G9", "user_id": "U9"},
     ]
+    q = scope.queryable_users("U1", _G, gm)
+    assert "U2" in q, "同帳本的人應該查得到"
+    assert "U3" in q, "監管對象當然查得到"
+    assert "U9" not in q, "完全無關的人不該查得到"
+
+    assert "U2" not in scope.visible_users("U1", _G), \
+        "visible_users 仍然只有自己＋監管對象，不可以被放寬"
+
+
+def test_同帳本的人包含自己():
+    assert "U1" in scope.co_members("U1", _M)
 
 
 def test_沒權限要丟例外不是回空的():
