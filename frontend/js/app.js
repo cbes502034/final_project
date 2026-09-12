@@ -237,9 +237,12 @@
         (t.raw ? '<br><span class="tx__raw">原句「' + esc(t.raw) + '」</span>' : '') + '</div></div>' +
       '<div class="tx__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
         (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</div>' +
+      /* 別人的紀錄就是不給刪除鈕，不用再掛一個「唯讀」標籤。
+         同一句話在一頁上重複十次不會更清楚，只會變成雜訊——
+         該講的在抬頭講一次就好。 */
       (isMine(t)
         ? '<button class="btn btn--sm" data-del="' + esc(t.id) + '">刪除</button>'
-        : '<span class="tag tag--na" title="監管是唯讀的">唯讀</span>') +
+        : '') +
       '</div>';
   }
 
@@ -460,7 +463,7 @@
      03 家庭總覽
      ============================================================ */
   function vFamily() {
-    head('家庭總覽', '你自己 ＋ 被指派給你監管的成員。唯讀');
+    head('家庭總覽', '你自己 ＋ 被指派給你監管的成員');
     $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
     Promise.all([API.summary({ scope: 'family' }), API.me(), API.budgets()])
       .then(function (r) {
@@ -653,9 +656,9 @@
         var by = d.guardianships.filter(function (g) { return g.ward === u.id; });
         return '<article class="row' + (seeable
             ? ' row--open" data-open="' + esc(u.id) + '" title="看 ' + esc(u.name) + ' 的記帳紀錄'
-            : '" title="你沒有監管這個人，看不到紀錄') +
+            : '" title="你沒有監管這個人，看不到他的紀錄') +
           '" style="animation-delay:' + (i * 50) +
-          'ms;grid-template-columns:44px 1fr 200px">' +
+          'ms;grid-template-columns:44px 1fr 104px">' +
           ava(u) +
           '<div class="row__m"><div class="row__top">' +
             '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
@@ -670,21 +673,23 @@
               by.map(function (g) { return esc(g.guardianName); }).join('、') + ' 監管</b>' : '') +
             (!wards.length && !by.length ? '無監管關係' : '') +
           '</div></div>' +
-          '<div class="row__do">' +
-            (seeable
-              ? '<span class="goal"><label>每月存款目標</label>' +
-                '<input class="goal__i" type="number" data-goal="' + esc(u.id) + '" value="' +
-                (u.savingsGoal || 0) + '"' + (canSetGoal(u, d) ? '' : ' disabled') + '></span>' +
-                (canSetGoal(u, d) ? '' : '<span class="tag tag--na">唯讀</span>')
-              : '<span class="goal goal--hid"><label>每月存款目標</label>' +
-                '<span class="goal__x" title="你沒有監管這個人">—</span></span>') +
-            (seeable ? '<span class="row__go">看紀錄 →</span>' : '') +
-          '</div></article>';
+          /* 這一列只講身分：誰、什麼角色、跟誰有監管關係。
+             存款目標是財務設定，不屬於這裡——自己的在「個人資料」，
+             代未成年設的在那個人的紀錄頁。擠在這裡又醜又難按。
+
+             看得到才給按鈕，而且一直看得到。
+             ⚠️ 之前這顆是 hover 才浮出來的，於是「哪幾列點得下去」
+             要滑過去才知道——使用者當然會去點一個點不進去的。 */
+          '<div class="row__go2">' +
+            (seeable ? '<span class="rowbtn">看紀錄 →</span>' : '') +
+          '</div>' +
+          '</article>';
       }).join('') + '</div>';
 
 
 
-      h += '<p class="hint">點任何一列可以看那個人的記帳紀錄（<b>唯讀</b>）。' +
+      h += '<p class="hint">有「<b>看紀錄</b>」的成員是被指派給你監管的，' +
+        '點進去可以看他的每一筆記帳。沒有的表示不在你的可見範圍內。<br>' +
         '下面兩份說明預設收起來，需要時點開。</p>';
 
       h += '<details class="fold"><summary class="fold__h">' +
@@ -724,7 +729,7 @@
        通知點某一則             → #/member/U3/T1051（那一筆會標起來）
      ============================================================ */
   function vMember(id, hit) {
-    head('成員紀錄', '唯讀檢視');
+    head('成員紀錄', '看得到，不能改');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
     /* 先問「我看不看得到」，確認之後才去拿明細。
@@ -777,8 +782,7 @@
             '<span class="tag tag--' + (u.role === 'master' ? 'done' :
               (u.role === 'parent' ? 'MEDIUM' : 'soft')) + '">' +
               ROLE_TW[u.role] + '</span>' +
-            (mine ? '<span class="tag tag--na">這是你自己</span>'
-                  : '<span class="tag tag--info">唯讀檢視</span>') +
+            (mine ? '<span class="tag tag--na">這是你自己</span>' : '') +
           '</div>' +
           '<p class="mhead__s">' +
             (mine
@@ -794,6 +798,21 @@
         '</div>' +
         '<div class="mhead__n2"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
       '</div>';
+
+      /* 未成年的存款目標由管理者代設——設定的地方就放在
+         看得到他紀錄的這一頁，不要塞回成員名冊那張表。 */
+      if (canSetGoal(u, d) && !mine) {
+        h += '<div class="card prof__goal">' +
+          '<div class="prof__m">' +
+            '<p class="prof__l"><b>' + esc(u.name) + '</b> 未滿 18 歲，' +
+            '每月存款目標由你代設。' +
+            '<br><span class="prof__h">改完立刻生效。他本人看得到這個數字。</span></p>' +
+          '</div>' +
+          '<span class="goal"><label>每月存款目標</label>' +
+            '<input class="goal__i" type="number" min="0" step="500" ' +
+            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
+        '</div>';
+      }
 
       if (hit) {
         h += '<div class="note note--hit"><div class="note__k">通知指的是這一筆</div>' +
@@ -927,6 +946,19 @@
             '<em class="fld__h">email 是登入帳號，改它等於換帳號，這一版不開放</em></label>' +
           '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
         '</form>' +
+
+        '<div class="sec"><h2 class="sec__t">每月存款目標</h2></div>' +
+        '<div class="card prof__goal">' +
+          '<div class="prof__m">' +
+            '<p class="prof__l">收入減掉這個數字，就是你這個月的<b>可支配上限</b>。' +
+            '<br><span class="prof__h">改完立刻生效，不用按儲存。' +
+            '過去月份沿用當時設定的值——否則十月回頭看九月，' +
+            '會用現在的目標去評斷過去的表現。</span></p>' +
+          '</div>' +
+          '<span class="goal"><label>每月存款目標</label>' +
+            '<input class="goal__i" type="number" min="0" step="1000" ' +
+            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '"></span>' +
+        '</div>' +
 
         '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
         '<form class="card prof__form" id="pwF">' +
