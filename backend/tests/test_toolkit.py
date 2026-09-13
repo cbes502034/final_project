@@ -423,24 +423,28 @@ def test_治理動作裡沒有任何一項是看資料():
     assert roles.can_govern("parent", "view_family_overview")
 
 
-def test_代設存款目標看的是監管關係不是年齡():
-    """系統只提供功能，幾歲該被管是那一家自己的事。
+def test_存款目標只有本人能設定():
+    """存多少錢是那個人自己的決定，父母無權干涉。
 
-    而且年齡會變——用它當權限依據，權限就會在某個生日當天自己改變。
+    家長可以給零用金、可以看監管對象的紀錄，但不能替他決定要存多少。
     """
-    assert roles.can_set_goal_for("U1", "U1", _G)      # 自己一定可以
-    assert roles.can_set_goal_for("U1", "U3", _G)      # U1 監管 U3
-    assert roles.can_set_goal_for("U1", "U4", _G)
-    assert not roles.can_set_goal_for("U1", "U2", _G)  # 沒監管關係就不行
-    assert not roles.can_set_goal_for("U3", "U4", _G)
+    assert roles.can_set_goal_for("U1", "U1")
+    assert roles.can_set_goal_for("U3", "U3")
+    assert not roles.can_set_goal_for("U1", "U3")     # U1 監管 U3 也不行
+    assert not roles.can_set_goal_for("U1", "U4")
+    assert not roles.can_set_goal_for("U2", "U3")
+    assert not roles.can_set_goal_for(None, None)
 
     with pytest.raises(scope.Forbidden):
-        roles.require_set_goal("U3", "U4", _G)
+        roles.require_set_goal("U1", "U3")
 
 
-def test_家長身分本身不給代設的權力():
-    """是家長也不能改任何人的目標——要先有那條監管關係。"""
-    assert not roles.can_set_goal_for("U2", "U3", _G)
+def test_代設存款目標的參數不可以加回來():
+    """早期版本讓監管者代設，靠的是把 guardianships 傳進來判斷。
+    簽名裡沒有那個參數，就沒有人能不小心把代設接回去。"""
+    import inspect
+    params = list(inspect.signature(roles.can_set_goal_for).parameters)
+    assert params == ["me", "target"], params
 
 
 def test_平台管理員只能停權與查稽核():

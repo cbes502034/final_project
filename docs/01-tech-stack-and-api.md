@@ -36,13 +36,13 @@
 
 | 用 React 的好處 | 對本專案的實際影響 |
 |---|---|
-| 元件化、狀態管理 | 目前十二個畫面已經寫完，重寫是純成本 |
+| 元件化、狀態管理 | 目前十一個畫面已經寫完，重寫是純成本 |
 | 生態系豐富 | 我們沒有要用第三方 UI 套件 |
 | 履歷加分 | 冠文已有 React 經驗，其他三人沒有 |
 
 | 用原生的代價 | 實際狀況 |
 |---|---|
-| 沒有元件複用 | 十二個畫面規模還撐得住，函式化就夠 |
+| 沒有元件複用 | 十一個畫面規模還撐得住，函式化就夠 |
 | 手寫 DOM 操作 | 已經封裝在 `app.js` 的 render 函式裡 |
 | 沒有型別檢查 | 用 `js/api.js` 這一層集中管住資料形狀 |
 
@@ -129,7 +129,7 @@ final_project/
 │   ├── index.html
 │   ├── css/
 │   │   ├── tokens.css          設計權杖：星空底、藍紫色系、圓角
-│   │   └── app.css             元件與十二個畫面
+│   │   └── app.css             元件與十一個畫面
 │   └── js/
 │       ├── stars.js            canvas 星空與流星
 │       ├── data.js             模擬資料（mock 模式用）
@@ -339,7 +339,7 @@ final_project/
 | 35 | GET | `/api/budgets` | 成員3 | 登入 | 預算與使用率 |
 | 36 | PUT | `/api/budgets` | 成員3 | 本人 | 設定預算 |
 | 37 | GET | `/api/savings-goal` | 成員3 | 登入 | **每月存款目標與達成狀態** |
-| 38 | PUT | `/api/savings-goal` | 成員3 | 本人或監管者 | **設定每月存款目標**（註冊時也走這支）。⚠️ 依監管關係，不看年齡 |
+| 38 | PUT | `/api/savings-goal` | 成員3 | 本人 | **設定每月存款目標**（註冊時也走這支）。⚠️ 只有本人能設，監管者不能代設 |
 | 39 | GET | `/api/savings-goals` | 成員3 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
 | 40 | GET | `/api/alerts` | 成員3 | 登入 | 我設定的階段性提醒門檻 |
 | 41 | POST | `/api/alerts` | 成員3 | 本人 | 新增一個門檻（百分比 1~200） |
@@ -433,7 +433,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 |---|---|---|---|---|---|---|
 | **成員1** | **認證** | `m1-auth` | 17 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 18 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
-| **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 我的總覽、家庭總覽、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
+| **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 總覽（我／全家）、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
 | **成員4** | **家庭** | `m4-access` | 15 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
 
 ### 切分原則
@@ -619,7 +619,7 @@ GET    /api/audit
 第 5 週要走過的清單：
 
 1. 三個層級各走一遍：平台 master / 家長 parent / 子女 child
-2. **權限的反向測試** —— 成員去打家庭總覽要被擋，這比正向測試重要
+2. **權限的反向測試** —— 子女切不到「全家」、直接打全家的 summary 也要被擋，這比正向測試重要
 3. 段落記帳的邊界：缺欄位、低信心、切分錯誤、空輸入、超長輸入
 4. 金額邊界：0、負數、小數、很大的數字
 5. 年度統計的「未完整」標示有沒有出現

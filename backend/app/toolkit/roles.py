@@ -52,7 +52,7 @@
 
     roles.require_govern(me.role, "invite_member")     # 不是家長就丟 Forbidden
 
-    if roles.can_set_goal_for(me.id, target_id, guardianships):
+    if roles.can_set_goal_for(me.id, target_id):
         ...
 
     roles.require_platform("suspend_user", me.is_platform_admin)
@@ -152,25 +152,22 @@ def require_govern(role: object, action: str) -> None:
         raise Forbidden("這個動作需要家長權限：%s" % action)
 
 
-def can_set_goal_for(
-    me: object, target: object, guardianships: Iterable[object]
-) -> bool:
-    """我能不能設定 `target` 的每月存款目標。
+def can_set_goal_for(me: object, target: object) -> bool:
+    """我能不能設定 `target` 的每月存款目標。**只有本人可以。**
 
-    自己一定可以；別人要有監管關係。
+    存多少錢是那個人自己的決定。家長可以給零用金、可以看監管對象的紀錄，
+    但不能替子女決定要存多少——那是干涉，不是照顧。
 
-    ⚠️ 不看角色、也不看年齡。家長不會因為是家長就能改任何人的目標——
-    要改誰的，就得先有那條監管關係，而那條關係被監管的人自己看得到。
+    ⚠️ 早期版本允許監管者代設，已經拿掉了。不要因為「家長好像應該可以」
+    又把 guardianships 參數加回來。
     """
-    return target in visible_users(me, guardianships)
+    return me is not None and me == target
 
 
-def require_set_goal(
-    me: object, target: object, guardianships: Iterable[object]
-) -> None:
-    """不能設就丟 `Forbidden`。"""
-    if not can_set_goal_for(me, target, guardianships):
-        raise Forbidden("只能設定自己或你監管對象的存款目標")
+def require_set_goal(me: object, target: object) -> None:
+    """不是本人就丟 `Forbidden`。"""
+    if not can_set_goal_for(me, target):
+        raise Forbidden("存款目標只有本人可以設定")
 
 
 def can_platform(action: str, is_platform_admin: object) -> bool:

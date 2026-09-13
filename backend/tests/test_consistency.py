@@ -1035,30 +1035,50 @@ def test_監管的通知不受帳本限制():
         "監管通知被加上帳本篩選了——被監管的人另開一本帳就收不到通知"
 
 
-def test_家庭總覽不可以重複統計頁的圖():
-    """三頁照**問題**分工，不是照範圍分：
+def test_總覽統計建議各自回答一個問題_不重複():
+    """三頁照**問題**分工，每樣資料只出現在一個地方：
 
-        家庭總覽   誰有問題      成員狀況、超支、誰花的
-        統計       數字長什麼樣   月／年對照、分類圓餅、趨勢
-        財務建議   那該怎麼辦     建議清單
+        總覽       這個月現在怎樣   四個數字、存款目標、預算（全家模式多每個人）
+        統計       過去的趨勢       月／年對照、趨勢、分類圓餅
+        財務建議   那該怎麼辦       建議清單
 
-    這支測試是有來由的：家庭總覽曾經被加上圓餅和月趨勢，
-    但「統計」那一頁早就有了，而且同樣是家庭範圍、同一份資料——
-    一模一樣的東西放了兩個地方。
+    家庭跟個人是同一套畫面，只差範圍。以前另外有一頁「家庭總覽」，
+    跟總覽的內容幾乎一樣、又跟統計互相重複，已經併進總覽的「全家」模式。
     """
     app = read("frontend/js/app.js")
-    mo = re.search(r"function vFamily\(\) \{(.*?)\n  \}", app, re.S)
-    assert mo, "找不到 vFamily"
-    body = mo.group(1)
+    assert "function vFamily(" not in app, "家庭總覽已經併進總覽的「全家」模式，不該再有獨立的一頁"
+    assert "family:" not in re.search(r"var ROUTES = \{(.*?)\};", app, re.S).group(1)
 
-    assert "donut(" not in body, "家庭總覽不該畫分類圓餅——那是「統計」的工作"
-    assert "barChart(" not in body, "家庭總覽不該畫月趨勢——那是「統計」的工作"
-    assert "memberBar(" in body, "家庭總覽應該要有「誰花的」，那是它獨有的"
+    mo = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S)
+    assert mo, "找不到 vHome"
+    home = mo.group(1)
+    for bad in ("donut(", "barChart(", "txTable(", "recentList("):
+        assert bad not in home, "總覽不該放 %s——圖在統計、紀錄在收支明細" % bad
+    assert "memberTable(" in home, "總覽的全家模式要有「每個人的這個月」"
 
-    mo2 = re.search(r"function vStats\(\) \{(.*?)\n  \}", app, re.S)
+    mo2 = re.search(r"function vStats\(\) \{(.*?)\n  \}\n", app, re.S)
     assert mo2, "找不到 vStats"
-    assert "memberBar(" not in mo2.group(1), \
-        "統計不該畫「誰花的」——那一頁是按時間和分類看，不是按人"
+    stats = mo2.group(1)
+    assert "donut(" in stats and "barChart(" in stats, "統計要有分類圓餅與趨勢"
+    assert "memberBar(" not in stats and "memberTable(" not in stats, \
+        "統計是按時間和分類看，不是按人"
+
+
+def test_全家模式只整理資訊不能編輯():
+    """家庭是整理資訊，沒有「記一筆」，也沒有任何輸入框。"""
+    app = read("frontend/js/app.js")
+    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "data-quick" not in home, "總覽的頁首不該再放「記一筆」（側欄與手機底部已經有了）"
+    for fn in ("memberTable", "budgetTable", "goalCard"):
+        body = re.search(r"function %s\(.*?\) \{(.*?)\n  \}" % fn, app, re.S).group(1)
+        assert "<input" not in body and "<select" not in body, "%s 裡出現了可以編輯的欄位" % fn
+
+
+def test_子女只有我的模式():
+    """「我／全家」切換只給有監管對象的家長。"""
+    app = read("frontend/js/app.js")
+    body = re.search(r"function canFamily\(m\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "'parent'" in body and "visible" in body
 
 
 def test_結算不可以搬動任何一筆紀錄():
@@ -1111,9 +1131,10 @@ def test_帳本沒有圖示方塊():
     assert "icon" not in mo.group(1), "建立帳本時還在產生 icon"
 
     app = read("frontend/js/app.js")
-    mo2 = re.search(r"function gcard\(g, i\) \{(.*?)\n      \}", app, re.S)
-    assert mo2, "app.js 裡找不到 gcard"
-    assert "g.icon" not in mo2.group(1), "帳本卡片還在畫圖示方塊"
+    for fn in ("ledgerRow", "ledgerBody"):
+        mo2 = re.search(r"function %s\(g\) \{(.*?)\n  \}" % fn, app, re.S)
+        assert mo2, "app.js 裡找不到 %s" % fn
+        assert "g.icon" not in mo2.group(1), "帳本（%s）還在畫圖示方塊" % fn
 
 
 def test_帳本通知預設是關的():
@@ -1492,24 +1513,93 @@ def test_平台管理員與一般使用者的頁面互不相通():
 
 
 def test_帳本頁進來只看得到帳本():
-    """開帳本跟記帳頁的「記一筆」同一種做法：縮成標題旁邊的＋。
+    """一本帳平常只佔一行，點開才有成員、月目標、通知、結算。
 
-    開帳本是一次性動作，那張表單卻每次進來都攤在畫面中間。
-    成員編輯、已封存也一樣收起來，進來先看到的是「我有哪幾本」。
+    成員管理也在展開後的內容裡——以前另外有一個「誰在哪一本帳裡」區塊，
+    同一本帳的資訊被拆成上下兩處。
     """
     app = read("frontend/js/app.js")
     mo = re.search(r"function vGroups\(\) \{(.*?)\n  \}\n", app, re.S)
     assert mo, "app.js 裡找不到 vGroups"
     body = mo.group(1)
 
-    assert "foldBlock('gnew', '常設帳本'" in body, \
-        "「開一本」應該掛在常設帳本的標題上，不是另外一個區塊"
-    assert "'開一本新的'" not in body, "還留著獨立的「開一本新的」區塊"
-    assert "foldBlock('gmem'" in body, "「誰在哪一本帳裡」應該收起來"
-    assert "foldBlock('garch'" in body, "「已封存」應該收起來"
-    assert "foldRestore()" in body, \
-        "重畫之後沒有 foldRestore()——展開的表單送出後會無聲收合"
+    assert "foldBlock('gnew', '常設帳本'" in body, "「開一本」應該掛在常設帳本的標題上"
+    assert "ledgerList(" in body, "帳本清單應該是收合列"
+    assert "'誰在哪一本帳裡'" not in app, "「誰在哪一本帳裡」已經併進每一本帳的展開內容"
+    assert "<table" not in body, "帳本不用表格"
+    assert "foldRestore()" in body, "重畫之後沒有 foldRestore()"
 
-    # 攤開的區塊標題只能是帳本清單本身
+    lb = re.search(r"function ledgerBody\(g\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "data-gdel" in lb and "data-gaddsel" in lb, "成員的加減應該在帳本展開的內容裡"
+
     plain = re.findall(r'<h2 class="sec__t">([^<\']+)', body)
     assert set(plain) <= {"活動帳本"}, "帳本頁多了攤開的區塊：%s" % plain
+
+
+def test_不再出現監視感的提示語():
+    """這是一個家庭，不是監獄。
+
+    「林建國 可以看到你的完整收支明細」這種句子本意是透明，
+    讀起來卻是被盯著。關係本身在「成員與權限」都查得到，不需要在每一頁提醒。
+    """
+    app = read("frontend/js/app.js")
+    for bad in ("可以看到你的完整收支明細", "誰看得到你的紀錄</div>", "不是每個人都達標",
+                "存不到自己的目標", "目標由你代設", "系統不提供隱藏監管", "不會偷偷發生"):
+        assert bad not in app, "還留著：" + bad
+
+
+def test_標題三層要真的拉得開():
+    """之前頁面 17px、區塊 15.5px、卡片 15px，三層只差一兩個像素，分不出來。"""
+    css = read("frontend/css/tokens.css")
+    size = dict((k, float(v)) for k, v in re.findall(r"--(h[123]):\s*([\d.]+)px", css))
+    assert size["h1"] / size["h2"] >= 1.4, size
+    assert size["h2"] / size["h3"] >= 1.25, size
+
+
+def test_預算的已花一律從明細算():
+    """林建國的交通曾經寫死 3,250，明細加起來是 15,150。"""
+    data = read("frontend/js/data.js")
+    block = data[data.index("  budgets: ["):data.index("],", data.index("  budgets: ["))]
+    assert "used:" not in block, "data.js 的預算又存了已花多少"
+
+    D = _load_data()
+    spent = {}
+    for tx in D["transactions"]:
+        if tx["kind"] == "expense" and tx["date"].startswith(D["meta"]["period"]):
+            key = (tx["user"], tx["cat"])
+            spent[key] = spent.get(key, 0) + tx["amount"]
+    api = read("frontend/js/api.js")
+    body = re.search(r"    budgets: function \(f\) \{(.*?)\n    \},", api, re.S).group(1)
+    assert "s.transactions" in body and "used:" in body, "API 的預算沒有從明細算"
+    # 建議引用的預算數字要跟明細一致
+    assert spent[("U1", "C02")] == 15150
+    assert spent[("U3", "C05")] == 6880
+
+
+def test_個人建議只給本人_全家建議只給家長():
+    """子女不會看到寫給家長的全家建議——那幾則會點名。"""
+    api = read("frontend/js/api.js")
+    body = re.search(r"    advices: function \(f\) \{(.*?)\n    \},", api, re.S).group(1)
+    assert "if (a.scope === 'family') return fam;" in body
+    assert "if (a.user === s.me) return !fam;" in body
+
+    D = _load_data()
+    people = {m["id"] for m in D["members"] if not m.get("isPlatformAdmin")}
+    has = {a.get("user") for a in D["advices"] if a["scope"] == "user"}
+    assert people <= has, "每個人都該有至少一則自己的建議，缺：%s" % (people - has)
+
+
+def test_每一步導覽都找得到看得見的目標():
+    """選單換了位置之後，導覽不可以指到不存在的元素。"""
+    app = read("frontend/js/app.js")
+    html = read("frontend/index.html")
+    tour = re.search(r"var TOUR = \[(.*?)\];", app, re.S).group(1)
+    for sel in re.findall(r"sel: '([^']+)'", tour):
+        alts = [x.strip() for x in sel.split(",")]
+        found = False
+        for a in alts:
+            m = re.match(r"^[.#]([\w-]+)", a)
+            token = m.group(1) if m else a
+            if ('id="%s"' % token in html) or (token in html) or (token in app):
+                found = True
+        assert found, "導覽步驟找不到目標：" + sel

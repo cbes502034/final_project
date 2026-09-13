@@ -179,7 +179,7 @@
     { n: 37, o: 'm3', m: 'GET', p: '/api/savings-goal', a: '登入',
       d: '每月存款目標與達成狀態',
       res: '可支配上限 = 本月收入 − 每月存款目標\n使用率     = 支出 ÷ 可支配上限\n\n< 80%        達標中\n80% ~ 100%   接近上限\n> 100%       存不到目標，算出短少多少' },
-    { n: 38, o: 'm3', m: 'PUT', p: '/api/savings-goal', a: '本人或監管者',
+    { n: 38, o: 'm3', m: 'PUT', p: '/api/savings-goal', a: '本人',
       d: '設定每月存款目標（註冊時也走這支）',
       body: '{ "userId": 3, "goal": 2000, "period": "2026-09" }',
       note: '目標改動<b>保留歷史不覆蓋</b>（<code>savings_goals</code> 帶 <code>period_key</code>），否則之後回頭看會不知道當時的目標是多少。' },

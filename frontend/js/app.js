@@ -152,6 +152,16 @@
     try { localStorage.setItem(GKEY, GROUP); } catch (e) {}
   }
   var STAT = { period: 'month' };
+
+  /* 手機「更多」面板 */
+  function sheetOpen(on) {
+    var sh = document.getElementById('sheet');
+    if (!sh) return;
+    sh.hidden = !on;
+    document.body.classList.toggle('sheet-on', !!on);
+    var b = document.getElementById('moreBtn');
+    if (b) b.setAttribute('aria-expanded', on ? 'true' : 'false');
+  }
   var draft = null;                       // 自然語言解析後、尚未確認的暫存
 
   /* ---------- 小工具 ---------- */
@@ -193,118 +203,208 @@
       esc(e && e.message ? e.message : String(e)) + '<br>目前模式：<b>' + API.mode + '</b></div></div>';
   }
 
-  var SV_TW = { safe: '達標中', near: '接近上限', over: '存不到目標' };
+  /* ============================================================
+     共用小零件
+     ============================================================ */
 
-  /* 存款目標狀態卡。level: safe / near / over */
-  function savingsCard(sv, who) {
-    var lv = sv.level;
-    var pct100 = Math.min(100, Math.round(sv.ratio * 100));
-    var over = lv === 'over';
-    return '<div class="svg-card svg-card--' + lv + ' rise">' +
-      '<div class="svg-card__h">' +
-        '<span class="svg-card__ic">' + (over ? '!' : (lv === 'near' ? '~' : '✓')) + '</span>' +
-        '<span class="svg-card__t">' +
-          (over ? (who ? esc(who) + '這個月存不到目標' : '這個月存不到目標')
-                : (lv === 'near' ? '快接近可支配上限了' : '存款目標達標中')) + '</span>' +
-        '<span class="tag tag--' + (over ? 'down' : (lv === 'near' ? 'warn' : 'up')) + '">' +
-          SV_TW[lv] + '</span>' +
-      '</div>' +
-      '<div class="svg-card__bar"><i style="width:' + pct100 + '%"></i>' +
-        '<em style="left:100%"></em></div>' +
-      '<div class="svg-card__nums">' +
-        svN('每月存款目標', money(sv.goal)) +
-        svN('可支配上限', money(sv.allowance), '收入 − 目標') +
-        svN('本月已支出', money(sv.used)) +
-        svN(over ? '超出上限' : '還可以花',
-            money(over ? sv.shortfall : Math.max(0, sv.left)),
-            over ? '這個月會少存這麼多' : '') +
-      '</div>' +
-      (over
-        ? '<div class="svg-card__msg">照目前的支出，這個月實際只能存下 <b>' +
-          money(Math.max(0, sv.actual)) + '</b>，比目標少 <b>' + money(sv.shortfall) + '</b>。</div>'
-        : (lv === 'near'
-          ? '<div class="svg-card__msg">已用掉可支配額度的 <b>' + pct100 +
-            '%</b>。再花 ' + money(Math.max(0, sv.left)) + ' 就會影響到存款目標。</div>'
-          : '')) +
-      '</div>';
+  /* 線條圖示，跟側欄同一套粗細 */
+  var IC = (function () {
+    function g(d) {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+    }
+    return {
+      in:   g('<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>'),
+      out:  g('<path d="M12 20V9"/><path d="m7 14 5-5 5 5"/><path d="M5 4h14"/>'),
+      net:  g('<path d="M3 7h18v12H3z"/><path d="M3 11h18"/><path d="M16 15h2"/>'),
+      left: g('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+      goal: g('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>')
+    };
+  })();
+
+  /* 金額：幣別小一號、淡一點，眼睛先落在數字上 */
+  function amt(v) {
+    var n = Math.round(Number(v) || 0);
+    return '<span class="amt"><i>NT$</i>' + (n < 0 ? '−' : '') +
+      Math.abs(n).toLocaleString('en-US') + '</span>';
   }
 
-  function svN(k, v, hint) {
-    return '<div class="svg-n"><span class="svg-n__k">' + esc(k) + '</span>' +
-      '<span class="svg-n__v">' + v + '</span>' +
-      (hint ? '<span class="svg-n__h">' + esc(hint) + '</span>' : '') + '</div>';
+  function num(v) { return Number(Math.round(v || 0)).toLocaleString('en-US'); }
+
+  /* 「林建國」叫「建國」，兩個字的名字就整個叫 */
+  function callName(name) {
+    name = String(name || '');
+    return name.length === 3 ? name.slice(1) : name;
+  }
+
+  function greeting() {
+    var h = new Date().getHours();
+    return h < 11 ? '早安' : (h < 17 ? '午安' : '晚上好');
+  }
+
+  function todayText() {
+    var d = new Date();
+    return (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日　星期' + '日一二三四五六'.charAt(d.getDay());
   }
 
   /* ============================================================
-     01 我的總覽
+     我／全家
+
+     家庭跟個人是**同一套畫面**，差別只在範圍：
+       我    自己的數字，可以記帳、可以調整
+       全家  整理全家的資訊，**唯讀**——沒有「記一筆」，也沒有任何輸入框
+
+     只有家長、而且真的有監管對象時才出現切換。子女只有「我」。
      ============================================================ */
-  function vHome() {
-    head('我的總覽', '本月收支、預算使用狀況、最近幾筆');
-    $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
+  var SCOPE = (function () {
+    try { return sessionStorage.getItem('fambudget.scope') === 'family' ? 'family' : 'me'; }
+    catch (e) { return 'me'; }
+  })();
 
-    Promise.all([API.summary({ scope: 'me', groupId: GROUP }), API.budgets(), API.me()])
-      .then(function (r) {
-        var d = r[0], b = r[1], m = r[2];
-        var h = '<div class="page"><div class="kpis">';
-        h += kpi('本月收入', d.income, '', d.period, 'ok', 0);
-        h += kpi('本月支出', d.expense, '', d.count + ' 筆紀錄', 'warn', 1);
-        h += kpi('結餘', d.net, '', '儲蓄率 ' + pct(d.rate), d.net >= 0 ? 'a' : 'crit', 2);
-        h += kpi(d.savings.level === 'over' ? '短少' : '可再支出',
-                 d.savings.level === 'over' ? d.savings.shortfall : Math.max(0, d.savings.left),
-                 '', '存款目標 ' + money(d.savings.goal),
-                 d.savings.level === 'over' ? 'crit' : (d.savings.level === 'near' ? 'warn' : 'ok'), 3);
-        h += '</div>';
-
-        // 存款目標狀態，超支時放最上面
-        if (d.savings) h += savingsCard(d.savings, null);
-
-        if (m.guardedBy && m.guardedBy.length) {
-          h += '<div class="note note--warn"><div class="note__k">誰看得到你的紀錄</div><p>' +
-            m.guardedBy.map(function (g) { return '<b>' + esc(g.name) + '</b>'; }).join('、') +
-            ' 可以看到你的完整收支明細。</p></div>';
-        }
-
-        var mine = b.budgets.filter(function (x) { return x.user === m.user.id; });
-        if (mine.length) {
-          h += '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
-               '<span class="sec__n">MONTHLY BUDGET</span></div><div class="card rise">';
-          h += mine.map(function (x) {
-            return '<div class="bgt"><div class="bgt__k">' +
-              '<span class="dot" style="background:' + tint(x.catColor) + '"></span>' + esc(x.catName) + '</div>' +
-              '<div class="bgt__t"><i style="width:' + Math.min(100, x.pct * 100) +
-              '%;background:' + (x.over ? 'var(--down)' : tint(x.catColor)) + '"></i></div>' +
-              '<div class="bgt__v' + (x.over ? ' is-over' : '') + '">' +
-              money(x.used) + ' / ' + money(x.limit) + '</div></div>';
-          }).join('') + '</div>';
-        }
-
-        h += '<div class="sec"><h2 class="sec__t">支出分類</h2></div>';
-        h += '<div class="charts"><div class="card rise">' + donut(d.byCat, d.expense) + '</div>' +
-          '<div class="card rise" style="animation-delay:80ms">' +
-          '<div class="card__h"><span class="card__t">近 6 個月</span></div>' +
-          barChart(d.monthly) + '</div></div>';
-
-        h += '<div class="sec"><h2 class="sec__t">最近的紀錄</h2>' +
-             '</div>' +
-             '<div id="recent">' + skeleton(4) + '</div></div>';
-        $view.innerHTML = h;
-        animate();
-        return API.transactions({});
-      }).then(function (d) {
-        var box = document.getElementById('recent');
-        if (!box || !d) return;
-        box.innerHTML = txTable(d.transactions.slice(0, 6), null, '') ||
-          emptyState('還沒有紀錄', '到「記帳」頁用一句話記下第一筆。');
-      }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  function canFamily(m) {
+    return !!(m && m.user && m.user.role === 'parent' && (m.visible || []).length > 1);
   }
 
-  function kpi(k, v, unit, sub, mod, i, plain) {
-    return '<div class="kpi kpi--' + mod + '" style="animation-delay:' + (i * 60) + 'ms">' +
-      '<div class="kpi__k">' + esc(k) + '</div>' +
-      '<div class="kpi__v" style="font-size:' + (plain ? '36' : '25') + 'px">' +
-      (plain ? '<span data-count="' + v + '">0</span>' : money(v)) +
-      '<small>' + esc(unit) + '</small></div>' +
-      '<div class="kpi__s">' + esc(sub) + '</div></div>';
+  function scopeOf(m) { return canFamily(m) ? SCOPE : 'me'; }
+
+  function seg(key, opts, cur, off) {
+    return '<div class="seg" role="group">' + opts.map(function (o) {
+      var dis = off && off.indexOf(o[0]) >= 0;
+      return '<button class="seg__b' + (cur === o[0] ? ' on' : '') + '" data-' + key + '="' + o[0] + '"' +
+        ' aria-pressed="' + (cur === o[0]) + '"' + (dis ? ' disabled' : '') + '>' + o[1] + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function scopeSeg(m) {
+    return canFamily(m) ? seg('scope', [['me', '我'], ['family', '全家']], SCOPE) : '';
+  }
+
+  /* ============================================================
+     01 總覽：這個月現在怎樣
+
+     只放四個數字、存款目標、預算。圖表在「統計」，紀錄在「收支明細」——
+     主頁什麼都塞，使用者反而找不到最重要的那一個數字。
+     ============================================================ */
+  function vHome() {
+    head('總覽', '');
+    $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
+
+    API.me().then(function (m) {
+      var sc = scopeOf(m), fam = sc === 'family';
+      return Promise.all([
+        API.summary({ scope: sc, groupId: GROUP }),
+        API.budgets({ groupId: GROUP })
+      ]).then(function (r) {
+        var d = r[0], b = r[1];
+        head(fam ? '全家這個月' : greeting() + '，' + callName(m.user.name),
+             fam ? d.members.length + ' 位家人的收支' : todayText(),
+             scopeSeg(m));
+
+        var sv = d.savings, lv = sv.level;
+        var budgets = fam ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; });
+
+        var h = '<div class="page"><div class="kpis">' +
+          kpi('in', fam ? '全家收入' : '本月收入', d.income, d.period, 'ok') +
+          kpi('out', fam ? '全家支出' : '本月支出', d.expense, d.count + ' 筆紀錄', 'warn') +
+          kpi('net', '結餘', d.net, '存下 ' + pct(d.rate), d.net >= 0 ? 'a' : 'crit') +
+          kpi('left', lv === 'over' ? '超出上限' : '還可以花',
+              lv === 'over' ? sv.shortfall : Math.max(0, sv.left),
+              '上限 ' + money(sv.allowance), lv === 'over' ? 'crit' : (lv === 'near' ? 'warn' : 'ok')) +
+        '</div>';
+
+        h += '<div class="duo">' +
+          '<section class="duo__c">' +
+            '<div class="sec"><h2 class="sec__t">存款目標</h2>' +
+              (fam ? '' : '<a class="sec__link" href="#/profile">調整</a>') + '</div>' +
+            goalCard(sv) +
+          '</section>' +
+          '<section class="duo__c">' +
+            '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
+              (budgets.length ? '<span class="sec__n">' + budgets.length + ' 項</span>' : '') + '</div>' +
+            (budgets.length
+              ? budgetTable(budgets, fam)
+              : '<div class="card">' + emptyState('還沒有設定預算', '替常花的分類設個上限，花到一定程度就會提醒你。') + '</div>') +
+          '</section>' +
+        '</div>';
+
+        if (fam) {
+          h += '<div class="sec"><h2 class="sec__t">每個人的這個月</h2></div>' +
+            memberTable(d.members, d.expense) +
+            '<div class="card mshare-card">' + memberBar(d.members, d.expense) + '</div>';
+        }
+
+        $view.innerHTML = h + '</div>';
+        animate();
+      });
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  var LEVEL_TW = { safe: '進度穩穩的', near: '快到上限了', over: '超出計畫' };
+
+  function kpi(icon, k, v, sub, mod) {
+    return '<div class="kpi kpi--' + mod + '">' +
+      '<div class="kpi__top"><span class="kpi__ic">' + IC[icon] + '</span>' +
+        '<span class="kpi__k">' + esc(k) + '</span></div>' +
+      '<div class="kpi__v">' + amt(v) + '</div>' +
+      '<div class="kpi__s">' + esc(sub) + '</div>' +
+    '</div>';
+  }
+
+  /* 存款目標：左邊是想存多少，右邊是額度用了幾成。
+     「還可以花」已經在上面那排數字裡，這裡不重複。 */
+  function goalCard(sv) {
+    var lv = sv.level;
+    var used = Math.min(100, Math.round(sv.ratio * 100));
+    return '<div class="card goal goal--' + lv + ' rise">' +
+      '<div class="goal__top">' +
+        '<div class="goal__main">' +
+          '<span class="goal__ic">' + IC.goal + '</span>' +
+          '<div><div class="goal__k">每月想存</div><div class="goal__v">' + amt(sv.goal) + '</div></div>' +
+        '</div>' +
+        '<span class="pill pill--' + lv + '">' + LEVEL_TW[lv] + '</span>' +
+      '</div>' +
+      '<div class="goal__track"><i style="width:' + used + '%"></i></div>' +
+      '<div class="goal__ends">' +
+        '<span>已花 <b>' + num(sv.used) + '</b></span>' +
+        '<span class="goal__pct">' + used + '%</span>' +
+        '<span>可花上限 <b>' + num(sv.allowance) + '</b></span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function budgetTable(list, withWho) {
+    return '<div class="card card--flush"><table class="dt">' +
+      '<thead><tr><th>分類</th><th>用了多少</th><th class="rt">已花 / 預算</th></tr></thead><tbody>' +
+      list.map(function (x) {
+        var p = Math.round(x.pct * 100);
+        return '<tr' + (x.over ? ' class="is-over"' : '') + '>' +
+          '<td><span class="dt__name"><span class="dot" style="background:' + tint(x.catColor) + '"></span>' +
+            '<span><b>' + esc(x.catName) + '</b>' +
+            (withWho ? '<small>' + esc(x.userName) + '</small>' : '') + '</span></span></td>' +
+          '<td class="dt__bar"><span class="mbar"><i style="width:' + Math.min(100, p) + '%;background:' +
+            (x.over ? 'var(--down)' : tint(x.catColor)) + '"></i></span><em>' + p + '%</em></td>' +
+          '<td class="rt num">' + num(x.used) + '<small> / ' + num(x.limit) + '</small></td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  /* 全家模式：每個人一列。點一列就進那個人的紀錄（唯讀） */
+  function memberTable(members, total) {
+    return '<div class="card card--flush"><table class="dt">' +
+      '<thead><tr><th>成員</th><th class="rt">收入</th><th class="rt">支出</th>' +
+      '<th class="rt">結餘</th><th>佔全家支出</th></tr></thead><tbody>' +
+      members.map(function (u) {
+        var net = u.income - u.expense;
+        var share = total ? Math.round(u.expense / total * 100) : 0;
+        return '<tr class="dt__go" data-open="' + esc(u.id) + '" title="看 ' + esc(u.name) + ' 的紀錄">' +
+          '<td><span class="dt__name">' + ava(u, 'ava--sm') +
+            '<span><b>' + esc(u.name) + '</b><small>' + esc(ROLE_TW[u.role] || '') + '</small></span></span></td>' +
+          '<td class="rt num">' + num(u.income) + '</td>' +
+          '<td class="rt num">' + num(u.expense) + '</td>' +
+          '<td class="rt num ' + (net >= 0 ? 'is-up' : 'is-down') + '">' + (net >= 0 ? '+' : '−') + num(Math.abs(net)) + '</td>' +
+          '<td class="dt__bar"><span class="mbar"><i style="width:' + share + '%"></i></span><em>' + share + '%</em></td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
   }
 
   /* 圓環圖：純 SVG */
@@ -372,7 +472,7 @@
         '<div class="bars__p">' +
           '<i style="height:' + (r.income / max * 100) + '%;background:var(--up);animation-delay:' + (i * 60) + 'ms"></i>' +
           '<i style="height:' + (r.expense / max * 100) + '%;background:var(--warn);animation-delay:' + (i * 60 + 30) + 'ms"></i>' +
-        '</div><div class="bars__k">' + esc(r.m.slice(5)) + '</div></div>';
+        '</div><div class="bars__k">' + esc(r.label || String(r.m || '').slice(5)) + '</div></div>';
     }).join('') + '</div>' +
       '<div class="lgd"><span><i style="background:var(--up)"></i>收入</span>' +
       '<span><i style="background:var(--warn)"></i>支出</span></div>';
@@ -411,7 +511,7 @@
   /* 表頭 ＋ 表身。空的時候不要畫一個只有表頭的空表格。 */
   function txTable(rows, hit, empty) {
     if (!rows.length) return empty;
-    return '<div class="txw"><table class="txt">' +
+    return '<div class="txw card card--flush"><table class="txt">' +
       '<thead><tr>' +
         '<th>日期</th><th>分類</th><th>項目</th><th>記錄者</th><th>來源</th>' +
         '<th class="rt">金額</th><th></th>' +
@@ -437,13 +537,14 @@
      ============================================================ */
   var FOLD = {};                       // id → 展開中嗎
 
-  function foldHead(id, title, label, kicker, help) {
+  function foldHead(id, title, label, kicker, help, tools) {
     var on = !!FOLD[id];
     /* ⚠️ title 一定要 esc()，所以問號不能混在 title 裡傳進來——
        那樣傳會變成畫面上出現一串 &lt;button&gt;。要掛說明就用 help 參數。 */
     return '<div class="sec"><h2 class="sec__t">' + esc(title) +
       (help ? helpBtn(help) : '') + '</h2>' +
       (kicker ? '<span class="sec__n">' + esc(kicker) + '</span>' : '') +
+      (tools ? '<div class="sec__tools">' + tools + '</div>' : '') +
       '<button class="fold__b' + (on ? ' on' : '') + '" data-fold="' + esc(id) + '" ' +
         'data-label="' + esc(label) + '" ' +
         'aria-expanded="' + (on ? 'true' : 'false') + '">' +
@@ -508,11 +609,12 @@
      大部分時候使用者是來看自己花了什麼，不是來記帳的。
      要記的時候點 ＋，表單才長出來。 */
   function vEntry() {
-    head('記帳', '');
+    head('收支明細', '');
     var h = '<div class="page">';
 
-    h += foldHead('entry', '收支明細', '記一筆', 'TRANSACTIONS');
-    h += filterBar() + '<div id="txList">' + skeleton(6) + '</div></div>';
+    /* 篩選放在標題那一列，跟「記一筆」並排——不要自己佔一整條 */
+    h += foldHead('entry', '所有紀錄', '記一筆', '', null, filterBar());
+    h += '<div id="txList">' + skeleton(6) + '</div></div>';
     $view.innerHTML = h;
 
     foldRestore();
@@ -766,7 +868,7 @@
             (F[key] === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
         }).join('') + '</select></label>';
     }
-    return '<div class="bar">' +
+    return '<div class="bar bar--inline">' +
       sel('kind', '收支', [['all', '全部'], ['expense', '支出'], ['income', '收入']]) +
       sel('source', '來源', [['all', '全部'], ['nlp', '段落記帳'], ['manual', '手動輸入']]) +
       '</div>';
@@ -777,171 +879,72 @@
     if (!box) return;
     API.transactions(Object.assign({}, F, { groupId: GROUP })).then(function (d) {
       box.innerHTML = txTable(d.transactions, null,
-        emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。'));
+        '<div class="card">' + emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。') + '</div>');
     }).catch(function (e) { box.innerHTML = errState(e); });
   }
 
   /* ============================================================
-     03 家庭總覽
-     ============================================================ */
-  function vFamily() {
-    head('家庭總覽', '你自己 ＋ 被指派給你監管的成員');
-    $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
-    Promise.all([API.summary({ scope: 'family', groupId: GROUP }), API.me(), API.budgets()])
-      .then(function (r) {
-        var d = r[0], m = r[1], b = r[2];
-        var h = '<div class="page">';
-        /* 第一道：這個功能只有家長有。 */
-        if (m.user.role !== 'parent') {
-          h += '<div class="note note--warn"><div class="note__k">沒有這個功能</div>' +
-            '<p>家庭總覽是給家長看的。</p></div></div>';
-          $view.innerHTML = h;
-          return;
-        }
+     03 統計：過去的趨勢
 
-        /* 第二道：有這個功能，但沒有人被指派給你看。 */
-        if ((m.visible || []).length <= 1) {
-          h += '<div class="note note--warn"><div class="note__k">你只看得到自己</div>' +
-            '<p>目前沒有成員指派給你。</p></div></div>';
-          $view.innerHTML = h;
-          return;
-        }
-        h += '<div class="kpis">';
-        h += kpi('家庭收入', d.income, '', d.period, 'ok', 0);
-        h += kpi('家庭支出', d.expense, '', d.members.length + ' 位成員', 'warn', 1);
-        h += kpi('結餘', d.net, '', '儲蓄率 ' + pct(d.rate), 'a', 2);
-        h += kpi('每月零用金', d.allowance || 0, '',
-          '子女已花 ' + money(d.wardSpend || 0), 'a', 3);
-        h += '</div>';
-
-        if (d.savings) h += savingsCard(d.savings, '全家');
-
-        var overs = d.members.filter(function (u) { return u.savingsLevel === 'over'; });
-        if (overs.length && d.savings.level !== 'over') {
-          h += '<div class="note note--crit"><div class="note__k">總體達標，但不是每個人都達標</div><p>' +
-            '家庭整體看起來安全，是因為結餘較多的成員把其他人的超支蓋過去了。' +
-            '實際上有 <b>' + overs.length + ' 位成員存不到自己的目標</b>：' +
-            overs.map(function (u) {
-              return '<b>' + esc(u.name) + '</b>（短少 ' + money(u.shortfall) + '）';
-            }).join('、') + '。</p></div>';
-        }
-
-        h += '<div class="sec"><h2 class="sec__t">各成員本月狀況</h2></div>';
-        h += '<div class="rows">' + d.members.map(function (u, i) {
-          var over = u.expense > u.budget;
-          var bs = b.budgets.filter(function (x) { return x.user === u.id && x.over; });
-          return '<article class="row" style="animation-delay:' + (i * 50) + 'ms;' +
-            'grid-template-columns:44px 1fr 150px 110px">' +
-            ava(u) +
-            '<div class="row__m"><div class="row__top">' +
-              '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
-              '<span class="tag tag--' + (u.role === 'parent' ? 'MEDIUM' : 'soft') + '">' +
-              ROLE_TW[u.role] + '</span>' +
-              (u.savingsLevel === 'over'
-                ? '<span class="tag tag--down">存不到目標 · 短少 ' + money(u.shortfall) + '</span>'
-                : (u.savingsLevel === 'near' ? '<span class="tag tag--warn">接近上限</span>'
-                                             : '<span class="tag tag--up">存款達標</span>')) +
-              (bs.length ? '<span class="tag tag--MEDIUM">' + bs.length + ' 項分類超支</span>' : '') +
-            '</div><div class="row__sub">收入 ' + money(u.income) + '　支出 ' + money(u.expense) +
-            '　存款目標 ' + money(u.savingsGoal) + '　可支配 ' + money(u.allowance) + '</div></div>' +
-            '<div class="sla"><div class="sla__v"' + (over ? ' style="color:var(--down)"' : '') + '>' +
-              pct(u.expense / u.budget) + '</div>' +
-              '<div class="sla__b"><i style="width:' + Math.min(100, u.expense / u.budget * 100) +
-              '%;background:' + (over ? 'var(--down)' : 'var(--up)') + '"></i></div></div>' +
-            '<div class="row__do"><b class="num" style="color:' +
-              (u.income - u.expense >= 0 ? 'var(--up)' : 'var(--down)') + '">' +
-              (u.income - u.expense >= 0 ? '+' : '') +
-              Number(u.income - u.expense).toLocaleString('en-US') + '</b></div>' +
-            '</article>';
-        }).join('') + '</div>';
-
-        /* 這一頁只回答「誰」。
-
-           ⚠️ 不要在這裡放圓餅或月趨勢——「統計」那一頁已經有了，
-           而且同樣是家庭範圍、同一份資料。放兩份就是同一個東西兩個地方。
-
-           三頁的分工是照**問題**切的，不是照範圍切的：
-             家庭總覽   誰有問題      成員狀況、超支、誰花的
-             統計       數字長什麼樣   月／年對照、分類圓餅、趨勢
-             財務建議   那該怎麼辦     建議清單 */
-        h += '<div class="sec"><h2 class="sec__t">誰花的</h2>' +
-             '<span class="sec__n">WHO</span></div>';
-        h += '<div class="card rise">' + memberBar(d.members, d.expense) + '</div>';
-
-        h += '<div class="sec"><h2 class="sec__t">超出預算的項目</h2></div>';
-        var over = b.budgets.filter(function (x) { return x.over; });
-        h += over.length ? '<div class="card">' + over.map(function (x) {
-          return '<div class="bgt"><div class="bgt__k"><span class="dot" style="background:' +
-            tint(x.catColor) + '"></span>' + esc(x.userName) + '　' + esc(x.catName) + '</div>' +
-            '<div class="bgt__t"><i style="width:100%;background:var(--down)"></i></div>' +
-            '<div class="bgt__v is-over">' + money(x.used) + ' / ' + money(x.limit) +
-            '（' + pct(x.pct) + '）</div></div>';
-        }).join('') + '</div>' : emptyState('沒有超支項目', '本月所有分類都在預算內。');
-        h += '</div>';
-        $view.innerHTML = h;
-        animate();
-      }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
-  }
-
-  /* ============================================================
-     04 統計（月／年）
+     家長可以切「我／全家」。年度數列只有涵蓋全家每一個人時才算得出來，
+     算不出來的時候「按年」直接關掉，不給一份對不上的數字。
      ============================================================ */
   function vStats() {
-    head('統計', '月與年兩個時間基準');
+    head('統計', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
-    API.summary({ scope: 'family', groupId: GROUP }).then(function (d) {
-      var h = '<div class="page"><div class="bar"><div class="chips">' +
-        [['month', '按月'], ['year', '按年']].map(function (p) {
-          return '<button class="chip' + (STAT.period === p[0] ? ' on' : '') +
-            '" data-sp="' + p[0] + '">' + p[1] + '</button>';
-        }).join('') + '</div></div>';
 
-      var rows = STAT.period === 'month'
-        ? (d.monthly || []).map(function (r) { return { k: r.m, income: r.income, expense: r.expense }; })
-        : (d.yearly || []).map(function (r) { return { k: r.y, income: r.income, expense: r.expense, partial: r.partial }; });
-
-      /* 選了單一帳本、又在看「按月」的時候，月數列是 null——
-         與其給一張空表，不如講清楚為什麼。 */
-      if (STAT.period === 'month' && !d.monthly) {
-        h += '<div class="note"><div class="note__k">月趨勢只有在「全部帳本」時看得到</div>' +
-          '<p>每個人的月數列沒有分帳本，硬拆出來的數字會是錯的。' +
-          '下面的支出分類仍然是這一本帳的。</p></div>';
-      }
-
-      h += (STAT.period === 'month' && !d.monthly) ? '' :
-        '<div class="card rise"><div class="card__h"><span class="card__t">' +
-        (STAT.period === 'month' ? '近 6 個月' : '近 3 年') + '收支對照</span></div>' +
-        '<div class="tbl" style="border:0"><table><thead><tr>' +
-        '<th>' + (STAT.period === 'month' ? '月份' : '年度') + '</th><th>收入</th><th>支出</th>' +
-        '<th>結餘</th><th>儲蓄率</th><th></th></tr></thead><tbody>' +
-        rows.map(function (r) {
-          var net = r.income - r.expense, rate = r.income ? net / r.income : 0;
-          return '<tr><td><b>' + esc(r.k) + '</b>' +
-            (r.partial ? ' <span class="tag tag--soft">未完整</span>' : '') + '</td>' +
-            '<td class="mono">' + money(r.income) + '</td>' +
-            '<td class="mono">' + money(r.expense) + '</td>' +
-            '<td class="mono"><b style="color:' + (net >= 0 ? 'var(--up)' : 'var(--down)') +
-            '">' + money(net) + '</b></td>' +
-            '<td class="mono">' + pct(rate) + '</td>' +
-            '<td style="width:140px"><div class="sla__b"><i style="width:' +
-            Math.max(0, Math.min(100, rate * 200)) + '%;background:' +
-            (rate >= 0.2 ? 'var(--up)' : (rate >= 0 ? 'var(--warn)' : 'var(--down)')) +
-            '"></i></div></td></tr>';
-        }).join('') + '</tbody></table></div></div>';
-
-      if (STAT.period === 'year') {
-        h += '<div class="note note--warn"><div class="note__k">2026 年尚未結束</div><p>' +
-          '年度統計在當年度會標示「未完整」，<b>不要直接跟完整年度比較</b>。</p></div>';
-      }
-
-      h += '<div class="charts" style="margin-top:12px"><div class="card rise">' +
-        '<div class="card__h"><span class="card__t">支出分類佔比</span></div>' +
-        donut(d.byCat, d.expense) + '</div>' +
-        '<div class="card rise" style="animation-delay:80ms">' +
-        '<div class="card__h"><span class="card__t">近 6 個月趨勢</span></div>' +
-        barChart(d.monthly) + '</div></div></div>';
-      $view.innerHTML = h;
+    API.me().then(function (m) {
+      var sc = scopeOf(m);
+      return API.summary({ scope: sc, groupId: GROUP }).then(function (d) { render(m, sc, d); });
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+
+    function render(m, sc, d) {
+      if (STAT.period === 'year' && !d.yearly) STAT.period = 'month';
+      var month = STAT.period === 'month';
+      head('統計', sc === 'family' ? '全家的收支' : '', scopeSeg(m));
+
+      var rows = month
+        ? (d.monthly || []).map(function (r) { return { k: r.m, label: r.m.slice(5) + ' 月', income: r.income, expense: r.expense }; })
+        : (d.yearly || []).map(function (r) { return { k: r.y, label: String(r.y), income: r.income, expense: r.expense, partial: r.partial }; });
+
+      var h = '<div class="page"><div class="sec"><h2 class="sec__t">收支對照</h2>' +
+        '<div class="sec__tools">' +
+          seg('sp', [['month', '按月'], ['year', '按年']], STAT.period, d.yearly ? null : ['year']) +
+        '</div></div>';
+
+      if (month && !d.monthly) {
+        h += '<div class="card">' + emptyState('選了單一帳本時看不到趨勢', '切回「全部帳本」就看得到。') + '</div>';
+      } else {
+        h += '<div class="duo">' +
+          '<section class="duo__c"><div class="card card--flush">' +
+            '<table class="dt"><thead><tr><th>' + (month ? '月份' : '年度') + '</th>' +
+              '<th class="rt">收入</th><th class="rt">支出</th><th class="rt">結餘</th><th>存下</th></tr></thead><tbody>' +
+            rows.slice().reverse().map(function (r) {
+              var net = r.income - r.expense, rate = r.income ? net / r.income : 0;
+              var w = Math.max(0, Math.min(100, rate * 200));
+              return '<tr><td><b>' + esc(r.label) + '</b>' +
+                  (r.partial ? '<small>還沒過完</small>' : '') + '</td>' +
+                '<td class="rt num">' + num(r.income) + '</td>' +
+                '<td class="rt num">' + num(r.expense) + '</td>' +
+                '<td class="rt num ' + (net >= 0 ? 'is-up' : 'is-down') + '">' + (net >= 0 ? '+' : '−') + num(Math.abs(net)) + '</td>' +
+                '<td class="dt__bar"><span class="mbar"><i style="width:' + w + '%;background:' +
+                  (rate >= 0.2 ? 'var(--up)' : (rate >= 0 ? 'var(--warn)' : 'var(--down)')) + '"></i></span>' +
+                  '<em>' + pct(rate) + '</em></td></tr>';
+            }).join('') + '</tbody></table>' +
+          '</div></section>' +
+          '<section class="duo__c"><div class="card">' +
+            '<div class="card__h"><span class="card__t">' + (month ? '近 6 個月' : '近 3 年') + '</span>' +
+              '<span class="card__s">收入與支出</span></div>' +
+            barChart(rows) +
+          '</div></section>' +
+        '</div>';
+      }
+
+      h += '<div class="sec"><h2 class="sec__t">錢花在哪</h2><span class="sec__n">' + esc(d.period) + '</span></div>' +
+        '<div class="card">' + (d.byCat.length ? donut(d.byCat, d.expense) : emptyState('這個月還沒有支出', '')) + '</div>';
+
+      $view.innerHTML = h + '</div>';
+    }
   }
 
   /* ============================================================
@@ -962,32 +965,32 @@
   function vAdvice() {
     head('財務建議', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
-    API.advices().then(function (d) {
-      ADV = d.advices || [];
-      $view.innerHTML =
-        '<div class="page">' +
-          '<div class="bar">' +
-            '<label class="fsel"><span>搜尋</span>' +
-              '<input type="search" id="advq" placeholder="標題、內容或依據" ' +
-                'value="' + esc(ADVQ) + '" autocomplete="off"></label>' +
-          '</div>' +
-          '<div id="advList"></div>' +
-        '</div>';
-      paintAdvices();
-      /* 沒填理財習慣的話，在這裡提一次——這是它真正會派上用場的地方，
-         比在註冊流程裡多問四題有用。 */
-      API.financeProfile().then(function (p) {
-        var f = p.finance || {};
-        var empty = !f.style && !(f.goals || []).length &&
-          !(f.habits || []).length && !f.note;
-        if (!empty) return;
-        var box = document.getElementById('advList');
-        if (!box) return;
-        box.insertAdjacentHTML('beforebegin',
-          '<div class="note"><div class="note__k">建議可以更貼近你</div>' +
-          '<p>到<a href="#/profile">個人資料</a>填一下理財習慣——' +
-          '在意的目標不一樣，同一筆支出的意義就不一樣。</p></div>');
-      }).catch(function () {});
+    API.me().then(function (m) {
+      var sc = scopeOf(m);
+      head('財務建議', sc === 'family' ? '全家的建議，以及你照顧的家人的個人建議' : '', scopeSeg(m));
+      return API.advices({ scope: sc }).then(function (d) {
+        ADV = d.advices || [];
+        $view.innerHTML =
+          '<div class="page">' +
+            '<div id="advHint"></div>' +
+            '<div class="sec"><h2 class="sec__t">' + (sc === 'family' ? '全家的建議' : '給你的建議') + '</h2>' +
+              '<span class="sec__n">' + ADV.length + ' 則</span>' +
+              '<div class="sec__tools"><label class="fsel fsel--q">' +
+                '<input type="search" id="advq" placeholder="搜尋建議" aria-label="搜尋建議" ' +
+                  'value="' + esc(ADVQ) + '" autocomplete="off"></label></div></div>' +
+            '<div class="card card--flush adl" id="advList"></div>' +
+          '</div>';
+        paintAdvices();
+        if (sc === 'family') return;
+        /* 沒填理財習慣的話提一次——這是它真正派得上用場的地方 */
+        return API.financeProfile().then(function (p) {
+          var f = p.finance || {};
+          if (f.style || (f.goals || []).length || (f.habits || []).length || f.note) return;
+          var box = document.getElementById('advHint');
+          if (box) box.innerHTML = '<a class="nudge" href="#/profile">' +
+            '<b>想要更貼近你的建議？</b><span>填一下理財習慣，一分鐘就好 →</span></a>';
+        }).catch(function () {});
+      });
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
@@ -1007,7 +1010,9 @@
     });
 
     if (!rows.length) {
-      box.innerHTML = emptyState('沒有符合的建議', '換個關鍵字試試。');
+      box.innerHTML = ADVQ.trim()
+        ? emptyState('沒有符合的建議', '換個關鍵字試試。')
+        : emptyState('這個月還沒有建議', '記帳的資料多一點，建議就會出現。');
       return;
     }
 
@@ -1017,7 +1022,7 @@
         '<button class="ad__h" data-adv="' + esc(a.id) + '">' +
           '<span class="ad__lv ad__lv--' + esc(a.level) + '">' + advLevel(a) + '</span>' +
           '<span class="ad__t">' + esc(a.title) + '</span>' +
-          '<span class="ad__m">' + esc(a.scope === 'family' ? '家庭' : a.userName) + '</span>' +
+          '<span class="ad__m">' + esc(a.scope === 'family' ? '全家' : a.userName) + '</span>' +
           '<span class="ad__p">' + esc(a.period) + '</span>' +
           '<svg class="ad__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
@@ -1041,65 +1046,37 @@
   /* ============================================================
      06 成員與權限
      ============================================================ */
-  /* 誰的存款目標我能改：我自己，或我監管的人。
-     ⚠️ 不看年齡、也不看角色——有沒有監管關係是那一家自己決定的。 */
-  function canSetGoal(u, d) {
-    if (u.id === d.me) return true;
-    return (d.guardianships || []).some(function (g) {
-      return g.guardian === d.me && g.ward === u.id;
-    });
-  }
-
   function vMembers() {
-    head('成員與權限', '角色、監管關係、以及每個角色看得到什麼');
-    $view.innerHTML = '<div class="page">' + skeleton(5) + '</div>';
+    head('成員與權限', '家裡的每一個人');
+    $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
     API.members().then(function (d) {
-      PERMS = d;   // 問號要用，見 HELP.perms
-      var h = '<div class="page"><div class="sec"><h2 class="sec__t">家庭成員' +
-        helpBtn('perms') + '</h2>' +
-        '<span class="sec__n">' + d.members.length + ' 人</span></div>';
-      h += '<div class="rows">' + d.members.map(function (u, i) {
+      PERMS = d;   // 「誰可以做什麼」要用，見 HELP.perms
+      function names(list, key) {
+        return list.map(function (g) { return esc(g[key]); }).join('、');
+      }
+      var h = '<div class="page"><div class="sec"><h2 class="sec__t">家庭成員</h2>' +
+        '<span class="sec__n">' + d.members.length + ' 人</span>' +
+        '<div class="sec__tools"><button class="btn btn--sm" data-help="perms">誰可以做什麼</button></div></div>';
+
+      h += '<div class="mtiles">' + d.members.map(function (u, i) {
         var seeable = (d.visible || []).indexOf(u.id) >= 0;
         var wards = d.guardianships.filter(function (g) { return g.guardian === u.id; });
         var by = d.guardianships.filter(function (g) { return g.ward === u.id; });
-        return '<article class="row' + (seeable
-            ? ' row--open" data-open="' + esc(u.id) + '" title="看 ' + esc(u.name) + ' 的記帳紀錄'
-            : '" title="你沒有監管這個人，看不到他的紀錄') +
-          '" style="animation-delay:' + (i * 50) +
-          'ms;grid-template-columns:44px 1fr 104px">' +
-          ava(u) +
-          '<div class="row__m"><div class="row__top">' +
-            '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
-            '<span class="tag tag--' + (u.role === 'parent' ? 'MEDIUM' : 'soft') + '">' +
-              ROLE_TW[u.role] + '</span>' +
-            (u.id === d.me ? '<span class="tag tag--na">目前登入</span>' : '') +
-            (canSetGoal(u, d) && u.id !== d.me
-              ? '<span class="tag tag--info">目標由你代設</span>' : '') +
-          '</div><div class="row__sub">' +
-            (wards.length ? '監管：' + wards.map(function (g) { return esc(g.wardName); }).join('、') : '') +
-            (wards.length && by.length ? '　｜　' : '') +
-            (by.length ? '<b style="color:var(--warn)">被 ' +
-              by.map(function (g) { return esc(g.guardianName); }).join('、') + ' 監管</b>' : '') +
-            (!wards.length && !by.length ? '無監管關係' : '') +
-          '</div></div>' +
-          /* 這一列只講身分：誰、什麼角色、跟誰有監管關係。
-             存款目標是財務設定，不屬於這裡——自己的在「個人資料」，
-             代監管對象設的在那個人的紀錄頁。擠在這裡又醜又難按。
-
-             看得到才給按鈕，而且一直看得到。
-             ⚠️ 之前這顆是 hover 才浮出來的，於是「哪幾列點得下去」
-             要滑過去才知道——使用者當然會去點一個點不進去的。 */
-          '<div class="row__go2">' +
-            (seeable ? '<span class="rowbtn">看紀錄 →</span>' : '') +
+        return '<article class="mt' + (seeable ? ' mt--go' : '') + '"' +
+          (seeable ? ' data-open="' + esc(u.id) + '" title="看 ' + esc(u.name) + ' 的紀錄"' : '') +
+          ' style="animation-delay:' + (i * 60) + 'ms">' +
+          (u.id === d.me ? '<span class="mt__me">你</span>' : '') +
+          ava(u, 'ava--lg') +
+          '<div class="mt__n">' + esc(u.name) + '</div>' +
+          '<div class="mt__r">' + esc(ROLE_TW[u.role] || '') + '</div>' +
+          '<div class="mt__rel">' +
+            (wards.length ? '<span>監管 ' + names(wards, 'wardName') + '</span>' : '') +
+            (by.length ? '<span>監管人 ' + names(by, 'guardianName') + '</span>' : '') +
           '</div>' +
-          '</article>';
-      }).join('') + '</div>';
+          (seeable ? '<span class="mt__go">看紀錄</span>' : '') +
+        '</article>';
+      }).join('') + '</div></div>';
 
-
-
-      h += '';
-
-      h += '</div>';
       $view.innerHTML = h;
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -1126,10 +1103,8 @@
         var u = d.members.filter(function (x) { return x.id === id; })[0];
 
         if (!u) {
-          $view.innerHTML = '<div class="page"><div class="note note--warn">' +
-            '<div class="note__k">找不到這個人</div>' +
-            '<p>這個家庭裡沒有 <code>' + esc(id) + '</code> 這位成員。</p>' +
-            '</div></div>';
+          $view.innerHTML = '<div class="page">' + backLink() + '<div class="card">' +
+            emptyState('找不到這個人', '他可能已經不在這個家庭裡了。') + '</div></div>';
           return;
         }
 
@@ -1144,11 +1119,8 @@
         var shared = (me.queryable || []).indexOf(id) >= 0;
 
         if (!supervised && !shared) {
-          $view.innerHTML = '<div class="page"><div class="note note--warn">' +
-            '<div class="note__k">看不到這個人的紀錄</div>' +
-            '<p>你沒有監管 <b>' + esc(u.name) + '</b>，也沒有跟他共用的帳本。<br>' +
-            '監管關係由家長建立，而且雙方都看得到——系統不提供隱藏監管。</p>' +
-            '</div>' + backLink() + '</div>';
+          $view.innerHTML = '<div class="page">' + backLink() + '<div class="card">' +
+            emptyState('看不到' + u.name + '的紀錄', '你們沒有監管關係，也沒有共用的帳本。') + '</div></div>';
           return;
         }
         var partial = !supervised;
@@ -1165,69 +1137,37 @@
 
     function render(me, d, u, tx, partial) {
       var mine = id === d.me;
-      var by = d.guardianships.filter(function (g) { return g.ward === id; });
+      head(mine ? '我的紀錄' : callName(u.name) + '的紀錄', '');
 
       var h = '<div class="page">' + backLink();
-
-      /* 只因為共用帳本才看得到的話，一定要說清楚這不是全部——
-         不然使用者會把「他這個月只花了 800」當成事實，
-         而那其實只是他記在這幾本帳裡的部分。 */
-      if (partial) {
-        h += '<div class="note"><div class="note__k">這不是他的全部紀錄</div>' +
-          '<p>你沒有監管 ' + esc(u.name) + '，看得到的只有你們<b>共用帳本</b>裡的紀錄。' +
-          '他記在其他帳本的不會出現在這裡。</p></div>';
-      }
-
-      h += '<div class="card mhead">' +
-        ava(u, 'ava--xl') +
-        '<div class="mhead__m">' +
-          '<div class="mhead__top">' +
-            '<span class="mhead__n">' + esc(u.name) + '</span>' +
-            '<span class="tag tag--' + (u.role === 'parent' ? 'MEDIUM' : 'soft') + '">' +
-              ROLE_TW[u.role] + '</span>' +
-            (mine ? '<span class="tag tag--na">這是你自己</span>' : '') +
+      h += '<div class="duo">' +
+        '<section class="duo__c"><div class="card pcard">' +
+          ava(u, 'ava--xl') +
+          '<div class="pcard__m"><div class="pcard__n">' + esc(u.name) + '</div>' +
+            '<div class="pcard__r">' + esc(ROLE_TW[u.role] || '') + (mine ? '　·　你自己' : '') + '</div>' +
+            (partial ? '<div class="pcard__h">只看得到你們共用帳本裡的紀錄</div>' : '') +
           '</div>' +
-          (by.length && !mine
-            ? '<p class="mhead__s"><span class="mhead__h">被 ' +
-              by.map(function (g) { return esc(g.guardianName); }).join('、') +
-              ' 監管</span></p>'
-            : '') +
-        '</div>' +
-        '<div class="mhead__n2"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
+          '<div class="pcard__stat"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
+        '</div></section>' +
+        /* 零用金只有監管他的人看得到——那是監管者對他的設定，不是一筆支出 */
+        (!mine && !partial
+          ? '<section class="duo__c"><div class="card allow">' +
+              '<div class="allow__k">每個月給' + esc(callName(u.name)) + '的零用金' + helpBtn('allowance') + '</div>' +
+              '<label class="money"><i>NT$</i><input type="number" min="0" inputmode="numeric" ' +
+                'data-allow="' + esc(u.id) + '" value="' + (u.allowance || 0) + '" aria-label="每月零用金"></label>' +
+              '<div class="allow__h">改完離開欄位就會存好</div>' +
+            '</div></section>'
+          : '') +
       '</div>';
 
-      /* 監管對象的存款目標可由監管者代設——設定的地方就放在
-         看得到他紀錄的這一頁，不要塞回成員名冊那張表。 */
-      /* ⚠️ 只有監管他的人才看得到零用金——那是監管者對監管對象的設定。
-         只是跟他共用一本帳的人不該看到，更不該改。 */
-      if (!mine && !partial) {
-        /* 我給他多少零用金。這是設定，不是一筆支出紀錄——
-           不要另外記一筆「給小孩 3000」，否則他花掉之後同一筆錢會被算兩次。 */
-        h += '<div class="sec"><h2 class="sec__t">每月零用金' + helpBtn('allowance') + '</h2></div>' +
-          '<div class="card prof__goal">' +
-            '<input class="goal__i" type="number" min="0" ' +
-              'data-allow="' + esc(u.id) + '" value="' + (u.allowance || 0) + '">' +
-          '</div>';
-      }
-
-      if (canSetGoal(u, d) && !mine) {
-        h += '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
-          '<div class="card prof__goal">' +
-            '<input class="goal__i" type="number" min="0" ' +
-              'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '">' +
-          '</div>';
-      }
-
-      h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
-        '<span class="sec__n">' + tx.total + ' 筆</span></div>';
-
+      h += '<div class="sec"><h2 class="sec__t">收支明細</h2><span class="sec__n">' + tx.total + ' 筆</span></div>';
       h += '<div id="mtx">' + txTable(tx.transactions, hit,
-        emptyState('還沒有紀錄', esc(u.name) + '這個月還沒有記過帳。')) + '</div></div>';
+        '<div class="card">' + emptyState('還沒有紀錄', '這個月還沒記過帳。') + '</div>') + '</div></div>';
 
       $view.innerHTML = h;
 
-      // 標起來的那一筆捲進畫面，不然在長清單裡要自己找
-      var el = document.querySelector('.tx.is-hit');
+      // 從通知點進來的那一筆捲進畫面，不然在長清單裡要自己找
+      var el = document.querySelector('.txr.is-hit');
       if (el) setTimeout(function () {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }, 120);
@@ -1235,7 +1175,7 @@
   }
 
   function backLink() {
-    return '<a class="back" href="#/members">← 回成員與權限</a>';
+    return '<a class="back" href="javascript:history.back()">← 返回</a>';
   }
 
 
@@ -1247,12 +1187,17 @@
      每一本帳可以各自設一個每月存款目標。
      ============================================================ */
   function vGroups() {
-    head('帳本', '一個家庭可以開好幾本，各自有自己的存款目標');
+    head('帳本', '家用、旅遊、自己的零用，分開記');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
     Promise.all([API.groups({ includeArchived: true }), API.members()])
       .then(function (r) {
       var d = r[0], fam = r[1];
+
+      /* 展開的時候要用到，先記下來——點開一本帳不用再打一次 API */
+      LG.fam = fam;
+      LG.byId = {};
+      d.groups.forEach(function (g) { LG.byId[g.id] = g; });
 
       var live = d.groups.filter(function (g) { return !g.archived; });
       var gone = d.groups.filter(function (g) { return g.archived; });
@@ -1265,145 +1210,172 @@
       var temps = live.filter(function (g) { return g.kind === 'temp' && !g.settled; });
       var done = live.filter(function (g) { return g.kind === 'temp' && g.settled; });
 
-      var h = '<div class="page">';
-
-      /* 「開一本新的」跟記帳頁的「記一筆」是同一個做法：
-         進來先看到的是**帳本本身**，開新的那張表單縮成標題右邊的一個＋。
-
-         ⚠️ 這不只是版面偏好。開帳本是一次性動作——開完就不會再開了，
-         但那張表單原本每次進來都攤在畫面中間，永遠佔著位置。
-         真正每天要看的是「我有哪幾本、各自花到哪」。 */
+      /* 開一本新的：跟「記一筆」同一個做法，縮成標題右邊的按鈕 */
       var gnewForm =
         '<form class="card gnew" id="gnewF">' +
-          '<label class="fld"><span>名字</span>' +
+          '<label class="fld fld--wide"><span>名字</span>' +
             '<input type="text" id="gnName" placeholder="例如 旅遊基金、沖繩旅遊" required></label>' +
           '<label class="fld"><span>種類</span>' +
             '<select id="gnKind">' +
-              '<option value="standing">常設 —— 一直用的</option>' +
-              '<option value="temp">活動 —— 有結束日，結束後結算</option>' +
+              '<option value="standing">常設</option>' +
+              '<option value="temp">活動（有結束日）</option>' +
             '</select></label>' +
-          /* 只有活動帳本要填結束日，所以它預設藏起來 */
-          '<label class="fld" id="gnEndWrap" hidden><span>結束日</span>' +
-            '<input type="date" id="gnEnd"></label>' +
           '<label class="fld"><span>顏色</span>' +
-            /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份。
-               寫死的那一版跟種子資料用的顏色完全是兩套：表單給亮彩、
-               資料用濁色，結果新開的帳本跟全站格格不入，而且看不見。 */
+            /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份 */
             '<select id="gnColor">' +
               ((global.DATA && global.DATA.groupColors) || []).map(function (c) {
                 return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
               }).join('') +
             '</select></label>' +
-          '<div><button class="btn btn--go" type="submit">建立</button></div>' +
+          /* 只有活動帳本要填結束日 */
+          '<label class="fld" id="gnEndWrap" hidden><span>結束日</span>' +
+            '<input type="date" id="gnEnd"></label>' +
+          '<div class="form__act"><button class="btn btn--go btn--sm" type="submit">建立</button></div>' +
         '</form>';
 
-      h += foldBlock('gnew', '常設帳本', '開一本', gnewForm,
-                     standing.length + ' 本', 'books');
-      h += '<div class="rows">' + standing.map(gcard).join('') + '</div>';
+      var archHTML = '<div class="card card--flush"><ul class="arch">' + gone.map(function (g) {
+        return '<li class="arch__i">' +
+          '<span class="gsw__d" style="background:' + tint(g.color) + '"></span>' +
+          '<span class="arch__n">' + esc(g.name) + '</span>' +
+          '<span class="arch__c">' + g.count + ' 筆</span>' +
+          (g.canEdit ? '<button class="btn btn--sm" data-grestore="' + esc(g.id) + '">復原</button>' : '') +
+        '</li>';
+      }).join('') + '</ul></div>';
 
-      if (temps.length) {
-        h += '<div class="sec"><h2 class="sec__t">活動帳本</h2>' +
-          '<span class="sec__n">' + temps.length + ' 本</span></div>';
-        h += '<div class="rows">' + temps.map(gcard).join('') + '</div>';
-      }
-      if (done.length) {
-        h += foldBlock('gdone', '已結算', '看看',
-          '<div class="rows">' + done.map(gcard).join('') + '</div>',
-          String(done.length) + ' 本');
-      }
-
-      function gcard(g, i) {
-        /* ⚠️ 帳本沒有圖示方塊。
-
-           名字已經說清楚是哪一本了，再擺一個寫著同一個字的方塊只是佔位；
-           活動帳本另外有「活動 · 到 mm/dd」的標籤，更沒有理由。
-           顏色靠切換器上的小圓點就夠。 */
-        return '<article class="row" style="animation-delay:' + ((i || 0) * 50) +
-          'ms;grid-template-columns:1fr 150px auto">' +
-          '<div class="row__m"><div class="row__top">' +
-            '<span class="row__act" style="font-size:15px">' + esc(g.name) + '</span>' +
-            (g.kind === 'temp'
-              ? '<span class="tag tag--MEDIUM">活動' +
-                (g.endsOn ? ' · 到 ' + esc(g.endsOn.slice(5).replace('-', '/')) : '') +
-                '</span>' : '') +
-            (g.settled ? '<span class="tag tag--soft">已結算</span>' : '') +
-            (g.overdue ? '<span class="tag tag--down">已到期</span>' : '') +
-            (g.canEdit ? '<span class="tag tag--done">你建立的</span>'
-                       : '<span class="tag tag--soft">你是成員</span>') +
-            (g.id === GROUP ? '<span class="tag tag--na">目前在看</span>' : '') +
-          '</div><div class="row__sub">' +
-            esc(g.memberNames.join('、')) +
-            (g.note ? '　｜　' + esc(g.note) : '') +
-          '</div></div>' +
-          '<div class="row__do">' +
-            '<span class="goal"><label>這本帳的月目標</label>' +
-            '<input class="goal__i" type="number" min="0" ' +
-              'data-ggoal="' + esc(g.id) + '" value="' + (g.goal || 0) + '"></span>' +
-          '</div>' +
-          '<div class="row__go2">' +
-            '<span class="rowbtn" data-gopen="' + esc(g.id) + '">' + g.count + ' 筆 →</span>' +
-            (g.kind === 'temp' && !g.settled && g.canEdit
-              ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">結算</button>' : '') +
-            (g.canEdit && !g.settled
-              ? '<button class="gx" data-garch="' + esc(g.id) +
-                '" title="收起這本帳。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
-          '</div>' +
-          '<label class="gnot"><input type="checkbox" data-gnotify="' + esc(g.id) + '"' +
-            (g.notify ? ' checked' : '') + '><span>有動靜通知我</span></label>' +
-        '</article>';
-      }
-
-      /* ---- 成員 ----
-         同樣收起來。編成員是偶爾才做一次的事，
-         但這張卡片會隨著帳本數量一直長高，攤開的話下面的「已封存」
-         幾乎永遠滾不到。 */
-      var editable = d.groups.filter(function (g) { return g.canEdit; });
-      if (editable.length) {
-        h += foldBlock('gmem', '誰在哪一本帳裡', '編成員',
-          '<div class="card gmem">' + editable.map(function (g) {
-          var inside = g.members;
-          var outside = fam.members.filter(function (u) { return inside.indexOf(u.id) < 0; });
-          return '<div class="gmem__g">' +
-            '<div class="gmem__t"><span class="gsw__d" style="background:' + tint(g.color) +
-              '"></span>' + esc(g.name) + '</div>' +
-            '<div class="gmem__l">' + inside.map(function (u) {
-              var m = fam.members.filter(function (x) { return x.id === u; })[0] || {};
-              return '<span class="chip">' + esc(m.name || u) +
-                (u === g.owner ? '' :
-                  '<button data-gdel="' + esc(g.id) + '|' + esc(u) + '" title="移出">×</button>') +
-                '</span>';
-            }).join('') + '</div>' +
-            (outside.length
-              ? '<div class="gmem__add">加人：' + outside.map(function (u) {
-                  return '<button class="chip chip--add" data-gadd="' + esc(g.id) + '|' +
-                    esc(u.id) + '">＋ ' + esc(u.name) + '</button>';
-                }).join('') + '</div>'
-              : '') +
-          '</div>';
-        }).join('') + '</div>', String(editable.length) + ' 本');
-      }
-
-      /* ---- 已封存 ---- */
-      if (gone.length) {
-        h += foldBlock('garch', '已封存', '看看',
-          '<div class="card arch">' +
-          '<div class="arch__l">' + gone.map(function (g) {
-            return '<div class="arch__i">' +
-              '<span class="gsw__d" style="background:' + tint(g.color) + '"></span>' +
-              '<span class="arch__n">' + esc(g.name) + '</span>' +
-              '<span class="arch__c">' + g.count + ' 筆紀錄還在</span>' +
-              (g.canEdit
-                ? '<button class="btn btn--sm" data-grestore="' + esc(g.id) + '">復原</button>'
-                : '') +
-            '</div>';
-          }).join('') + '</div></div>', String(gone.length) + ' 本', 'archive');
-      }
+      var h = '<div class="page"><div class="duo">' +
+        '<section class="duo__c">' +
+          foldBlock('gnew', '常設帳本', '開一本', gnewForm, standing.length + ' 本', 'books') +
+          ledgerList(standing) +
+          (gone.length ? foldBlock('garch', '已封存', '看看', archHTML, String(gone.length) + ' 本', 'archive') : '') +
+        '</section>' +
+        '<section class="duo__c">' +
+          '<div class="sec"><h2 class="sec__t">活動帳本</h2><span class="sec__n">' + temps.length + ' 本</span></div>' +
+          (temps.length
+            ? ledgerList(temps)
+            : '<div class="card">' + emptyState('沒有進行中的活動', '出國、搬家這種有結束日的花費，開一本活動帳本來記。') + '</div>') +
+          (done.length ? foldBlock('gdone', '已結算', '看看', ledgerList(done), String(done.length) + ' 本') : '') +
+        '</section>' +
+      '</div>';
 
       $view.innerHTML = h + '</div>';
       /* ⚠️ 重畫之後一定要叫它——不然使用者展開表單、按了建立，
          畫面重畫完就無聲收合，看起來像沒有反應。 */
       foldRestore();
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+
+  /* ============================================================
+     帳本清單：收合列
+
+     跟財務建議同一個做法——一本帳平常只佔一行：
+       顏色 · 名稱 · 狀態 · 成員 · 筆數
+     點開才出現成員、月目標、通知、結算／封存。
+
+     ⚠️ 原本一本帳就是一張 150px 高的卡：月目標輸入框、三顆按鈕、
+     通知勾選全部攤開，三本帳就佔掉一整個螢幕，而且那些東西
+     每天根本不會動。真正每天要看的只有「有哪幾本、各記了多少」。
+
+     ⚠️ 成員管理也在這裡。以前另外有一個「誰在哪一本帳裡」區塊，
+     同一本帳的資訊被拆成上下兩處，要對著名字找。
+     ============================================================ */
+  var LG = { open: null, fam: null, byId: {} };
+
+  function ledgerList(list) {
+    return '<div class="lgl">' + list.map(ledgerRow).join('') + '</div>';
+  }
+
+  function ledgerRow(g) {
+    var open = LG.open === g.id;
+    return '<div class="lg' + (open ? ' on' : '') + '" data-lgid="' + esc(g.id) + '">' +
+      '<button class="lg__h" data-lg="' + esc(g.id) + '" aria-expanded="' + open + '">' +
+        /* ⚠️ 帳本沒有圖示方塊。名字已經說清楚是哪一本了；
+           顏色只用一個小方點，跟切換器上的一樣。 */
+        '<span class="gsw__d lg__dot" style="background:' + tint(g.color) + '"></span>' +
+        '<span class="lg__t">' + esc(g.name) + '</span>' +
+        '<span class="lg__tags">' +
+          (g.kind === 'temp' && g.endsOn && !g.settled
+            ? '<span class="tag tag--MEDIUM">到 ' + esc(g.endsOn.slice(5).replace('-', '/')) + '</span>' : '') +
+          (g.overdue ? '<span class="tag tag--down">已到期</span>' : '') +
+          (g.settled ? '<span class="tag tag--soft">已結算</span>' : '') +
+          (g.id === GROUP ? '<span class="tag tag--done">目前在看</span>' : '') +
+        '</span>' +
+        '<span class="lg__m">' + esc(g.memberNames.join('、')) + '</span>' +
+        '<span class="lg__c">' + g.count + ' 筆</span>' +
+        '<svg class="lg__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>' +
+      '</button>' +
+      (open ? ledgerBody(g) : '') +
+    '</div>';
+  }
+
+  function ledgerBody(g) {
+    var fam = LG.fam || { members: [] };
+    var byId = {};
+    fam.members.forEach(function (m) { byId[m.id] = m; });
+
+    /* 結算之後唯讀：不能再加減人。改成員等於改「誰看得到這本帳」，
+       結算過的帳不該在事後被改掉這件事。 */
+    var editable = g.canEdit && !g.settled;
+    var outside = editable
+      ? fam.members.filter(function (m) { return g.members.indexOf(m.id) < 0; })
+      : [];
+
+    var who = g.members.map(function (u) {
+      var m = byId[u] || {};
+      var owner = u === g.owner;
+      return '<span class="chip' + (owner ? ' chip--own' : '') + '">' + esc(m.name || u) +
+        (owner ? '<i>開帳本的人</i>' : '') +
+        (editable && !owner
+          ? '<button data-gdel="' + esc(g.id) + '|' + esc(u) + '" title="移出這本帳" ' +
+            'aria-label="把' + esc(m.name || u) + '移出這本帳">×</button>'
+          : '') +
+        '</span>';
+    }).join('');
+
+    var add = outside.length
+      ? '<select class="lg__add" data-gaddsel="' + esc(g.id) + '" aria-label="把家人加進這本帳">' +
+          '<option value="">＋ 加人</option>' +
+          outside.map(function (m) {
+            return '<option value="' + esc(m.id) + '">' + esc(m.name) + '</option>';
+          }).join('') +
+        '</select>'
+      : '';
+
+    return '<div class="lg__b">' +
+      (g.note ? '<p class="lg__note">' + esc(g.note) + '</p>' : '') +
+      '<dl class="lg__f">' +
+        '<dt>成員</dt><dd><div class="lg__who">' + who + add + '</div>' +
+          (g.canEdit ? '' : '<div class="lg__hint">只有開這本帳的人可以加減成員</div>') + '</dd>' +
+        '<dt>月目標</dt><dd>' +
+          '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(g.id) + '" ' +
+            'value="' + (g.goal || 0) + '" aria-label="這本帳的每月存款目標"></dd>' +
+        '<dt>通知</dt><dd>' +
+          '<label class="lg__chk"><input type="checkbox" data-gnotify="' + esc(g.id) + '"' +
+            (g.notify ? ' checked' : '') + '><span>這本帳有動靜就通知我</span></label></dd>' +
+      '</dl>' +
+      '<div class="lg__acts">' +
+        '<button class="btn btn--sm" data-gopen="' + esc(g.id) + '">看這本的 ' + g.count + ' 筆紀錄 →</button>' +
+        '<span class="lg__sp"></span>' +
+        (g.kind === 'temp' && !g.settled && g.canEdit
+          ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">結算</button>' : '') +
+        (g.canEdit && !g.settled
+          ? '<button class="gx" data-garch="' + esc(g.id) +
+            '" title="收起這本帳。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  /* 點一本打開、再點收起；一次只開一本，跟財務建議一樣。
+     只換那兩列，不重打 API，也不重畫整頁。 */
+  function ledgerToggle(id) {
+    var prev = LG.open;
+    LG.open = (prev === id) ? null : id;
+    [prev, LG.open].forEach(function (gid) {
+      if (!gid || !LG.byId[gid]) return;
+      var node = document.querySelector('.lg[data-lgid="' + gid + '"]');
+      if (node) node.outerHTML = ledgerRow(LG.byId[gid]);
+    });
   }
 
 
@@ -1417,23 +1389,15 @@
      每一則都用「使用者聽得懂的話」寫，不寫系統怎麼實作。
      ============================================================ */
   var HELP = {
-    allowance: {
-      t: '可支配上限是怎麼算的',
-      b: '<p>先看這個月進來多少錢，扣掉你設定的<b>每月存款目標</b>，' +
-         '剩下的就是這個月可以放心花的錢。</p>' +
-         '<p class="hp__f">本月收入　−　每月存款目標　＝　可支配上限</p>' +
-         '<p>舉個例子：這個月收入 68,000，你希望存下 20,000，' +
-         '那可以花的就是 48,000。花超過的話，這個月就存不到原本想存的金額。</p>' +
-         '<p>所以進度條看的不是「你花了多少」，而是' +
-         '<b>「離存不到錢還有多遠」</b>。</p>'
+    limit: {
+      t: '還可以花是怎麼算的',
+      b: '<p class="hp__f">本月收入 − 每月想存的 ＝ 這個月可以花的</p>' +
+         '<p>例如收入 68,000、想存 20,000，這個月就可以花 48,000。</p>'
     },
     goal: {
       t: '每月存款目標',
-      b: '<p>你希望每個月存下多少錢。填了之後，系統才知道你還剩多少可以花。</p>' +
-         '<p>這個數字<b>隨時可以改</b>，改了只影響現在和以後。' +
-         '過去的月份會沿用當時設定的數字——否則十月回頭看九月，' +
-         '會用現在的標準去評斷當時的自己，那不公平也不準。</p>' +
-         '<p>如果有人監管你，他也可以幫你設定這個數字。</p>'
+      b: '<p>每個月想存多少，<b>只有你自己能設定</b>。</p>' +
+         '<p>隨時可以改，改了只影響這個月和以後的月份。</p>'
     },
     entry: {
       t: '一句話就能記好幾筆',
@@ -1448,55 +1412,30 @@
     watch: {
       t: '誰看得到我的紀錄',
       b: '<p>預設只有你自己。</p>' +
-         '<p>家裡的家長可以建立「監管關係」，被指派之後，' +
-         '那個人就看得到你的記帳明細。<b>但他只能看</b>——' +
-         '不能修改、不能刪除，也不能登入你的帳號。</p>' +
-         '<p>這件事<b>不會偷偷發生</b>：只要有人看得到你，' +
-         '你的畫面上就一定看得到是誰。系統不提供隱藏的監管。</p>'
+         '<p>家長建立監管關係後可以看你的紀錄，但不能修改、刪除，也不能登入你的帳號。' +
+         '這些關係在「成員與權限」都看得到。</p>'
     },
     books: {
       t: '帳本是什麼',
-      b: '<p>同一個家庭可以開好幾本帳，例如「家用」「旅遊基金」「我自己的」。' +
-         '每一筆記帳都會歸到其中一本。</p>' +
-         '<p>分類回答的是「錢花在什麼」，帳本回答的是' +
-         '<b>「這筆算在哪一份預算上」</b>。' +
-         '所以同樣是吃飯，家庭聚餐算家用，出國吃的算旅遊基金。</p>' +
-         '<p>每一本帳可以設<b>自己的每月存款目標</b>，' +
-         '右上角切換帳本之後，統計和進度都會跟著那一本走。</p>' +
-         '<p>任何人都可以開自己的帳本，不分身分。開的人就是那本帳的管理者。</p>'
+      b: '<p>把不同用途的錢分開記，例如「家用」「旅遊基金」。</p>' +
+         '<p>右上角切換帳本之後，數字都只看那一本。</p>'
     },
     archive: {
-      t: '封存會發生什麼事',
-      b: '<p>把一本帳收起來不再使用。它會從切換器和統計裡消失，' +
-         '<b>但裡面的記帳一筆都不會被刪掉</b>。</p>' +
-         '<p>在「已封存」那一區隨時可以把它叫回來，' +
-         '回來之後所有紀錄都還在原位。</p>'
+      t: '封存',
+      b: '<p>把用不到的帳本收起來。<b>紀錄一筆都不會刪</b>，隨時可以復原。</p>'
     },
     alerts: {
-      t: '階段性提醒',
-      b: '<p>自己決定在花到幾成的時候提醒你。' +
-         '例如設 60%、85%、100% 三個門檻，' +
-         '每跨過一個就通知一次。</p>' +
-         '<p>算的是<b>可支配額度的幾成</b>，不是收入的幾成。</p>' +
-         '<p>同一個門檻<b>一個月只會響一次</b>，' +
-         '不會因為你來回記帳就一直被吵。下個月自動重新開始。</p>' +
-         '<p>暫時不想被打擾的話，把它關掉就好，設定會留著。</p>'
+      t: '花到幾成提醒我',
+      b: '<p>例如設 80%，花到可以花的額度八成時就通知你。</p>' +
+         '<p>同一個提醒一個月只響一次，下個月重新開始。</p>'
     },
     budget: {
-      t: '預算怎麼用',
-      b: '<p>針對某一個分類設一個月的上限，例如餐飲不超過 8,000。</p>' +
-         '<p>它跟存款目標是兩件事：<b>存款目標管的是整體</b>' +
-         '（這個月要留下多少），<b>預算管的是單一類別</b>' +
-         '（這一類最多花多少）。兩個一起看，才知道是哪裡超出去的。</p>'
+      t: '預算',
+      b: '<p>替某一個分類設每月上限，例如餐飲不超過 8,000。</p>'
     },
     advice: {
-      t: '財務建議是怎麼來的',
-      b: '<p>系統先把你這個月的收支算清楚，' +
-         '再把<b>算好的數字</b>交給模型，請它用人話講出來，' +
-         '並且給幾個具體可做的調整。</p>' +
-         '<p>每一則建議底下都會附上它依據的數字。' +
-         '<b>數字是系統算的，不是模型猜的</b>——' +
-         '你可以自己核對。</p>'
+      t: '建議是怎麼來的',
+      b: '<p>系統先把數字算好，再請模型用白話說出來。每一則底下都附著依據的算式。</p>'
     },
     perms: {
       t: '誰可以做什麼',
@@ -1517,13 +1456,8 @@
     },
     allowance: {
       t: '每月零用金',
-      b: '<p>你每個月給他多少錢。<b>這是設定，不是一筆支出紀錄。</b></p>' +
-         '<p>不要另外記一筆「給小孩 3000」——他把那 3000 花掉時會記成支出，' +
-         '同一筆錢就被算了兩次，家庭支出會憑空多一倍。</p>' +
-         '<p>所以家庭總覽是這樣算的：' +
-         '<b>子女的支出算進家庭支出</b>（那筆錢確實離開了這個家），' +
-         '<b>子女的收入不算進家庭收入</b>（零用錢是家裡給的）。</p>' +
-         '<p>這個數字只拿來跟「他實際花了多少」做對照。</p>'
+      b: '<p>每個月給家人多少零用金。<b>這是設定，不是一筆支出。</b></p>' +
+         '<p>不用另外記一筆「給小孩 3000」，不然他花掉時同一筆錢會被算兩次。</p>'
     },
     avatar: {
       t: '大頭貼',
@@ -1702,26 +1636,23 @@
      ============================================================ */
   var TOUR_KEY = 'fambudget.tour';
   var TOUR = [
-    { sel: '.nav__i[data-nav="entry"]', hash: '#/',
+    { sel: '.quick, .tab--add', hash: '#/',
       t: '從這裡記帳',
       b: '打一段話就好，例如「早餐55 中午吃飯320」，系統會幫你拆成一筆一筆。' },
     { sel: '.kpis .kpi:last-child', hash: '#/',
       t: '這個月還能花多少',
-      b: '收入扣掉你設定的存款目標，剩下的就是能放心花的錢。' },
+      b: '收入扣掉你想存的，剩下的就是能放心花的錢。' },
     { sel: '#gswBtn', hash: '#/',
       t: '切換帳本',
-      b: '家用、旅遊基金可以分開記。切過去之後，統計和目標都只看那一本。' },
+      b: '家用、旅遊基金可以分開記。切過去之後，數字都只看那一本。' },
     { sel: '#bell', hash: '#/',
       t: '通知',
       b: '家人記帳、或是你花到設定的比例時，這裡會亮。' },
-    { sel: '.nav__i[data-nav="profile"]', hash: '#/',
-      t: '設定在這裡',
-      b: '每月想存多少、花到幾成提醒你，都在個人資料裡設定。' },
-    { sel: '.docs__i--main', hash: '#/',
-      t: '看不懂就來這裡',
-      b: '完整的使用說明放在這。另外，畫面上標題旁邊的「?」可以隨時點開。' }
+    { sel: '#who, #moreBtn', hash: '#/',
+      t: '你的設定在這裡',
+      b: '每月想存多少、花到幾成提醒你，都在個人資料裡。' }
   ];
-  var tourAt = -1;
+    var tourAt = -1;
 
   function clamp(v, lo, hi) {
     if (hi < lo) return lo;                   // 空間比框還小：貼著上緣就好
@@ -1806,7 +1737,11 @@
     var box = document.getElementById('tourBox');
     if (!hole || !box) return;
 
-    var el0 = document.querySelector(step.sel);
+    /* 同一步可能有桌機和手機兩個位置，挑畫面上真的看得到的那一個 */
+    var el0 = Array.prototype.filter.call(document.querySelectorAll(step.sel), function (n) {
+      var rr = n.getBoundingClientRect();
+      return rr.width > 0 && rr.height > 0;
+    })[0];
     if (!el0) { tourGo(1); return; }          // 那個東西這次不在畫面上就跳過
 
     /* 導覽期間 body 是 overflow:hidden（不讓使用者自己捲，否則圈圈會跟目標分家）。
@@ -1914,53 +1849,41 @@
      停權是關門，不是配鑰匙。
      ============================================================ */
   function vAdmin() {
-    head('平台管理', '停權與稽核');
+    head('平台管理', '停權與稽核。這裡看不到任何人的帳。');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
     Promise.all([API.adminUsers(), API.audit()]).then(function (r) {
       var users = r[0].users, logs = r[1].logs;
-      var h = '<div class="page">';
-
-      h += '<div class="note"><div class="note__k">這裡看不到任何人的錢</div>' +
-        '<p>平台管理員能停權、能查稽核，但<b>讀不到任何一筆帳</b>。' +
-        '停權是關門，不是配鑰匙。</p></div>';
-
-      h += '<div class="sec"><h2 class="sec__t">帳號</h2>' +
-        '<span class="sec__n">' + users.length + ' 個</span></div>';
-
-      h += '<div class="rows">' + users.map(function (u, i) {
-        var off = !!u.suspendedAt;
-        return '<article class="row" style="animation-delay:' + (i * 50) +
-          'ms;grid-template-columns:1fr 150px">' +
-          '<div class="row__m"><div class="row__top">' +
-            '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
-            (off ? '<span class="tag tag--down">已停權</span>'
-                 : '<span class="tag tag--soft">正常</span>') +
-          '</div><div class="row__sub">' + esc(u.email) +
-            (off ? '　｜　' + esc(u.suspendedReason) : '') + '</div></div>' +
-          '<div class="row__go2">' +
-            (off
-              ? '<button class="gx gx--go" data-unsus="' + esc(u.id) + '">解除停權</button>'
-              : '<button class="gx gx--warn" data-sus="' + esc(u.id) + '">停權</button>') +
-          '</div>' +
-        '</article>';
-      }).join('') + '</div>';
-
-      /* ⚠️ 稽核收合起來，但**不是次要功能**——沒有稽核的停權就是任意封鎖。
-         收起來只是因為它是清單，不是一進來就要處理的東西。 */
-      h += foldBlock('audit', '稽核紀錄', '看紀錄',
-        '<div class="card">' + logs.map(function (a) {
-          return '<div class="aud">' +
-            '<span class="aud__t">' + esc(a.at) + '</span>' +
-            '<span class="aud__a">' + esc(a.actorName) + '</span>' +
-            '<span class="aud__k">' + esc(AUDIT_TW[a.action] || a.action) + '</span>' +
-            '<span class="aud__n">' + esc(a.note || '') + '</span>' +
-          '</div>';
-        }).join('') + '</div>', String(logs.length) + ' 筆');
-
-      h += '</div>';
+      var h = '<div class="page"><div class="duo">' +
+        '<section class="duo__c">' +
+          '<div class="sec"><h2 class="sec__t">帳號</h2><span class="sec__n">' + users.length + ' 個</span></div>' +
+          '<div class="card card--flush"><table class="dt">' +
+            '<thead><tr><th>帳號</th><th>狀態</th><th></th></tr></thead><tbody>' +
+            users.map(function (u) {
+              var off = !!u.suspendedAt;
+              return '<tr><td><span class="dt__name"><span><b>' + esc(u.name) + '</b>' +
+                  '<small>' + esc(u.email) + '</small></span></span></td>' +
+                '<td>' + (off
+                  ? '<span class="pill pill--over">已停權</span><small class="dt__why">' + esc(u.suspendedReason) + '</small>'
+                  : '<span class="pill pill--safe">正常</span>') + '</td>' +
+                '<td class="rt">' + (off
+                  ? '<button class="gx gx--go" data-unsus="' + esc(u.id) + '">解除停權</button>'
+                  : '<button class="gx gx--warn" data-sus="' + esc(u.id) + '">停權</button>') + '</td></tr>';
+            }).join('') + '</tbody></table></div>' +
+        '</section>' +
+        /* ⚠️ 稽核跟帳號並排，不收起來——沒有稽核的停權就是任意封鎖 */
+        '<section class="duo__c">' +
+          '<div class="sec"><h2 class="sec__t">稽核紀錄</h2><span class="sec__n">' + logs.length + ' 筆</span></div>' +
+          '<div class="card card--flush"><ol class="audl">' + logs.map(function (a) {
+            return '<li class="audl__i">' +
+              '<div class="audl__top"><b>' + esc(AUDIT_TW[a.action] || a.action) + '</b>' +
+                '<time>' + esc(a.at) + '</time></div>' +
+              '<div class="audl__s">' + esc(a.actorName) + (a.note ? '　' + esc(a.note) : '') + '</div>' +
+            '</li>';
+          }).join('') + '</ol></div>' +
+        '</section>' +
+      '</div></div>';
       $view.innerHTML = h;
-      foldRestore();
     }).catch(function (e) {
       $view.innerHTML = '<div class="page">' + errState(e) + '</div>';
     });
@@ -1973,7 +1896,31 @@
   };
 
   /* ---------- 共用 ---------- */
-  function head(t, s) { $title.textContent = t; $sub.textContent = s; }
+  /* 第一層標題。分區小字（個人／家庭／平台）直接讀側欄的分組，不另外維護對照表；
+     act 是這一頁右上角的動作，可以不給。 */
+  function head(t, sub, act) {
+    $title.textContent = t;
+    $sub.textContent = sub || '';
+    $sub.hidden = !sub;
+    var a = document.getElementById('pact');
+    if (a) { a.innerHTML = act || ''; a.hidden = !act; }
+    /* 有「我／全家」切換的頁面，小字直接說現在看的是誰 */
+    var k = document.getElementById('pkick');
+    if (k) k.textContent = /data-scope=/.test(act || '')
+      ? (SCOPE === 'family' ? '全家' : '我的') : navGroup();
+    var mini = document.getElementById('pmini');
+    if (mini) mini.textContent = t;
+  }
+
+  function navGroup() {
+    var page = (location.hash || '#/').replace(/^#\/?/, '').split('/')[0];
+    if (page === 'member') page = 'members';
+    var b = document.querySelector('.rail .nav__i[data-nav="' + page + '"]');
+    for (var n = b && b.previousElementSibling; n; n = n.previousElementSibling) {
+      if (n.classList.contains('nav__lb')) return n.textContent.trim();
+    }
+    return '';
+  }
 
   function animate() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-count]'), function (n) {
@@ -2164,66 +2111,59 @@
     $view.innerHTML = '<div class="page">' + skeleton(3) + '</div>';
     API.me().then(function (m) {
       var u = m.user;
-      /* 左右兩欄。大頭貼、存款目標、密碼都只需要半欄的寬度，
-         各自獨佔一整條的話，整頁會被拉得很長而且空空的。
-         階段性提醒有清單又有新增列，需要整欄，所以放在下面。 */
-      /* 基本資料在左，其他設定在右。
-         階段性提醒有清單又有新增列，需要整欄，放下面。 */
-      var h = '<div class="page">' +
-        '<div class="cols"><div class="col">' +
-
-        '<div class="sec"><h2 class="sec__t">基本資料</h2></div>' +
-        '<form class="card prof__form" id="profF">' +
-          '<label class="fld"><span>名字</span>' +
-            '<input type="text" id="pfName" value="' + esc(u.name) + '" required></label>' +
-          '<label class="fld"><span>出生年份</span>' +
-            '<input type="number" id="pfYear" min="1900" max="' + new Date().getFullYear() + '" ' +
-              'value="' + (u.birthYear || '') + '" placeholder="例如 1974">' +
-            '</label>' +
-          '<label class="fld"><span>Email</span>' +
-            '<input type="email" value="' + esc(u.email || '') + '" disabled>' +
-            '</label>' +
-          '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
-        '</form>' +
-
-        '</div><div class="col">' +
-
-        '<div class="sec"><h2 class="sec__t">大頭貼' + helpBtn('avatar') + '</h2></div>' +
-        '<div class="card prof">' +
-          '<div class="prof__a" id="profAva">' + ava(u, 'ava--xl') + '</div>' +
-          '<div class="prof__m">' +
-            '<div class="prof__do">' +
-              '<label class="btn btn--sm btn--go">選一張圖' +
-                '<input type="file" id="avaF" accept="image/png,image/jpeg,image/webp" hidden></label>' +
-              (u.avatarUrl ? '<button class="btn btn--sm" id="avaDel">移除，改用文字</button>' : '') +
+      /* 左邊是「我是誰」，右邊是「我的錢怎麼管」。
+         存款目標和提醒放在一起：提醒算的就是目標之後剩下的額度。 */
+      var h = '<div class="page"><div class="duo">' +
+        '<section class="duo__c">' +
+          '<div class="sec"><h2 class="sec__t">我的資料</h2></div>' +
+          '<div class="card me">' +
+            '<div class="me__top">' +
+              '<div class="me__a" id="profAva">' + ava(u, 'ava--xl') + '</div>' +
+              '<div class="me__who">' +
+                '<div class="me__n">' + esc(u.name) + '</div>' +
+                '<div class="me__r">' + esc(ROLE_TW[u.role] || '') + '</div>' +
+                '<div class="me__do">' +
+                  '<label class="btn btn--sm">換照片' +
+                    '<input type="file" id="avaF" accept="image/png,image/jpeg,image/webp" hidden></label>' +
+                  (u.avatarUrl ? '<button class="btn btn--sm btn--ghost" id="avaDel">移除照片</button>' : '') +
+                '</div>' +
+              '</div>' +
             '</div>' +
+            '<form class="grid-form" id="profF">' +
+              '<label class="fld"><span>名字</span>' +
+                '<input type="text" id="pfName" value="' + esc(u.name) + '" required></label>' +
+              '<label class="fld"><span>出生年份</span>' +
+                '<input type="number" id="pfYear" min="1900" max="' + new Date().getFullYear() + '" ' +
+                  'value="' + (u.birthYear || '') + '" placeholder="例如 1974"></label>' +
+              '<label class="fld fld--wide"><span>Email</span>' +
+                '<input type="email" value="' + esc(u.email || '') + '" disabled></label>' +
+              '<div class="form__act"><button class="btn btn--go btn--sm" type="submit">儲存</button></div>' +
+            '</form>' +
           '</div>' +
-        '</div>' +
 
-        '<div class="sec"><h2 class="sec__t">每月存款目標' + helpBtn('goal') + '</h2></div>' +
-        '<div class="card prof__goal">' +
-          '<input class="goal__i" type="number" min="0" ' +
-            'data-goal="' + esc(u.id) + '" value="' + (u.savingsGoal || 0) + '">' +
-        '</div>' +
+          '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
+          '<form class="card grid-form" id="pwF">' +
+            '<label class="fld"><span>目前的密碼</span>' +
+              '<input type="password" id="pwOld" autocomplete="current-password" required></label>' +
+            '<label class="fld"><span>新密碼</span>' +
+              '<input type="password" id="pwNew" autocomplete="new-password" placeholder="至少 8 個字" required></label>' +
+            '<div class="form__act"><button class="btn btn--sm" type="submit">更改密碼</button></div>' +
+          '</form>' +
+        '</section>' +
 
-        '<div class="sec"><h2 class="sec__t">密碼</h2></div>' +
-        '<form class="card prof__form" id="pwF">' +
-          '<label class="fld"><span>目前的密碼</span>' +
-            '<input type="password" id="pwOld" autocomplete="current-password" required></label>' +
-          '<label class="fld"><span>新密碼</span>' +
-            '<input type="password" id="pwNew" autocomplete="new-password" required>' +
-            '<em class="fld__h">至少 8 個字</em></label>' +
-          '<div><button class="btn" type="submit">更改密碼</button></div>' +
-        '</form>' +
-
-        '</div></div>' +
-
-        foldHead('fin', '理財習慣', '填寫', 'FOR ADVICE') +
-
-        '<div class="sec"><h2 class="sec__t">階段性提醒' + helpBtn('alerts') + '</h2></div>' +
-        '<div class="card" id="alertBox">' + skeleton(2) + '</div>' +
-
-      '</div>';
+        '<section class="duo__c">' +
+          '<div class="sec"><h2 class="sec__t">存錢計畫</h2></div>' +
+          '<div class="card plan">' +
+            '<div class="plan__k">每個月想存' + helpBtn('goal') + '</div>' +
+            '<label class="money money--lg"><i>NT$</i>' +
+              '<input type="number" min="0" inputmode="numeric" data-goal="' + esc(u.id) + '" ' +
+                'value="' + (u.savingsGoal || 0) + '" aria-label="每月存款目標"></label>' +
+            '<div class="plan__h">只有你自己能設定。改完離開欄位就會存好</div>' +
+          '</div>' +
+          '<div class="card card--flush" id="alertBox">' + skeleton(2) + '</div>' +
+          foldHead('fin', '理財習慣', '填寫') +
+        '</section>' +
+      '</div></div>';
       $view.innerHTML = h;
       foldRestore();
       paintAlerts();
@@ -2231,7 +2171,7 @@
   }
 
   /* ---------------------------------------------------------
-     階段性提醒：使用者自己設幾個百分比門檻
+     花到幾成提醒我：一條清單 ＋ 同一行加一個
      --------------------------------------------------------- */
   function paintAlerts() {
     var box = document.getElementById('alertBox');
@@ -2239,28 +2179,28 @@
     Promise.all([API.alerts(), API.savingsGoals()]).then(function (r) {
       var list = r[0].alerts || [], goals = r[1].goals || [];
 
-      var h = list.length
-        ? '<div class="alist">' + list.map(function (a) {
-            return '<div class="ai' + (a.enabled ? '' : ' off') + '">' +
-              '<span class="ai__p">' + esc(a.percent) + '%</span>' +
+      var h = '<div class="card__h"><span class="card__t">花到幾成提醒我</span>' + helpBtn('alerts') + '</div>';
+      h += list.length
+        ? '<ul class="alist">' + list.map(function (a) {
+            return '<li class="ai' + (a.enabled ? '' : ' off') + '">' +
+              '<span class="ai__p">' + esc(a.percent) + '<i>%</i></span>' +
               '<span class="ai__s">' + esc(a.groupName) + '</span>' +
-              '<button class="ai__t" data-atoggle="' + esc(a.id) + '|' +
-                (a.enabled ? '0' : '1') + '">' +
-                (a.enabled ? '開著' : '關掉了') + '</button>' +
-              '<button class="ai__x" data-adel="' + esc(a.id) + '" title="刪掉">×</button>' +
-            '</div>';
-          }).join('') + '</div>'
-        : '<p class="prof__h">還沒設定</p>';
+              '<button class="sw' + (a.enabled ? ' on' : '') + '" role="switch" aria-checked="' + !!a.enabled + '" ' +
+                'data-atoggle="' + esc(a.id) + '|' + (a.enabled ? '0' : '1') + '" ' +
+                'aria-label="' + (a.enabled ? '關掉' : '打開') + '這個提醒"><i></i></button>' +
+              '<button class="ai__x" data-adel="' + esc(a.id) + '" title="刪掉" aria-label="刪掉這個提醒">×</button>' +
+            '</li>';
+          }).join('') + '</ul>'
+        : '<p class="alist__empty">還沒有提醒</p>';
 
       h += '<form class="anew" id="anewF">' +
-        '<label class="fld anew__pct"><span>百分比</span>' +
-          '<input type="number" id="anPct" min="1" max="200" value="80" required></label>' +
-        '<label class="fld anew__grp"><span>哪一本帳</span>' +
-          '<select id="anGroup">' + goals.map(function (g) {
-            return '<option value="' + (g.groupId || '') + '">' + esc(g.groupName) +
-              (g.goal ? '（目標 ' + money(g.goal) + '）' : '（還沒設目標）') + '</option>';
-          }).join('') + '</select></label>' +
-        '<div><button class="btn btn--sm btn--go" type="submit">加一個門檻</button></div>' +
+        '<span class="anew__t">花到</span>' +
+        '<input type="number" id="anPct" min="1" max="200" value="80" required aria-label="百分比">' +
+        '<span class="anew__t">%，</span>' +
+        '<select id="anGroup" aria-label="哪一本帳">' + goals.map(function (g) {
+          return '<option value="' + (g.groupId || '') + '">' + esc(g.groupName) + '</option>';
+        }).join('') + '</select>' +
+        '<button class="btn btn--sm btn--go" type="submit">加入</button>' +
       '</form>';
 
       box.innerHTML = h;
@@ -2364,30 +2304,24 @@
   function paintWho() {
     API.me().then(function (m) {
       ME = m;
-      var w = document.getElementById('who');
-      if (w) {
-        w.innerHTML = ava(m.user, 'ava--sm') +
-          '<span class="who__n">' + esc(m.user.name) + '</span>' +
-          '<span class="who__r">' + ROLE_TW[m.user.role] + '</span>' +
-          '<button class="who__out" id="logout">登出</button>';
-      }
-      /* 家庭總覽是給家長的功能。
-         ⚠️ 這跟「可見範圍」是兩件事：
-           角色  決定「有沒有這個功能」
-           監管  決定「看得到誰的資料」
-         兩道都要過——家長也只看得到被指派給他的那幾個人。 */
+      var card = ava(m.user, 'ava--md') +
+        '<span class="acct__m"><b class="acct__n">' + esc(m.user.name) + '</b>' +
+          '<span class="acct__r">' + esc(ROLE_TW[m.user.role] || (m.user.isPlatformAdmin ? '平台管理員' : '')) + '</span></span>' +
+        '<svg class="acct__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+          'aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+      ['who', 'whoSheet'].forEach(function (k) {
+        var w = document.getElementById(k);
+        if (w) w.innerHTML = card;
+      });
+      /* 角色決定「有沒有這個功能」，監管決定「看得到誰」——兩件事 */
       document.body.classList.toggle('role-child', m.user.role !== 'parent');
-      /* ⚠️ 平台管理員沒有財務頁可以看——那不是藏起來，是他真的沒有資料。
-         側欄只留「平台管理」。 */
+      /* ⚠️ 平台管理員沒有財務頁可以看——那不是藏起來，是他真的沒有資料 */
       document.body.classList.toggle('is-admin', !!m.user.isPlatformAdmin);
-
-      var f = document.getElementById('famName');
-      if (f) f.textContent = m.family.family + '　' + m.family.period;
     });
   }
 
   /* ---------- 路由 ---------- */
-  var ROUTES = { '': vHome, entry: vEntry, family: vFamily, stats: vStats,
+  var ROUTES = { '': vHome, entry: vEntry, stats: vStats,
                  advice: vAdvice, members: vMembers,
                  login: vLogin, register: vRegister, profile: vProfile,
                  member: vMember, groups: vGroups, admin: vAdmin };
@@ -2427,9 +2361,10 @@
         (ROUTES[page] || vHome)(parts[1], parts[2]);
         // 看某個成員的紀錄時，左邊仍然亮「成員與權限」
         var lit = page === 'member' ? 'members' : page;
-        Array.prototype.forEach.call(document.querySelectorAll('.nav__i'), function (b) {
+        Array.prototype.forEach.call(document.querySelectorAll('.nav__i, .tab[data-nav]'), function (b) {
           b.classList.toggle('on', b.dataset.nav === lit);
         });
+        sheetOpen(false);
       }
     });
   }
@@ -2473,8 +2408,35 @@
     var q = t.closest('[data-help]');
     if (q) { openHelp(q.dataset.help); return; }
 
+    /* 手機的「更多」面板 */
+    if (t.closest('#moreBtn')) { sheetOpen(document.getElementById('sheet').hidden); return; }
+    if (t.closest('[data-sheet="close"]')) { sheetOpen(false); return; }
+
+    /* 記一筆：從哪裡按都直接打開記帳的輸入區 */
+    if (t.closest('[data-quick="entry"]')) {
+      sheetOpen(false);
+      if (/^#\/entry/.test(location.hash)) {
+        if (!FOLD.entry) foldToggle('entry');
+        var fw = document.getElementById('fold-entry');
+        if (fw) fw.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      } else {
+        FOLD.entry = true;
+        location.hash = '#/entry';
+      }
+      return;
+    }
+
+    /* 我／全家：換範圍之後重畫這一頁 */
+    var scp = t.closest('[data-scope]');
+    if (scp) {
+      SCOPE = scp.dataset.scope === 'family' ? 'family' : 'me';
+      try { sessionStorage.setItem('fambudget.scope', SCOPE); } catch (err) {}
+      paint();
+      return;
+    }
+
     var nav = t.closest('[data-nav]');
-    if (nav) { location.hash = '#/' + nav.dataset.nav; return; }
+    if (nav) { sheetOpen(false); location.hash = '#/' + nav.dataset.nav; return; }
 
     /* 成員那一列點下去看他的紀錄。
        存款目標的輸入框也在這一列裡，點它不能跳走。 */
@@ -2485,6 +2447,7 @@
     }
 
     if (t.closest('#logout') || t.closest('#logout2')) {
+      sheetOpen(false);
       API.logout().then(function () {
         // 先把通知收件匣清掉，不然登出後 DOM 裡還躺著上一個人的明細
         if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
@@ -2677,6 +2640,9 @@
     }
 
     /* ---- 帳本管理 ---- */
+    var lgh = t.closest('[data-lg]');
+    if (lgh) { ledgerToggle(lgh.dataset.lg); return; }
+
     var gopen = t.closest('[data-gopen]');
     if (gopen) {
       setGroup(gopen.dataset.gopen);
@@ -2715,14 +2681,6 @@
         paintGroups(); vGroups();
         toast('「' + g.name + '」回來了', 'ok');
       }).catch(function (err) { toast(err.message || '復原失敗', 'err'); });
-      return;
-    }
-    var gadd = t.closest('[data-gadd]');
-    if (gadd) {
-      var a = gadd.dataset.gadd.split('|');
-      API.addGroupMember(a[0], a[1]).then(function () {
-        vGroups(); toast('加進去了', 'ok');
-      }).catch(function (err) { toast(err.message || '加不進去', 'err'); });
       return;
     }
     var gdel = t.closest('[data-gdel]');
@@ -3117,6 +3075,22 @@
       return;
     }
 
+    /* 加人：收合列裡的下拉選單，選了就加 */
+    var ga = e.target.closest ? e.target.closest('[data-gaddsel]') : null;
+    if (ga) {
+      var uid = ga.value;
+      if (!uid) return;
+      ga.disabled = true;
+      API.addGroupMember(ga.dataset.gaddsel, uid).then(function () {
+        paintGroups(); vGroups();
+        toast('加進去了', 'ok');
+      }).catch(function (err) {
+        ga.disabled = false; ga.value = '';
+        toast(err.message || '加不進去', 'err');
+      });
+      return;
+    }
+
     var gg = e.target.closest ? e.target.closest('[data-ggoal]') : null;
     if (gg) {
       var gv = Number(gg.value);
@@ -3186,6 +3160,22 @@
   }, { passive: true });
 
   window.addEventListener('hashchange', paint);
+
+  (function () {
+    var src = document.querySelector('.rail .nav'), dst = document.getElementById('sheetNav');
+    if (src && dst) dst.innerHTML = src.innerHTML;
+
+    var ph = document.getElementById('phead');
+    if (ph && 'IntersectionObserver' in global) {
+      new IntersectionObserver(function (es) {
+        document.body.classList.toggle('phead-gone', !es[0].isIntersecting);
+      }, { rootMargin: '-72px 0px 0px 0px' }).observe(ph);
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') sheetOpen(false);
+    });
+  })();
 
   /* 舊版側欄有一個顯示 API 模式的小徽章。那是給開發者看的，
      介面上已經拿掉——這裡留一個保險，元素不在就不要炸。 */

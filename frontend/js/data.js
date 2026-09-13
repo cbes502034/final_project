@@ -408,14 +408,19 @@ window.DATA = {
   },
 
   /* ---------- 預算（月／年兩個時間基準） ---------- */
+  /* 預算只存「上限」。⚠️ **已花多少不存**，一律由 api.js 從明細現算。
+
+     以前這裡寫死了 used：林建國的交通寫 3,250，明細加起來卻是 15,150。
+     同一頁上「本月支出」從明細算、預算從這裡讀，兩個數字就各說各話——
+     而且選了某一本帳時，支出變成 0，預算卻還是一整個月的數字。 */
   budgets: [
-    { user: 'U1', period: 'month', cat: 'C01', limit: 8000, used: 6420 },
-    { user: 'U1', period: 'month', cat: 'C02', limit: 4000, used: 3250 },
-    { user: 'U1', period: 'month', cat: 'C03', limit: 20000, used: 18500 },
-    { user: 'U3', period: 'month', cat: 'C05', limit: 3000, used: 6880 },
-    { user: 'U3', period: 'month', cat: 'C01', limit: 4000, used: 3120 },
-    { user: 'U4', period: 'month', cat: 'C01', limit: 2000, used: 2340 },
-    { user: 'U4', period: 'month', cat: 'C06', limit: 1500, used: 450 }
+    { user: 'U1', period: 'month', cat: 'C01', limit: 5000 },
+    { user: 'U1', period: 'month', cat: 'C02', limit: 16000 },
+    { user: 'U1', period: 'month', cat: 'C03', limit: 20000 },
+    { user: 'U3', period: 'month', cat: 'C05', limit: 3000 },
+    { user: 'U3', period: 'month', cat: 'C01', limit: 4000 },
+    { user: 'U4', period: 'month', cat: 'C01', limit: 2000 },
+    { user: 'U4', period: 'month', cat: 'C06', limit: 1500 }
   ],
 
   /* ---------- 月度與年度統計 ---------- */
@@ -453,17 +458,42 @@ window.DATA = {
       suggest: ['此項為固定支出，短期無調整空間，建議維持現狀觀察'],
       conf: 0.97 },
 
+    /* 個人建議是寫給**本人**看的，所以用第二人稱、不點名。
+       家長在「全家」模式看得到監管對象的這一則，畫面上會標是誰的。 */
     { id: 'A3', scope: 'user', user: 'U4', period: '2026-09', level: 'warn',
-      title: '宇軒的餐飲支出已超出預算',
-      body: '本月餐飲 2,340 元，超出預算 2,000 元的 17%。目前為 9 月 10 日，' +
-            '若維持相同速度，月底預估將達 7,020 元。',
-      basis: ['宇軒 2026-09 餐飲類支出 2,340 元（預算 2,000 元）',
+      title: '餐飲花得比預算多一點',
+      body: '這個月餐飲 2,340 元，比預算 2,000 元多了 17%。' +
+            '照現在的速度，月底大約會到 7,020 元。',
+      basis: ['2026-09 餐飲類支出 2,340 元（預算 2,000 元）',
               '前 10 天平均每日 234 元 × 30 天 = 7,020 元'],
-      suggest: ['與宇軒確認是否有特殊支出，或調整預算至合理水準'],
+      suggest: ['看看最近幾筆外食，決定要少吃幾次，還是把預算調高'],
       conf: 0.89 },
 
+    { id: 'A5', scope: 'user', user: 'U3', period: '2026-09', level: 'warn',
+      title: '娛樂的錢這個月花得比較多',
+      body: '這個月娛樂 6,880 元，是預算 3,000 元的 229%。',
+      basis: ['2026-09 娛樂類支出 6,880 元 ÷ 預算 3,000 元 = 229%'],
+      suggest: ['訂閱類佔了不少，可以檢查有沒有用不到的',
+                '如果這是常態，把娛樂預算調到比較實際的數字'],
+      conf: 0.9 },
+
+    { id: 'A6', scope: 'user', user: 'U1', period: '2026-09', level: 'info',
+      title: '交通費快用完這個月的預算',
+      body: '這個月交通 15,150 元，已經用掉預算 16,000 元的 95%。',
+      basis: ['2026-09 交通類支出 15,150 元 ÷ 預算 16,000 元 = 95%'],
+      suggest: ['月底前還有加油或停車的話，大概會稍微超過一點'],
+      conf: 0.93 },
+
+    { id: 'A7', scope: 'user', user: 'U2', period: '2026-09', level: 'ok',
+      title: '這個月存下了四分之一',
+      body: '收入 52,000 元、支出 38,900 元，存下 13,100 元。',
+      basis: ['2026-09 收入 52,000 元 − 支出 38,900 元 = 13,100 元',
+              '13,100 ÷ 52,000 = 25.2%'],
+      suggest: ['照這個節奏，每月存款目標可以維持不變'],
+      conf: 0.98 },
+
     { id: 'A4', scope: 'family', period: '2026-09', level: 'ok',
-      title: '本月結餘為正，儲蓄率 26.9%',
+      title: '本月結餘為正，儲蓄率 26.4%',
       body: '收入 131,000 元、支出 96,400 元，結餘 34,600 元。',
       basis: ['2026-09 收入 131,000 元 − 支出 96,400 元 = 34,600 元',
               '34,600 ÷ 131,000 = 26.4%'],
@@ -510,7 +540,7 @@ window.DATA = {
              ['goal_amount', 'NUMERIC(14,2)', '每月想存多少'],
              ['warn_ratio', 'NUMERIC', '達可支配上限的幾成時提醒，預設 0.8'],
              ['created_at', 'TIMESTAMPTZ', ''],
-             ['created_by', 'BIGINT', '本人，或監管我的人代設']] },
+             ['created_by', 'BIGINT', '一定是本人。存多少錢由自己決定']] },
 
     { t: 'sessions', label: '登入工作階段', note: '支援登出與強制下線',
       cols: [['id', 'UUID', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
@@ -684,13 +714,13 @@ window.DATA = {
     { action: '記錄自己的收支', parent: 'Y', child: 'Y' },
     { action: '查看自己的統計', parent: 'Y', child: 'Y' },
     { action: '設定自己的預算', parent: 'Y', child: 'Y' },
-    { action: '設定每月存款目標', parent: 'Y', child: 'Y（監管者可代設）' },
+    { action: '設定每月存款目標', parent: 'Y（只有自己的）', child: 'Y（只有自己的）' },
     { action: '查看被監管者的明細', parent: 'Y（被指派的）', child: 'Y（被指派的）' },
     { action: '查看沒有指派給自己的人', parent: 'N', child: 'N' },
     { action: '修改／刪除被監管者的紀錄', parent: 'N', child: 'N' },
     { action: '登入被監管者的帳號', parent: 'N', child: 'N' },
     { action: '收到被監管者新增紀錄的通知', parent: 'Y（被指派的）', child: 'Y（被指派的）' },
-    { action: '查看家庭總覽', parent: 'Y', child: 'N' },
+    { action: '切換到「全家」（唯讀）', parent: 'Y', child: 'N' },
     { action: '設定家庭預算', parent: 'Y', child: 'N' },
     { action: '邀請／移除成員', parent: 'Y', child: 'N' },
     { action: '建立監管關係', parent: 'Y', child: 'N' },

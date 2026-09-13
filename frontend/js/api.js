@@ -896,7 +896,9 @@
         var g = groupOf(gid);
         if (!g) throw new Error('找不到這個群組');
         if (g.owner !== s.me) { var e = new Error('只有建立者可以加人'); e.status = 403; throw e; }
-        if (!memberOf(userId)) throw new Error('這個家庭裡沒有這個人');
+        var who = memberOf(userId);
+        /* 平台管理員加進帳本，就等於讓他讀得到那本帳——停權是關門，不是配鑰匙 */
+        if (!who || who.isPlatformAdmin) throw new Error('這個家庭裡沒有這個人');
         if (memberIdsOf(gid).indexOf(userId) >= 0) throw new Error('他已經在這本帳裡了');
         s.joined = (s.joined || []).concat([{ group: gid, user: userId }]);
         save();
@@ -1134,7 +1136,16 @@
             return { cat: c, name: cat.name, color: cat.color, amount: byCat[c] };
           }).sort(function (a, b) { return b.amount - a.amount; }),
           monthly: monthly,
-          yearly: clone(D.yearly),
+          /* ⚠️ 年度數列是「全家所有人」的合計，沒有按人拆。
+             所以只有這次統計剛好涵蓋全家每一個人時才給；
+             看「我」、或家長只監管其中幾位時回 null——
+             否則「我・按年」會拿到全家的數字，跟個人的月資料對不起來。 */
+          yearly: (function () {
+            var all = D.members.filter(function (m) { return !m.isPlatformAdmin; })
+              .map(function (m) { return m.id; });
+            var covers = scoped && all.every(function (id) { return users.indexOf(id) >= 0; });
+            return covers ? clone(D.yearly) : null;
+          })(),
           members: D.members.filter(function (m) { return users.indexOf(m.id) >= 0; })
             .map(function (m) {
               /* 這個人的數字也一樣從明細算 */
@@ -1345,13 +1356,12 @@
         var m = D.members.filter(function (x) { return x.id === userId; })[0];
         if (!m) throw new Error('not found: ' + userId);
 
-        /* 誰能設誰的目標：本人，或監管他的人。
-           ⚠️ 不看年齡、也不看角色。系統只提供功能，要不要建立監管關係
-              是那一家自己的事——我們不替任何家庭決定幾歲該被管。 */
-        var mine = userId === st.me;
-        var proxy = wardsOf(st.me).indexOf(userId) >= 0;
-        if (!mine && !proxy) throw new Error('只能設定自己、或你監管對象的存款目標');
-        if (groupId && !mine) throw new Error('群組目標只能設自己的');
+        /* 存款目標**只有本人能設**。存多少錢是那個人自己的決定——
+           家長可以給零用金、可以看監管對象的紀錄，但不能替他決定要存多少。
+           後端用 toolkit/roles.py 的 require_set_goal()。 */
+        if (userId !== st.me) {
+          var fe = new Error('存款目標只有本人可以設定'); fe.status = 403; throw fe;
+        }
 
         var v = Number(goal);
         if (isNaN(v) || v < 0) throw new Error('存款目標要是 0 以上的數字');
@@ -1530,17 +1540,29 @@
       });
     },
 
-    budgets: function () {
+    /* 預算：上限來自設定，**已花多少一律從明細現算**。
+       帶 groupId 時只算那一本帳裡的花費，跟同一頁的「本月支出」一致。 */
+    budgets: function (f) {
+      f = f || {};
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
         var vis = visibleUsers(s.me);
+        var one = f.groupId && f.groupId !== 'all';
+        function used(uid, cat) {
+          return sum(s.transactions.filter(function (t) {
+            return t.user === uid && t.cat === cat && t.date.indexOf(D.meta.period) === 0 &&
+              (!one || t.group === f.groupId);
+          }), 'expense');
+        }
         return {
           budgets: D.budgets.filter(function (b) { return vis.indexOf(b.user) >= 0; })
             .map(function (b) {
               var c = D.categories.filter(function (x) { return x.id === b.cat; })[0];
+              var u = used(b.user, b.cat);
               return Object.assign(clone(b), {
+                used: u,
                 userName: memberOf(b.user).name, catName: c.name, catColor: c.color,
-                over: b.used > b.limit, pct: b.limit ? b.used / b.limit : 0
+                over: u > b.limit, pct: b.limit ? u / b.limit : 0
               });
             }).sort(function (a, b) { return b.pct - a.pct; })
         };
@@ -1552,9 +1574,14 @@
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
         var vis = visibleUsers(s.me);
+        /* scope: 'me'     只有寫給我本人的
+                  'family' 全家的建議 ＋ 我監管的人的個人建議（家長才有）
+           ⚠️ 子女不會拿到全家的建議——那幾則是寫給家長看的，裡面會點名。 */
+        var fam = f.scope === 'family' && vis.length > 1;
         var rows = D.advices.filter(function (a) {
-          if (a.scope === 'family') return true;
-          return vis.indexOf(a.user) >= 0;
+          if (a.scope === 'family') return fam;
+          if (a.user === s.me) return !fam;
+          return fam && vis.indexOf(a.user) >= 0;
         });
         return {
           advices: rows.map(function (a) {
@@ -1579,7 +1606,10 @@
           me: s.me,
           visible: vis,
           queryable: queryableUsers(s.me),
-          members: D.members.map(function (m) {
+          /* ⚠️ 平台管理員不屬於任何家庭，不可以出現在家庭成員清單裡。
+             漏過一次：成員與權限多出第五個人「系統管理員」，角色顯示 undefined，
+             帳本的加人清單也能把他加進來——等於讓平台管理員讀到那本帳。 */
+          members: D.members.filter(function (m) { return !m.isPlatformAdmin; }).map(function (m) {
             var o = clone(m);
             if (vis.indexOf(m.id) < 0) {
               delete o.savingsGoal;
@@ -1793,7 +1823,7 @@
     createAlert:       function (p)     { return req('/api/alerts', { method: 'POST', body: p }); },
     updateAlert:       function (a, p)  { return req('/api/alerts/' + encodeURIComponent(a), { method: 'PATCH', body: p }); },
     deleteAlert:       function (a)     { return req('/api/alerts/' + encodeURIComponent(a), { method: 'DELETE' }); },
-    budgets:           function ()      { return req('/api/budgets'); },
+    budgets:           function (f)     { return req('/api/budgets' + qs(f || {})); },
     setSavingsGoal:    function (u, g, gid) { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g, groupId: gid || null } }); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
     members:           function ()      { return req('/api/family'); },
@@ -1847,7 +1877,7 @@
     createAlert:       function (p)    { return impl.createAlert(p); },
     updateAlert:       function (a, p) { return impl.updateAlert(a, p); },
     deleteAlert:       function (a)    { return impl.deleteAlert(a); },
-    budgets:           function ()     { return impl.budgets(); },
+    budgets:           function (f)    { return impl.budgets(f); },
     setSavingsGoal:    function (u, g, gid) { return impl.setSavingsGoal(u, g, gid); },
     advices:           function (f)    { return impl.advices(f); },
     members:           function ()     { return impl.members(); },

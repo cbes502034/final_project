@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#05060A">
+<meta name="theme-color" content="#16493F">
 <meta name="description" content="家庭記帳與財務控管系統 — 一句話記帳、家庭階層權限、子女消費監管、月年統計、LLM 財務建議。">
 
 <!-- ============================================================
@@ -19,8 +19,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/tokens.css?v=125">
-<link rel="stylesheet" href="css/app.css?v=125">
+<link rel="stylesheet" href="css/tokens.css?v=130">
+<link rel="stylesheet" href="css/app.css?v=130">
 </head>
 <body>
 
@@ -28,87 +28,82 @@
 
 <div class="app">
 
-  <nav class="rail">
+  <!-- ============================================================
+       側欄：銀行 App 的儀表板
+       最上面是「帳戶卡」（我是誰），接著一顆最常用的動作，然後才是選單。
+       ⚠️ 帳戶卡**不放金額**——「還可以花」在我的總覽已經有了，放兩處就是重複。
+       ============================================================ -->
+  <nav class="rail" aria-label="主選單">
     <div class="brand">
+      <span class="brand__m" aria-hidden="true">帳</span>
       <span class="brand__n">家庭記帳</span>
       <button class="railx" id="railx" title="收合側欄" aria-label="收合側欄">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <path d="M15 6 9 12l6 6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 6 9 12l6 6"/></svg>
       </button>
     </div>
 
+    <a class="acct" id="who" href="#/profile" title="個人資料"></a>
+
+    <button class="quick" data-quick="entry" title="記一筆">
+      <svg class="quick__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="quick__t">記一筆</span>
+    </button>
+
     <div class="nav">
-      <div class="nav__lb">個人</div>
+      <div class="nav__lb">財務</div>
       <button class="nav__i" data-nav="">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
-        <span class="nav__t">我的總覽</span>
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg>
+        <span class="nav__t">總覽</span>
       </button>
       <button class="nav__i" data-nav="entry">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>
-        <span class="nav__t">記帳</span>
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M9 13h6M12 10v6"/></svg>
+        <span class="nav__t">收支明細</span>
       </button>
-
       <button class="nav__i" data-nav="groups">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h11a3 3 0 0 1 3 3v12H7a3 3 0 0 1-3-3z"/><path d="M18 8h2v12"/><path d="M8 9h6M8 13h4"/></svg>
         <span class="nav__t">帳本</span>
       </button>
-      <button class="nav__i" data-nav="profile">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V20"/></svg>
-        <span class="nav__t">個人資料</span>
-      </button>
-
-      <div class="nav__lb">家庭</div>
-      <button class="nav__i" data-nav="family">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2"/></svg>
-        <span class="nav__t">家庭總覽</span>
-      </button>
       <button class="nav__i" data-nav="stats">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>
         <span class="nav__t">統計</span>
       </button>
       <button class="nav__i" data-nav="advice">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3a6 6 0 0 0-3 11v3h6v-3a6 6 0 0 0-3-11z"/><path d="M10 20h4"/></svg>
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3z"/><path d="M9.5 20.5h5"/></svg>
         <span class="nav__t">財務建議</span>
       </button>
+
+      <div class="nav__lb">家庭</div>
       <button class="nav__i" data-nav="members">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 10-4-2.5-7-5.5-7-10V6z"/><circle cx="12" cy="10" r="2.2"/><path d="M8.8 15.5a3.5 3.5 0 0 1 6.4 0"/></svg>
         <span class="nav__t">成員與權限</span>
       </button>
 
-      <!-- 平台管理：只有平台管理員看得到（body.is-admin）。
-           他也只看得到這一項——其餘全部被 CSS 收掉，因為他真的沒有那些資料。 -->
+      <!-- 平台管理：只有平台管理員看得到（body.is-admin），而且他只看得到這一項 -->
       <div class="nav__lb nav__lb--admin">平台</div>
       <button class="nav__i nav__i--admin" data-nav="admin">
-        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v6c0 4-3 6.5-7 9-4-2.5-7-5-7-9V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 6.5-7 9-4-2.5-7-5-7-9V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
         <span class="nav__t">平台管理</span>
       </button>
-
-    </div>
-
-    <div class="docs">
-      <div class="docs__lb">說明</div>
-      <a class="docs__i docs__i--main" href="docs/guide.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 6.5S10 5 7 5H4v13h3c3 0 5 1.5 5 1.5S14 18 17 18h3V5h-3c-3 0-5 1.5-5 1.5z"/><path d="M12 6.5v13"/></svg>
-        <span>使用說明</span>
-      </a>
-      <a class="docs__i" href="docs/index.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>
-        <span>專題文件</span>
-        <i>↗</i>
-      </a>
     </div>
 
     <div class="rail__f">
-      <div class="quota__k" style="margin-bottom:8px">目前登入</div>
-      <div class="who" id="who"></div>
-      <div class="rail__sync" id="famName"></div>
+      <a class="docs__i docs__i--main" href="docs/guide.html" title="使用說明">
+        <svg class="docs__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5S10 5 7 5H4v13h3c3 0 5 1.5 5 1.5S14 18 17 18h3V5h-3c-3 0-5 1.5-5 1.5z"/><path d="M12 6.5v13"/></svg><span>使用說明</span>
+      </a>
+      <a class="docs__i" href="docs/index.html" title="專題文件">
+        <svg class="docs__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg><span>專題文件</span>
+      </a>
+      <button class="docs__i docs__i--out" id="logout" title="登出">
+        <svg class="docs__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg><span>登出</span>
+      </button>
     </div>
   </nav>
 
   <main class="main">
     <header class="top">
-      <div><div class="top__t" id="ptitle">我的總覽</div></div>
-      <div class="top__s" id="psub"></div>
+      <span class="top__brand" aria-hidden="true"><span class="brand__m">帳</span>家庭記帳</span>
+      <!-- 頁面標題捲出畫面之後，這裡才浮出一個小標題 -->
+      <div class="top__mini" id="pmini" aria-hidden="true"></div>
       <span class="top__sp"></span>
       <div class="gsw" id="gsw" hidden></div>
       <button class="ic" id="searchBtn" title="搜尋" aria-label="搜尋">
@@ -118,7 +113,7 @@
         <input id="search" type="search" placeholder="搜尋店家或備註" autocomplete="off">
       </div>
       <div class="bell__wrap">
-        <button class="bell" id="bell" title="監管通知" aria-label="監管通知">
+        <button class="bell" id="bell" title="通知" aria-label="通知">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
           <span class="bell__n" id="bellDot" hidden>0</span>
         </button>
@@ -126,20 +121,54 @@
       </div>
     </header>
 
+    <!-- 第一層標題：頁面。放在內容區，右邊可以放這一頁最主要的動作 -->
+    <div class="phead" id="phead">
+      <div class="phead__m">
+        <div class="phead__k" id="pkick"></div>
+        <h1 class="phead__t" id="ptitle">我的總覽</h1>
+        <p class="phead__s" id="psub" hidden></p>
+      </div>
+      <div class="phead__a" id="pact" hidden></div>
+    </div>
+
     <div id="view"></div>
 
-    <footer style="padding:24px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-dim);line-height:1.8">
-      家庭記帳　·　目前顯示的是示範資料
-    </footer>
+    <footer class="foot">家庭記帳　·　目前顯示的是示範資料</footer>
   </main>
+
+  <!-- ============================================================
+       手機：底部分頁列（銀行 App 的做法）
+       最常用的四個頁面加上中間一顆「記一筆」，其他收在「更多」。
+       ============================================================ -->
+  <nav class="tabs" aria-label="主選單">
+    <button class="tab" data-nav=""><svg class="tab__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg><span>總覽</span></button>
+    <button class="tab" data-nav="stats"><svg class="tab__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>統計</span></button>
+    <button class="tab tab--add" data-quick="entry" aria-label="記一筆"><svg class="tab__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="tab" data-nav="groups"><svg class="tab__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h11a3 3 0 0 1 3 3v12H7a3 3 0 0 1-3-3z"/><path d="M18 8h2v12"/><path d="M8 9h6M8 13h4"/></svg><span>帳本</span></button>
+    <button class="tab" id="moreBtn" aria-expanded="false" aria-controls="sheet"><svg class="tab__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>更多</span></button>
+  </nav>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet__bg" data-sheet="close"></div>
+    <div class="sheet__p" role="dialog" aria-modal="true" aria-label="更多">
+      <div class="sheet__grip" aria-hidden="true"></div>
+      <a class="acct acct--sheet" id="whoSheet" href="#/profile"></a>
+      <div class="sheet__nav" id="sheetNav"></div>
+      <div class="sheet__f">
+        <a class="docs__i" href="docs/guide.html"><svg class="docs__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5S10 5 7 5H4v13h3c3 0 5 1.5 5 1.5S14 18 17 18h3V5h-3c-3 0-5 1.5-5 1.5z"/><path d="M12 6.5v13"/></svg><span>使用說明</span></a>
+        <a class="docs__i" href="docs/index.html"><svg class="docs__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg><span>專題文件</span></a>
+        <button class="docs__i docs__i--out" id="logout2"><svg class="docs__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg><span>登出</span></button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=125"></script>
-<script src="js/data.js?v=125"></script>
-<script src="js/api.js?v=125"></script>
-<script src="js/notify.js?v=125"></script>
-<script src="js/app.js?v=125"></script>
+<script src="js/stars.js?v=130"></script>
+<script src="js/data.js?v=130"></script>
+<script src="js/api.js?v=130"></script>
+<script src="js/notify.js?v=130"></script>
+<script src="js/app.js?v=130"></script>
 </body>
 </html>
