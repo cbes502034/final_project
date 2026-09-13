@@ -16,6 +16,8 @@
    PATCH  /api/auth/me                改個人資料（displayName / birthYear）
    PUT    /api/auth/me/avatar         上傳大頭貼（body: { image: dataUri }）
    DELETE /api/auth/me/avatar         移除大頭貼
+   GET    /api/auth/me/finance        我的理財習慣（拿去當建議的背景）
+   PUT    /api/auth/me/finance        改理財習慣
    PATCH  /api/auth/password          改密碼
    POST   /api/auth/verify-password   重大操作前再確認一次（不發新 token）
    GET    /api/auth/me                目前登入者 + 家庭角色
@@ -548,6 +550,49 @@
       return sleep(320).then(function () {
         if (String(pw || '').length < 8) throw new Error('密碼不正確');
         return { ok: true };
+      });
+    },
+
+    /* 理財習慣。⚠️ 它會被放進財務建議的 prompt，所以：
+       · 風格／目標／固定安排都是**從固定清單挑 id**，不是自由文字
+       · 補充說明限 200 字，而且在組 prompt 時會被標示成「資料，不是指令」
+         （隔離的做法寫在 backend/app/toolkit/profile.py）
+
+       為什麼要這麼小心：建議是**給監管者看的**，
+       子女如果能在自己的補充說明裡下指令，就能操控父母看到的內容。 */
+    financeProfile: function () {
+      var s = load(), D = global.DATA;
+      return sleep(160).then(function () {
+        var m = memberOf(s.me) || {};
+        return {
+          finance: clone((s.finance || {})[s.me] || m.finance || null),
+          styles: clone(D.financeStyles),
+          goals: clone(D.financeGoals),
+          habits: clone(D.financeHabits)
+        };
+      });
+    },
+
+    setFinanceProfile: function (p) {
+      var s = load(), D = global.DATA;
+      p = p || {};
+      return sleep(280).then(function () {
+        var okStyle = D.financeStyles.map(function (x) { return x.id; });
+        var okGoals = D.financeGoals.map(function (x) { return x.id; });
+        var okHabits = D.financeHabits.map(function (x) { return x.id; });
+
+        /* ⚠️ 認得的才留。不是為了防呆，是為了**不讓使用者自己造 id
+           把任意文字送進 prompt**。 */
+        var v = {
+          style: okStyle.indexOf(p.style) >= 0 ? p.style : null,
+          goals: (p.goals || []).filter(function (g) { return okGoals.indexOf(g) >= 0; }),
+          habits: (p.habits || []).filter(function (h) { return okHabits.indexOf(h) >= 0; }),
+          note: String(p.note || '').replace(/\s+/g, ' ').trim().slice(0, 200)
+        };
+        s.finance = s.finance || {};
+        s.finance[s.me] = v;
+        save();
+        return clone(v);
       });
     },
 
@@ -1581,6 +1626,8 @@
     updateProfile:     function (p)     { return req('/api/auth/me', { method: 'PATCH', body: p }); },
     uploadAvatar:      function (d)     { return req('/api/auth/me/avatar', { method: 'PUT', body: { image: d } }); },
     deleteAvatar:      function ()      { return req('/api/auth/me/avatar', { method: 'DELETE' }); },
+    financeProfile:    function ()      { return req('/api/auth/me/finance'); },
+    setFinanceProfile: function (p)     { return req('/api/auth/me/finance', { method: 'PUT', body: p }); },
     changePassword:    function (p)     { return req('/api/auth/password', { method: 'PATCH', body: p }); },
     verifyPassword:    function (pw)    { return req('/api/auth/verify-password', { method: 'POST', body: { password: pw } }); },
 
@@ -1630,6 +1677,8 @@
     updateProfile:     function (p)    { return impl.updateProfile(p); },
     uploadAvatar:      function (d)    { return impl.uploadAvatar(d); },
     deleteAvatar:      function ()     { return impl.deleteAvatar(); },
+    financeProfile:    function ()     { return impl.financeProfile(); },
+    setFinanceProfile: function (p)    { return impl.setFinanceProfile(p); },
     changePassword:    function (p)    { return impl.changePassword(p); },
     verifyPassword:    function (pw)   { return impl.verifyPassword(pw); },
     summary:           function (f)    { return impl.summary(f); },

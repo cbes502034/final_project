@@ -26,6 +26,7 @@
     scope       可見範圍的兩條路（聯集）  visible_users / can_see_row
     roles       角色能做哪些治理動作    can_govern / require_govern
     notify      通知發給誰（已去重）    recipients_for
+    profile     理財習慣組成 prompt     to_prompt_block / clean_note
 
 ===========================================================================
 怎麼查一個工具怎麼用

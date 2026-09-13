@@ -175,7 +175,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **57 條路由**。標示說明：
+共 **59 條路由**。標示說明：
 
 - **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -192,11 +192,13 @@ final_project/
 | 5 | POST | `/api/auth/logout-all` | 成員1 | 登入 | 撤銷所有裝置的 token |
 | 6 | GET | `/api/auth/me` | 成員1 | 登入 | 目前使用者、家庭角色、被誰監管 |
 | 7 | PATCH | `/api/auth/password` | 成員1 | 登入 | 修改密碼，同時讓其他 session 失效 |
-| 8 | POST | `/api/auth/verify-password` | 成員1 | 本人 | 重大操作前再確認一次 |
-| 9 | GET | `/api/auth/sessions` | 成員1 | 登入 | 列出有效的登入裝置 |
-| 10 | PATCH | `/api/auth/me` | 成員1 | 登入 | 修改個人資料：顯示名稱、出生年 |
-| 11 | PUT | `/api/auth/me/avatar` | 成員1 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
-| 12 | DELETE | `/api/auth/me/avatar` | 成員1 | 登入 | 移除大頭貼，改回顯示文字頭像 |
+| 8 | GET | `/api/auth/me/finance` | 成員1 | 本人 | 我的理財習慣（財務建議的背景） |
+| 9 | PUT | `/api/auth/me/finance` | 成員1 | 本人 | 改理財習慣。body: { style, goals[], habits[], note } |
+| 10 | POST | `/api/auth/verify-password` | 成員1 | 本人 | 重大操作前再確認一次 |
+| 11 | GET | `/api/auth/sessions` | 成員1 | 登入 | 列出有效的登入裝置 |
+| 12 | PATCH | `/api/auth/me` | 成員1 | 登入 | 修改個人資料：顯示名稱、出生年 |
+| 13 | PUT | `/api/auth/me/avatar` | 成員1 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
+| 14 | DELETE | `/api/auth/me/avatar` | 成員1 | 登入 | 移除大頭貼，改回顯示文字頭像 |
 
 **回應範例 — `POST /api/auth/login`**
 
@@ -213,39 +215,39 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 44 | GET | `/api/family` | 成員4 | 登入 | 家庭資訊、成員清單、角色 |
-| 45 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立者成為家長（僅記於 `created_by`，不給額外權限） |
-| 46 | POST | `/api/family/invite` | 成員4 | 家長 | 產生邀請碼 |
-| 47 | POST | `/api/family/join` | 成員4 | 登入 | 用邀請碼加入家庭 |
-| 48 | PATCH | `/api/family/members/{userId}` | 成員4 | master | 修改成員角色 |
-| 49 | DELETE | `/api/family/members/{userId}` | 成員4 | master | 移除成員（標記 removed，不刪資料） |
-| 50 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
-| 51 | POST | `/api/guardianships` | 成員4 | 家長 | 建立監管關係 |
-| 52 | DELETE | `/api/guardianships/{id}` | 成員4 | 家長 | 解除監管（設 `ended_at`，不刪除） |
-| 53 | GET | `/api/notifications` | 成員4 | 登入 | 通知清單。帶 since 只拿新的 |
-| 54 | PATCH | `/api/notifications/{nid}` | 成員4 | 本人 | 把一則標記成已讀 |
-| 55 | PATCH | `/api/notifications` | 成員4 | 本人 | 整批標記已讀 |
-| 23 | GET | `/api/groups` | 成員2 | 登入 | 我加入的群組（帳本） |
-| 24 | POST | `/api/groups` | 成員2 | 登入 | 建立一個群組，建立者自動加入 |
-| 25 | PATCH | `/api/groups/{gid}` | 成員2 | 建立者 | 改名稱、圖示、顏色 |
-| 26 | DELETE | `/api/groups/{gid}` | 成員2 | 建立者 | 封存這本帳 |
-| 27 | POST | `/api/groups/{gid}/members` | 成員2 | 建立者 | 把家人加進這本帳 |
-| 28 | DELETE | `/api/groups/{gid}/members/{user_id}` | 成員2 | 建立者 | 把某個人移出這本帳 |
-| 29 | POST | `/api/groups/{gid}/settle` | 成員2 | 本人（開帳本的人） | 結算活動帳本。之後唯讀，不能再往裡面記 |
-| 30 | PATCH | `/api/groups/{gid}/notify` | 成員2 | 帳本成員 | 這本帳有動靜要不要通知我。body: { notify } |
-| 56 | GET | `/api/allowances` | 成員4 | 登入 | 我每月給每個被監管者多少零用金 |
-| 57 | PUT | `/api/allowance` | 成員4 | 監管者 | 設定零用金。body: { wardId, amount } |
+| 46 | GET | `/api/family` | 成員4 | 登入 | 家庭資訊、成員清單、角色 |
+| 47 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立者成為家長（僅記於 `created_by`，不給額外權限） |
+| 48 | POST | `/api/family/invite` | 成員4 | 家長 | 產生邀請碼 |
+| 49 | POST | `/api/family/join` | 成員4 | 登入 | 用邀請碼加入家庭 |
+| 50 | PATCH | `/api/family/members/{userId}` | 成員4 | master | 修改成員角色 |
+| 51 | DELETE | `/api/family/members/{userId}` | 成員4 | master | 移除成員（標記 removed，不刪資料） |
+| 52 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
+| 53 | POST | `/api/guardianships` | 成員4 | 家長 | 建立監管關係 |
+| 54 | DELETE | `/api/guardianships/{id}` | 成員4 | 家長 | 解除監管（設 `ended_at`，不刪除） |
+| 55 | GET | `/api/notifications` | 成員4 | 登入 | 通知清單。帶 since 只拿新的 |
+| 56 | PATCH | `/api/notifications/{nid}` | 成員4 | 本人 | 把一則標記成已讀 |
+| 57 | PATCH | `/api/notifications` | 成員4 | 本人 | 整批標記已讀 |
+| 25 | GET | `/api/groups` | 成員2 | 登入 | 我加入的群組（帳本） |
+| 26 | POST | `/api/groups` | 成員2 | 登入 | 建立一個群組，建立者自動加入 |
+| 27 | PATCH | `/api/groups/{gid}` | 成員2 | 建立者 | 改名稱、圖示、顏色 |
+| 28 | DELETE | `/api/groups/{gid}` | 成員2 | 建立者 | 封存這本帳 |
+| 29 | POST | `/api/groups/{gid}/members` | 成員2 | 建立者 | 把家人加進這本帳 |
+| 30 | DELETE | `/api/groups/{gid}/members/{user_id}` | 成員2 | 建立者 | 把某個人移出這本帳 |
+| 31 | POST | `/api/groups/{gid}/settle` | 成員2 | 本人（開帳本的人） | 結算活動帳本。之後唯讀，不能再往裡面記 |
+| 32 | PATCH | `/api/groups/{gid}/notify` | 成員2 | 帳本成員 | 這本帳有動靜要不要通知我。body: { notify } |
+| 58 | GET | `/api/allowances` | 成員4 | 登入 | 我每月給每個被監管者多少零用金 |
+| 59 | PUT | `/api/allowance` | 成員4 | 監管者 | 設定零用金。body: { wardId, amount } |
 
 ## 4-3　記帳 `/api/transactions`
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 13 | GET | `/api/transactions` | 成員2 | 登入 | 明細。可帶 `userId` / `from` / `to` / `categoryId` / `kind` / `q` / `page` |
-| 14 | POST | `/api/transactions` | 成員2 | 登入 | 手動新增。**單筆手動模式走這支**，不經過模型，寫入的 `source` 記成 `manual` |
-| 15 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改 |
-| 16 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除 |
-| 21 | GET | `/api/categories` | 成員2 | 登入 | 分類體系（系統預設 + 家庭自訂） |
-| 22 | POST | `/api/categories` | 成員2 | 家長 | 新增家庭自訂分類 |
+| 15 | GET | `/api/transactions` | 成員2 | 登入 | 明細。可帶 `userId` / `from` / `to` / `categoryId` / `kind` / `q` / `page` |
+| 16 | POST | `/api/transactions` | 成員2 | 登入 | 手動新增。**單筆手動模式走這支**，不經過模型，寫入的 `source` 記成 `manual` |
+| 17 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改 |
+| 18 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除 |
+| 23 | GET | `/api/categories` | 成員2 | 登入 | 分類體系（系統預設 + 家庭自訂） |
+| 24 | POST | `/api/categories` | 成員2 | 家長 | 新增家庭自訂分類 |
 
 **查詢參數的權限行為**：不帶 `userId` 時回傳「你看得到的所有人」；
 帶 `userId` 但你沒有權限看那個人 → **回 403 而不是空陣列**（空陣列會讓人以為對方沒記帳）。
@@ -254,10 +256,10 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 17 | POST | `/api/nlp/parse` | 成員2 ★ | 登入 | 單句：一句話 → 一筆。**只解析，不寫入** |
-| 18 | POST | `/api/nlp/parse-batch` | 成員2 ★ | 登入 | **段落：一段話 → 切成 N 筆**。只解析，不寫入 |
-| 19 | POST | `/api/nlp/confirm` | 成員2 ★ | 登入 | 單筆確認後寫入，同時記錄修正供評測。`source` 記成 `nlp`，只有經過模型的資料才走這支 |
-| 20 | POST | `/api/nlp/confirm-batch` | 成員2 ★ | 登入 | 批次確認後一次寫入 N 筆 |
+| 19 | POST | `/api/nlp/parse` | 成員2 ★ | 登入 | 單句：一句話 → 一筆。**只解析，不寫入** |
+| 20 | POST | `/api/nlp/parse-batch` | 成員2 ★ | 登入 | **段落：一段話 → 切成 N 筆**。只解析，不寫入 |
+| 21 | POST | `/api/nlp/confirm` | 成員2 ★ | 登入 | 單筆確認後寫入，同時記錄修正供評測。`source` 記成 `nlp`，只有經過模型的資料才走這支 |
+| 22 | POST | `/api/nlp/confirm-batch` | 成員2 ★ | 登入 | 批次確認後一次寫入 N 筆 |
 
 **段落解析比單句難的地方在「切分」**：模型要先判斷這段話裡有幾筆。
 切錯（把兩筆合成一筆）比抽錯更難發現，所以**切分結果也要讓使用者確認** ——
@@ -310,17 +312,17 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 31 | GET | `/api/summary` | 成員3 | 登入 | 摘要。`scope=me\|family`、`period=2026-09` |
-| 32 | GET | `/api/stats` | 成員3 | 登入 | 統計。`periodType=month\|year`、`from`、`to` |
-| 33 | GET | `/api/budgets` | 成員3 | 登入 | 預算與使用率 |
-| 34 | PUT | `/api/budgets` | 成員3 | 本人 | 設定預算 |
-| 35 | GET | `/api/savings-goal` | 成員3 | 登入 | **每月存款目標與達成狀態** |
-| 36 | PUT | `/api/savings-goal` | 成員3 | 本人或監管者 | **設定每月存款目標**（註冊時也走這支）。⚠️ 依監管關係，不看年齡 |
-| 37 | GET | `/api/savings-goals` | 成員3 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
-| 38 | GET | `/api/alerts` | 成員3 | 登入 | 我設定的階段性提醒門檻 |
-| 39 | POST | `/api/alerts` | 成員3 | 本人 | 新增一個門檻（百分比 1~200） |
-| 40 | PATCH | `/api/alerts/{aid}` | 成員3 | 本人 | 改百分比、或暫時關掉 |
-| 41 | DELETE | `/api/alerts/{aid}` | 成員3 | 本人 | 刪掉一個門檻 |
+| 33 | GET | `/api/summary` | 成員3 | 登入 | 摘要。`scope=me\|family`、`period=2026-09` |
+| 34 | GET | `/api/stats` | 成員3 | 登入 | 統計。`periodType=month\|year`、`from`、`to` |
+| 35 | GET | `/api/budgets` | 成員3 | 登入 | 預算與使用率 |
+| 36 | PUT | `/api/budgets` | 成員3 | 本人 | 設定預算 |
+| 37 | GET | `/api/savings-goal` | 成員3 | 登入 | **每月存款目標與達成狀態** |
+| 38 | PUT | `/api/savings-goal` | 成員3 | 本人或監管者 | **設定每月存款目標**（註冊時也走這支）。⚠️ 依監管關係，不看年齡 |
+| 39 | GET | `/api/savings-goals` | 成員3 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
+| 40 | GET | `/api/alerts` | 成員3 | 登入 | 我設定的階段性提醒門檻 |
+| 41 | POST | `/api/alerts` | 成員3 | 本人 | 新增一個門檻（百分比 1~200） |
+| 42 | PATCH | `/api/alerts/{aid}` | 成員3 | 本人 | 改百分比、或暫時關掉 |
+| 43 | DELETE | `/api/alerts/{aid}` | 成員3 | 本人 | 刪掉一個門檻 |
 
 **存款目標的計算**
 
@@ -340,8 +342,8 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 42 | GET | `/api/advices` | 成員3 | 登入 | 建議清單。`scope`、`period` |
-| 43 | POST | `/api/advices/generate` | 成員3 ★ | 家長 | 重新產生。**後端先算好數字再餵給模型** |
+| 44 | GET | `/api/advices` | 成員3 | 登入 | 建議清單。`scope`、`period` |
+| 45 | POST | `/api/advices/generate` | 成員3 ★ | 家長 | 重新產生。**後端先算好數字再餵給模型** |
 
 **產生流程（順序不能顛倒）**
 
@@ -363,8 +365,8 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 58 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
-| 59 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
+| 60 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
+| 61 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
 
 ---
 
@@ -407,7 +409,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 資料表 | 畫面 | 該模組的 LLM |
 |---|---|---|---|---|---|---|
-| **成員1** | **認證** | `m1-auth` | 12 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
+| **成員1** | **認證** | `m1-auth` | 14 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 18 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 我的總覽、家庭總覽、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
 | **成員4** | **家庭** | `m4-access` | 14 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |

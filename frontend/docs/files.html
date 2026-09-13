@@ -258,6 +258,7 @@ PostgreSQL
             <tr><td><span class="fname">images.py</span></td><td>圖片驗證</td><td><code>validate_avatar</code>、<code>from_data_uri</code></td></tr>
             <tr><td><span class="fname">alerts.py</span></td><td>階段性提醒的門檻計算</td><td><code>usage_percent</code>、<code>crossed</code>、<code>should_fire</code></td></tr>
             <tr><td><span class="fname">scope.py</span></td><td>可見範圍的兩條路（聯集）</td><td><code>visible_users</code>、<code>visible_groups</code>、<code>require_user</code></td></tr>
+            <tr><td><span class="fname">profile.py</span></td><td>把理財習慣安全地組成 prompt 背景（隔離注入）</td><td><code>to_prompt_block</code>、<code>clean_note</code></td></tr>
             <tr><td><span class="fname">notify.py</span></td><td>通知發給誰，同一筆對同一個人只發一則</td><td><code>recipients_for</code></td></tr>
             <tr><td><span class="fname">roles.py</span></td><td>角色能做哪些治理動作（不管可見範圍）</td><td><code>can_govern</code>、<code>require_govern</code>、<code>can_set_goal_for</code></td></tr>
           </tbody>

@@ -505,6 +505,47 @@
     loadTx();
   }
 
+  /* 理財習慣：拿來當財務建議的背景。
+
+     ⚠️ 全部是**從固定清單挑選**，只有補充說明是自由文字，而且限 200 字。
+     不是為了防呆——建議是會給監管者看的，如果子女能在自己的說明裡
+     下指令，就能操控父母看到的內容。隔離的做法在 toolkit/profile.py。 */
+  FOLD_BUILD.fin = function (wrap) {
+    wrap.innerHTML = skeleton(2);
+    API.financeProfile().then(function (d) {
+      var f = d.finance || {};
+      var picked = function (list, key) {
+        return (f[key] || []).indexOf(list) >= 0 ? ' checked' : '';
+      };
+      wrap.innerHTML = '<form class="card finf" id="finF">' +
+        '<div class="finf__g"><span class="finf__k">理財風格</span>' +
+          '<div class="finf__o">' + d.styles.map(function (x) {
+            return '<label class="pick"><input type="radio" name="finStyle" value="' +
+              esc(x.id) + '"' + (f.style === x.id ? ' checked' : '') + '>' +
+              '<b>' + esc(x.name) + '</b><i>' + esc(x.desc) + '</i></label>';
+          }).join('') + '</div></div>' +
+
+        '<div class="finf__g"><span class="finf__k">目前最在意的</span>' +
+          '<div class="finf__o finf__o--row">' + d.goals.map(function (x) {
+            return '<label class="pick pick--sm"><input type="checkbox" name="finGoal" value="' +
+              esc(x.id) + '"' + picked(x.id, 'goals') + '><b>' + esc(x.name) + '</b></label>';
+          }).join('') + '</div></div>' +
+
+        '<div class="finf__g"><span class="finf__k">固定的財務安排</span>' +
+          '<div class="finf__o finf__o--row">' + d.habits.map(function (x) {
+            return '<label class="pick pick--sm"><input type="checkbox" name="finHabit" value="' +
+              esc(x.id) + '"' + picked(x.id, 'habits') + '><b>' + esc(x.name) + '</b></label>';
+          }).join('') + '</div></div>' +
+
+        '<label class="fld"><span>還有什麼是我們該知道的（選填，200 字）</span>' +
+          '<textarea id="finNote" rows="3" maxlength="200" ' +
+            'placeholder="例如：房貸還有十二年，小孩教育費最優先">' +
+            esc(f.note || '') + '</textarea></label>' +
+        '<div><button class="btn btn--go" type="submit">儲存</button></div>' +
+      '</form>';
+    }).catch(function (e) { wrap.innerHTML = errState(e); });
+  };
+
   FOLD_BUILD.entry = function (wrap) {
     /* ---- 模式切換：抽屜 ----
        兩張帶說明的大卡片收成一條。要用哪一種是常態性的選擇，
@@ -910,6 +951,20 @@
           '<div id="advList"></div>' +
         '</div>';
       paintAdvices();
+      /* 沒填理財習慣的話，在這裡提一次——這是它真正會派上用場的地方，
+         比在註冊流程裡多問四題有用。 */
+      API.financeProfile().then(function (p) {
+        var f = p.finance || {};
+        var empty = !f.style && !(f.goals || []).length &&
+          !(f.habits || []).length && !f.note;
+        if (!empty) return;
+        var box = document.getElementById('advList');
+        if (!box) return;
+        box.insertAdjacentHTML('beforebegin',
+          '<div class="note"><div class="note__k">建議可以更貼近你</div>' +
+          '<p>到<a href="#/profile">個人資料</a>填一下理財習慣——' +
+          '在意的目標不一樣，同一筆支出的意義就不一樣。</p></div>');
+      }).catch(function () {});
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
@@ -1905,11 +1960,14 @@
 
         '</div></div>' +
 
+        foldHead('fin', '理財習慣', '填寫', 'FOR ADVICE') +
+
         '<div class="sec"><h2 class="sec__t">階段性提醒' + helpBtn('alerts') + '</h2></div>' +
         '<div class="card" id="alertBox">' + skeleton(2) + '</div>' +
 
       '</div>';
       $view.innerHTML = h;
+      foldRestore();
       paintAlerts();
     });
   }
@@ -2613,6 +2671,28 @@
       }).catch(function (err) {
         busy(f, false);
         toast(err.message || '建立失敗', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'finF') {
+      e.preventDefault();
+      busy(f, true, '儲存中…');
+      var pick = function (name) {
+        return [].slice.call(f.querySelectorAll('[name="' + name + '"]:checked'))
+          .map(function (i) { return i.value; });
+      };
+      API.setFinanceProfile({
+        style: (pick('finStyle')[0] || null),
+        goals: pick('finGoal'),
+        habits: pick('finHabit'),
+        note: document.getElementById('finNote').value
+      }).then(function () {
+        busy(f, false);
+        toast('記下了。之後的財務建議會參考這些', 'ok');
+      }).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '儲存失敗', 'err');
       });
       return;
     }
