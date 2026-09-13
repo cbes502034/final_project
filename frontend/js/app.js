@@ -1245,11 +1245,12 @@
           '<label class="fld"><span>名字</span>' +
             '<input type="text" id="gnName" placeholder="例如 旅遊基金、寵物開銷" required></label>' +
           '<label class="fld"><span>顏色</span>' +
+            /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份。
+               寫死的那一版跟種子資料用的顏色完全是兩套：表單給亮彩、
+               資料用濁色，結果新開的帳本跟全站格格不入，而且看不見。 */
             '<select id="gnColor">' +
-              ['#6C9FFB:藍', '#8B7CF0:紫', '#5FB8D9:青', '#6EE7B7:綠',
-               '#FBBF6E:橙', '#FB8A8F:紅'].map(function (c) {
-                var p = c.split(':');
-                return '<option value="' + p[0] + '">' + p[1] + '</option>';
+              ((global.DATA && global.DATA.groupColors) || []).map(function (c) {
+                return '<option value="' + esc(c.hex) + '">' + esc(c.name) + '</option>';
               }).join('') +
             '</select></label>' +
           '<div><button class="btn btn--go" type="submit">建立</button></div>' +

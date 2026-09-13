@@ -844,3 +844,102 @@ def test_選了單一帳本時不可以畫近六個月():
     assert "var scoped = !(f.groupId && f.groupId !== 'all');" in api, \
         "summary 沒有判斷是否只看單一帳本"
     assert "}) : null;" in api, "選了單一帳本時 monthly 應該回 null"
+
+
+# ===========================================================================
+# 顏色
+# ===========================================================================
+
+_PAPER = "#F4F1EA"      # 背景
+_CARD = "#FFFFFF"       # 卡片
+
+
+def _luminance(hex_color):
+    h = hex_color.lstrip("#")
+    parts = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    parts = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+             for x in parts]
+    return 0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2]
+
+
+def _contrast(a, b):
+    la, lb = _luminance(a), _luminance(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def test_帳本顏色在米白上看得見():
+    """小圓點這類非文字元素，對比至少要 3:1。
+
+    上一版的色盤是深色主題留下來的亮彩：薄荷綠 #6EE7B7 在米白上只有
+    1.35——那顆標示目前帳本的小圓點等於不存在。而且它不會報錯，
+    只會讓人覺得「怎麼看不出現在在哪一本」。
+    """
+    data = read("frontend/js/data.js")
+    block = data[data.index("  groupColors: ["):data.index("]", data.index("  groupColors: ["))]
+    colors = re.findall(r"hex: '(#[0-9A-Fa-f]{6})'", block)
+    assert len(colors) >= 4, "帳本色盤太少：%d" % len(colors)
+
+    bad = []
+    for c in colors:
+        for bg, name in ((_PAPER, "米白"), (_CARD, "白卡")):
+            r = _contrast(c, bg)
+            if r < 3.0:
+                bad.append("%s 在%s上只有 %.2f:1" % (c, name, r))
+    assert not bad, "這些顏色太淡，小圓點會看不見：\n" + "\n".join(bad)
+
+
+def test_帳本色與分類色要分得開():
+    """兩套顏色會同時出現在圖表上，撞色就分不清誰是誰。
+
+    分類回答「錢花在什麼」，帳本回答「這筆算哪一本帳」。
+    區別靠**明度**不靠色相——色相不夠用，分類已經佔掉赭藍紫綠紅琥珀。
+    """
+    data = read("frontend/js/data.js")
+    block = data[data.index("  groupColors: ["):data.index("]", data.index("  groupColors: ["))]
+    ledger = re.findall(r"hex: '(#[0-9A-Fa-f]{6})'", block)
+    cats = re.findall(r"kind: '(?:income|expense)', color: '(#[0-9A-Fa-f]{6})'", data)
+    assert ledger and cats
+
+    brightest = max(_luminance(c) for c in ledger)
+    darkest = min(_luminance(c) for c in cats)
+    assert brightest < darkest, (
+        "帳本色必須整組比分類色暗：帳本最亮 %.4f，分類最暗 %.4f" % (brightest, darkest))
+
+    overlap = set(ledger) & set(cats)
+    assert not overlap, "帳本色跟分類色撞色了：" + "、".join(sorted(overlap))
+
+
+def test_現有帳本都用色盤裡的顏色():
+    """色盤是單一來源。種子資料自己挑一個不在盤裡的顏色，
+    就等於「表單給一套、資料用另一套」——那正是上一版的毛病。
+    """
+    data = read("frontend/js/data.js")
+    block = data[data.index("  groupColors: ["):data.index("]", data.index("  groupColors: ["))]
+    palette = set(re.findall(r"hex: '(#[0-9A-Fa-f]{6})'", block))
+
+    used = re.findall(r"name: '[^']+', icon: '[^']+', color: '(#[0-9A-Fa-f]{6})'", data)
+    assert used, "找不到帳本的顏色"
+    bad = [c for c in used if c not in palette]
+    assert not bad, "這些帳本用了色盤外的顏色：" + "、".join(bad)
+
+
+def test_開帳本的表單不可以自己寫死一套顏色():
+    """寫死的那一版跟種子資料完全是兩套，新開的帳本因此格格不入。"""
+    app = read("frontend/js/app.js")
+    mo = re.search(r"<select id=\"gnColor\">(.{0,400})", app, re.S)
+    assert mo, "找不到開帳本的顏色選單"
+    assert "groupColors" in mo.group(1), "顏色選單沒有讀 DATA.groupColors"
+
+
+def test_app_js_不可以用裸的_DATA():
+    """app.js 裡沒有 var DATA，只有 global.DATA。
+
+    寫成裸的 DATA 不會有任何靜態錯誤，載入也正常——
+    要等使用者點到那一段才 ReferenceError。
+    """
+    app = _blank(read("frontend/js/app.js"))     # 註解和字串裡的不算
+    # 前面有 `.` 的（global.DATA）本來就被 lookbehind 排除了
+    bare = re.findall(r"(?<![.\w$])DATA\b(?!_)", app)
+    assert not bare, (
+        "app.js 出現了 %d 處裸的 DATA，請改成 global.DATA" % len(bare))
