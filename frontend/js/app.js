@@ -39,6 +39,40 @@
     panel.classList.add('inflow');
   }
 
+  /* 寬螢幕的搜尋是頂欄上一直都在的輸入框，窄螢幕才是「按圖示展開」的抽屜。
+     ⚠️ 以前兩邊都靠 CSS 硬蓋：寬螢幕用 display:flex !important 蓋掉 [hidden]，
+     結果那個輸入框看得見、打得了字，hidden 屬性卻是 true——
+     螢幕閱讀器會直接跳過它，等於對讀螢幕的人來說搜尋不存在。
+     改成讓 hidden 一直說實話：寬螢幕拿掉它，窄螢幕才交給按鈕控制。 */
+  var narrowBar = window.matchMedia('(max-width: 760px)');
+
+  function syncSearchMode() {
+    var sd = document.getElementById('searchDrawer');
+    var sb = document.getElementById('searchBtn');
+    if (!sd) return;
+    if (narrowBar.matches) {
+      sd.hidden = true;                       // 收起來，等使用者按圖示
+      if (sb) sb.classList.remove('open');
+      document.body.classList.remove('dw-on');
+    } else {
+      sd.hidden = false;                      // 一直都在
+    }
+  }
+  syncSearchMode();
+  /* ⚠️ 只靠 matchMedia 的 change 不夠可靠（換裝置模擬、某些瀏覽器不一定送），
+     所以 resize 也補一道。但只在**模式真的變了**的時候才動——
+     否則使用者一邊打字一邊轉螢幕，搜尋框會被關掉。 */
+  var wasNarrow = narrowBar.matches;
+  narrowBar.addEventListener('change', function () {
+    wasNarrow = narrowBar.matches;
+    syncSearchMode();
+  });
+  window.addEventListener('resize', function () {
+    if (narrowBar.matches === wasNarrow) return;
+    wasNarrow = narrowBar.matches;
+    syncSearchMode();
+  });
+
   /* ⚠️ 只有這兩個是抽屜。#searchDrawer 在文字模式是頂欄上的行內搜尋框，
      把它搬進版面的話，頂欄的搜尋就不見了。 */
   var DRAWERS = ['#gswPanel', '#bellPanel'];
@@ -353,17 +387,104 @@
   /* ============================================================
      02 記帳（自然語言輸入）
      ============================================================ */
+  /* ============================================================
+     收合區塊
+
+     一個畫面只留「現在要看的東西」，其他的收起來，點了才長出來。
+
+     理由是版面：一進來就攤開三四個區塊，使用者得先跳過前面兩個
+     才找得到自己要的。次要功能收起來之後，主功能自己會浮上來。
+
+     ⚠️ 內容是**點了才渲染**，不是先畫好再 display:none。
+        先畫好的話，一個沒人展開的區塊照樣花掉它的渲染時間，
+        而且藏起來的東西最容易腐爛——沒人看得到它壞了。
+     ============================================================ */
+  var FOLD = {};                       // id → 展開中嗎
+
+  function foldHead(id, title, label, kicker) {
+    var on = !!FOLD[id];
+    return '<div class="sec"><h2 class="sec__t">' + esc(title) + '</h2>' +
+      (kicker ? '<span class="sec__n">' + esc(kicker) + '</span>' : '') +
+      '<button class="fold__b' + (on ? ' on' : '') + '" data-fold="' + esc(id) + '" ' +
+        'data-label="' + esc(label) + '" ' +
+        'aria-expanded="' + (on ? 'true' : 'false') + '">' +
+        '<span class="fold__x" aria-hidden="true"></span>' +
+        '<span class="fold__t">' + esc(on ? '收起' : label) + '</span>' +
+      '</button></div>' +
+      '<div class="fold__p" id="fold-' + esc(id) + '"' + (on ? '' : ' hidden') + '></div>';
+  }
+
+  /* 每個收合區塊怎麼長出自己的內容。展開的當下才會被呼叫。 */
+  var FOLD_BUILD = {};
+
+  /* 內容已經是一段 HTML 字串的，放這裡就好，不用另外寫 builder。
+     ⚠️ 字串是先組好沒錯，但**節點要展開才會進 DOM**——
+        沒有版面、沒有排版計算，收起來的區塊是真的不存在。 */
+  var FOLD_HTML = {};
+
+  function foldBlock(id, title, label, html, kicker) {
+    FOLD_HTML[id] = html;
+    return foldHead(id, title, label, kicker);
+  }
+
+  function foldFill(id, wrap) {
+    if (FOLD_BUILD[id]) { FOLD_BUILD[id](wrap); return; }
+    if (FOLD_HTML[id] != null) wrap.innerHTML = FOLD_HTML[id];
+  }
+
+  /* 畫面重畫之後，本來展開的區塊要自己長回來——
+     否則使用者展開一個表單、按了送出，重畫完就無聲收合了。 */
+  function foldRestore() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll('[data-fold]'), function (b) {
+        var id = b.dataset.fold;
+        if (!FOLD[id]) return;
+        var wrap = document.getElementById('fold-' + id);
+        if (wrap && !wrap.innerHTML) foldFill(id, wrap);
+      });
+  }
+
+  function foldToggle(id) {
+    var wrap = document.getElementById('fold-' + id);
+    var btn = document.querySelector('[data-fold="' + id + '"]');
+    if (!wrap) return;
+    var on = !FOLD[id];
+    FOLD[id] = on;
+    wrap.hidden = !on;
+    if (btn) {
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      var t = btn.querySelector('.fold__t');
+      if (t) t.textContent = on ? '收起' : (btn.dataset.label || '展開');
+    }
+    if (on && !wrap.innerHTML) foldFill(id, wrap);
+  }
+
   var MODE = 'para';          // 'para' 段落批次 ｜ 'single' 單筆手動。兩者互斥
   var batch = null;           // 段落解析結果，尚未寫入
 
+  /* 記帳頁：明細先出來。
+
+     「記一筆」是有事才做的動作，不該一進來就佔掉半個版面——
+     大部分時候使用者是來看自己花了什麼，不是來記帳的。
+     要記的時候點 ＋，表單才長出來。 */
   function vEntry() {
     head('記帳', '');
     var h = '<div class="page">';
 
+    h += foldHead('entry', '收支明細', '記一筆', 'TRANSACTIONS');
+    h += filterBar() + '<div id="txList">' + skeleton(6) + '</div></div>';
+    $view.innerHTML = h;
+
+    foldRestore();
+    loadTx();
+  }
+
+  FOLD_BUILD.entry = function (wrap) {
     /* ---- 模式切換：抽屜 ----
        兩張帶說明的大卡片收成一條。要用哪一種是常態性的選擇，
        選好之後幾乎不會再動，不值得一直佔著版面。 */
-    h += '<div class="mbar">' +
+    var h = '<div class="mbar">' +
       /* ⚠️ helpBtn() 回傳的是一個 <button>，不可以放進另一個 <button> 裡。
          HTML 不允許按鈕巢狀——瀏覽器解析到內層按鈕時會把外層直接關掉，
          後面的東西就被踢出去變成兄弟節點，樣式全部對不上。
@@ -380,16 +501,10 @@
       '</div>' +
     '</div>';
 
-
     h += '<div id="entryBox"></div>';
-
-    h += '<div class="sec"><h2 class="sec__t">收支明細</h2>' +
-      '<span class="sec__n">TRANSACTIONS</span></div>';
-    h += filterBar() + '<div id="txList">' + skeleton(6) + '</div></div>';
-    $view.innerHTML = h;
+    wrap.innerHTML = h;
     renderMode();
-    loadTx();
-  }
+  };
 
   function modeRow(id, title, desc) {
     return '<button class="mbar__i' + (MODE === id ? ' on' : '') +
@@ -1060,7 +1175,7 @@
       }).join('') + '</div>';
 
       // ---- 建立 ----
-      h += '<div class="sec"><h2 class="sec__t">開一本新的</h2></div>' +
+      h += foldBlock('gnew', '開一本新的', '開一本',
         '<form class="card gnew" id="gnewF">' +
           '<label class="fld"><span>名字</span>' +
             '<input type="text" id="gnName" placeholder="例如 旅遊基金、寵物開銷" required></label>' +
@@ -1073,7 +1188,7 @@
               }).join('') +
             '</select></label>' +
           '<div><button class="btn btn--go" type="submit">建立</button></div>' +
-        '</form>';
+        '</form>');
 
       // ---- 成員 ----
       var editable = d.groups.filter(function (g) { return g.canEdit; });
@@ -1580,6 +1695,7 @@
     box.style.top = Math.round(top) + 'px';
   }
 
+
   /* ---------- 共用 ---------- */
   function head(t, s) { $title.textContent = t; $sub.textContent = s; }
 
@@ -1741,9 +1857,9 @@
         : '<p class="prof__h">還沒設定</p>';
 
       h += '<form class="anew" id="anewF">' +
-        '<label class="fld"><span>百分比</span>' +
+        '<label class="fld anew__pct"><span>百分比</span>' +
           '<input type="number" id="anPct" min="1" max="200" value="80" required></label>' +
-        '<label class="fld"><span>哪一本帳</span>' +
+        '<label class="fld anew__grp"><span>哪一本帳</span>' +
           '<select id="anGroup">' + goals.map(function (g) {
             return '<option value="' + (g.groupId || '') + '">' + esc(g.groupName) +
               (g.goal ? '（目標 ' + money(g.goal) + '）' : '（還沒設目標）') + '</option>';
@@ -1986,7 +2102,11 @@
       }
     }
 
+    var fold = t.closest('[data-fold]');
+    if (fold) { foldToggle(fold.dataset.fold); return; }
+
     /* ---- 搜尋抽屜 ---- */
+    if (t.closest('#searchBtn') && !narrowBar.matches) return;   // 寬螢幕沒有這顆
     if (t.closest('#searchBtn')) {
       var sd = document.getElementById('searchDrawer');
       var sb = document.getElementById('searchBtn');

@@ -2,6 +2,21 @@
    app.css — 元件與八個畫面
    ============================================================ */
 
+/* ⚠️ 這條要放在最前面，而且一定要有。
+
+   瀏覽器預設的 [hidden] 是 `display: none`，但它的優先度跟元素選擇器
+   一樣低——只要我們自己寫了 `.gsw__p { display: grid }`，class 就贏了，
+   hidden 屬性直接失效。
+
+   這個坑踩過兩次，而且兩次都不會報錯，只會「怪怪的」：
+     · 帳本面板永遠攤在首頁上，把第一屏整個佔掉；
+       按切換鈕時 hidden 有翻，畫面卻沒變——看起來就是「按了沒反應」。
+     · 搜尋框在寬螢幕看得見、打得了字，hidden 卻是 true，
+       螢幕閱讀器會直接跳過它。
+
+   所以這裡一次講死：hidden 說了算。 */
+[hidden] { display: none !important; }
+
 .app { position: relative; z-index: 1; display: flex; min-height: 100vh; }
 
 /* ============================================================
@@ -1844,7 +1859,7 @@ body.bar-text .gsw__n {
 /* 搜尋回到原本的樣子：一條線上的輸入框，不用先點圖示 */
 body.bar-text #searchBtn { display: none; }
 body.bar-text #searchDrawer {
-  position: static; display: flex !important; padding: 0 16px;
+  position: static; display: flex; padding: 0 16px;
   border: 0; border-left: 1px solid var(--line); box-shadow: none;
   animation: none; min-width: 230px; align-self: stretch;
 }
@@ -1884,7 +1899,6 @@ body.bar-icon.dw-on #view { opacity: 1; pointer-events: auto; }
 
 /* ⚠️ #searchDrawer 自己有 display:flex，會蓋過 [hidden] 的 display:none。
    方案二要靠 hidden 收起來，所以這裡補一條贏過它。 */
-body.bar-icon #searchDrawer[hidden] { display: none !important; }
 
 
 /* ============================================================
@@ -1898,15 +1912,28 @@ body.bar-icon #searchDrawer[hidden] { display: none !important; }
   display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
   padding-top: 18px; border-top: 1px solid var(--line);
 }
-.anew > div:last-child { width: auto; display: block; }
-.anew > div:last-child .btn { min-width: 0; padding: 9px 18px; }
+/* 按鈕跟其他表單一樣佔滿一列並置中。
+   之前為了「不要讓一顆按鈕佔掉一整行」把它改成靠左，
+   結果全站只有這一顆是靠左的——一致比省那幾 px 重要。 */
+.anew > div:last-child .btn { min-width: 148px; padding: 9px 18px; }
 .anew input { width: 92px; }
 .anew select { min-width: 170px; }
 .anew .fld > span { font-size: 11.5px; }
 
 @media (max-width: 560px) {
+  /* ⚠️ 這裡本來寫 `.anew select { flex: 1 1 140px }`，那是錯的：
+     <select> 的父層是 .fld，而 .fld 是 flex-direction: column——
+     在直向的軸上，flex-basis 是**高度**。所以那顆下拉在手機上
+     被撐成 140px 高的巨大方塊，整排版面就垮了。
+
+     要伸縮的是 .fld 本身（它才是 .anew 這個橫向 flex 的項目），
+     控制項只要填滿自己的欄寬就好。 */
   .anew { gap: 10px; }
-  .anew select { min-width: 0; flex: 1 1 140px; }
+  .anew .fld { min-width: 0; }
+  .anew__pct { flex: 0 0 96px; }
+  .anew__grp { flex: 1 1 150px; }
+  .anew__pct input,
+  .anew__grp select { width: 100%; min-width: 0; }
 }
 
 
@@ -2321,18 +2348,28 @@ body.bar-icon .bell__wrap, body.bar-icon .gsw { position: relative; }
     border-top: 1px solid var(--line); border-bottom: 1px solid var(--line-2);
     box-shadow: 0 14px 28px rgba(60, 50, 35, .09);
   }
-  body.bar-text #searchDrawer[hidden] { display: none !important; }
 
-  body.bar-text .gsw__n,
-  body.bar-text .gsw__cv,
+  /* ⚠️ 帳本名稱在窄螢幕一定要留著。
+     以前這裡把名稱和箭頭都藏掉，只剩一個方形圖示配右下角一顆小點——
+     使用者看不出那是什麼，也看不出它可以按。點下去面板從頂欄下面展開，
+     因為沒有任何線索指向那顆按鈕，感覺就像「按了沒反應」。
+
+     空間是從**頁面標題**讓出來的：左邊的導覽列已經把目前頁面標亮了，
+     頂欄再寫一次是重複的；而「現在在哪一本帳」沒有別的地方會說。 */
   body.bar-text .gsw__d { display: none; }
   body.bar-text .gsw__ic { display: block; }
-  body.bar-text .ic__d { display: block; }
-  body.bar-text .gsw__b { width: 52px; padding: 0; }
+  body.bar-text .gsw__n {
+    display: block; max-width: 84px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  body.bar-text .gsw__cv { display: block; }      /* 箭頭 = 這會展開 */
+  body.bar-text .ic__d { display: none; }         /* 有名字了，小點是多餘的 */
+  body.bar-text .gsw__b { width: auto; padding: 0 12px; gap: 7px; }
 
   .top { padding-left: 16px; }
   .top__s { display: none; }
-  .top__t { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 標題讓位給帳本名稱：導覽列已經標亮目前頁面了 */
+  .top__t { display: none; }
   .ic, .bell { width: 48px; }
 
   /* 提示訊息不要比畫面寬 */
@@ -2428,3 +2465,39 @@ body.tour-on { overflow: hidden; }
 }
 /* 版面裡的東西不需要再讓位 */
 body.dw-push #view { padding-top: 0; }
+
+/* ============================================================
+   收合區塊的開關
+   ------------------------------------------------------------
+   放在區塊標題那一列的右邊，不佔自己的一行。
+   全直角、無外框——它是一個動作，不是一顆方塊。
+   ============================================================ */
+.fold__b {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; border: 0; border-radius: 0; padding: 6px 2px;
+  color: var(--accent); font-size: 13.5px; font-weight: 500; cursor: pointer;
+  transition: color .16s var(--ease);
+}
+.fold__b:hover { color: var(--accent-hi); }
+
+/* ＋ 用兩條線畫，展開時轉成 ×——同一顆按鈕，狀態看得出來 */
+.fold__x {
+  position: relative; width: 13px; height: 13px; flex: 0 0 13px;
+  transition: transform .22s var(--back);
+}
+.fold__x::before, .fold__x::after {
+  content: ''; position: absolute; left: 0; top: 6px;
+  width: 13px; height: 1.5px; background: currentColor;
+}
+.fold__x::after { transform: rotate(90deg); }
+.fold__b.on .fold__x { transform: rotate(45deg); }
+
+.fold__p { animation: foldIn .22s var(--out); }
+@keyframes foldIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 區塊標題那一列的 kicker 本來用 margin-left:auto 推到右邊，
+   現在右邊是開關，kicker 要讓開 */
+.sec:has(.fold__b) .sec__n { margin-left: 0; }
