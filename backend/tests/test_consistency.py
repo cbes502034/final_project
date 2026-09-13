@@ -802,6 +802,12 @@ def test_每個人的月數列最後一個月要等於本月彙總():
     D = _load_data()
     bad = []
     for m in D["members"]:
+        # ⚠️ 平台管理員沒有財務資料，這正是那個角色的定義——
+        # 他能停權，但讀不到也沒有任何一筆帳。所以他不該有月數列。
+        if m.get("isPlatformAdmin"):
+            assert not m.get("monthly"), \
+                "%s 是平台管理員，不該有財務數列" % m["name"]
+            continue
         series = m.get("monthly")
         assert series, "%s 沒有 monthly 數列" % m["name"]
         last = series[-1]
@@ -1177,3 +1183,333 @@ def test_每一個用到_monthly_的地方都要防著它是_null():
     mo = re.search(r"function barChart\(rows\) \{(.*?)\n    var max", app, re.S)
     assert mo, "app.js 裡找不到 barChart"
     assert "!rows" in mo.group(1), "barChart 沒有防住 null／空陣列"
+
+
+# ===========================================================================
+# 停權與稽核：用 node 把 mock 真的跑一次
+# ===========================================================================
+#
+# 前面的測試大多是讀原始碼找字串。停權這件事不能只這樣驗——
+# 「停權了但重新整理就失效」「停權了但他還登得進來」都是**字串完全正確、
+# 行為完全錯誤**的情況。所以這裡真的登入、真的停權、真的重新載入一次。
+
+_ADMIN_DRIVER = r"""
+const [dataJs, apiJs] = process.argv.slice(2);
+
+// 瀏覽器環境的最小替身
+const store = new Map();
+global.localStorage = {
+  getItem: k => store.has(k) ? store.get(k) : null,
+  setItem: (k, v) => store.set(k, String(v)),
+  removeItem: k => store.delete(k)
+};
+global.document = { querySelector: () => null };      // 沒有 api-base → mock
+global.setTimeout = fn => setImmediate(fn);           // 不要真的等延遲
+
+function boot() {
+  // 重新 require 等於重新整理頁面：closure 裡的 state 會歸零，只剩 localStorage
+  delete require.cache[require.resolve(dataJs)];
+  delete require.cache[require.resolve(apiJs)];
+  global.window = {};
+  require(dataJs);
+  require(apiJs);
+  return window.API;
+}
+
+async function fails(p) {
+  try { await p; return null; } catch (e) { return { msg: e.message, status: e.status || null }; }
+}
+
+(async () => {
+  const out = {};
+  const PW = 'password123';
+  let API = boot();
+
+  await API.login({ email: 'admin@fambudget.tw', password: PW });
+  out.me = (await API.me()).user;
+  out.users = (await API.adminUsers()).users;
+
+  out.noReason     = await fails(API.suspendUser('U4', ''));
+  out.spaceReason  = await fails(API.suspendUser('U4', 'a          b'));
+  out.suspendAdmin = await fails(API.suspendUser('U0', '測試停權管理員'));
+  await API.suspendUser('U4', '  重複   張貼廣告  ');
+  out.auditAfterSuspend = (await API.audit()).logs;
+
+  await API.logout();
+  out.loginWhileSuspended = await fails(API.login({ email: 'yuxuan@lin.tw', password: PW }));
+  out.wrongPwLeaks = await fails(API.login({ email: 'yuxuan@lin.tw', password: 'x' }));
+
+  API = boot();                                        // 重新整理
+  out.loginAfterReload = await fails(API.login({ email: 'yuxuan@lin.tw', password: PW }));
+
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.parentAdminUsers = await fails(API.adminUsers());
+  out.parentAudit      = await fails(API.audit());
+  out.parentSuspend    = await fails(API.suspendUser('U3', '家長想停小孩'));
+
+  await API.login({ email: 'admin@fambudget.tw', password: PW });
+  // 用 fails() 包起來：停權如果在重新整理時消失了，這一步會丟錯，
+  // 要讓底下那條「重新整理之後停權就失效了」講出真正的原因，而不是整支當掉
+  out.unsuspend = await fails(API.unsuspendUser('U4'));
+  out.auditAfterUnsuspend = (await API.audit()).logs;
+  out.loginAfterUnsuspend = await fails(API.login({ email: 'yuxuan@lin.tw', password: PW }));
+
+  // 已經登入的人被停權：下一次請求就要被踢出去，不是等他下次登入
+  await API.login({ email: 'admin@fambudget.tw', password: PW });
+  await API.suspendUser('U4', '已登入中被停權');
+  const raw = JSON.parse(localStorage.getItem('fambudget.state.v1'));
+  raw.me = 'U4'; raw.auth = { loggedIn: true };
+  localStorage.setItem('fambudget.state.v1', JSON.stringify(raw));
+  API = boot();
+  out.authStateOfSuspended = await API.authState();
+
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+_ADMIN_RUN = {}
+
+
+def _run_admin_flow():
+    """整個流程只跑一次，底下幾支測試共用結果。"""
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if "out" in _ADMIN_RUN:
+        return _ADMIN_RUN["out"]
+    if not shutil.which("node"):
+        import pytest
+        pytest.skip("這台機器沒有 node")
+
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as fh:
+        fh.write(_ADMIN_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp,
+         os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")],
+        capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    _ADMIN_RUN["out"] = json.loads(res.stdout.decode("utf-8"))
+    return _ADMIN_RUN["out"]
+
+
+def test_平台管理員拿到的帳號清單裡沒有任何金額():
+    """停權是關門，不是配鑰匙。後端不回，前端就畫不出來——不是藏起來。"""
+    out = _run_admin_flow()
+    assert out["me"]["isPlatformAdmin"] is True
+
+    money = {"income", "expense", "budget", "savingsGoal", "monthly",
+             "balance", "amount", "transactions", "allowance"}
+    for u in out["users"]:
+        leaked = money & set(u)
+        assert not leaked, "%s 的資料裡帶著金額欄位：%s" % (u["name"], leaked)
+    assert all(u["id"] != "U0" for u in out["users"]), "清單裡不該有平台管理員自己"
+
+
+def test_停權沒有理由就不能執行():
+    out = _run_admin_flow()
+    assert out["noReason"], "沒寫理由也停權成功了"
+    assert out["spaceReason"], "用空白湊字數也停權成功了"
+    assert out["suspendAdmin"], "平台管理員被停權了——那就沒有人能解除了"
+
+
+def test_停權與解除都會寫進稽核():
+    out = _run_admin_flow()
+    top = out["auditAfterSuspend"][0]
+    assert top["action"] == "suspend_user" and top["target"] == "U4"
+    assert top["note"] == "重複 張貼廣告", "稽核裡的理由沒有經過整理：%r" % top["note"]
+    assert top["actorName"] == "系統管理員"
+
+    top2 = out["auditAfterUnsuspend"][0]
+    assert top2["action"] == "unsuspend_user" and top2["target"] == "U4", \
+        "解除停權沒有留下紀錄——「誰放他回來的」跟「誰停的他」一樣重要"
+
+
+def test_停權真的擋得住登入_而且重新整理之後還在():
+    """⚠️ 這條抓到過：save()/load() 沒有存 suspended，
+    停權在同一頁看起來有效，重新整理之後被停的人就登得進來了。"""
+    out = _run_admin_flow()
+    assert out["loginWhileSuspended"] and "停權" in out["loginWhileSuspended"]["msg"]
+    assert out["loginAfterReload"] and "停權" in out["loginAfterReload"]["msg"], \
+        "重新整理之後停權就失效了"
+    assert out["loginAfterUnsuspend"] is None, "解除停權之後還是登不進去"
+
+
+def test_密碼錯的時候不可以透露帳號被停權():
+    """停權檢查要在密碼驗證之後。反過來就能拿 email 試出誰被停權了。"""
+    out = _run_admin_flow()
+    assert out["wrongPwLeaks"], "密碼錯還登入成功？"
+    assert "停權" not in out["wrongPwLeaks"]["msg"], \
+        "密碼錯的時候就回了「已被停權」，等於送出一支停權帳號查詢器"
+
+
+def test_已經登入的人被停權_下一次請求就會被踢出去():
+    out = _run_admin_flow()
+    assert out["authStateOfSuspended"]["loggedIn"] is False, \
+        "被停權的人還維持著登入狀態——停權變成「下次登入才生效」"
+
+
+def test_稽核時間是當地時間不是_UTC():
+    """toISOString() 是 UTC：下午三點停的權，在台灣會記成早上七點。
+
+    ⚠️ 瀏覽器實測時抓到的。稽核紀錄就是拿來對時間的，差 8 小時等於紀錄是錯的。
+    這裡用 TZ=Asia/Taipei 跑一次，確認寫進去的時間跟當地時鐘一樣。
+    """
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        import pytest
+        pytest.skip("這台機器沒有 node")
+
+    driver = _ADMIN_DRIVER.split("(async () => {")[0] + r"""
+(async () => {
+  const API = boot();
+  await API.login({ email: 'admin@fambudget.tw', password: 'password123' });
+  const before = new Date();
+  await API.suspendUser('U3', '測試稽核時間');
+  const top = (await API.audit()).logs[0];
+  const p = n => String(n).padStart(2, '0');
+  const local = before.getFullYear() + '-' + p(before.getMonth() + 1) + '-' + p(before.getDate()) +
+                ' ' + p(before.getHours()) + ':';
+  process.stdout.write(JSON.stringify({ at: top.at, localPrefix: local }));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as fh:
+        fh.write(driver)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp,
+         os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")],
+        capture_output=True, env=dict(os.environ, TZ="Asia/Taipei"))
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    out = json.loads(res.stdout.decode("utf-8"))
+    assert out["at"].startswith(out["localPrefix"]), \
+        "稽核時間 %s 跟當地時間 %s 對不上——大概又用了 toISOString()" % (
+            out["at"], out["localPrefix"])
+
+
+def test_家長不能用平台管理的任何一支():
+    """家長是家庭治理權限，跟平台管理員完全分開。"""
+    out = _run_admin_flow()
+    for k in ("parentAdminUsers", "parentAudit", "parentSuspend"):
+        assert out[k], "家長呼叫 %s 成功了" % k
+        assert out[k]["status"] == 403, "%s 應該回 403" % k
+
+
+def test_mock_存檔與讀檔的欄位要成對():
+    """load() 讀回哪些欄位，save() 就要寫出哪些欄位。
+
+    這一類錯誤不會報錯：少存一個欄位，功能在同一頁完全正常，
+    **重新整理才消失**。suspended／audit 就是這樣漏掉的。
+    """
+    api = read("frontend/js/api.js")
+    mo = re.search(r"\[('newGroups'.*?)\]\.forEach", api, re.S)
+    assert mo, "api.js 的 load() 裡找不到要讀回的欄位清單"
+    restored = re.findall(r"'(\w+)'", mo.group(1))
+
+    mo2 = re.search(r"function save\(\) \{(.*?)\n  \}", api, re.S)
+    assert mo2, "api.js 裡找不到 save()"
+    missing = [k for k in restored if not re.search(r"\b%s:" % k, mo2.group(1))]
+    assert not missing, "load() 會讀回、但 save() 沒有寫出：" + "、".join(missing)
+
+
+def test_規格文件的路由清單由_ownership_產生():
+    """docs/01 的 6-2 總表與 6-3 各領域清單，一律由 tools/sync_spec.py 產生。
+
+    這兩段手動維護過，結果 ownership.py 已經 17/18/13/15，
+    文件還停在 8/8/10/9——差了一倍，而且沒有任何測試抓到。
+    """
+    import subprocess
+    import sys
+
+    res = subprocess.run(
+        [sys.executable, os.path.join(REPO, "backend", "tools", "sync_spec.py"), "--check"],
+        capture_output=True, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+    assert res.returncode == 0, res.stdout.decode("utf-8", "replace")
+
+
+def test_輸入框不可以留著星空主題的深色底():
+    """換成米白主題時，有三個輸入框的底色沒換到：rgba(5,6,10,.5)。
+
+    深底配深字，在米白上變成一塊灰色方塊，數字幾乎讀不到——
+    帳本頁每一本帳的「月目標」就是這樣。沒有報錯，只是看起來髒。
+    輸入框的底色一律用 --sunk。
+    """
+    css = read("frontend/css/app.css")
+    leftovers = re.findall(r"[^\n]*background:\s*rgba\(\s*5\s*,\s*6\s*,\s*10[^\n]*", css)
+    assert not leftovers, "還有星空主題留下來的深色底：\n" + "\n".join(leftovers)
+
+
+def test_管理員的側欄項目不可以自己指定_display():
+    """⚠️ 瀏覽器實測時抓到的。
+
+    寫成 `body.is-admin .nav__lb--admin { display: block }` 的話，
+    它的優先度會蓋過「窄螢幕藏分組標題」「側欄收合藏標題」這兩條既有規則——
+    手機的橫向導覽列上就冒出一個被擠成直排的「平／台」。
+    正確做法是只在「不是管理員」時藏，其餘交給一般 .nav__lb / .nav__i 的規則。
+    """
+    css = read("frontend/css/app.css")
+    bad = re.findall(
+        r"body\.is-admin[^{,]*\.nav__(?:lb|i)--admin[^{]*\{[^}]*display:\s*(?:block|flex|grid)",
+        css)
+    assert not bad, "管理員的側欄項目被強制指定 display，會蓋掉響應式規則：\n" + "\n".join(bad)
+    assert "body:not(.is-admin) .nav__lb--admin" in css
+    assert "body:not(.is-admin) .nav__i--admin" in css
+
+
+def test_平台管理員與一般使用者的頁面互不相通():
+    """管理員登入後落在「我的總覽」會是一頁全部是 0 的空殼；
+    一般使用者打 #/admin 會拿到 403。兩邊都要在路由閘擋掉。
+
+    ME 在登出與登入時都要清掉，否則路由閘會拿上一個人的身分判斷——
+    管理員登出、家長登入的那一瞬間，家長會被送去 #/admin。
+    """
+    app = read("frontend/js/app.js")
+    mo = re.search(r"function paint\(\) \{(.*?)\n  \}\n", app, re.S)
+    assert mo, "app.js 裡找不到 paint()"
+    body = mo.group(1)
+    assert "admin && page !== 'admin'" in body, "路由閘沒有把管理員送去平台管理"
+    assert "!admin && page === 'admin'" in body, "路由閘沒有擋一般使用者進平台管理"
+
+    mo2 = re.search(r"function afterLogin\(d\) \{(.*?)\n  \}", app, re.S)
+    assert mo2 and "ME = null" in mo2.group(1), "登入之後沒有清掉上一個人的身分"
+    mo3 = re.search(r"API\.logout\(\)\.then\(function \(\) \{(.*?)\n      \}\);", app, re.S)
+    assert mo3 and "ME = null" in mo3.group(1), "登出之後沒有清掉身分"
+
+    mo4 = re.search(r"function tourAsk\(\) \{(.*?)\n  \}", app, re.S)
+    assert mo4 and "isPlatformAdmin" in mo4.group(1), \
+        "導覽會對管理員出現——它的每一步都指向他看不到的財務功能"
+
+
+def test_帳本頁進來只看得到帳本():
+    """開帳本跟記帳頁的「記一筆」同一種做法：縮成標題旁邊的＋。
+
+    開帳本是一次性動作，那張表單卻每次進來都攤在畫面中間。
+    成員編輯、已封存也一樣收起來，進來先看到的是「我有哪幾本」。
+    """
+    app = read("frontend/js/app.js")
+    mo = re.search(r"function vGroups\(\) \{(.*?)\n  \}\n", app, re.S)
+    assert mo, "app.js 裡找不到 vGroups"
+    body = mo.group(1)
+
+    assert "foldBlock('gnew', '常設帳本'" in body, \
+        "「開一本」應該掛在常設帳本的標題上，不是另外一個區塊"
+    assert "'開一本新的'" not in body, "還留著獨立的「開一本新的」區塊"
+    assert "foldBlock('gmem'" in body, "「誰在哪一本帳裡」應該收起來"
+    assert "foldBlock('garch'" in body, "「已封存」應該收起來"
+    assert "foldRestore()" in body, \
+        "重畫之後沒有 foldRestore()——展開的表單送出後會無聲收合"
+
+    # 攤開的區塊標題只能是帳本清單本身
+    plain = re.findall(r'<h2 class="sec__t">([^<\']+)', body)
+    assert set(plain) <= {"活動帳本"}, "帳本頁多了攤開的區塊：%s" % plain

@@ -470,6 +470,45 @@ def test_不是平台管理員就什麼都不能做():
         roles.require_platform("suspend_user", False)
 
 
+def test_停權一定要有理由():
+    """沒有理由的停權就是任意封鎖，被停的人也沒有東西可以申訴。"""
+    for bad in (None, "", "ab", "   ", "a  b"):
+        with pytest.raises(ValueError):
+            roles.clean_suspend_reason(bad)
+
+
+def test_用空白湊字數騙不過去():
+    """「a        b」有十個字元，但實際上只寫了兩個字。"""
+    with pytest.raises(ValueError):
+        roles.clean_suspend_reason("a" + " " * 20 + "b")
+    assert roles.clean_suspend_reason("  重複   洗版  ") == "重複 洗版"
+
+
+def test_停權理由太長會被截掉而不是報錯():
+    why = roles.clean_suspend_reason("違" * 500)
+    assert len(why) == roles.SUSPEND_REASON_MAX
+
+
+def test_平台管理員不能被停權():
+    """停掉最後一個管理員之後，就沒有人能解除停權了。"""
+    with pytest.raises(scope.Forbidden):
+        roles.require_suspendable(True)
+    roles.require_suspendable(False)          # 一般帳號可以
+
+
+def test_停權中的帳號每一次請求都擋():
+    """只在登入時擋的話，手上那張 access token 還能再用 30 分鐘。"""
+    from datetime import datetime, timezone
+
+    assert roles.is_active(None)
+    roles.require_active(None)
+
+    now = datetime.now(timezone.utc)
+    assert not roles.is_active(now)
+    with pytest.raises(scope.Forbidden):
+        roles.require_active(now)
+
+
 # ===========================================================================
 # notify —— 通知發給誰
 # ===========================================================================

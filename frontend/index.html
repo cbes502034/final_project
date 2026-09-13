@@ -19,8 +19,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/tokens.css?v=118">
-<link rel="stylesheet" href="css/app.css?v=118">
+<link rel="stylesheet" href="css/tokens.css?v=125">
+<link rel="stylesheet" href="css/app.css?v=125">
 </head>
 <body>
 
@@ -73,6 +73,14 @@
       <button class="nav__i" data-nav="members">
         <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="10"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
         <span class="nav__t">成員與權限</span>
+      </button>
+
+      <!-- 平台管理：只有平台管理員看得到（body.is-admin）。
+           他也只看得到這一項——其餘全部被 CSS 收掉，因為他真的沒有那些資料。 -->
+      <div class="nav__lb nav__lb--admin">平台</div>
+      <button class="nav__i nav__i--admin" data-nav="admin">
+        <svg class="nav__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v6c0 4-3 6.5-7 9-4-2.5-7-5-7-9V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
+        <span class="nav__t">平台管理</span>
       </button>
 
     </div>
@@ -128,10 +136,10 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=118"></script>
-<script src="js/data.js?v=118"></script>
-<script src="js/api.js?v=118"></script>
-<script src="js/notify.js?v=118"></script>
-<script src="js/app.js?v=118"></script>
+<script src="js/stars.js?v=125"></script>
+<script src="js/data.js?v=125"></script>
+<script src="js/api.js?v=125"></script>
+<script src="js/notify.js?v=125"></script>
+<script src="js/app.js?v=125"></script>
 </body>
 </html>

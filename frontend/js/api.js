@@ -20,6 +20,10 @@
    PUT    /api/auth/me/finance        改理財習慣
    PATCH  /api/auth/password          改密碼
    POST   /api/auth/verify-password   重大操作前再確認一次（不發新 token）
+   GET    /api/admin/users             平台管理員：帳號清單（⚠️ 不含任何金額）
+   POST   /api/admin/users/{id}/suspend    停權（body: { reason }）
+   DELETE /api/admin/users/{id}/suspend    解除停權
+   GET    /api/audit                   稽核紀錄
    GET    /api/auth/me                目前登入者 + 家庭角色
 
    家庭與權限
@@ -134,8 +138,12 @@
         if (saved.auth) base.auth = saved.auth;
         if (saved.patch) base.patch = saved.patch;
         if (saved.newUsers) base.newUsers = saved.newUsers;
+        /* ⚠️ 新增一種要存的狀態，這裡跟 save() 兩邊都要加。
+           suspended／audit 漏過一次：停權在同一頁看起來有效，
+           重新整理之後就消失——被停權的人重新整理一下就能登入。 */
         ['newGroups', 'groupPatch', 'joined', 'left', 'archived',
-         'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone'].forEach(function (k) {
+         'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
+         'suspended', 'audit'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
         });
       }
@@ -164,7 +172,9 @@
         allowancePatch: state.allowancePatch || [],
         newAlerts: state.newAlerts || [],
         alertPatch: state.alertPatch || {},
-        alertGone: state.alertGone || []
+        alertGone: state.alertGone || [],
+        suspended: state.suspended || {},
+        audit: state.audit || []
       }));
     } catch (e) {}
   }
@@ -204,6 +214,35 @@
       return m.group === gid && m.user === uid;
     });
     return hit.length ? !!hit[hit.length - 1].notify : false;
+  }
+
+  /* ⚠️ 每一支管理端路由的第一行都要呼叫它。
+     真後端請用 toolkit/roles.py 的 require_platform()。 */
+  function requirePlatform(s) {
+    var me = memberOf(s.me);
+    if (!me || !me.isPlatformAdmin) {
+      var e = new Error('這個動作需要平台管理員權限');
+      e.status = 403;
+      throw e;
+    }
+  }
+
+  /* ⚠️ 稽核時間要用當地時間。toISOString() 是 UTC，
+     在台灣會比實際早 8 小時——下午三點停的權，紀錄上寫早上七點。
+     稽核紀錄就是拿來對時間的，差 8 小時等於紀錄是錯的。
+     真後端存 TIMESTAMPTZ，由前端依使用者時區顯示。 */
+  function localStamp(d) {
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+      ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function pushAudit(s, action, target, note) {
+    s.audit = (s.audit || []).concat([{
+      id: 'A' + (2000 + (s.audit || []).length),
+      actor: s.me, action: action, target: target,
+      at: localStamp(new Date()), note: note
+    }]);
   }
 
   function memberOf(id) {
@@ -415,6 +454,13 @@
        --------------------------------------------------------- */
     authState: function () {
       var s = load();
+      /* ⚠️ 已經登入的人被停權，下一次請求就要被擋——不是等他下次登入。
+         真後端在載入目前使用者那層呼叫 roles.require_active()；
+         只在登入時檢查的話，他手上那張 access token 還能用 30 分鐘。 */
+      if ((s.suspended || {})[s.me]) {
+        s.auth = { loggedIn: false };
+        save();
+      }
       return Promise.resolve({ loggedIn: !!(s.auth && s.auth.loggedIn) });
     },
 
@@ -431,6 +477,15 @@
            這裡分開只是為了 demo 時看得懂自己打錯什麼。 */
         if (!u) throw new Error('這個 email 沒有註冊過');
         if (String(c.password || '').length < 8) throw new Error('密碼至少 8 個字');
+
+        /* ⚠️ 停權必須真的擋得住登入，否則它只是畫面上的一個標籤。
+           ⚠️ 而且要**在密碼驗證通過之後**才檢查——順序反過來的話，
+              任何人都能用一個 email 試出「這個帳號是不是被停權了」。 */
+        var sus = (s.suspended || {})[u.id];
+        if (sus) {
+          throw new Error('這個帳號已被停權：' + (sus.reason || '違反使用規範'));
+        }
+
         s.me = u.id;
         s.auth = { loggedIn: true };
         save();
@@ -546,6 +601,83 @@
     /* 重大操作前的密碼確認。
        ⚠️ 它跟登入不一樣：驗證通過也**不換發 token**。
        真後端一定要做速率限制，否則這支就是免費的密碼嘗試器。 */
+    /* ============================================================
+       平台管理員
+
+       ⚠️ 這幾支**刻意不回傳任何金額**。平台管理員能停權、能看稽核，
+       但讀不到任何人的收支——一個能讀全系統消費明細的帳號，
+       比家長越權嚴重得多，而且沒有任何人看得見那個視角。
+
+       權限判斷在 toolkit/roles.py 的 require_platform()，
+       它的白名單只有停權、解除停權、讀稽核三項。
+       ============================================================ */
+    adminUsers: function () {
+      var s = load(), D = global.DATA;
+      return sleep(240).then(function () {
+        requirePlatform(s);
+        return {
+          users: D.members.filter(function (m) { return !m.isPlatformAdmin; })
+            .map(function (m) {
+              /* ⚠️ 只有身分欄位。income / expense / savingsGoal 一律不給。 */
+              return {
+                id: m.id, name: m.name, email: m.email, role: m.role,
+                joined: m.joined,
+                suspendedAt: (s.suspended || {})[m.id] ? (s.suspended || {})[m.id].at : null,
+                suspendedReason: (s.suspended || {})[m.id]
+                  ? (s.suspended || {})[m.id].reason : null
+              };
+            })
+        };
+      });
+    },
+
+    suspendUser: function (uid, reason) {
+      var s = load();
+      return sleep(320).then(function () {
+        requirePlatform(s);
+        var m = memberOf(uid);
+        if (!m) throw new Error('找不到這個帳號');
+        if (m.isPlatformAdmin) throw new Error('不能停權平台管理員');
+        /* 跟 toolkit/roles.py 的 clean_suspend_reason() 同一套規則：
+           空白壓成一格再數字數（擋掉用空白湊字數），最多 200 字。 */
+        var why = String(reason || '').split(/\s+/).join(' ').trim().slice(0, 200);
+        if (why.length < 4) throw new Error('要寫停權理由——沒有理由的停權就是任意封鎖');
+
+        s.suspended = s.suspended || {};
+        s.suspended[uid] = { at: new Date().toISOString(), reason: why };
+        pushAudit(s, 'suspend_user', uid, why);
+        save();
+        return { id: uid, suspendedAt: s.suspended[uid].at };
+      });
+    },
+
+    unsuspendUser: function (uid) {
+      var s = load();
+      return sleep(280).then(function () {
+        requirePlatform(s);
+        s.suspended = s.suspended || {};
+        if (!s.suspended[uid]) throw new Error('這個帳號沒有被停權');
+        delete s.suspended[uid];
+        pushAudit(s, 'unsuspend_user', uid, '解除停權');
+        save();
+        return { id: uid, suspendedAt: null };
+      });
+    },
+
+    audit: function () {
+      var s = load(), D = global.DATA;
+      return sleep(220).then(function () {
+        requirePlatform(s);
+        var extra = (s.audit || []).slice().reverse();
+        return {
+          logs: extra.concat(clone(D.auditLogs)).map(function (a) {
+            var who = memberOf(a.actor);
+            return Object.assign({}, a, { actorName: who ? who.name : a.actor });
+          })
+        };
+      });
+    },
+
     verifyPassword: function (pw) {
       return sleep(320).then(function () {
         if (String(pw || '').length < 8) throw new Error('密碼不正確');
@@ -1629,6 +1761,10 @@
     financeProfile:    function ()      { return req('/api/auth/me/finance'); },
     setFinanceProfile: function (p)     { return req('/api/auth/me/finance', { method: 'PUT', body: p }); },
     changePassword:    function (p)     { return req('/api/auth/password', { method: 'PATCH', body: p }); },
+    adminUsers:        function ()      { return req('/api/admin/users'); },
+    suspendUser:       function (u, r)  { return req('/api/admin/users/' + u + '/suspend', { method: 'POST', body: { reason: r } }); },
+    unsuspendUser:     function (u)     { return req('/api/admin/users/' + u + '/suspend', { method: 'DELETE' }); },
+    audit:             function ()      { return req('/api/audit'); },
     verifyPassword:    function (pw)    { return req('/api/auth/verify-password', { method: 'POST', body: { password: pw } }); },
 
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
@@ -1680,6 +1816,10 @@
     financeProfile:    function ()     { return impl.financeProfile(); },
     setFinanceProfile: function (p)    { return impl.setFinanceProfile(p); },
     changePassword:    function (p)    { return impl.changePassword(p); },
+    adminUsers:        function ()     { return impl.adminUsers(); },
+    suspendUser:       function (u, r) { return impl.suspendUser(u, r); },
+    unsuspendUser:     function (u)    { return impl.unsuspendUser(u); },
+    audit:             function ()     { return impl.audit(); },
     verifyPassword:    function (pw)   { return impl.verifyPassword(pw); },
     summary:           function (f)    { return impl.summary(f); },
     transactions:      function (f)    { return impl.transactions(f); },

@@ -36,13 +36,13 @@
 
 | 用 React 的好處 | 對本專案的實際影響 |
 |---|---|
-| 元件化、狀態管理 | 目前八個畫面已經寫完，重寫是純成本 |
+| 元件化、狀態管理 | 目前十二個畫面已經寫完，重寫是純成本 |
 | 生態系豐富 | 我們沒有要用第三方 UI 套件 |
 | 履歷加分 | 冠文已有 React 經驗，其他三人沒有 |
 
 | 用原生的代價 | 實際狀況 |
 |---|---|
-| 沒有元件複用 | 八個畫面規模還撐得住，函式化就夠 |
+| 沒有元件複用 | 十二個畫面規模還撐得住，函式化就夠 |
 | 手寫 DOM 操作 | 已經封裝在 `app.js` 的 render 函式裡 |
 | 沒有型別檢查 | 用 `js/api.js` 這一層集中管住資料形狀 |
 
@@ -129,7 +129,7 @@ final_project/
 │   ├── index.html
 │   ├── css/
 │   │   ├── tokens.css          設計權杖：星空底、藍紫色系、圓角
-│   │   └── app.css             元件與八個畫面
+│   │   └── app.css             元件與十二個畫面
 │   └── js/
 │       ├── stars.js            canvas 星空與流星
 │       ├── data.js             模擬資料（mock 模式用）
@@ -143,7 +143,7 @@ final_project/
 │   │   │   ├── config.py       環境變數（pydantic-settings）
 │   │   │   ├── security.py     密碼雜湊、JWT 簽發驗證
 │   │   │   └── deps.py         依賴注入：取得目前使用者、權限守門
-│   │   ├── models/             SQLAlchemy 資料表定義（12 張）
+│   │   ├── models/             SQLAlchemy 資料表定義（18 張）
 │   │   ├── schemas/            Pydantic 請求／回應模型
 │   │   ├── routers/            API 路由，一個檔案一組
 │   │   │   ├── auth.py
@@ -175,7 +175,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **59 條路由**。標示說明：
+共 **63 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -199,6 +199,27 @@ final_project/
 | 12 | PATCH | `/api/auth/me` | 成員1 | 登入 | 修改個人資料：顯示名稱、出生年 |
 | 13 | PUT | `/api/auth/me/avatar` | 成員1 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
 | 14 | DELETE | `/api/auth/me/avatar` | 成員1 | 登入 | 移除大頭貼，改回顯示文字頭像 |
+| 62 | GET | `/api/admin/users` | 成員1 | 平台管理員 | 帳號清單（停權用）。⚠️ 刻意不回傳任何金額 |
+| 63 | POST | `/api/admin/users/{user_id}/suspend` | 成員1 | 平台管理員 | 停權一個帳號。body: { reason }，理由必填 |
+| 64 | DELETE | `/api/admin/users/{user_id}/suspend` | 成員1 | 平台管理員 | 解除停權 |
+
+**⚠️ 停權是關門，不是配鑰匙。**
+
+平台管理員停得了違規帳號，但**讀不到任何一筆帳**。
+一個能讀全系統消費明細的帳號，比家長越權嚴重得多——家長越權至少還在一個
+看得見彼此的家庭裡，平台管理員的視角則沒有任何人看得到。
+所以 `/api/admin/users` 只回身分欄位，`income`／`expense`／`savingsGoal` 一律不給；
+不是前端藏起來，是後端真的不回。
+
+另外三條界線：
+
+- **停權不刪任何資料。** 擋登入、擋寫入，紀錄全部留著。停權是可以解除的。
+- **理由必填**（少於 4 個字退回）。沒有理由的停權就是任意封鎖，被停的人也沒有東西可以申訴。
+- **每一次停權與解除都要寫進 `audit_logs`。** 「誰放他回來的」跟「誰停的他」一樣重要。
+
+權限判斷一律走 `toolkit/roles.py` 的 `require_platform()`，它的白名單只有
+停權、解除停權、讀稽核三項——不要在路由裡自己寫 `if user.is_platform_admin`。
+
 
 **回應範例 — `POST /api/auth/login`**
 
@@ -219,8 +240,8 @@ final_project/
 | 47 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立者成為家長（僅記於 `created_by`，不給額外權限） |
 | 48 | POST | `/api/family/invite` | 成員4 | 家長 | 產生邀請碼 |
 | 49 | POST | `/api/family/join` | 成員4 | 登入 | 用邀請碼加入家庭 |
-| 50 | PATCH | `/api/family/members/{userId}` | 成員4 | master | 修改成員角色 |
-| 51 | DELETE | `/api/family/members/{userId}` | 成員4 | master | 移除成員（標記 removed，不刪資料） |
+| 50 | PATCH | `/api/family/members/{userId}` | 成員4 | 家長 | 修改成員角色 |
+| 51 | DELETE | `/api/family/members/{userId}` | 成員4 | 家長 | 移除成員（標記 removed，不刪資料） |
 | 52 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
 | 53 | POST | `/api/guardianships` | 成員4 | 家長 | 建立監管關係 |
 | 54 | DELETE | `/api/guardianships/{id}` | 成員4 | 家長 | 解除監管（設 `ended_at`，不刪除） |
@@ -237,6 +258,7 @@ final_project/
 | 32 | PATCH | `/api/groups/{gid}/notify` | 成員2 | 帳本成員 | 這本帳有動靜要不要通知我。body: { notify } |
 | 58 | GET | `/api/allowances` | 成員4 | 登入 | 我每月給每個被監管者多少零用金 |
 | 59 | PUT | `/api/allowance` | 成員4 | 監管者 | 設定零用金。body: { wardId, amount } |
+| 65 | GET | `/api/audit` | 成員4 | 平台管理員 | 稽核紀錄：誰做了什麼。⚠️ 只記動作，不記金額 |
 
 ## 4-3　記帳 `/api/transactions`
 
@@ -365,8 +387,8 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 60 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
-| 61 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
+| 66 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
+| 67 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
 
 ---
 
@@ -409,10 +431,10 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 資料表 | 畫面 | 該模組的 LLM |
 |---|---|---|---|---|---|---|
-| **成員1** | **認證** | `m1-auth` | 14 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
+| **成員1** | **認證** | `m1-auth` | 17 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 18 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 我的總覽、家庭總覽、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
-| **成員4** | **家庭** | `m4-access` | 14 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
+| **成員4** | **家庭** | `m4-access` | 15 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
 
 ### 切分原則
 
@@ -423,11 +445,18 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 ### 為什麼路由數不是 10 / 10 / 10 / 5 這種平均切法
 
-因為**路由數不是工作量**，但它也不能差太多。這一版是 8 / 8 / 10 / 9，
+因為**路由數不是工作量**，但它也不能差太多。這一版是 17 / 18 / 13 / 15，
 差距控制在合理範圍，同時讓每個領域維持概念上的完整。
 
-成員1 的路由最少（8 支），是刻意的：他同時扛著 `core/` 這個**所有人都要用的地基**。
-路由少一點，他才能最快把地基做完，讓其他三個人動得了。
+成員3 的路由最少，是刻意的：他那一條的重量不在路由數，而在**整個系統只有他算錢**，
+加上財務建議的 prompt 與邊界規則。一支 `/api/summary` 背後是全站的加總邏輯，
+跟一支 `/api/auth/logout` 不是同一個量級。
+
+成員1 看起來最多，但其中有一整組是同形狀的個人資料與工作階段路由；
+他真正吃重的地方也不在路由，而在 `core/` 這個**所有人都要用的地基**——
+地基沒做完，其他三個人動不了。
+
+**所以這張表上的數字只用來確認「沒有人被塞了兩倍的東西」，不拿來當工作量。**
 
 ## 6-3　各領域的邊界
 
@@ -436,20 +465,29 @@ python -m app.ownership      # 印出分工表並檢查一致性
 ### 成員1 · 認證　`m1-auth`
 
 負責「你是誰」以及整個後端的地基。
-屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層。
+屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層，以及平台管理員的停權（停權擋的是登入，所以歸認證）。
 不屬於他的：家庭角色與監管關係（那是成員4）。users 表存的是登入身分，family_members 表才是家庭角色，兩者刻意分開。
 
-**路由（8 支）**
+**路由（17 支）**
 
 ```
-POST    /api/auth/register
-POST    /api/auth/login
-POST    /api/auth/refresh
-POST    /api/auth/logout
-POST    /api/auth/logout-all
-GET     /api/auth/me
-PATCH   /api/auth/password
-GET     /api/auth/sessions
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/refresh
+POST   /api/auth/logout
+POST   /api/auth/logout-all
+GET    /api/auth/me
+PATCH  /api/auth/password
+GET    /api/auth/me/finance
+PUT    /api/auth/me/finance
+POST   /api/auth/verify-password
+GET    /api/auth/sessions
+PATCH  /api/auth/me
+PUT    /api/auth/me/avatar
+DELETE /api/auth/me/avatar
+GET    /api/admin/users
+POST   /api/admin/users/{user_id}/suspend
+DELETE /api/admin/users/{user_id}/suspend
 ```
 
 ### 成員2 · 記帳　`m2-ledger`
@@ -458,17 +496,27 @@ GET     /api/auth/sessions
 屬於他的：明細的增刪改查、段落解析、單句解析、確認後寫入、nlp_parses 的寫入。
 不屬於他的：分類體系的定義與 /api/categories（那是成員3 —— 分類由成員3 定義，成員2 只是把清單寫進 prompt）；統計加總（那是成員3，前端和這裡都不做任何加總）。
 
-**路由（8 支）**
+**路由（18 支）**
 
 ```
-GET     /api/transactions
-POST    /api/transactions
-PATCH   /api/transactions/{tx_id}
-DELETE  /api/transactions/{tx_id}
-POST    /api/nlp/parse
-POST    /api/nlp/parse-batch
-POST    /api/nlp/confirm
-POST    /api/nlp/confirm-batch
+GET    /api/transactions
+POST   /api/transactions
+PATCH  /api/transactions/{tx_id}
+DELETE /api/transactions/{tx_id}
+POST   /api/nlp/parse
+POST   /api/nlp/parse-batch
+POST   /api/nlp/confirm
+POST   /api/nlp/confirm-batch
+GET    /api/categories
+POST   /api/categories
+GET    /api/groups
+POST   /api/groups
+PATCH  /api/groups/{gid}
+DELETE /api/groups/{gid}
+POST   /api/groups/{gid}/members
+DELETE /api/groups/{gid}/members/{user_id}
+POST   /api/groups/{gid}/settle
+PATCH  /api/groups/{gid}/notify
 ```
 
 ### 成員3 · 數字　`m3-analytics`
@@ -478,19 +526,22 @@ POST    /api/nlp/confirm-batch
 **整個系統只有這裡算錢** —— 路由不算、前端不算、模型更不算。
 不屬於他的：明細的寫入（那是成員2）；決定要算哪些人（那是成員4 的 permission）。
 
-**路由（10 支）**
+**路由（13 支）**
 
 ```
-GET     /api/categories
-POST    /api/categories
-GET     /api/summary
-GET     /api/stats
-GET     /api/budgets
-PUT     /api/budgets
-GET     /api/savings-goal
-PUT     /api/savings-goal
-GET     /api/advices
-POST    /api/advices/generate
+GET    /api/summary
+GET    /api/stats
+GET    /api/budgets
+PUT    /api/budgets
+GET    /api/savings-goal
+PUT    /api/savings-goal
+GET    /api/savings-goals
+GET    /api/alerts
+POST   /api/alerts
+PATCH  /api/alerts/{aid}
+DELETE /api/alerts/{aid}
+GET    /api/advices
+POST   /api/advices/generate
 ```
 
 ### 成員4 · 家庭　`m4-access`
@@ -499,18 +550,24 @@ POST    /api/advices/generate
 屬於他的：家庭、成員角色、邀請碼、監管關係、權限計算、稽核紀錄、評測。
 不屬於他的：登入本身（那是成員1）。成員1 回答「你是誰」，成員4 回答「你能看到什麼」。
 
-**路由（9 支）**
+**路由（15 支）**
 
 ```
-GET     /api/family
-POST    /api/family
-POST    /api/family/invite
-POST    /api/family/join
-PATCH   /api/family/members/{user_id}
-DELETE  /api/family/members/{user_id}
-GET     /api/guardianships
-POST    /api/guardianships
-DELETE  /api/guardianships/{gid}
+GET    /api/family
+POST   /api/family
+POST   /api/family/invite
+POST   /api/family/join
+PATCH  /api/family/members/{user_id}
+DELETE /api/family/members/{user_id}
+GET    /api/guardianships
+POST   /api/guardianships
+DELETE /api/guardianships/{gid}
+GET    /api/notifications
+PATCH  /api/notifications/{nid}
+PATCH  /api/notifications
+GET    /api/allowances
+PUT    /api/allowance
+GET    /api/audit
 ```
 
 

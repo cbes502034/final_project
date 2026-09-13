@@ -204,10 +204,10 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 獨佔檔案 | 共用元件（要最先完成） |
 |---|---|---|---|---|---|
-| **成員1** | **認證** | `m1-auth` | 8 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
-| **成員2** | **記帳** | `m2-ledger` | 8 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
-| **成員3** | **數字** | `m3-analytics` | 10 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
-| **成員4** | **家庭** | `m4-access` | 9 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
+| **成員1** | **認證** | `m1-auth` | 17 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
+| **成員2** | **記帳** | `m2-ledger` | 18 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
+| **成員3** | **數字** | `m3-analytics` | 13 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
+| **成員4** | **家庭** | `m4-access` | 15 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
 
 ### 切分原則
 
@@ -221,22 +221,31 @@ python -m app.ownership      # 印出分工表並檢查一致性
 #### 成員1 · 認證　`m1-auth`
 
 負責「你是誰」以及整個後端的地基。
-屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層。
+屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層，以及平台管理員的停權（停權擋的是登入，所以歸認證）。
 不屬於他的：家庭角色與監管關係（那是成員4）。users 表存的是登入身分，family_members 表才是家庭角色，兩者刻意分開。
 
 **LLM 工作**：共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證。成員2 和成員3 都會呼叫它，所以第 1 週要先做出來。
 
-**路由（8 支）**
+**路由（17 支）**
 
 ```
-POST    /api/auth/register
-POST    /api/auth/login
-POST    /api/auth/refresh
-POST    /api/auth/logout
-POST    /api/auth/logout-all
-GET     /api/auth/me
-PATCH   /api/auth/password
-GET     /api/auth/sessions
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/refresh
+POST   /api/auth/logout
+POST   /api/auth/logout-all
+GET    /api/auth/me
+PATCH  /api/auth/password
+GET    /api/auth/me/finance
+PUT    /api/auth/me/finance
+POST   /api/auth/verify-password
+GET    /api/auth/sessions
+PATCH  /api/auth/me
+PUT    /api/auth/me/avatar
+DELETE /api/auth/me/avatar
+GET    /api/admin/users
+POST   /api/admin/users/{user_id}/suspend
+DELETE /api/admin/users/{user_id}/suspend
 ```
 
 #### 成員2 · 記帳　`m2-ledger`
@@ -247,17 +256,27 @@ GET     /api/auth/sessions
 
 **LLM 工作**：段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準。切分比抽欄位更難，而且切錯比抽錯更難發現。
 
-**路由（8 支）**
+**路由（18 支）**
 
 ```
-GET     /api/transactions
-POST    /api/transactions
-PATCH   /api/transactions/{tx_id}
-DELETE  /api/transactions/{tx_id}
-POST    /api/nlp/parse
-POST    /api/nlp/parse-batch
-POST    /api/nlp/confirm
-POST    /api/nlp/confirm-batch
+GET    /api/transactions
+POST   /api/transactions
+PATCH  /api/transactions/{tx_id}
+DELETE /api/transactions/{tx_id}
+POST   /api/nlp/parse
+POST   /api/nlp/parse-batch
+POST   /api/nlp/confirm
+POST   /api/nlp/confirm-batch
+GET    /api/categories
+POST   /api/categories
+GET    /api/groups
+POST   /api/groups
+PATCH  /api/groups/{gid}
+DELETE /api/groups/{gid}
+POST   /api/groups/{gid}/members
+DELETE /api/groups/{gid}/members/{user_id}
+POST   /api/groups/{gid}/settle
+PATCH  /api/groups/{gid}/notify
 ```
 
 #### 成員3 · 數字　`m3-analytics`
@@ -269,19 +288,22 @@ POST    /api/nlp/confirm-batch
 
 **LLM 工作**：財務建議的 prompt 與邊界規則。順序不能顛倒：先用 analytics 算好數字，再餵給模型敘述，模型不做任何算術。
 
-**路由（10 支）**
+**路由（13 支）**
 
 ```
-GET     /api/categories
-POST    /api/categories
-GET     /api/summary
-GET     /api/stats
-GET     /api/budgets
-PUT     /api/budgets
-GET     /api/savings-goal
-PUT     /api/savings-goal
-GET     /api/advices
-POST    /api/advices/generate
+GET    /api/summary
+GET    /api/stats
+GET    /api/budgets
+PUT    /api/budgets
+GET    /api/savings-goal
+PUT    /api/savings-goal
+GET    /api/savings-goals
+GET    /api/alerts
+POST   /api/alerts
+PATCH  /api/alerts/{aid}
+DELETE /api/alerts/{aid}
+GET    /api/advices
+POST   /api/advices/generate
 ```
 
 #### 成員4 · 家庭　`m4-access`
@@ -292,18 +314,24 @@ POST    /api/advices/generate
 
 **LLM 工作**：模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1。**留出集必須 100% 人工標註**，否則量到的是「多像那個老師」而不是「多正確」。
 
-**路由（9 支）**
+**路由（15 支）**
 
 ```
-GET     /api/family
-POST    /api/family
-POST    /api/family/invite
-POST    /api/family/join
-PATCH   /api/family/members/{user_id}
-DELETE  /api/family/members/{user_id}
-GET     /api/guardianships
-POST    /api/guardianships
-DELETE  /api/guardianships/{gid}
+GET    /api/family
+POST   /api/family
+POST   /api/family/invite
+POST   /api/family/join
+PATCH  /api/family/members/{user_id}
+DELETE /api/family/members/{user_id}
+GET    /api/guardianships
+POST   /api/guardianships
+DELETE /api/guardianships/{gid}
+GET    /api/notifications
+PATCH  /api/notifications/{nid}
+PATCH  /api/notifications
+GET    /api/allowances
+PUT    /api/allowance
+GET    /api/audit
 ```
 
 

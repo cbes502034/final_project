@@ -260,7 +260,7 @@ PostgreSQL
             <tr><td><span class="fname">scope.py</span></td><td>可見範圍的兩條路（聯集）</td><td><code>visible_users</code>、<code>visible_groups</code>、<code>require_user</code></td></tr>
             <tr><td><span class="fname">profile.py</span></td><td>把理財習慣安全地組成 prompt 背景（隔離注入）</td><td><code>to_prompt_block</code>、<code>clean_note</code></td></tr>
             <tr><td><span class="fname">notify.py</span></td><td>通知發給誰，同一筆對同一個人只發一則</td><td><code>recipients_for</code></td></tr>
-            <tr><td><span class="fname">roles.py</span></td><td>角色能做哪些治理動作（不管可見範圍）</td><td><code>can_govern</code>、<code>require_govern</code>、<code>can_set_goal_for</code></td></tr>
+            <tr><td><span class="fname">roles.py</span></td><td>角色能做哪些治理動作（不管可見範圍）；平台管理員的停權規則</td><td><code>can_govern</code>、<code>require_govern</code>、<code>can_set_goal_for</code>、<code>require_platform</code>、<code>clean_suspend_reason</code>、<code>require_active</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -271,6 +271,13 @@ PostgreSQL
         3. <b>金額一律走 money 模組</b>，浮點數累加會產生 12345.670000000002。</p>
       </div>
       <pre class="tree" style="margin-top:18px">python -c "from app.toolkit import alerts; help(alerts.crossed)"</pre>
+
+      <div class="note" style="margin-top:18px">
+        <div class="note__k">tools/：產生文件的程式，不是給路由用的</div>
+        <p><span class="fname">tools/sync_spec.py</span>　把 <code>docs/01</code> 的分工總表與各領域路由清單，從 <code>ownership.py</code> 重新產生一次。<br>
+        搬了一支路由之後跑 <code>python backend/tools/sync_spec.py</code>；忘了跑，pytest 會紅燈。<br>
+        ⚠️ 這兩段手動維護過，結果文件停在 8/8/10/9，實際已經 17/18/13/15。<b>跨檔案的數字不要靠人記。</b></p>
+      </div>
     </section>
 
     <footer class="foot">

@@ -129,7 +129,9 @@
     { name: '林建國 · 家長',   email: 'jianguo@lin.tw' },
     { name: '陳淑芬 · 家長',   email: 'shufen@lin.tw' },
     { name: '林宇涵 · 子女',   email: 'yuhan@lin.tw' },
-    { name: '林宇軒 · 成員',   email: 'yuxuan@lin.tw' }
+    { name: '林宇軒 · 子女',   email: 'yuxuan@lin.tw' },
+    /* ⚠️ 用他登入會看到完全不同的側欄——那正是這個角色的重點 */
+    { name: '系統管理員 · 平台', email: 'admin@fambudget.tw' }
   ];
   var $title = document.getElementById('ptitle');
   var $sub = document.getElementById('psub');
@@ -435,9 +437,12 @@
      ============================================================ */
   var FOLD = {};                       // id → 展開中嗎
 
-  function foldHead(id, title, label, kicker) {
+  function foldHead(id, title, label, kicker, help) {
     var on = !!FOLD[id];
-    return '<div class="sec"><h2 class="sec__t">' + esc(title) + '</h2>' +
+    /* ⚠️ title 一定要 esc()，所以問號不能混在 title 裡傳進來——
+       那樣傳會變成畫面上出現一串 &lt;button&gt;。要掛說明就用 help 參數。 */
+    return '<div class="sec"><h2 class="sec__t">' + esc(title) +
+      (help ? helpBtn(help) : '') + '</h2>' +
       (kicker ? '<span class="sec__n">' + esc(kicker) + '</span>' : '') +
       '<button class="fold__b' + (on ? ' on' : '') + '" data-fold="' + esc(id) + '" ' +
         'data-label="' + esc(label) + '" ' +
@@ -456,9 +461,9 @@
         沒有版面、沒有排版計算，收起來的區塊是真的不存在。 */
   var FOLD_HTML = {};
 
-  function foldBlock(id, title, label, html, kicker) {
+  function foldBlock(id, title, label, html, kicker, help) {
     FOLD_HTML[id] = html;
-    return foldHead(id, title, label, kicker);
+    return foldHead(id, title, label, kicker, help);
   }
 
   function foldFill(id, wrap) {
@@ -1262,8 +1267,38 @@
 
       var h = '<div class="page">';
 
-      h += '<div class="sec"><h2 class="sec__t">常設帳本' + helpBtn('books') + '</h2>' +
-        '<span class="sec__n">' + standing.length + ' 本</span></div>';
+      /* 「開一本新的」跟記帳頁的「記一筆」是同一個做法：
+         進來先看到的是**帳本本身**，開新的那張表單縮成標題右邊的一個＋。
+
+         ⚠️ 這不只是版面偏好。開帳本是一次性動作——開完就不會再開了，
+         但那張表單原本每次進來都攤在畫面中間，永遠佔著位置。
+         真正每天要看的是「我有哪幾本、各自花到哪」。 */
+      var gnewForm =
+        '<form class="card gnew" id="gnewF">' +
+          '<label class="fld"><span>名字</span>' +
+            '<input type="text" id="gnName" placeholder="例如 旅遊基金、沖繩旅遊" required></label>' +
+          '<label class="fld"><span>種類</span>' +
+            '<select id="gnKind">' +
+              '<option value="standing">常設 —— 一直用的</option>' +
+              '<option value="temp">活動 —— 有結束日，結束後結算</option>' +
+            '</select></label>' +
+          /* 只有活動帳本要填結束日，所以它預設藏起來 */
+          '<label class="fld" id="gnEndWrap" hidden><span>結束日</span>' +
+            '<input type="date" id="gnEnd"></label>' +
+          '<label class="fld"><span>顏色</span>' +
+            /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份。
+               寫死的那一版跟種子資料用的顏色完全是兩套：表單給亮彩、
+               資料用濁色，結果新開的帳本跟全站格格不入，而且看不見。 */
+            '<select id="gnColor">' +
+              ((global.DATA && global.DATA.groupColors) || []).map(function (c) {
+                return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
+              }).join('') +
+            '</select></label>' +
+          '<div><button class="btn btn--go" type="submit">建立</button></div>' +
+        '</form>';
+
+      h += foldBlock('gnew', '常設帳本', '開一本', gnewForm,
+                     standing.length + ' 本', 'books');
       h += '<div class="rows">' + standing.map(gcard).join('') + '</div>';
 
       if (temps.length) {
@@ -1284,7 +1319,7 @@
            活動帳本另外有「活動 · 到 mm/dd」的標籤，更沒有理由。
            顏色靠切換器上的小圓點就夠。 */
         return '<article class="row" style="animation-delay:' + ((i || 0) * 50) +
-          'ms;grid-template-columns:1fr 150px 108px">' +
+          'ms;grid-template-columns:1fr 150px auto">' +
           '<div class="row__m"><div class="row__top">' +
             '<span class="row__act" style="font-size:15px">' + esc(g.name) + '</span>' +
             (g.kind === 'temp'
@@ -1318,36 +1353,14 @@
         '</article>';
       }
 
-      // ---- 建立 ----
-      h += foldBlock('gnew', '開一本新的', '開一本',
-        '<form class="card gnew" id="gnewF">' +
-          '<label class="fld"><span>名字</span>' +
-            '<input type="text" id="gnName" placeholder="例如 旅遊基金、沖繩旅遊" required></label>' +
-          '<label class="fld"><span>種類</span>' +
-            '<select id="gnKind">' +
-              '<option value="standing">常設 —— 一直用的</option>' +
-              '<option value="temp">活動 —— 有結束日，結束後結算</option>' +
-            '</select></label>' +
-          /* 只有活動帳本要填結束日，所以它預設藏起來 */
-          '<label class="fld" id="gnEndWrap" hidden><span>結束日</span>' +
-            '<input type="date" id="gnEnd"></label>' +
-          '<label class="fld"><span>顏色</span>' +
-            /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份。
-               寫死的那一版跟種子資料用的顏色完全是兩套：表單給亮彩、
-               資料用濁色，結果新開的帳本跟全站格格不入，而且看不見。 */
-            '<select id="gnColor">' +
-              ((global.DATA && global.DATA.groupColors) || []).map(function (c) {
-                return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
-              }).join('') +
-            '</select></label>' +
-          '<div><button class="btn btn--go" type="submit">建立</button></div>' +
-        '</form>');
-
-      // ---- 成員 ----
+      /* ---- 成員 ----
+         同樣收起來。編成員是偶爾才做一次的事，
+         但這張卡片會隨著帳本數量一直長高，攤開的話下面的「已封存」
+         幾乎永遠滾不到。 */
       var editable = d.groups.filter(function (g) { return g.canEdit; });
       if (editable.length) {
-        h += '<div class="sec"><h2 class="sec__t">誰在哪一本帳裡</h2></div>';
-        h += '<div class="card gmem">' + editable.map(function (g) {
+        h += foldBlock('gmem', '誰在哪一本帳裡', '編成員',
+          '<div class="card gmem">' + editable.map(function (g) {
           var inside = g.members;
           var outside = fam.members.filter(function (u) { return inside.indexOf(u.id) < 0; });
           return '<div class="gmem__g">' +
@@ -1367,14 +1380,13 @@
                 }).join('') + '</div>'
               : '') +
           '</div>';
-        }).join('') + '</div>';
+        }).join('') + '</div>', String(editable.length) + ' 本');
       }
 
-      // ---- 已封存 ----
+      /* ---- 已封存 ---- */
       if (gone.length) {
-        h += '<div class="sec"><h2 class="sec__t">已封存' + helpBtn('archive') + '</h2>' +
-          '<span class="sec__n">' + gone.length + ' 本</span></div>';
-        h += '<div class="card arch">' +
+        h += foldBlock('garch', '已封存', '看看',
+          '<div class="card arch">' +
           '<div class="arch__l">' + gone.map(function (g) {
             return '<div class="arch__i">' +
               '<span class="gsw__d" style="background:' + tint(g.color) + '"></span>' +
@@ -1384,11 +1396,13 @@
                 ? '<button class="btn btn--sm" data-grestore="' + esc(g.id) + '">復原</button>'
                 : '') +
             '</div>';
-          }).join('') + '</div></div>';
+          }).join('') + '</div></div>', String(gone.length) + ' 本', 'archive');
       }
 
-
       $view.innerHTML = h + '</div>';
+      /* ⚠️ 重畫之後一定要叫它——不然使用者展開表單、按了建立，
+         畫面重畫完就無聲收合，看起來像沒有反應。 */
+      foldRestore();
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
@@ -1600,6 +1614,13 @@
           '<p class="dg__w">' + opt.detail + '</p>' +
           '<label class="fld"><span>輸入密碼</span>' +
             '<input type="password" id="dgPw" autocomplete="current-password"></label>' +
+          /* 有些動作要留下理由。⚠️ 不是為了流程好看——
+             沒有理由的停權就是任意封鎖，被停的人也沒有東西可以申訴。
+             理由會跟著寫進稽核紀錄。 */
+          (opt.reason
+            ? '<label class="fld"><span>' + esc(opt.reason) + '</span>' +
+                '<input type="text" id="dgReason" autocomplete="off" maxlength="80"></label>'
+            : '') +
           (dangerCode
             ? '<div class="dg__code"><span>把下面這段複製貼到欄位裡</span>' +
                 '<b id="dgSrc">' + dangerCode + '</b></div>' +
@@ -1644,6 +1665,13 @@
     var pw = (document.getElementById('dgPw') || {}).value || '';
     if (!pw) { dangerErr('請先輸入密碼'); return; }
 
+    var reasonEl = document.getElementById('dgReason');
+    var reason = reasonEl ? reasonEl.value.trim() : null;
+    if (reasonEl && reason.length < 4) {
+      dangerErr('請寫一下理由，這會留在稽核紀錄裡');
+      return;
+    }
+
     if (dangerCode) {
       var typed = ((document.getElementById('dgCode') || {}).value || '').trim();
       if (typed !== dangerCode) { dangerErr('那段代碼跟上面不一樣'); return; }
@@ -1655,7 +1683,7 @@
     API.verifyPassword(pw).then(function () {
       var fn = dangerFn;
       dangerClose();
-      if (fn) fn();
+      if (fn) fn(reason);
     }).catch(function (err) {
       if (btn) { btn.disabled = false; btn.textContent = '確定刪除'; }
       dangerErr(err.message || '密碼不正確');
@@ -1709,6 +1737,15 @@
 
   function tourAsk() {
     if (tourDone()) return;
+    /* ⚠️ 導覽的每一步都指向財務功能（記帳、帳本、通知），
+       平台管理員的側欄裡一個都沒有——框會圈在看不見的元素上。 */
+    API.me().then(function (m) {
+      if (m.user.isPlatformAdmin || tourDone() || document.getElementById('tourAsk')) return;
+      tourAskShow();
+    });
+  }
+
+  function tourAskShow() {
     var w = el('<div class="hp tw2 on" id="tourAsk">' +
       '<div class="hp__c" role="dialog" aria-modal="true">' +
         '<div class="hp__b" style="padding-top:26px">' +
@@ -1863,6 +1900,77 @@
     var t = String(token || '').replace(/[^a-z0-9-]/gi, '');
     return t ? 'var(--' + t + ')' : 'var(--ink-faint)';
   }
+
+
+  /* ============================================================
+     平台管理（只有平台管理員看得到）
+
+     ⚠️ 這一頁**沒有任何金額**，而且是刻意的。
+
+     平台管理員能停權、能看稽核，但讀不到任何人的收支——一個能讀全系統
+     消費明細的帳號，比家長越權嚴重得多，因為沒有任何人看得見那個視角。
+     後端不回金額，前端也就畫不出來；不是藏起來，是真的沒有。
+
+     停權是關門，不是配鑰匙。
+     ============================================================ */
+  function vAdmin() {
+    head('平台管理', '停權與稽核');
+    $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
+
+    Promise.all([API.adminUsers(), API.audit()]).then(function (r) {
+      var users = r[0].users, logs = r[1].logs;
+      var h = '<div class="page">';
+
+      h += '<div class="note"><div class="note__k">這裡看不到任何人的錢</div>' +
+        '<p>平台管理員能停權、能查稽核，但<b>讀不到任何一筆帳</b>。' +
+        '停權是關門，不是配鑰匙。</p></div>';
+
+      h += '<div class="sec"><h2 class="sec__t">帳號</h2>' +
+        '<span class="sec__n">' + users.length + ' 個</span></div>';
+
+      h += '<div class="rows">' + users.map(function (u, i) {
+        var off = !!u.suspendedAt;
+        return '<article class="row" style="animation-delay:' + (i * 50) +
+          'ms;grid-template-columns:1fr 150px">' +
+          '<div class="row__m"><div class="row__top">' +
+            '<span class="row__act" style="font-size:15px">' + esc(u.name) + '</span>' +
+            (off ? '<span class="tag tag--down">已停權</span>'
+                 : '<span class="tag tag--soft">正常</span>') +
+          '</div><div class="row__sub">' + esc(u.email) +
+            (off ? '　｜　' + esc(u.suspendedReason) : '') + '</div></div>' +
+          '<div class="row__go2">' +
+            (off
+              ? '<button class="gx gx--go" data-unsus="' + esc(u.id) + '">解除停權</button>'
+              : '<button class="gx gx--warn" data-sus="' + esc(u.id) + '">停權</button>') +
+          '</div>' +
+        '</article>';
+      }).join('') + '</div>';
+
+      /* ⚠️ 稽核收合起來，但**不是次要功能**——沒有稽核的停權就是任意封鎖。
+         收起來只是因為它是清單，不是一進來就要處理的東西。 */
+      h += foldBlock('audit', '稽核紀錄', '看紀錄',
+        '<div class="card">' + logs.map(function (a) {
+          return '<div class="aud">' +
+            '<span class="aud__t">' + esc(a.at) + '</span>' +
+            '<span class="aud__a">' + esc(a.actorName) + '</span>' +
+            '<span class="aud__k">' + esc(AUDIT_TW[a.action] || a.action) + '</span>' +
+            '<span class="aud__n">' + esc(a.note || '') + '</span>' +
+          '</div>';
+        }).join('') + '</div>', String(logs.length) + ' 筆');
+
+      h += '</div>';
+      $view.innerHTML = h;
+      foldRestore();
+    }).catch(function (e) {
+      $view.innerHTML = '<div class="page">' + errState(e) + '</div>';
+    });
+  }
+
+  var AUDIT_TW = {
+    suspend_user: '停權帳號', unsuspend_user: '解除停權',
+    grant_guardianship: '建立監管關係', end_guardianship: '解除監管',
+    change_role: '變更角色', create_family: '建立家庭', view_ward: '查看被監管者'
+  };
 
   /* ---------- 共用 ---------- */
   function head(t, s) { $title.textContent = t; $sub.textContent = s; }
@@ -2269,6 +2377,9 @@
            監管  決定「看得到誰的資料」
          兩道都要過——家長也只看得到被指派給他的那幾個人。 */
       document.body.classList.toggle('role-child', m.user.role !== 'parent');
+      /* ⚠️ 平台管理員沒有財務頁可以看——那不是藏起來，是他真的沒有資料。
+         側欄只留「平台管理」。 */
+      document.body.classList.toggle('is-admin', !!m.user.isPlatformAdmin);
 
       var f = document.getElementById('famName');
       if (f) f.textContent = m.family.family + '　' + m.family.period;
@@ -2279,7 +2390,7 @@
   var ROUTES = { '': vHome, entry: vEntry, family: vFamily, stats: vStats,
                  advice: vAdvice, members: vMembers,
                  login: vLogin, register: vRegister, profile: vProfile,
-                 member: vMember, groups: vGroups };
+                 member: vMember, groups: vGroups, admin: vAdmin };
 
   var OPEN = ['login', 'register'];      // 沒登入也能看的頁
 
@@ -2293,13 +2404,33 @@
       if (!a.loggedIn && OPEN.indexOf(page) < 0) { location.hash = '#/login'; return; }
       if (a.loggedIn && OPEN.indexOf(page) >= 0) { location.hash = '#/'; return; }
 
-      if (a.loggedIn) document.body.classList.remove('is-out');
-      (ROUTES[page] || vHome)(parts[1], parts[2]);
-      // 看某個成員的紀錄時，左邊仍然亮「成員與權限」
-      var lit = page === 'member' ? 'members' : page;
-      Array.prototype.forEach.call(document.querySelectorAll('.nav__i'), function (b) {
-        b.classList.toggle('on', b.dataset.nav === lit);
+      if (!a.loggedIn) { render(); return; }
+      document.body.classList.remove('is-out');
+
+      /* 平台管理員與一般使用者走的是兩組完全不重疊的頁面。
+
+         ⚠️ 這一段擋的是「平台管理員登入之後落在我的總覽」：
+         他沒有任何財務資料，總覽會是一頁全部是 0 的空殼，
+         看起來像壞掉，而且那一頁的存在本身就在暗示他「應該要有」。
+         反過來，一般使用者打 #/admin 會拿到 403，直接送回首頁。
+
+         ME 在登出時會清掉，所以這裡不會拿上一個人的身分來判斷。 */
+      (ME && ME.user ? Promise.resolve(ME) : API.me()).then(function (m) {
+        ME = m;
+        var admin = !!m.user.isPlatformAdmin;
+        if (admin && page !== 'admin') { location.hash = '#/admin'; return; }
+        if (!admin && page === 'admin') { location.hash = '#/'; return; }
+        render();
       });
+
+      function render() {
+        (ROUTES[page] || vHome)(parts[1], parts[2]);
+        // 看某個成員的紀錄時，左邊仍然亮「成員與權限」
+        var lit = page === 'member' ? 'members' : page;
+        Array.prototype.forEach.call(document.querySelectorAll('.nav__i'), function (b) {
+          b.classList.toggle('on', b.dataset.nav === lit);
+        });
+      }
     });
   }
 
@@ -2357,6 +2488,10 @@
       API.logout().then(function () {
         // 先把通知收件匣清掉，不然登出後 DOM 裡還躺著上一個人的明細
         if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
+        /* ⚠️ 身分也要清。不清的話，管理員登出、家長登入的那一瞬間，
+           路由閘還拿著管理員的身分，會把家長送去 #/admin。 */
+        ME = null;
+        document.body.classList.remove('is-admin', 'role-child');
         document.body.classList.add('is-out');
         location.hash = '#/login';
         paint();
@@ -2434,6 +2569,36 @@
         document.body.classList.remove('dw-on');
         pushForDrawer();
       }
+    }
+
+    /* 停權。⚠️ 一定要有理由——沒有理由的停權就是任意封鎖，
+       而且被停的人沒有東西可以申訴。 */
+    var sus = t.closest('[data-sus]');
+    if (sus) {
+      var sid = sus.dataset.sus;
+      danger({
+        title: '停權這個帳號',
+        detail: '停權之後他<b>無法登入</b>，但<b>資料一筆都不會刪</b>。' +
+                '<br>這個動作會寫進稽核紀錄，而且需要理由。',
+        level: 'password',
+        ok: '確定停權',
+        reason: '停權理由',
+        onOk: function (why) {
+          API.suspendUser(sid, why).then(function () {
+            vAdmin(); toast('已停權', 'ok');
+          }).catch(function (err) { toast(err.message || '停權失敗', 'err'); });
+        }
+      });
+      return;
+    }
+
+    var unsus = t.closest('[data-unsus]');
+    if (unsus) {
+      var uid = unsus.dataset.unsus;
+      API.unsuspendUser(uid).then(function () {
+        vAdmin(); toast('已解除停權', 'ok');
+      }).catch(function (err) { toast(err.message || '解除失敗', 'err'); });
+      return;
     }
 
     /* ---- 帳本切換器 ---- */
@@ -2772,6 +2937,7 @@
 
   /* 登入成功之後要做的事都一樣：重畫身分、開通知、回總覽 */
   function afterLogin(d) {
+    ME = null;                      // 同上：路由閘要重新問一次這個人是誰
     document.body.classList.remove('is-out');
     paintWho();
     if (global.Notify) { global.Notify.reset(); global.Notify.start(); }
@@ -2835,6 +3001,9 @@
           ? (document.getElementById('gnEnd') || {}).value : null
       }).then(function (g) {
         busy(f, false);
+        /* 開完就收起來。開帳本是一次性動作，不像記帳會連記好幾筆——
+           建好之後該看到的是「我現在有哪幾本」，不是一張空白表單。 */
+        FOLD.gnew = false;
         paintGroups(); vGroups();
         toast('「' + g.name + '」開好了', 'ok');
       }).catch(function (err) {
@@ -3041,7 +3210,9 @@
     if (!a.loggedIn) return;
     if (/[?&]tour=1/.test(location.search)) {
       try { localStorage.removeItem(TOUR_KEY); } catch (e) {}
-      setTimeout(tourStart, 600);
+      API.me().then(function (m) {
+        if (!m.user.isPlatformAdmin) setTimeout(tourStart, 600);
+      });
     } else {
       setTimeout(tourAsk, 900);
     }

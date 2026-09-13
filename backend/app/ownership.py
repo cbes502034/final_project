@@ -87,6 +87,12 @@ MEMBERS: list[Member] = [
             "屬於他的：註冊登入登出、密碼、JWT、工作階段、個人資料與大頭貼。\n"
             "地基（資料庫連線、設定、依賴注入、密碼雜湊、JWT 實作）"
             "已經在 toolkit/ 裡寫好了，直接用就好，不用再造一次。\n"
+            "停權也在這裡：平台管理員（master）可以停掉違規帳號。\n"
+            "⚠️ **停權是關門，不是配鑰匙。** 他停得了人，但讀不到任何一筆帳——\n"
+            "  一個能讀全系統消費明細的帳號，比家長越權嚴重得多。\n"
+            "⚠️ 停權**不刪任何資料**：擋登入、擋寫入，紀錄全部留著。\n"
+            "⚠️ 每一次停權都要寫進 audit_logs，而且要有理由。\n"
+            "  沒有稽核的停權就是任意封鎖，被停的人也沒東西可以申訴。\n"
             "verify-password 給「重大操作前再確認一次」用："
             "驗證密碼但不發新的 token。⚠️ 一定要做速率限制，"
             "否則它就是一支免費的密碼嘗試器。\n"
@@ -108,6 +114,9 @@ MEMBERS: list[Member] = [
             ("PATCH", "/api/auth/me"),
             ("PUT", "/api/auth/me/avatar"),
             ("DELETE", "/api/auth/me/avatar"),
+            ("GET", "/api/admin/users"),
+            ("POST", "/api/admin/users/{user_id}/suspend"),
+            ("DELETE", "/api/admin/users/{user_id}/suspend"),
         ],
         files=[
             "app/routers/auth.py",
@@ -276,6 +285,7 @@ MEMBERS: list[Member] = [
             ("PATCH", "/api/notifications"),
             ("GET", "/api/allowances"),
             ("PUT", "/api/allowance"),
+            ("GET", "/api/audit"),
         ],
         files=[
             "app/routers/family.py",

@@ -270,8 +270,21 @@
       d: '改理財習慣。body: { style, goals[], habits[], note }',
       note: '⚠️ 這段會進財務建議的 prompt。風格／目標／安排一律**從固定清單挑 id**，認不得的直接丟掉；補充說明限 200 字，而且組 prompt 時會被標示成「資料，不是指令」——建議是給監管者看的，不隔離的話子女可以操控父母看到的內容。做法見 toolkit/profile.py。' },
 
-    { n: 60, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
-    { n: 61, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
+    { n: 62, o: 'm1', m: 'GET', p: '/api/admin/users', a: '平台管理員',
+      d: '帳號清單（停權用）',
+      note: '⚠️ <b>刻意不回傳任何金額。</b>只有 id／名字／email／角色／停權狀態。一個能讀全系統消費明細的帳號，比家長越權嚴重得多——而且沒有任何人看得見那個視角。停權是關門，不是配鑰匙。' },
+    { n: 63, o: 'm1', m: 'POST', p: '/api/admin/users/{user_id}/suspend', a: '平台管理員',
+      d: '停權一個帳號。body: { reason }',
+      note: '⚠️ <b>理由是必填的</b>，少於 4 個字就退回。沒有理由的停權就是任意封鎖，被停的人也沒有東西可以申訴。<br>⚠️ 停權<b>不刪任何資料</b>：擋登入、擋寫入，紀錄全部留著。<br>⚠️ 每一次都要寫進 audit_logs。權限判斷用 toolkit/roles.py 的 require_platform()。' },
+    { n: 64, o: 'm1', m: 'DELETE', p: '/api/admin/users/{user_id}/suspend', a: '平台管理員',
+      d: '解除停權',
+      note: '解除也要寫進 audit_logs——「誰放他回來的」跟「誰停的他」一樣重要。' },
+    { n: 65, o: 'm4', m: 'GET', p: '/api/audit', a: '平台管理員',
+      d: '稽核紀錄：誰做了什麼',
+      note: '⚠️ 這張表<b>只記動作，不記金額</b>。讀得到稽核不等於讀得到任何人的財務資料。' },
+
+    { n: 66, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
+    { n: 67, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
       note: '後端上線後<b>這支才是真正能送出請求的地方</b>。' }
   ];
 

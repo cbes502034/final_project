@@ -416,7 +416,7 @@
 .prs__f label span { color: var(--accent-hi); font-family: var(--mono); }
 .prs__f.is-low label span { color: var(--warn); }
 .prs__f input, .prs__f select {
-  background: rgba(5,6,10,.55); border: 1px solid var(--line-2); border-radius: 0;
+  background: var(--sunk); border: 1px solid var(--line-2); border-radius: 0;
   color: var(--ink); padding: 10px 13px; font-size: 13.5px;
 }
 .prs__f.is-low input, .prs__f.is-low select { border-color: var(--warn-wash); }
@@ -680,7 +680,7 @@
 /* 每一格：缺欄位與低信心直接標在該欄位上 */
 .bcell { position: relative; display: block; min-width: 0; }
 .bcell input, .bcell select {
-  width: 100%; background: rgba(5,6,10,.5); border: 1px solid var(--line-2);
+  width: 100%; background: var(--sunk); border: 1px solid var(--line-2);
   border-radius: 0; color: var(--ink);
   padding: 8px 10px; font-size: 12.5px;
 }
@@ -769,7 +769,7 @@
 .goal { display: flex; flex-direction: column; gap: 4px; }
 .goal label { font-size: 10.5px; color: var(--ink-dim); }
 .goal__i {
-  width: 116px; background: rgba(5,6,10,.5); border: 1px solid var(--line-2);
+  width: 116px; background: var(--sunk); border: 1px solid var(--line-2);
   border-radius: 0; color: var(--ink);
   padding: 7px 14px; font-size: 13px; font-family: var(--mono);
 }
@@ -971,7 +971,11 @@ body.is-out .main {
 .row--open:hover { border-color: var(--line-3); }
 
 /* 「看紀錄」一直在，不是 hover 才浮出來——哪幾列點得下去要一眼看得出來 */
-.row__go2 { display: flex; align-items: center; justify-content: flex-end; }
+.row__go2 { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+/* ⚠️ 這一欄原本寫死 108px，「21 筆 →」一放進去就沒位子了，
+   後面的「結算」「封存」被擠成一個字一行。欄寬改成 auto，
+   按鈕本身也不准斷行——兩個字的按鈕斷成兩行永遠是錯的。 */
+.row__go2 .gx { flex: 0 0 auto; white-space: nowrap; }
 .rowbtn {
   flex: 0 0 auto; white-space: nowrap;
   padding: 6px 12px; border-radius: 0;
@@ -2748,4 +2752,71 @@ body.dw-push #view { padding-top: 0; }
   .lg__rule, .lg__row, .lg__dbl, .lg__t, .lg__sum {
     animation: none; opacity: 1; stroke-dashoffset: 0;
   }
+}
+
+
+/* ============================================================
+   平台管理
+   ------------------------------------------------------------
+   ⚠️ 這裡最重要的一條不是樣式，是**平台管理員的側欄只有一項**。
+
+   他能停權，但讀不到任何一筆帳。這件事在畫面上就要看得出來：
+   總覽、記帳、統計、家庭全部不在側欄裡——不是灰掉、不是點了說沒權限，
+   是根本沒有那個入口，因為後端也真的不會回那些資料給他。
+
+   停權是關門，不是配鑰匙。
+   ============================================================ */
+/* ⚠️ 只在「不是管理員」時藏起來，**不要**反過來替管理員寫 display: block。
+   寫了的話，它的優先度會蓋過既有的「窄螢幕藏分組標題」「側欄收合藏標題」——
+   手機橫向導覽列上就冒出一個被擠成直排的「平／台」。
+   不指定 display，它就跟著一般 .nav__lb / .nav__i 的規則走。 */
+body:not(.is-admin) .nav__lb--admin,
+body:not(.is-admin) .nav__i--admin { display: none; }
+
+/* 其餘入口整批收掉。用 :not() 而不是一條條列，
+   之後新增頁面也不會忘記擋——預設就是管理員看不到。 */
+body.is-admin .nav__i:not(.nav__i--admin),
+body.is-admin .nav__lb:not(.nav__lb--admin) { display: none; }
+
+/* 帳本切換器、搜尋、通知鈴對他都沒有意義（他沒有帳、沒有被監管的人） */
+body.is-admin #gsw,
+body.is-admin #searchBtn,
+body.is-admin .search,
+body.is-admin .bell__wrap { display: none; }
+
+/* 窄螢幕的頂列本來只放帳本切換、搜尋、通知（標題讓給導覽列）。
+   那三樣管理員都沒有，留著就是一條 58px 的空白。 */
+@media (max-width: 760px) {
+  body.is-admin header.top { display: none; }
+  /* 頂列拿掉之後，第一個區塊會直接貼在導覽列底下（間距 0） */
+  body.is-admin #view .page { padding-top: 20px; }
+}
+
+/* 停權：破壞性動作，顏色要跟「結算」那種正向動作分開 */
+.gx--warn { color: var(--down); border-color: var(--down-wash); }
+.gx--warn:hover { color: var(--down); border-color: var(--down); }
+
+/* 稽核紀錄：時間 / 誰 / 做了什麼 / 備註。
+   窄螢幕改成上下堆疊，備註本來就常常是一整句話。 */
+.aud {
+  display: grid; gap: 4px 14px; align-items: baseline;
+  grid-template-columns: 132px 88px 96px 1fr;
+  padding: 12px 20px; border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.aud:last-child { border-bottom: 0; }
+.aud__t { color: var(--ink-faint); font-family: var(--mono); font-size: 11.5px; }
+.aud__a { color: var(--ink); }
+.aud__k { color: var(--accent); }
+.aud__n { color: var(--ink-dim); line-height: 1.7; }
+
+@media (max-width: 720px) {
+  .aud {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: 'time who' 'act act' 'note note';
+  }
+  .aud__t { grid-area: time; }
+  .aud__a { grid-area: who; }
+  .aud__k { grid-area: act; }
+  .aud__n { grid-area: note; }
 }

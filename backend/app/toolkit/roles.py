@@ -56,6 +56,13 @@
         ...
 
     roles.require_platform("suspend_user", me.is_platform_admin)
+
+    # 停權路由（成員1）
+    why = roles.clean_suspend_reason(body.reason)      # 理由太短就丟 ValueError → 422
+    roles.require_suspendable(target.is_platform_admin)
+
+    # 載入目前使用者之後（每一支需要登入的路由都會經過）
+    roles.require_active(user.suspended_at)            # 停權中就丟 Forbidden → 403
 """
 
 from __future__ import annotations
@@ -77,6 +84,12 @@ __all__ = [
     "require_set_goal",
     "can_platform",
     "require_platform",
+    "SUSPEND_REASON_MIN",
+    "SUSPEND_REASON_MAX",
+    "clean_suspend_reason",
+    "require_suspendable",
+    "is_active",
+    "require_active",
 ]
 
 PARENT = "parent"
@@ -175,3 +188,65 @@ def require_platform(action: str, is_platform_admin: object) -> None:
     """不能做就丟 `Forbidden`。"""
     if not can_platform(action, is_platform_admin):
         raise Forbidden("這個動作需要平台管理員權限，且僅限停權與稽核：%s" % action)
+
+
+# ===========================================================================
+# 停權
+# ===========================================================================
+#
+# ⚠️ 停權是關門，不是配鑰匙：擋登入、擋寫入，**不刪任何一筆資料**，
+# 而且可以解除。下面三個函式分別守住三件事——
+#
+#   1. 一定有理由        clean_suspend_reason
+#   2. 不能停平台管理員  require_suspendable
+#   3. 真的擋得住        require_active
+#
+# 第 3 條最容易漏。只在登入時檢查的話，被停權的人手上那張還沒過期的
+# access token 照樣能用 30 分鐘——停權變成「下次登入才生效」。
+# 所以它要放在「載入目前使用者」的那一層，每一支需要登入的路由都會經過。
+
+#: 理由至少幾個字。沒有理由的停權就是任意封鎖，被停的人也沒有東西可以申訴。
+SUSPEND_REASON_MIN = 4
+
+#: 理由最多幾個字。會進稽核紀錄，也會顯示給被停權的人看。
+SUSPEND_REASON_MAX = 200
+
+
+def clean_suspend_reason(reason: object) -> str:
+    """整理停權理由；太短就丟 `ValueError`（路由層轉成 422）。
+
+    前後空白會被去掉，所以「        」這種湊字數的寫法過不了。
+    超過上限的部分直接截掉，不報錯——理由寫得長不是錯。
+    """
+    text = " ".join(str(reason or "").split())
+    if len(text) < SUSPEND_REASON_MIN:
+        raise ValueError(
+            "停權一定要寫理由（至少 %d 個字）——沒有理由的停權就是任意封鎖"
+            % SUSPEND_REASON_MIN
+        )
+    return text[:SUSPEND_REASON_MAX]
+
+
+def require_suspendable(target_is_platform_admin: object) -> None:
+    """平台管理員不能被停權。
+
+    不是因為他比較大，是因為**停掉最後一個管理員之後，就沒有人能解除停權了**——
+    包括解除他自己。那是一個沒有出口的狀態。
+    """
+    if target_is_platform_admin:
+        raise Forbidden("不能停權平台管理員")
+
+
+def is_active(suspended_at: object) -> bool:
+    """帳號是不是正常狀態。`suspended_at` 是 NULL 就是正常。"""
+    return suspended_at is None
+
+
+def require_active(suspended_at: object) -> None:
+    """停權中就丟 `Forbidden`。
+
+    ⚠️ 要在**密碼驗證通過之後**才呼叫。順序反過來的話，
+    任何人拿一個 email 亂打密碼，就能從錯誤訊息試出「這個帳號是不是被停權了」。
+    """
+    if not is_active(suspended_at):
+        raise Forbidden("這個帳號已被停權")

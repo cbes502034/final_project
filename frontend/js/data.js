@@ -173,6 +173,16 @@ window.DATA = {
   /* savingsGoal 是註冊時就要填的「每月想存多少」。
      可支配上限 = 收入 − 存款目標，支出超過就代表這個月存不到目標。 */
   members: [
+    /* 平台管理員。⚠️ **刻意不屬於任何家庭，也不在任何帳本裡。**
+
+       他能停權，但讀不到任何一筆帳——這一點在畫面上就看得出來：
+       用他登入的時候，側欄只有「平台管理」，沒有總覽、沒有記帳、沒有統計。
+       那不是藏起來，是他真的沒有那些資料。
+
+       停權是關門，不是配鑰匙。 */
+    { id: 'U0', name: '系統管理員', email: 'admin@fambudget.tw', role: null,
+      avatar: '管', age: null, isPlatformAdmin: true,
+      joined: '2026-01-01', income: 0, expense: 0, budget: 0, savingsGoal: 0 },
     { id: 'U1', name: '林建國', email: 'jianguo@lin.tw', role: 'parent', avatar: '國', age: 52,
       joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000,
       savingsGoal: 20000,
@@ -206,6 +216,21 @@ window.DATA = {
     { guardian: 'U1', ward: 'U3', since: '2026-02-11', scope: '全部明細' },
     { guardian: 'U1', ward: 'U4', since: '2026-02-11', scope: '全部明細' },
     { guardian: 'U2', ward: 'U4', since: '2026-02-11', scope: '全部明細' }
+  ],
+
+  /* ---------- 稽核紀錄 ----------
+     誰做了什麼。⚠️ **停權一定要留下紀錄**——沒有稽核的停權就是任意封鎖，
+     而且被停權的人沒有任何東西可以申訴。
+
+     這張表只記「做了什麼動作」，不記金額；平台管理員讀得到它，
+     但那不等於讀得到任何人的財務資料。 */
+  auditLogs: [
+    { id: 'A1003', actor: 'U1', action: 'grant_guardianship',
+      target: 'U4', at: '2026-02-11 09:20', note: '建立對林宇軒的監管' },
+    { id: 'A1002', actor: 'U1', action: 'change_role',
+      target: 'U3', at: '2026-02-11 09:18', note: '把林宇涵設為子女' },
+    { id: 'A1001', actor: 'U1', action: 'create_family',
+      target: null, at: '2026-01-05 21:04', note: '建立「林家」' }
   ],
 
   /* ---------- 分類體系 ---------- */
@@ -474,6 +499,8 @@ window.DATA = {
              ['display_name', 'TEXT', ''],
              ['birth_year', 'INT', '個人資料。⚠️ 不參與任何權限判斷'],
              ['is_platform_admin', 'BOOLEAN', '平台管理員。與家庭角色無關，且看不到任何財務資料'],
+             ['suspended_at', 'TIMESTAMPTZ', 'NULL = 正常。⚠️ 停權只擋登入與寫入，不刪任何資料'],
+             ['suspended_reason', 'TEXT', '停權理由。沒有理由的停權就是任意封鎖'],
              ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', '']] },
 
     { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊時就要填。改過的值保留歷史，不覆蓋',
