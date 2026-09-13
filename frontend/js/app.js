@@ -139,7 +139,7 @@
   var ME = null;
   var F = { userId: 'all', kind: 'all', source: 'all', q: '' };
 
-  /* 目前在看哪一本帳。'all' = 全部（我看得到的所有群組合起來）。
+  /* 目前在看哪一本帳。'all' = 全部（我看得到的所有帳本合起來）。
      存在 localStorage，重新整理不會跳回去。 */
   var GKEY = 'fambudget.group';
   var GROUP = (function () {
@@ -505,23 +505,6 @@
     loadTx();
   }
 
-  FOLD_BUILD.famad = function (wrap) {
-    wrap.innerHTML = skeleton(2);
-    API.advices().then(function (d) {
-      var fam = (d.advices || []).filter(function (a) { return a.scope === 'family'; });
-      if (!fam.length) {
-        wrap.innerHTML = emptyState('這個月還沒有家庭層級的建議', '記帳累積得夠多才會產生。');
-        return;
-      }
-      wrap.innerHTML = '<div class="card">' + fam.slice(0, 3).map(function (a) {
-        return '<div class="fad fad--' + esc(a.level) + '">' +
-          '<div class="fad__t">' + esc(a.title) + '</div>' +
-          '<p class="fad__b">' + esc(a.body) + '</p></div>';
-      }).join('') +
-      '<a class="fad__more" href="#/advice">看完整建議與依據 →</a></div>';
-    }).catch(function (e) { wrap.innerHTML = errState(e); });
-  };
-
   FOLD_BUILD.entry = function (wrap) {
     /* ---- 模式切換：抽屜 ----
        兩張帶說明的大卡片收成一條。要用哪一種是常態性的選擇，
@@ -817,22 +800,18 @@
             '</article>';
         }).join('') + '</div>';
 
-        /* 錢花在什麼 ＋ 誰花的。兩張圖回答不同的問題，不重複。 */
-        h += '<div class="sec"><h2 class="sec__t">家庭支出分佈</h2>' +
-             '<span class="sec__n">WHERE &amp; WHO</span></div>';
-        h += '<div class="charts"><div class="card rise">' +
-               '<div class="card__h"><span class="card__t">花在什麼</span></div>' +
-               donut(d.byCat, d.expense) + '</div>' +
-             '<div class="card rise" style="animation-delay:80ms">' +
-               '<div class="card__h"><span class="card__t">誰花的</span></div>' +
-               memberBar(d.members, d.expense) + '</div></div>';
+        /* 這一頁只回答「誰」。
 
-        /* 近 6 個月：選了某一本帳的時候 summary 會回 null，
-           因為每個人的月數列沒有分帳本——寧可不畫，也不要畫一張假的。 */
-        if (d.monthly) {
-          h += '<div class="sec"><h2 class="sec__t">近 6 個月</h2></div>' +
-            '<div class="card rise">' + barChart(d.monthly) + '</div>';
-        }
+           ⚠️ 不要在這裡放圓餅或月趨勢——「統計」那一頁已經有了，
+           而且同樣是家庭範圍、同一份資料。放兩份就是同一個東西兩個地方。
+
+           三頁的分工是照**問題**切的，不是照範圍切的：
+             家庭總覽   誰有問題      成員狀況、超支、誰花的
+             統計       數字長什麼樣   月／年對照、分類圓餅、趨勢
+             財務建議   那該怎麼辦     建議清單 */
+        h += '<div class="sec"><h2 class="sec__t">誰花的</h2>' +
+             '<span class="sec__n">WHO</span></div>';
+        h += '<div class="card rise">' + memberBar(d.members, d.expense) + '</div>';
 
         h += '<div class="sec"><h2 class="sec__t">超出預算的項目</h2></div>';
         var over = b.budgets.filter(function (x) { return x.over; });
@@ -843,14 +822,8 @@
             '<div class="bgt__v is-over">' + money(x.used) + ' / ' + money(x.limit) +
             '（' + pct(x.pct) + '）</div></div>';
         }).join('') + '</div>' : emptyState('沒有超支項目', '本月所有分類都在預算內。');
-
-        /* 建議只放摘要，收合。
-           完整內容在「財務建議」那一頁（已經有條列收合＋搜尋），
-           這裡再塞一份就是第二次重複。 */
-        h += foldHead('famad', '這個月的建議', '看建議', 'ADVICE');
         h += '</div>';
         $view.innerHTML = h;
-        foldRestore();
         animate();
       }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -1189,14 +1162,14 @@
 
 
   /* ============================================================
-     群組（帳本）
+     帳本
 
      記帳除了有「分類」，還有「這筆算在哪一本帳上」。
-     分類回答錢花在什麼，群組回答這筆屬於哪一份預算。
+     分類回答錢花在什麼，帳本回答這筆屬於哪一份預算。
      每一本帳可以各自設一個每月存款目標。
      ============================================================ */
   function vGroups() {
-    head('群組', '一個家庭可以開好幾本帳，各自有自己的存款目標');
+    head('帳本', '一個家庭可以開好幾本，各自有自己的存款目標');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
     Promise.all([API.groups({ includeArchived: true }), API.members()])
@@ -1980,7 +1953,7 @@
     return '<span class="ava' + cls + '">' + esc((u && u.avatar) || '') + '</span>';
   }
 
-  /* 群組切換器。只有一本帳的時候不顯示——一個只有一個選項的下拉是雜訊。 */
+  /* 帳本切換器。只有一本帳的時候不顯示——一個只有一個選項的下拉是雜訊。 */
   function paintGroups() {
     var box = document.getElementById('gsw');
     if (!box) return;
@@ -1989,7 +1962,7 @@
       box.hidden = gs.length < 2;
       if (box.hidden) { setGroup('all'); return; }
 
-      // 選到的群組如果已經看不到了（被移出或封存），退回全部
+      // 選到的帳本如果已經看不到了（被移出或封存），退回全部
       if (GROUP !== 'all' && !gs.some(function (g) { return g.id === GROUP; })) setGroup('all');
 
       var cur = GROUP === 'all'
@@ -2024,7 +1997,7 @@
                 g.count + ' 筆' + (g.goal ? '　目標 ' + money(g.goal) : '') +
               '</i></span></button>';
           }).join('') +
-          '<a class="gsw__more" href="#/groups">管理群組 →</a>' +
+          '<a class="gsw__more" href="#/groups">管理帳本 →</a>' +
         '</div>';
       // 重繪之後面板是新的，馬上搬到版面裡，避免留下同 id 的舊節點
       pushForDrawer();
@@ -2195,7 +2168,7 @@
       }
     }
 
-    /* ---- 群組切換器 ---- */
+    /* ---- 帳本切換器 ---- */
     if (t.closest('#gswBtn')) {
       var gp = document.getElementById('gswPanel');
       if (gp) {
@@ -2229,7 +2202,7 @@
       }
     }
 
-    /* ---- 群組管理 ---- */
+    /* ---- 帳本管理 ---- */
     var gopen = t.closest('[data-gopen]');
     if (gopen) {
       setGroup(gopen.dataset.gopen);

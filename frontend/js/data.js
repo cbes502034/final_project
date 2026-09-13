@@ -39,9 +39,13 @@ window.DATA = {
     { hex: '#7A2F3C', name: '墨酒紅' }
   ],
 
-  /* ---------- 群組（一個家庭可以開好幾本帳） ----------
-     仿家族群組的做法：記帳除了有「分類」，還有「這筆算在哪一本帳上」。
-     分類回答「錢花在什麼」，群組回答「這筆屬於哪一份預算」。
+  /* ---------- 帳本（一個家庭可以開好幾本） ----------
+     ⚠️ 這張表的 id 叫 groups 是歷史包袱，它是**帳本**。
+     早期「群組」和「帳本」被當成同一個東西，於是側欄寫「群組」、
+     切換器寫「全部帳本」——同一個東西兩個名字。介面已經統一叫帳本。
+
+     記帳除了有「分類」，還有「這筆算在哪一本帳上」。
+     分類回答「錢花在什麼」，帳本回答「這筆屬於哪一份預算」。
      每一本帳可以各自設一個每月存款目標。 */
   groups: [
     { id: 'G1', name: '家用', icon: '家', color: '#27405E', owner: 'U1',
@@ -52,7 +56,16 @@ window.DATA = {
       created: '2026-02-11', note: '打工收入與自己的開銷' }
   ],
 
-  /* 誰在哪個群組裡。這是可見範圍的**另一條路**，不是第二道關卡——
+  /* 誰在哪一本帳裡。
+
+     ⚠️ **帳本裡面沒有權限階級**：在裡面的人都看得到這本帳的全部，
+     也都記得進去。不分讀寫、不分等級——要「只能看不能改」的關係，
+     那叫監管，走 guardianships，不是靠帳本成員做出半套的唯讀。
+
+     （原本這裡有一個 can_write 欄位，但沒有任何程式用它——
+      一個寫在文件上卻不存在的權限，比沒有更糟。）
+
+     這是可見範圍的**另一條路**，不是第二道關卡——
      ⚠️ 跟監管關係是**聯集**：
           A 我監管的人記的，跨所有帳本都看得到（監管不該被帳本切斷）
           B 我有加入的帳本裡的，那本帳的成員彼此看得到（加進來就是給看）
@@ -65,7 +78,7 @@ window.DATA = {
     { group: 'G3', user: 'U3' }, { group: 'G3', user: 'U1' }
   ],
 
-  /* 每月存款目標可以分群組設。group 為 null = 不分群組的整體目標。
+  /* 每月存款目標可以分帳本設。group 為 null = 不分帳本的整體目標。
      整體目標仍然是 members[].savingsGoal，這裡放的是「額外針對某一本帳」的。 */
   groupGoals: [
     { user: 'U1', group: 'G2', goal: 10000 },
@@ -407,7 +420,7 @@ window.DATA = {
 
     { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊時就要填。改過的值保留歷史，不覆蓋',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
-             ['group_id', 'BIGINT', 'FK → groups。NULL = 不分群組的整體目標'],
+             ['group_id', 'BIGINT', 'FK → groups。NULL = 不分帳本的整體目標'],
              ['period_key', 'TEXT', "'2026-09'。NULL = 預設值，套用到所有未指定的月份"],
              ['goal_amount', 'NUMERIC(14,2)', '每月想存多少'],
              ['warn_ratio', 'NUMERIC', '達可支配上限的幾成時提醒，預設 0.8'],
@@ -503,12 +516,12 @@ window.DATA = {
              ['recipient_id', 'BIGINT', 'FK → users，收件人。查詢一律 WHERE recipient_id = 我'],
              ['actor_id', 'BIGINT', 'FK → users，做這件事的人。系統發的為 NULL'],
              ['type', 'TEXT', "'ward_transaction' / 'budget_alert'"],
-             ['transaction_id', 'BIGINT', 'FK → transactions，非記帳類通知為 NULL'],
-             ['payload_json', 'JSONB', '提醒類通知放門檻百分比、群組、金額'],
+             ['transaction_id', 'BIGINT', 'FK → transactions，非記帳類通知為 NULL。⚠️ UNIQUE (recipient_id, transaction_id)：同一筆對同一個人只發一則'],
+             ['payload_json', 'JSONB', '提醒類通知放門檻百分比、帳本、金額'],
              ['read_at', 'TIMESTAMPTZ', 'NULL = 未讀。紅點數字就是數這個'],
              ['created_at', 'TIMESTAMPTZ', '與 recipient_id 做複合索引，輪詢查得快']] },
 
-    { t: 'groups', label: '群組（帳本）', note: '★ 一個家庭可以開好幾本帳，各自有自己的存款目標',
+    { t: 'groups', label: '帳本', note: '★ 一個家庭可以開好幾本帳，各自有自己的存款目標',
       cols: [['id', 'BIGSERIAL', 'PK'], ['family_id', 'BIGINT', 'FK → families'],
              ['name', 'TEXT', '例如「家用」「旅遊基金」'],
              ['icon', 'TEXT', '一個字，畫面上的圓標'],
@@ -517,11 +530,11 @@ window.DATA = {
              ['created_at', 'TIMESTAMPTZ', ''],
              ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著']] },
 
-    { t: 'group_members', label: '群組成員', note: '可見範圍的另一條路：我在這本帳裡就看得到這本帳',
+    { t: 'group_members', label: '帳本成員', note: '可見範圍的另一條路：我在這本帳裡就看得到這本帳',
       cols: [['group_id', 'BIGINT', 'PK, FK → groups'],
              ['user_id', 'BIGINT', 'PK, FK → users'],
              ['joined_at', 'TIMESTAMPTZ', ''],
-             ['can_write', 'BOOLEAN', 'false = 只能看這本帳，不能往裡面記']] },
+             ['notify', 'BOOLEAN', '這本帳有動靜要不要通知我。預設 false']] },
 
     { t: 'alert_rules', label: '階段性提醒門檻', note: '★ 使用者自己設幾個百分比，跨過就通知',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
@@ -594,11 +607,11 @@ window.DATA = {
     { action: '設定家庭預算', parent: 'Y', child: 'N' },
     { action: '邀請／移除成員', parent: 'Y', child: 'N' },
     { action: '建立監管關係', parent: 'Y', child: 'N' },
-    /* 群組不看角色：誰都可以開自己的帳本。
+    /* 帳本不看角色：誰都可以開自己的帳本。
        ⚠️ 這是刻意的——記帳的分類方式是個人的事，不該由家裡的階級決定。 */
-    { action: '建立群組（帳本）', parent: 'Y', child: 'Y' },
-    { action: '管理自己建的群組', parent: 'Y', child: 'Y' },
-    { action: '管理別人建的群組', parent: 'N', child: 'N' },
+    { action: '建立帳本', parent: 'Y', child: 'Y' },
+    { action: '管理自己建的帳本', parent: 'Y', child: 'Y' },
+    { action: '管理別人建的帳本', parent: 'N', child: 'N' },
     { action: '設定自己的階段性提醒', parent: 'Y', child: 'Y' },
     { action: '查看「誰看得到我」', parent: 'Y（強制可見）', child: 'Y（強制可見）' },
     { action: '匯出資料', parent: 'Y（限可見範圍）', child: 'Y（限可見範圍）' }

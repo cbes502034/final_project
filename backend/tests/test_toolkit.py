@@ -21,7 +21,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-at-least-32-
 import pytest  # noqa: E402
 
 from app.toolkit import (  # noqa: E402
-    alerts, scope, roles, images, money, passwords, period, tokens,
+    alerts, scope, roles, notify, images, money, passwords, period, tokens,
 )
 
 
@@ -467,3 +467,61 @@ def test_不是平台管理員就什麼都不能做():
     assert not roles.can_platform("suspend_user", None)
     with pytest.raises(scope.Forbidden):
         roles.require_platform("suspend_user", False)
+
+
+# ===========================================================================
+# notify —— 通知發給誰
+# ===========================================================================
+
+_TX = {"user_id": "U3", "group_id": "G_TRIP"}
+_GUARD = [{"guardian_id": "U1", "ward_id": "U3"}]
+
+
+def test_同一筆對同一個人只發一則():
+    """父母最容易同時滿足兩個理由：既是子女的監管者，
+    又跟子女在同一本旅遊帳裡。不去重就會收到兩則一模一樣的。
+    """
+    members = [
+        {"group_id": "G_TRIP", "user_id": "U1", "notify": True},   # 父母，也在帳本裡
+        {"group_id": "G_TRIP", "user_id": "U9", "notify": True},   # 朋友
+        {"group_id": "G_TRIP", "user_id": "U3", "notify": True},   # 記帳的人自己
+    ]
+    got = notify.recipients_for(_TX, _GUARD, members)
+    assert got == [("U1", notify.GUARDIAN), ("U9", notify.LEDGER)]
+
+    who = [u for u, _ in got]
+    assert len(who) == len(set(who)), "同一個人出現了兩次"
+
+
+def test_監管優先於帳本訂閱():
+    """監管跨所有帳本，是比較強的理由。
+
+    標成 ledger 的話，父母會以為「我只看得到這本帳」——那是錯的。
+    """
+    members = [{"group_id": "G_TRIP", "user_id": "U1", "notify": True}]
+    got = notify.recipients_for(_TX, _GUARD, members)
+    assert got == [("U1", notify.GUARDIAN)]
+
+
+def test_沒開訂閱的帳本成員不會被通知():
+    """預設不訂閱。家用帳本 31 筆 × 3 個成員 = 93 則，那不是通知是洗版。"""
+    members = [
+        {"group_id": "G_TRIP", "user_id": "U9", "notify": False},
+        {"group_id": "G_TRIP", "user_id": "U8"},                   # 沒有這個欄位
+    ]
+    assert notify.recipients_for(_TX, [], members) == []
+
+
+def test_不會通知記帳的人自己():
+    members = [{"group_id": "G_TRIP", "user_id": "U3", "notify": True}]
+    assert notify.recipients_for(_TX, [], members) == []
+
+
+def test_別本帳的成員不會被通知():
+    members = [{"group_id": "G_OTHER", "user_id": "U9", "notify": True}]
+    assert notify.recipients_for(_TX, [], members) == []
+
+
+def test_監管者不在帳本裡也收得到():
+    """監管是跨帳本無條件的——被監管的人另開一本帳也躲不掉。"""
+    assert notify.recipients_for(_TX, _GUARD, []) == [("U1", notify.GUARDIAN)]

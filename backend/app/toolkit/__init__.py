@@ -25,6 +25,7 @@
     alerts      階段性提醒的門檻計算    usage_percent / crossed / should_fire
     scope       可見範圍的兩條路（聯集）  visible_users / can_see_row
     roles       角色能做哪些治理動作    can_govern / require_govern
+    notify      通知發給誰（已去重）    recipients_for
 
 ===========================================================================
 怎麼查一個工具怎麼用

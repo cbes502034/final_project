@@ -412,8 +412,8 @@ def test_權限矩陣要跟_data_js_一致():
     assert not missing, "手冊的權限矩陣少了：" + "、".join(missing)
 
     # 建立群組不分角色，這是刻意的設計，不可以被悄悄改掉
-    assert "{ action: '建立群組（帳本）', parent: 'Y', child: 'Y' }" in data, \
-        "建立群組應該兩種角色都可以——記帳的分類方式不該由家裡的階級決定"
+    assert "{ action: '建立帳本', parent: 'Y', child: 'Y' }" in data, \
+        "建立帳本應該兩種角色都可以——記帳的分類方式不該由家裡的階級決定"
 
 
 def test_每一條建立紀錄的路徑都要帶群組():
@@ -943,3 +943,63 @@ def test_app_js_不可以用裸的_DATA():
     bare = re.findall(r"(?<![.\w$])DATA\b(?!_)", app)
     assert not bare, (
         "app.js 出現了 %d 處裸的 DATA，請改成 global.DATA" % len(bare))
+
+
+def test_帳本裡面沒有權限階級():
+    """在一本帳裡的人，看得到的東西一樣，也都記得進去。
+
+    要「只能看不能改」的關係，那叫監管（guardianships），
+    不是靠帳本成員做半套的唯讀。
+
+    原本 group_members 有一個 can_write 欄位，但沒有任何程式讀它——
+    一個寫在文件上卻不存在的權限，比沒有更糟：讀文件的人會以為有。
+    """
+    data = _blank(read("frontend/js/data.js"))    # 註解裡提到它是可以的
+    assert "can_write" not in data, \
+        "can_write 又出現了。帳本內不分讀寫；要唯讀就用監管關係"
+
+    for path in ("frontend/js/api.js", "frontend/js/app.js"):
+        src = read(path)
+        assert "canWrite" not in src and "can_write" not in src, \
+            "%s 出現了帳本層級的寫入權限" % path
+
+
+def test_監管的通知不受帳本限制():
+    """父母收得到子女的消息，不管子女記在哪一本帳。
+
+    這是監管存在的意義。做臨時帳本的時候最容易弄丟它——
+    一旦通知改成只看「我也在那本帳裡」，被監管的人開一本新帳就消音了。
+    """
+    api = read("frontend/js/api.js")
+    mo = re.search(r"type: 'ward_transaction'", api)
+    assert mo, "找不到 ward_transaction"
+    head = api[max(0, mo.start() - 1400):mo.start()]
+    assert "wards.indexOf(t.user) >= 0" in head, "監管通知應該只看監管關係"
+    assert "vgs.indexOf(t.group)" not in head, \
+        "監管通知被加上帳本篩選了——被監管的人另開一本帳就收不到通知"
+
+
+def test_家庭總覽不可以重複統計頁的圖():
+    """三頁照**問題**分工，不是照範圍分：
+
+        家庭總覽   誰有問題      成員狀況、超支、誰花的
+        統計       數字長什麼樣   月／年對照、分類圓餅、趨勢
+        財務建議   那該怎麼辦     建議清單
+
+    這支測試是有來由的：家庭總覽曾經被加上圓餅和月趨勢，
+    但「統計」那一頁早就有了，而且同樣是家庭範圍、同一份資料——
+    一模一樣的東西放了兩個地方。
+    """
+    app = read("frontend/js/app.js")
+    mo = re.search(r"function vFamily\(\) \{(.*?)\n  \}", app, re.S)
+    assert mo, "找不到 vFamily"
+    body = mo.group(1)
+
+    assert "donut(" not in body, "家庭總覽不該畫分類圓餅——那是「統計」的工作"
+    assert "barChart(" not in body, "家庭總覽不該畫月趨勢——那是「統計」的工作"
+    assert "memberBar(" in body, "家庭總覽應該要有「誰花的」，那是它獨有的"
+
+    mo2 = re.search(r"function vStats\(\) \{(.*?)\n  \}", app, re.S)
+    assert mo2, "找不到 vStats"
+    assert "memberBar(" not in mo2.group(1), \
+        "統計不該畫「誰花的」——那一頁是按時間和分類看，不是按人"
