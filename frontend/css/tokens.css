@@ -115,6 +115,36 @@ html {
   background-size: 88px 88px, 88px 88px, auto, auto;
   background-attachment: fixed;
   scroll-behavior: smooth;
+
+  /* ---------- 語意色：分類與帳本 ----------
+     ⚠️ 這些**不是裝飾色，是資料的顏色**。
+
+     以前它們是色碼，直接寫在 data.js 裡（餐飲 #C4693C、家用 #27405E …）。
+     那表示它們是「資料」不是「主題」——換一套外觀的時候，
+     圓餅圖和帳本圓點還是原來的顏色，跟整頁格格不入。
+
+     改成代號之後，資料只說「這是餐飲」，**由主題決定餐飲長什麼樣**。
+     要做第二套外觀，只要在這裡重新定義一次就好。
+
+     ⚠️ 加新顏色之前先量對比：小圓點這類非文字元素門檻是 3:1，
+     有測試在擋（見 test_帳本顏色在米白上看得見）。 */
+  --cat-food: #C4693C;
+  --cat-transit: #3C5FA0;
+  --cat-home: #6A5B9E;
+  --cat-daily: #2C7A56;
+  --cat-fun: #BE4239;
+  --cat-study: #B0741A;
+  --cat-health: #3E8DA8;
+  --cat-other: #8A8E95;
+  --cat-bonus: #1B6B5A;
+
+  --book-indigo: #27405E;
+  --book-violet: #4A3F6B;
+  --book-teal: #1F5E63;
+  --book-moss: #2F5D3A;
+  --book-umber: #7A4A2E;
+  --book-wine: #7A2F3C;
+
 }
 
 body {

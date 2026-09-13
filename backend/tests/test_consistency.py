@@ -874,6 +874,16 @@ def _contrast(a, b):
     return (hi + 0.05) / (lo + 0.05)
 
 
+def _palette(prefix):
+    """從 tokens.css 撈出一組語意色。
+
+    ⚠️ 顏色現在住在 tokens.css，不在 data.js——
+    data.js 只說「這是餐飲」，主題才決定餐飲長什麼樣。
+    """
+    css = read("frontend/css/tokens.css")
+    return dict(re.findall(r"--(%s-[a-z]+):\s*(#[0-9A-Fa-f]{6})" % prefix, css))
+
+
 def test_帳本顏色在米白上看得見():
     """小圓點這類非文字元素，對比至少要 3:1。
 
@@ -881,17 +891,15 @@ def test_帳本顏色在米白上看得見():
     1.35——那顆標示目前帳本的小圓點等於不存在。而且它不會報錯，
     只會讓人覺得「怎麼看不出現在在哪一本」。
     """
-    data = read("frontend/js/data.js")
-    block = data[data.index("  groupColors: ["):data.index("]", data.index("  groupColors: ["))]
-    colors = re.findall(r"hex: '(#[0-9A-Fa-f]{6})'", block)
-    assert len(colors) >= 4, "帳本色盤太少：%d" % len(colors)
+    books = _palette("book")
+    assert len(books) >= 4, "帳本色盤太少：%d" % len(books)
 
     bad = []
-    for c in colors:
-        for bg, name in ((_PAPER, "米白"), (_CARD, "白卡")):
+    for name, c in sorted(books.items()):
+        for bg, label in ((_PAPER, "米白"), (_CARD, "白卡")):
             r = _contrast(c, bg)
             if r < 3.0:
-                bad.append("%s 在%s上只有 %.2f:1" % (c, name, r))
+                bad.append("%s %s 在%s上只有 %.2f:1" % (name, c, label, r))
     assert not bad, "這些顏色太淡，小圓點會看不見：\n" + "\n".join(bad)
 
 
@@ -901,33 +909,69 @@ def test_帳本色與分類色要分得開():
     分類回答「錢花在什麼」，帳本回答「這筆算哪一本帳」。
     區別靠**明度**不靠色相——色相不夠用，分類已經佔掉赭藍紫綠紅琥珀。
     """
-    data = read("frontend/js/data.js")
-    block = data[data.index("  groupColors: ["):data.index("]", data.index("  groupColors: ["))]
-    ledger = re.findall(r"hex: '(#[0-9A-Fa-f]{6})'", block)
-    cats = re.findall(r"kind: '(?:income|expense)', color: '(#[0-9A-Fa-f]{6})'", data)
-    assert ledger and cats
+    books = _palette("book")
+    cats = _palette("cat")
+    assert books and cats
 
-    brightest = max(_luminance(c) for c in ledger)
-    darkest = min(_luminance(c) for c in cats)
+    brightest = max(_luminance(c) for c in books.values())
+    darkest = min(_luminance(c) for c in cats.values())
     assert brightest < darkest, (
         "帳本色必須整組比分類色暗：帳本最亮 %.4f，分類最暗 %.4f" % (brightest, darkest))
 
-    overlap = set(ledger) & set(cats)
+    overlap = set(books.values()) & set(cats.values())
     assert not overlap, "帳本色跟分類色撞色了：" + "、".join(sorted(overlap))
 
 
-def test_現有帳本都用色盤裡的顏色():
-    """色盤是單一來源。種子資料自己挑一個不在盤裡的顏色，
+def test_顏色不可以再寫死在資料裡():
+    """data.js 只存語意代號，色碼一律住在 tokens.css。
+
+    寫死在資料裡的顏色是**資料**不是主題——換一套外觀的時候，
+    圓餅圖和帳本圓點還是原來的顏色，跟整頁格格不入。
+    這是換膚做得起來的前提。
+    """
+    data = read("frontend/js/data.js")
+    stray = re.findall(r"color: '(#[0-9A-Fa-f]{6})'", data)
+    assert not stray, "data.js 又出現寫死的色碼：" + "、".join(stray)
+
+    # 用到的代號，tokens.css 裡都要有
+    css = read("frontend/css/tokens.css")
+    used = set(re.findall(r"color: '((?:cat|book)-[a-z]+)'", data))
+    assert used, "data.js 裡找不到任何語意代號"
+    missing = [t for t in sorted(used) if ("--%s:" % t) not in css]
+    assert not missing, "這些代號在 tokens.css 裡沒有定義：" + "、".join(missing)
+
+
+def test_顏色進畫面之前一定要過_tint():
+    """顏色字串會被塞進 style="background:…"，那是 CSS 的情境。
+
+    ⚠️ esc() 擋不住這裡——它只處理 HTML。所以 tint() 兼任過濾器，
+    只放行 [a-z0-9-]。繞過它就等於開了一個 CSS 注入的口。
+    """
+    app = read("frontend/js/app.js")
+    mo = re.search(r"function tint\(token\) \{(.*?)\n  \}", app, re.S)
+    assert mo, "app.js 裡找不到 tint()"
+    assert "replace(" in mo.group(1), "tint() 沒有過濾字元"
+
+    # 從**資料**來的顏色（x.color / t.catColor 這種）一定要過 tint()。
+    # 程式裡自己寫死的 var(--accent) 常數陣列不算——那不是使用者給的。
+    raw = re.findall(r"style=\"(?:background|color|stroke):' \+ (?!tint\()"
+                     r"([A-Za-z_$][\w$]*\.[\w$]*[Cc]olor)", app)
+    assert not raw, "這些資料來源的顏色沒過 tint()：" + "、".join(sorted(set(raw)))
+
+
+def test_現有帳本都用色盤裡的代號():
+    """色盤是單一來源。種子資料自己挑一個不在盤裡的代號，
     就等於「表單給一套、資料用另一套」——那正是上一版的毛病。
     """
     data = read("frontend/js/data.js")
     block = data[data.index("  groupColors: ["):data.index("]", data.index("  groupColors: ["))]
-    palette = set(re.findall(r"hex: '(#[0-9A-Fa-f]{6})'", block))
+    palette = set(re.findall(r"id: '([a-z-]+)'", block))
+    assert palette, "找不到帳本色盤"
 
-    used = re.findall(r"name: '[^']+', color: '(#[0-9A-Fa-f]{6})', owner:", data)
+    used = re.findall(r"name: '[^']+', color: '([a-z-]+)', owner:", data)
     assert used, "找不到帳本的顏色"
     bad = [c for c in used if c not in palette]
-    assert not bad, "這些帳本用了色盤外的顏色：" + "、".join(bad)
+    assert not bad, "這些帳本用了色盤外的代號：" + "、".join(bad)
 
 
 def test_開帳本的表單不可以自己寫死一套顏色():

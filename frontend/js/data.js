@@ -66,13 +66,15 @@ window.DATA = {
      ⚠️ 而且深色在米白上一定安全。上一版用的是深色主題留下來的亮彩
      （#6EE7B7 之類），在米白上對比只有 1.35——那顆小圓點等於看不見。
      測試會擋住太淡的顏色。 */
+  /* ⚠️ 這裡只有**代號**，沒有色碼。實際顏色由 tokens.css 決定——
+     那是換外觀時唯一要改的地方。 */
   groupColors: [
-    { hex: '#27405E', name: '墨藍' },
-    { hex: '#4A3F6B', name: '墨紫' },
-    { hex: '#1F5E63', name: '墨青' },
-    { hex: '#2F5D3A', name: '墨綠' },
-    { hex: '#7A4A2E', name: '墨赭' },
-    { hex: '#7A2F3C', name: '墨酒紅' }
+    { id: 'book-indigo', name: '墨藍' },
+    { id: 'book-violet', name: '墨紫' },
+    { id: 'book-teal', name: '墨青' },
+    { id: 'book-moss', name: '墨綠' },
+    { id: 'book-umber', name: '墨赭' },
+    { id: 'book-wine', name: '墨酒紅' }
   ],
 
   /* ---------- 帳本（一個家庭可以開好幾本） ----------
@@ -90,14 +92,14 @@ window.DATA = {
      ⚠️ 臨時帳本**不是另一種實體**，就是一本帳，只是多了生命週期。
      拆成兩張表的話，成員、紀錄、統計、目標全部要寫兩份。 */
   groups: [
-    { id: 'G1', name: '家用', color: '#27405E', owner: 'U1',
+    { id: 'G1', name: '家用', color: 'book-indigo', owner: 'U1',
       kind: 'standing', created: '2026-01-05', note: '日常開銷，全家共用' },
-    { id: 'G2', name: '旅遊基金', color: '#4A3F6B', owner: 'U1',
+    { id: 'G2', name: '旅遊基金', color: 'book-violet', owner: 'U1',
       kind: 'standing', created: '2026-03-01', note: '為了出國先存起來的錢' },
-    { id: 'G3', name: '宇涵的零用', color: '#1F5E63', owner: 'U3',
+    { id: 'G3', name: '宇涵的零用', color: 'book-teal', owner: 'U3',
       kind: 'standing', created: '2026-02-11', note: '打工收入與自己的開銷' },
     /* 到期日已經過了（示範資料的今天是 2026-09-10），畫面上會出現結算提示 */
-    { id: 'G4', name: '沖繩旅遊', color: '#2F5D3A', owner: 'U1',
+    { id: 'G4', name: '沖繩旅遊', color: 'book-moss', owner: 'U1',
       kind: 'temp', endsOn: '2026-09-08', settledAt: null,
       created: '2026-08-20', note: '五天四夜，回來就結算' }
   ],
@@ -208,18 +210,18 @@ window.DATA = {
 
   /* ---------- 分類體系 ---------- */
   categories: [
-    { id: 'C01', name: '餐飲', kind: 'expense', color: '#C4693C', icon: '食' },
-    { id: 'C02', name: '交通', kind: 'expense', color: '#3C5FA0', icon: '行' },
-    { id: 'C03', name: '居住', kind: 'expense', color: '#6A5B9E', icon: '住' },
-    { id: 'C04', name: '日用品', kind: 'expense', color: '#2C7A56', icon: '用' },
-    { id: 'C05', name: '娛樂', kind: 'expense', color: '#BE4239', icon: '樂' },
-    { id: 'C06', name: '教育', kind: 'expense', color: '#B0741A', icon: '學' },
-    { id: 'C07', name: '醫療', kind: 'expense', color: '#3E8DA8', icon: '醫' },
-    { id: 'C08', name: '其他', kind: 'expense', color: '#8A8E95', icon: '他' },
-    { id: 'I01', name: '薪資', kind: 'income', color: '#2C7A56', icon: '薪' },
-    { id: 'I02', name: '獎金', kind: 'income', color: '#1B6B5A', icon: '獎' },
-    { id: 'I03', name: '零用金', kind: 'income', color: '#3C5FA0', icon: '零' },
-    { id: 'I04', name: '其他收入', kind: 'income', color: '#8A8E95', icon: '收' }
+    { id: 'C01', name: '餐飲', kind: 'expense', color: 'cat-food', icon: '食' },
+    { id: 'C02', name: '交通', kind: 'expense', color: 'cat-transit', icon: '行' },
+    { id: 'C03', name: '居住', kind: 'expense', color: 'cat-home', icon: '住' },
+    { id: 'C04', name: '日用品', kind: 'expense', color: 'cat-daily', icon: '用' },
+    { id: 'C05', name: '娛樂', kind: 'expense', color: 'cat-fun', icon: '樂' },
+    { id: 'C06', name: '教育', kind: 'expense', color: 'cat-study', icon: '學' },
+    { id: 'C07', name: '醫療', kind: 'expense', color: 'cat-health', icon: '醫' },
+    { id: 'C08', name: '其他', kind: 'expense', color: 'cat-other', icon: '他' },
+    { id: 'I01', name: '薪資', kind: 'income', color: 'cat-daily', icon: '薪' },
+    { id: 'I02', name: '獎金', kind: 'income', color: 'cat-bonus', icon: '獎' },
+    { id: 'I03', name: '零用金', kind: 'income', color: 'cat-transit', icon: '零' },
+    { id: 'I04', name: '其他收入', kind: 'income', color: 'cat-other', icon: '收' }
   ],
 
   /* ---------- 交易明細（核心表） ---------- */

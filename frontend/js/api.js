@@ -703,7 +703,7 @@
 
         var g = {
           id: 'G' + n, name: name,
-          color: p.color || (global.DATA.groupColors || [{}])[0].hex || '#27405E',
+          color: p.color || (global.DATA.groupColors || [{}])[0].id || 'book-indigo',
           owner: s.me,
           kind: kind,
           endsOn: kind === 'temp' ? p.endsOn : null,

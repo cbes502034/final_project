@@ -268,9 +268,9 @@
                '<span class="sec__n">MONTHLY BUDGET</span></div><div class="card rise">';
           h += mine.map(function (x) {
             return '<div class="bgt"><div class="bgt__k">' +
-              '<span class="dot" style="background:' + x.catColor + '"></span>' + esc(x.catName) + '</div>' +
+              '<span class="dot" style="background:' + tint(x.catColor) + '"></span>' + esc(x.catName) + '</div>' +
               '<div class="bgt__t"><i style="width:' + Math.min(100, x.pct * 100) +
-              '%;background:' + (x.over ? 'var(--down)' : x.catColor) + '"></i></div>' +
+              '%;background:' + (x.over ? 'var(--down)' : tint(x.catColor)) + '"></i></div>' +
               '<div class="bgt__v' + (x.over ? ' is-over' : '') + '">' +
               money(x.used) + ' / ' + money(x.limit) + '</div></div>';
           }).join('') + '</div>';
@@ -310,7 +310,8 @@
     var R = 62, C = 2 * Math.PI * R, off = 0;
     var arcs = byCat.map(function (c) {
       var frac = total ? c.amount / total : 0;
-      var seg = '<circle cx="80" cy="80" r="' + R + '" fill="none" stroke="' + c.color +
+      /* ⚠️ stroke 是 SVG 的「呈現屬性」，不吃 var()——要寫進 style 才有效 */
+      var seg = '<circle cx="80" cy="80" r="' + R + '" fill="none" style="stroke:' + tint(c.color) +
         '" stroke-width="24" stroke-dasharray="' + (frac * C).toFixed(1) + ' ' + C.toFixed(1) +
         '" stroke-dashoffset="' + (-off * C).toFixed(1) + '" transform="rotate(-90 80 80)"/>';
       off += frac;
@@ -322,7 +323,7 @@
       '<text x="80" y="95" text-anchor="middle" font-size="15" fill="var(--ink)" ' +
       'font-weight="700" font-family="var(--mono)">' + Number(total).toLocaleString('en-US') + '</text>' +
       '</svg><div class="dnt__l">' + byCat.map(function (c) {
-        return '<div class="dnt__i"><span class="dot" style="background:' + c.color + '"></span>' +
+        return '<div class="dnt__i"><span class="dot" style="background:' + tint(c.color) + '"></span>' +
           '<span class="dnt__n">' + esc(c.name) + '</span>' +
           '<span class="dnt__v">' + money(c.amount) + '</span>' +
           '<span class="dnt__p">' + pct(total ? c.amount / total : 0) + '</span></div>';
@@ -382,7 +383,7 @@
   function txRow(t, hit) {
     return '<tr class="txr' + (hit && hit === t.id ? ' is-hit' : '') + '">' +
       '<td class="txr__d">' + esc(t.date) + '</td>' +
-      '<td class="txr__c"><span style="color:' + t.catColor + '">' +
+      '<td class="txr__c"><span style="color:' + tint(t.catColor) + '">' +
         esc(t.catName) + '</span></td>' +
       '<td class="txr__t">' + esc(t.merchant || t.catName) +
         (t.note ? ' <em>' + esc(t.note) + '</em>' : '') +
@@ -858,7 +859,7 @@
         var over = b.budgets.filter(function (x) { return x.over; });
         h += over.length ? '<div class="card">' + over.map(function (x) {
           return '<div class="bgt"><div class="bgt__k"><span class="dot" style="background:' +
-            x.catColor + '"></span>' + esc(x.userName) + '　' + esc(x.catName) + '</div>' +
+            tint(x.catColor) + '"></span>' + esc(x.userName) + '　' + esc(x.catName) + '</div>' +
             '<div class="bgt__t"><i style="width:100%;background:var(--down)"></i></div>' +
             '<div class="bgt__v is-over">' + money(x.used) + ' / ' + money(x.limit) +
             '（' + pct(x.pct) + '）</div></div>';
@@ -1319,7 +1320,7 @@
                資料用濁色，結果新開的帳本跟全站格格不入，而且看不見。 */
             '<select id="gnColor">' +
               ((global.DATA && global.DATA.groupColors) || []).map(function (c) {
-                return '<option value="' + esc(c.hex) + '">' + esc(c.name) + '</option>';
+                return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
               }).join('') +
             '</select></label>' +
           '<div><button class="btn btn--go" type="submit">建立</button></div>' +
@@ -1333,7 +1334,7 @@
           var inside = g.members;
           var outside = fam.members.filter(function (u) { return inside.indexOf(u.id) < 0; });
           return '<div class="gmem__g">' +
-            '<div class="gmem__t"><span class="gsw__d" style="background:' + esc(g.color) +
+            '<div class="gmem__t"><span class="gsw__d" style="background:' + tint(g.color) +
               '"></span>' + esc(g.name) + '</div>' +
             '<div class="gmem__l">' + inside.map(function (u) {
               var m = fam.members.filter(function (x) { return x.id === u; })[0] || {};
@@ -1359,7 +1360,7 @@
         h += '<div class="card arch">' +
           '<div class="arch__l">' + gone.map(function (g) {
             return '<div class="arch__i">' +
-              '<span class="gsw__d" style="background:' + esc(g.color) + '"></span>' +
+              '<span class="gsw__d" style="background:' + tint(g.color) + '"></span>' +
               '<span class="arch__n">' + esc(g.name) + '</span>' +
               '<span class="arch__c">' + g.count + ' 筆紀錄還在</span>' +
               (g.canEdit
@@ -1831,6 +1832,21 @@
   }
 
 
+
+  /* 語意代號 → 主題變數。
+
+     資料裡存的是「這是餐飲」（cat-food），不是「這是 #C4693C」。
+     實際顏色由 tokens.css 決定，所以換一套外觀時圖表會跟著換。
+
+     ⚠️ 它同時是**過濾器**。這個字串會被塞進 style="background:…"，
+     那是 CSS 的情境——esc() 擋不住，因為 esc() 只處理 HTML。
+     所以這裡只放行 [a-z0-9-]，其他一律丟掉。
+     沒有代號就回中性色，不要讓畫面出現空白的洞。 */
+  function tint(token) {
+    var t = String(token || '').replace(/[^a-z0-9-]/gi, '');
+    return t ? 'var(--' + t + ')' : 'var(--ink-faint)';
+  }
+
   /* ---------- 共用 ---------- */
   function head(t, s) { $title.textContent = t; $sub.textContent = s; }
 
@@ -2195,8 +2211,8 @@
           '<svg class="gsw__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">' +
             '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>' +
             '<path d="M10 4h8.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H10"/></svg>' +
-          '<span class="ic__d" style="background:' + esc(cur.color) + '"></span>' +
-          '<span class="gsw__d" style="background:' + esc(cur.color) + '"></span>' +
+          '<span class="ic__d" style="background:' + tint(cur.color) + '"></span>' +
+          '<span class="gsw__d" style="background:' + tint(cur.color) + '"></span>' +
           '<span class="gsw__n">' + esc(cur.name) + '</span>' +
           '<svg class="gsw__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
@@ -2208,7 +2224,7 @@
           gs.map(function (g) {
             return '<button class="gsw__i' + (g.id === GROUP ? ' on' : '') +
               '" data-group="' + esc(g.id) + '">' +
-              '<span class="gsw__d" style="background:' + esc(g.color) + '"></span>' +
+              '<span class="gsw__d" style="background:' + tint(g.color) + '"></span>' +
               '<span class="gsw__m"><b>' + esc(g.name) + '</b><i>' +
                 g.count + ' 筆' + (g.goal ? '　目標 ' + money(g.goal) : '') +
               '</i></span></button>';
