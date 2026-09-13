@@ -175,7 +175,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **55 條路由**。標示說明：
+共 **57 條路由**。標示說明：
 
 - **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -231,8 +231,10 @@ final_project/
 | 51 | DELETE | `/api/groups/{gid}` | 成員4 | 建立者 | 封存這本帳 |
 | 52 | POST | `/api/groups/{gid}/members` | 成員4 | 建立者 | 把家人加進這本帳 |
 | 53 | DELETE | `/api/groups/{gid}/members/{user_id}` | 成員4 | 建立者 | 把某個人移出這本帳 |
-| 54 | GET | `/api/allowances` | 成員4 | 登入 | 我每月給每個被監管者多少零用金 |
-| 55 | PUT | `/api/allowance` | 成員4 | 監管者 | 設定零用金。body: { wardId, amount } |
+| 54 | POST | `/api/groups/{gid}/settle` | 成員4 | 本人（開帳本的人） | 結算活動帳本。之後唯讀，不能再往裡面記 |
+| 55 | PATCH | `/api/groups/{gid}/notify` | 成員4 | 帳本成員 | 這本帳有動靜要不要通知我。body: { notify } |
+| 56 | GET | `/api/allowances` | 成員4 | 登入 | 我每月給每個被監管者多少零用金 |
+| 57 | PUT | `/api/allowance` | 成員4 | 監管者 | 設定零用金。body: { wardId, amount } |
 
 ## 4-3　記帳 `/api/transactions`
 
@@ -361,8 +363,8 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 56 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
-| 57 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
+| 58 | GET | `/healthz` | 系統 | 公開 | 健康檢查（Render 用） |
+| 59 | GET | `/docs` | 系統 | 公開 | FastAPI 自動產生的 OpenAPI 文件 |
 
 ---
 
@@ -408,7 +410,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 | **成員1** | **認證與基礎建設** | `m1-auth` | 12 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 8 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
 | **成員3** | **數字與建議** | `m3-analytics` | 15 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 我的總覽、家庭總覽、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
-| **成員4** | **家庭與可見範圍** | `m4-access` | 20 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
+| **成員4** | **家庭與可見範圍** | `m4-access` | 22 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
 
 ### 切分原則
 

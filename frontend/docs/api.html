@@ -27,7 +27,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>55 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>57 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -69,7 +69,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">55 ROUTES · 4 MODULES</div>
+    <div class="mono">57 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -251,14 +251,21 @@
     { n: 8, o: 'm1', m: 'POST', p: '/api/auth/verify-password', a: '本人',
       d: '重大操作前再確認一次',
       note: '⚠️ 驗證密碼但<b>不發新的 token</b>，跟登入不一樣。一定要做速率限制，否則它就是一支免費的密碼嘗試器。' },
-    { n: 54, o: 'm4', m: 'GET', p: '/api/allowances', a: '登入',
+    { n: 56, o: 'm4', m: 'GET', p: '/api/allowances', a: '登入',
       d: '我每月給每個被監管者多少零用金' },
-    { n: 55, o: 'm4', m: 'PUT', p: '/api/allowance', a: '監管者',
+    { n: 57, o: 'm4', m: 'PUT', p: '/api/allowance', a: '監管者',
       d: '設定零用金。body: { wardId, amount }',
       note: '⚠️ <b>零用金是設定，不是一筆支出紀錄。</b>家長記一筆「給小孩 3000」、小孩再把它花掉記成支出，家庭總支出就會變成 6000——同一筆錢被算了兩次。' },
 
-    { n: 56, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
-    { n: 57, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
+    { n: 54, o: 'm4', m: 'POST', p: '/api/groups/{gid}/settle', a: '本人（開帳本的人）',
+      d: '結算活動帳本。之後唯讀，不能再往裡面記',
+      note: '⚠️ <b>結算不搬動任何一筆紀錄。</b>紀錄本來就屬於這本帳，也本來就出現在每個成員的收支明細裡（可見範圍是聯集）。所以它<b>不會改變任何人的可見範圍</b>——監管者早就看得到監管對象在任何帳本的紀錄。' },
+    { n: 55, o: 'm4', m: 'PATCH', p: '/api/groups/{gid}/notify', a: '帳本成員',
+      d: '這本帳有動靜要不要通知我。body: { notify }',
+      note: '⚠️ <b>預設關。</b>開著的話，光家用帳本本月就是 31 筆 × 3 個成員 = 93 則。而且監管優先：父母既是監管者又在帳本裡時只會收到一則，去重規則見 toolkit/notify.py。' },
+
+    { n: 58, o: 'sys', m: 'GET', p: '/healthz', a: '公開', d: '健康檢查（Render 用）' },
+    { n: 59, o: 'sys', m: 'GET', p: '/docs', a: '公開', d: 'FastAPI 自動產生的 OpenAPI 文件',
       note: '後端上線後<b>這支才是真正能送出請求的地方</b>。' }
   ];
 

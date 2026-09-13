@@ -257,6 +257,8 @@ MEMBERS: list[Member] = [
             ("DELETE", "/api/groups/{gid}"),
             ("POST", "/api/groups/{gid}/members"),
             ("DELETE", "/api/groups/{gid}/members/{user_id}"),
+            ("POST", "/api/groups/{gid}/settle"),
+            ("PATCH", "/api/groups/{gid}/notify"),
             ("GET", "/api/allowances"),
             ("PUT", "/api/allowance"),
         ],

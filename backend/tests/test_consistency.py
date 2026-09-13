@@ -605,8 +605,14 @@ def test_家庭角色只有兩層():
     # 沒有人的 role 還掛著 master
     assert "role: 'master'" not in data, \
         "還有成員掛著 role: 'master'——master 不是家庭角色"
-    assert "role: 'member'" not in data, \
-        "member 已經改名為 child，還有地方沒改"
+    # ⚠️ 三個檔案都要檢查。原本只看 data.js，結果 api.js 的註冊流程
+    # 還在發 role: 'member'——新註冊的人，角色標籤會顯示 undefined。
+    # ⚠️ 這裡**不能**用 _blank()：它會把字串塗白，而我們要找的正是
+    # role: 'member' 這個字串本身——塗白等於自己把證據擦掉，
+    # 測試會永遠通過。（寫錯過一次，反向驗證才發現。）
+    for path in ("frontend/js/data.js", "frontend/js/api.js", "frontend/js/app.js"):
+        assert "role: 'member'" not in read(path), \
+            "%s 還在用 member 這個角色，它已經改名為 child" % path
 
 
 def test_平台管理員不可以讀任何人的財務資料():
@@ -1003,3 +1009,51 @@ def test_家庭總覽不可以重複統計頁的圖():
     assert mo2, "找不到 vStats"
     assert "memberBar(" not in mo2.group(1), \
         "統計不該畫「誰花的」——那一頁是按時間和分類看，不是按人"
+
+
+def test_結算不可以搬動任何一筆紀錄():
+    """結算只是把帳本標記結束，不是把紀錄換一本帳。
+
+    最早的設計是「結算＝把紀錄歸戶到個人時間軸」，那會改變 group_id，
+    也就改變了誰看得到。後來可見範圍從交集改成聯集——監管者本來就看得到
+    監管對象在任何帳本的紀錄——那個顧慮自己消失了，結算也就不必搬東西。
+
+    搬動紀錄是不可逆的；標記結束是可逆的。能不搬就不要搬。
+    """
+    api = read("frontend/js/api.js")
+    mo = re.search(r"settleGroup: function \(gid\) \{(.*?)\n    \},", api, re.S)
+    assert mo, "api.js 裡找不到 settleGroup"
+    body = mo.group(1)
+
+    for bad in ("t.group =", ".group =", "transactions"):
+        assert bad not in body, "結算動到紀錄了：" + bad
+    assert "s.settled" in body, "結算應該只寫一筆結算標記"
+
+
+def test_活動帳本一定要有結束日():
+    """沒有結束日的活動帳本永遠不會到期，也就永遠不會被結算——
+    那它跟常設帳本沒有差別，只是多一個標籤。
+    """
+    api = read("frontend/js/api.js")
+    assert "if (kind === 'temp' && !p.endsOn) throw new Error('活動帳本要有結束日');" in api, \
+        "建立活動帳本時沒有擋掉缺少結束日的情況"
+
+
+def test_活動帳本不放圖示():
+    """活動帳本用「活動 · 到 mm/dd」的標籤區別，不需要再佔一個圖示方塊。"""
+    api = read("frontend/js/api.js")
+    assert "icon: kind === 'temp' ? '' :" in api, \
+        "建立活動帳本時仍然給了圖示"
+
+    app = read("frontend/js/app.js")
+    mo = re.search(r"function gcard\(g, i\) \{(.*?)\n      \}", app, re.S)
+    assert mo, "app.js 裡找不到 gcard"
+    assert "g.kind === 'temp' ? '' :" in mo.group(1), \
+        "帳本卡片沒有對活動帳本略過圖示方塊"
+
+
+def test_帳本通知預設是關的():
+    """家用帳本本月 31 筆 × 3 個其他成員 = 93 則。預設開就是洗版。"""
+    data = read("frontend/js/data.js")
+    assert "notify: true" not in data, "種子資料裡有帳本預設開著通知"
+    assert data.count("notify: false") >= 8, "帳本成員應該都明確標記 notify: false"

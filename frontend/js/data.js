@@ -47,13 +47,23 @@ window.DATA = {
      記帳除了有「分類」，還有「這筆算在哪一本帳上」。
      分類回答「錢花在什麼」，帳本回答「這筆屬於哪一份預算」。
      每一本帳可以各自設一個每月存款目標。 */
+  /* kind：
+       'standing'  常設。永遠在，沒有結束這回事。
+       'temp'      臨時。有結束日，到了就結算，結算後唯讀。
+
+     ⚠️ 臨時帳本**不是另一種實體**，就是一本帳，只是多了生命週期。
+     拆成兩張表的話，成員、紀錄、統計、目標全部要寫兩份。 */
   groups: [
     { id: 'G1', name: '家用', icon: '家', color: '#27405E', owner: 'U1',
-      created: '2026-01-05', note: '日常開銷，全家共用' },
+      kind: 'standing', created: '2026-01-05', note: '日常開銷，全家共用' },
     { id: 'G2', name: '旅遊基金', icon: '旅', color: '#4A3F6B', owner: 'U1',
-      created: '2026-03-01', note: '存暑假出國的錢，花費也記在這裡' },
+      kind: 'standing', created: '2026-03-01', note: '為了出國先存起來的錢' },
     { id: 'G3', name: '宇涵的零用', icon: '涵', color: '#1F5E63', owner: 'U3',
-      created: '2026-02-11', note: '打工收入與自己的開銷' }
+      kind: 'standing', created: '2026-02-11', note: '打工收入與自己的開銷' },
+    /* 到期日已經過了（示範資料的今天是 2026-09-10），畫面上會出現結算提示 */
+    { id: 'G4', name: '沖繩旅遊', icon: '沖', color: '#2F5D3A', owner: 'U1',
+      kind: 'temp', endsOn: '2026-09-08', settledAt: null,
+      created: '2026-08-20', note: '五天四夜，回來就結算' }
   ],
 
   /* 誰在哪一本帳裡。
@@ -71,11 +81,17 @@ window.DATA = {
           B 我有加入的帳本裡的，那本帳的成員彼此看得到（加進來就是給看）
         過一條就看得到。早期版本用交集，那讓監管一鍵可繞：
         被監管的人只要另外開一本不加監管者的帳就躲掉了。 */
+  /* notify：這本帳有動靜要不要通知我。**預設關。**
+     開著的話光家用本月就是 31 筆 × 3 個成員 = 93 則，那不是通知是洗版。
+     ⚠️ 而且監管優先：父母既是監管者又在帳本裡時，只會收到一則。
+        去重規則寫在 backend/app/toolkit/notify.py。 */
   groupMembers: [
-    { group: 'G1', user: 'U1' }, { group: 'G1', user: 'U2' },
-    { group: 'G1', user: 'U3' }, { group: 'G1', user: 'U4' },
-    { group: 'G2', user: 'U1' }, { group: 'G2', user: 'U2' },
-    { group: 'G3', user: 'U3' }, { group: 'G3', user: 'U1' }
+    { group: 'G1', user: 'U1', notify: false }, { group: 'G1', user: 'U2', notify: false },
+    { group: 'G1', user: 'U3', notify: false }, { group: 'G1', user: 'U4', notify: false },
+    { group: 'G2', user: 'U1', notify: false }, { group: 'G2', user: 'U2', notify: false },
+    { group: 'G3', user: 'U3', notify: false }, { group: 'G3', user: 'U1', notify: false },
+    { group: 'G4', user: 'U1', notify: false }, { group: 'G4', user: 'U2', notify: false },
+    { group: 'G4', user: 'U3', notify: false }, { group: 'G4', user: 'U4', notify: false }
   ],
 
   /* 每月存款目標可以分帳本設。group 為 null = 不分帳本的整體目標。
@@ -219,9 +235,9 @@ window.DATA = {
       cat: 'C04', merchant: '盥洗用品', note: '', source: 'manual' },
     { id: 'T1069', group: 'G1', user: 'U4', date: '2026-09-08', amount: 700, kind: 'expense',
       cat: 'C08', merchant: '班費', note: '', source: 'manual' },
-    { id: 'T1044', group: 'G2', user: 'U1', date: '2026-09-09', amount: 12800, kind: 'expense',
+    { id: 'T1044', group: 'G4', user: 'U1', date: '2026-09-09', amount: 12800, kind: 'expense',
       cat: 'C02', merchant: '訂機票（訂金）', note: '暑假沖繩', source: 'manual' },
-    { id: 'T1043', group: 'G2', user: 'U2', date: '2026-09-06', amount: 4800, kind: 'expense',
+    { id: 'T1043', group: 'G4', user: 'U2', date: '2026-09-06', amount: 4800, kind: 'expense',
       cat: 'C08', merchant: '訂房訂金', note: '', source: 'manual' },
     /* ⚠️ 帳本之間的轉帳，不是收入。
        家用轉 15,000 到旅遊基金，錢沒有進到這個家，只是換了一本帳。
@@ -528,7 +544,10 @@ window.DATA = {
              ['color', 'TEXT', '圖表與標籤的顏色'],
              ['created_by', 'BIGINT', 'FK → users'],
              ['created_at', 'TIMESTAMPTZ', ''],
-             ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著']] },
+             ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著'],
+             ['kind', 'TEXT', "'standing' 常設 / 'temp' 臨時（有結束日、會結算）"],
+             ['ends_on', 'DATE', '臨時帳本的結束日。常設為 NULL'],
+             ['settled_at', 'TIMESTAMPTZ', 'NULL = 還沒結算。結算後這本帳唯讀']] },
 
     { t: 'group_members', label: '帳本成員', note: '可見範圍的另一條路：我在這本帳裡就看得到這本帳',
       cols: [['group_id', 'BIGINT', 'PK, FK → groups'],

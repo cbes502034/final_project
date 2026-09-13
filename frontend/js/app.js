@@ -1179,19 +1179,49 @@
       var live = d.groups.filter(function (g) { return !g.archived; });
       var gone = d.groups.filter(function (g) { return g.archived; });
 
-      var h = '<div class="page">' +
-        '';
+      /* 常設／活動分成兩區，不是兩個分頁。
+         分頁會把一半藏起來——只有一本活動帳的時候，為它開一個分頁太重，
+         手機上多一層隱藏狀態也跟「看得到現在在哪一本」相反。
+         區塊則是全部看得到、只是分群；沒有活動帳本時整個區塊不出現。 */
+      var standing = live.filter(function (g) { return g.kind !== 'temp'; });
+      var temps = live.filter(function (g) { return g.kind === 'temp' && !g.settled; });
+      var done = live.filter(function (g) { return g.kind === 'temp' && g.settled; });
 
-      h += '<div class="sec"><h2 class="sec__t">我的帳本' + helpBtn('books') + '</h2>' +
-        '<span class="sec__n">' + live.length + ' 本</span></div>';
+      var h = '<div class="page">';
 
-      h += '<div class="rows">' + live.map(function (g, i) {
-        return '<article class="row" style="animation-delay:' + (i * 50) +
-          'ms;grid-template-columns:44px 1fr 150px 108px">' +
-          '<div class="ava" style="background:' + esc(g.color) + '22;color:' + esc(g.color) +
-            ';border-color:' + esc(g.color) + '55">' + esc(g.icon) + '</div>' +
+      h += '<div class="sec"><h2 class="sec__t">常設帳本' + helpBtn('books') + '</h2>' +
+        '<span class="sec__n">' + standing.length + ' 本</span></div>';
+      h += '<div class="rows">' + standing.map(gcard).join('') + '</div>';
+
+      if (temps.length) {
+        h += '<div class="sec"><h2 class="sec__t">活動帳本</h2>' +
+          '<span class="sec__n">' + temps.length + ' 本</span></div>';
+        h += '<div class="rows">' + temps.map(gcard).join('') + '</div>';
+      }
+      if (done.length) {
+        h += foldBlock('gdone', '已結算', '看看',
+          '<div class="rows">' + done.map(gcard).join('') + '</div>',
+          String(done.length) + ' 本');
+      }
+
+      function gcard(g, i) {
+        /* ⚠️ 活動帳本不放圖示方塊——它用「活動 · 到 mm/dd」的標籤區別，
+           不需要再佔一格。常設帳本才有圖示。 */
+        var cols = g.kind === 'temp'
+          ? '1fr 150px 108px' : '44px 1fr 150px 108px';
+        return '<article class="row" style="animation-delay:' + ((i || 0) * 50) +
+          'ms;grid-template-columns:' + cols + '">' +
+          (g.kind === 'temp' ? '' :
+            '<div class="ava" style="background:' + esc(g.color) + '22;color:' + esc(g.color) +
+            ';border-color:' + esc(g.color) + '55">' + esc(g.icon) + '</div>') +
           '<div class="row__m"><div class="row__top">' +
             '<span class="row__act" style="font-size:15px">' + esc(g.name) + '</span>' +
+            (g.kind === 'temp'
+              ? '<span class="tag tag--MEDIUM">活動' +
+                (g.endsOn ? ' · 到 ' + esc(g.endsOn.slice(5).replace('-', '/')) : '') +
+                '</span>' : '') +
+            (g.settled ? '<span class="tag tag--soft">已結算</span>' : '') +
+            (g.overdue ? '<span class="tag tag--down">已到期</span>' : '') +
             (g.canEdit ? '<span class="tag tag--done">你建立的</span>'
                        : '<span class="tag tag--soft">你是成員</span>') +
             (g.id === GROUP ? '<span class="tag tag--na">目前在看</span>' : '') +
@@ -1206,17 +1236,30 @@
           '</div>' +
           '<div class="row__go2">' +
             '<span class="rowbtn" data-gopen="' + esc(g.id) + '">' + g.count + ' 筆 →</span>' +
-            (g.canEdit ? '<button class="gx" data-garch="' + esc(g.id) +
-                         '" title="收起這本帳。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
+            (g.kind === 'temp' && !g.settled && g.canEdit
+              ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">結算</button>' : '') +
+            (g.canEdit && !g.settled
+              ? '<button class="gx" data-garch="' + esc(g.id) +
+                '" title="收起這本帳。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
           '</div>' +
+          '<label class="gnot"><input type="checkbox" data-gnotify="' + esc(g.id) + '"' +
+            (g.notify ? ' checked' : '') + '><span>有動靜通知我</span></label>' +
         '</article>';
-      }).join('') + '</div>';
+      }
 
       // ---- 建立 ----
       h += foldBlock('gnew', '開一本新的', '開一本',
         '<form class="card gnew" id="gnewF">' +
           '<label class="fld"><span>名字</span>' +
-            '<input type="text" id="gnName" placeholder="例如 旅遊基金、寵物開銷" required></label>' +
+            '<input type="text" id="gnName" placeholder="例如 旅遊基金、沖繩旅遊" required></label>' +
+          '<label class="fld"><span>種類</span>' +
+            '<select id="gnKind">' +
+              '<option value="standing">常設 —— 一直用的</option>' +
+              '<option value="temp">活動 —— 有結束日，結束後結算</option>' +
+            '</select></label>' +
+          /* 只有活動帳本要填結束日，所以它預設藏起來 */
+          '<label class="fld" id="gnEndWrap" hidden><span>結束日</span>' +
+            '<input type="date" id="gnEnd"></label>' +
           '<label class="fld"><span>顏色</span>' +
             /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份。
                寫死的那一版跟種子資料用的顏色完全是兩套：表單給亮彩、
@@ -2202,6 +2245,47 @@
       }
     }
 
+    /* 選了「活動」才要填結束日 */
+    var kindSel = t.closest('#gnKind');
+    if (kindSel) {
+      var wrap = document.getElementById('gnEndWrap');
+      if (wrap) wrap.hidden = kindSel.value !== 'temp';
+      return;
+    }
+
+    /* 有動靜通知我。⚠️ 預設關——開著的話光家用本月就是 93 則。 */
+    var gnot = t.closest('[data-gnotify]');
+    if (gnot) {
+      API.setGroupNotify(gnot.dataset.gnotify, gnot.checked).then(function (r) {
+        toast(r.notify ? '這本帳有動靜會通知你' : '已關閉這本帳的通知', 'ok');
+      }).catch(function (err) {
+        gnot.checked = !gnot.checked;
+        toast(err.message || '設定失敗', 'err');
+      });
+      return;
+    }
+
+    /* 結算。⚠️ 它不搬動任何一筆紀錄，也不改變誰看得到——
+       只是把這本帳標記結束、之後不能再往裡面記。 */
+    var gset = t.closest('[data-gsettle]');
+    if (gset) {
+      var gid = gset.dataset.gsettle;
+      danger({
+        title: '結算這本活動帳本',
+        detail: '結算之後<b>不能再往裡面記帳</b>，紀錄會留著、也還看得到。' +
+                '<br>已經花掉的錢本來就算在你的收支裡，<b>數字不會變</b>。',
+        level: 'password',
+        ok: '確定結算',
+        onOk: function () {
+          API.settleGroup(gid).then(function () {
+            paintGroups(); vGroups();
+            toast('已結算', 'ok');
+          }).catch(function (err) { toast(err.message || '結算失敗', 'err'); });
+        }
+      });
+      return;
+    }
+
     /* ---- 帳本管理 ---- */
     var gopen = t.closest('[data-gopen]');
     if (gopen) {
@@ -2517,9 +2601,13 @@
     if (f.id === 'gnewF') {
       e.preventDefault();
       busy(f, true, '建立中…');
+      var kind = (document.getElementById('gnKind') || {}).value || 'standing';
       API.createGroup({
         name: document.getElementById('gnName').value,
-        color: document.getElementById('gnColor').value
+        color: document.getElementById('gnColor').value,
+        kind: kind,
+        endsOn: kind === 'temp'
+          ? (document.getElementById('gnEnd') || {}).value : null
       }).then(function (g) {
         busy(f, false);
         paintGroups(); vGroups();

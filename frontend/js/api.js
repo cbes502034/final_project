@@ -188,6 +188,22 @@
     return st.patch[id];
   }
 
+  /* 示範資料的「今天」。真後端用伺服器時間，這裡跟著示範期間走，
+     不然示範資料會因為你哪一天打開而表現不同。 */
+  function todayStr() {
+    return (global.DATA.meta.updated || '').slice(0, 10) ||
+      new Date().toISOString().slice(0, 10);
+  }
+
+  function notifyOf(gid, uid) {
+    var rows = (global.DATA.groupMembers || []).concat(
+      (state && state.joined) || []);
+    var hit = rows.filter(function (m) {
+      return m.group === gid && m.user === uid;
+    });
+    return hit.length ? !!hit[hit.length - 1].notify : false;
+  }
+
   function memberOf(id) {
     return global.DATA.members.filter(function (m) { return m.id === id; })[0];
   }
@@ -250,8 +266,11 @@
     return global.DATA.groups.concat(s.newGroups || [])
       .map(function (g) {
         var p = (s.groupPatch || {})[g.id] || {};
+        // 這次工作階段裡結算掉的，要蓋回種子資料上
+        var done = (s.settled || []).filter(function (x) { return x.group === g.id; });
         return Object.assign({}, g, p, {
-          archived: (s.archived || []).indexOf(g.id) >= 0
+          archived: (s.archived || []).indexOf(g.id) >= 0,
+          settledAt: done.length ? done[done.length - 1].at : (g.settledAt || null)
         });
       })
       .filter(function (g) { return withArchived || !g.archived; });
@@ -438,7 +457,7 @@
           return Math.max(mx, Number(String(m.id).replace(/\D/g, '')) || 0);
         }, 0) + 1;
         var u = {
-          id: 'U' + n, name: name, email: mail, role: 'member',
+          id: 'U' + n, name: name, email: mail, role: 'child',
           avatar: name.slice(-1), age: null,
           joined: new Date().toISOString().slice(0, 10),
           income: 0, expense: 0, budget: 0,
@@ -557,7 +576,14 @@
             .filter(function (g) { return mine.indexOf(g.id) >= 0; })
             .map(function (g) {
               var members = memberIdsOf(g.id);
+              /* 活動帳本到期了沒。⚠️ 只是一個判斷，不是排程——
+                 沒有人在背景跑，是畫面問「今天過了沒」。 */
+              var overdue = g.kind === 'temp' && !g.settledAt && g.endsOn &&
+                g.endsOn < todayStr();
               return Object.assign(clone(g), {
+                kind: g.kind || 'standing',
+                settled: !!g.settledAt,
+                overdue: !!overdue,
                 members: members,
                 memberNames: members.map(function (u) {
                   return (memberOf(u) || {}).name || u;
@@ -569,10 +595,50 @@
                   return t.group === g.id && vis.indexOf(t.user) >= 0;
                 }).length,
                 goal: goalOf(s.me, g.id),
-                canEdit: g.owner === s.me
+                canEdit: g.owner === s.me,
+                notify: notifyOf(g.id, s.me)
               });
             })
         };
+      });
+    },
+
+    /* 結算一本活動帳本。
+
+       ⚠️ 結算**不搬動任何一筆紀錄**。紀錄本來就屬於這本帳，也本來就
+       出現在每個成員自己的收支明細裡（可見範圍是聯集）。結算做的是
+       兩件事：把這本帳標記成結束、之後不能再往裡面記。
+
+       所以它也**不會改變任何人的可見範圍**——監管者早就看得到監管對象
+       在任何帳本的紀錄了。這一點跟最早的設計不同，是因為可見範圍後來
+       從交集改成聯集，那個隱私顧慮自己消失了。 */
+    settleGroup: function (gid) {
+      var s = load();
+      return sleep(320).then(function () {
+        var g = allGroups(true).filter(function (x) { return x.id === gid; })[0];
+        if (!g) throw new Error('找不到這本帳');
+        if (g.kind !== 'temp') throw new Error('只有活動帳本需要結算');
+        if (g.owner !== s.me) throw new Error('只有開這本帳的人可以結算');
+        if (g.settledAt) throw new Error('這本帳已經結算過了');
+        s.settled = (s.settled || []).concat([
+          { group: gid, at: new Date().toISOString() }]);
+        save();
+        return { id: gid, settledAt: s.settled[s.settled.length - 1].at };
+      });
+    },
+
+    /* 這本帳有動靜要不要通知我。預設關——開著的話光家用本月就是
+       31 筆 × 3 個成員 = 93 則。 */
+    setGroupNotify: function (gid, on) {
+      var s = load();
+      return sleep(200).then(function () {
+        if (visibleGroups(s.me, true).indexOf(gid) < 0) {
+          var e = new Error('你不在這本帳裡'); e.status = 403; throw e;
+        }
+        s.joined = (s.joined || []).concat([
+          { group: gid, user: s.me, notify: !!on }]);
+        save();
+        return { group: gid, notify: !!on };
       });
     },
 
@@ -580,19 +646,27 @@
       var s = load(); p = p || {};
       return sleep(300).then(function () {
         var name = String(p.name || '').trim();
-        if (!name) throw new Error('群組要有名字');
+        if (!name) throw new Error('帳本要有名字');
         if (allGroups().some(function (g) { return g.name === name; })) {
           throw new Error('已經有一本叫「' + name + '」的帳了');
         }
         var n = allGroups().reduce(function (mx, g) {
           return Math.max(mx, Number(String(g.id).replace(/\D/g, '')) || 0);
         }, 0) + 1;
+        var kind = p.kind === 'temp' ? 'temp' : 'standing';
+        if (kind === 'temp' && !p.endsOn) throw new Error('活動帳本要有結束日');
+
         var g = {
           id: 'G' + n, name: name,
-          icon: (p.icon || name).slice(-1),
-          color: p.color || '#6C9FFB',
+          /* ⚠️ 活動帳本不放圖示——它用「活動 · 到 mm/dd」的標籤區別，
+             不需要再佔一個方塊。常設帳本才取名字的最後一個字當圖示。 */
+          icon: kind === 'temp' ? '' : (p.icon || name).slice(-1),
+          color: p.color || (global.DATA.groupColors || [{}])[0].hex || '#27405E',
           owner: s.me,
-          created: new Date().toISOString().slice(0, 10),
+          kind: kind,
+          endsOn: kind === 'temp' ? p.endsOn : null,
+          settledAt: null,
+          created: todayStr(),
           note: String(p.note || '')
         };
         s.newGroups = (s.newGroups || []).concat([g]);
@@ -1526,6 +1600,8 @@
     readNotifications: function (u)     { return req('/api/notifications', { method: 'PATCH', body: { readUntil: u } }); },
     groups:            function (f)     { return req('/api/groups' + qs(f)); },
     createGroup:       function (p)     { return req('/api/groups', { method: 'POST', body: p }); },
+    settleGroup:       function (g)     { return req('/api/groups/' + g + '/settle', { method: 'POST' }); },
+    setGroupNotify:    function (g, on) { return req('/api/groups/' + g + '/notify', { method: 'PATCH', body: { notify: !!on } }); },
     updateGroup:       function (g, p)  { return req('/api/groups/' + encodeURIComponent(g), { method: 'PATCH', body: p }); },
     archiveGroup:      function (g)     { return req('/api/groups/' + encodeURIComponent(g), { method: 'DELETE' }); },
     addGroupMember:    function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members', { method: 'POST', body: { userId: u } }); },
@@ -1572,6 +1648,8 @@
     readNotifications: function (u)    { return impl.readNotifications(u); },
     groups:            function (f)    { return impl.groups(f); },
     createGroup:       function (p)    { return impl.createGroup(p); },
+    settleGroup:       function (g)    { return impl.settleGroup(g); },
+    setGroupNotify:    function (g, on){ return impl.setGroupNotify(g, on); },
     updateGroup:       function (g, p) { return impl.updateGroup(g, p); },
     archiveGroup:      function (g)    { return impl.archiveGroup(g); },
     addGroupMember:    function (g, u) { return impl.addGroupMember(g, u); },
