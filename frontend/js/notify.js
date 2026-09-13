@@ -209,10 +209,7 @@
     panel.hidden = !state.open;
     btn.classList.toggle('open', state.open);
     document.body.classList.toggle('dw-on', state.open);
-    // 抽屜拉開要把內容推下去，不要蓋住
-    if (global.__pushForDrawer) setTimeout(global.__pushForDrawer, 0);
-    // 抽屜在版面最上面，捲到下面才打開的話會開在畫面外
-    if (state.open) setTimeout(function () { global.scrollTo(0, 0); }, 40);
+    if (global.__pushForDrawer) global.__pushForDrawer();
     if (!state.open) {
       // 關起來就把內容清掉。留著的話，換人之後 DOM 裡還躺著
       // 上一個使用者的記帳明細 —— 看不到不等於不在。
@@ -221,7 +218,7 @@
     }
 
     var h = '<div class="bell__h">' +
-      '<span class="bell__t">監管通知</span>' +
+      '<span class="bell__t">通知</span>' +
       '<button class="bell__mute" id="bellMute" title="開關提示音">' +
         (muted() ? '🔇 靜音中' : '🔔 有聲音') + '</button>' +
       (state.unread ? '<button class="bell__all" id="bellAll">全部已讀</button>' : '') +

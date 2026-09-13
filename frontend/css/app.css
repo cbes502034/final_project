@@ -2764,51 +2764,121 @@ body.is-admin #searchBtn,
 body.is-admin .search,
 body.is-admin .bell__wrap { display: none; }
 
-/* ---------- 頂列：工具靠在內容旁邊 ---------- */
-.top {
-  position: sticky; top: 0; z-index: 30;
-  display: flex; align-items: center; gap: 12px;
-  min-height: 60px; margin: 0; border: 0; box-shadow: none;
-  padding: 0 max(var(--page-x), calc((100% - var(--page-w)) / 2 + var(--page-x)));
-  background: rgba(244, 241, 234, .9);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  border-bottom: 1px solid transparent;
-  transition: border-color .2s var(--ease);
-}
-body.phead-gone .top { border-bottom-color: var(--line); }
-.top::after { display: none; }
-.top__brand { display: none; }
-.top__mini {
-  font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; min-width: 0;
-  opacity: 0; transform: translateY(6px); pointer-events: none;
-  transition: opacity .2s var(--ease), transform .2s var(--ease);
-}
-body.phead-gone .top__mini { opacity: 1; transform: none; }
-.top .gsw, .top .bell__wrap { border-left: 0; }
-.top .gsw__b, .top .bell, .top .ic { background: transparent; }
-
 /* ============================================================
-   第一層：頁面標題
+   第一層：頁面標題 ＋ 工具
+   ------------------------------------------------------------
+   標題在左，右邊是「我｜全家」、帳本、搜尋、通知，全部同一行。
+   ⚠️ 原本工具在另一條獨立的頂列上，兩個橫幅疊在一起，中間空一大塊。
    ============================================================ */
 .phead {
   max-width: var(--page-w); margin: 0 auto;
-  padding: 18px var(--page-x) 8px;
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap;
+  padding: 26px var(--page-x) 6px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap;
 }
 .phead__m { min-width: 0; }
-.phead__k {
-  font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--accent);
-  margin-bottom: 6px;
-}
+.phead__k { font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--accent); margin-bottom: 6px; }
 .phead__k:empty { display: none; }
 .phead__t {
   font-family: var(--serif); font-size: var(--h1); font-weight: 700;
   line-height: 1.2; letter-spacing: .01em; color: var(--ink);
 }
 .phead__s { margin-top: 8px; font-size: 14px; color: var(--ink-faint); }
-.phead__a { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.phead__r { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.phead__a { display: flex; align-items: center; gap: 10px; }
+.phead__tools { display: flex; align-items: center; gap: 8px; }
 body.is-out .phead, body.is-out .tabs, body.is-out .sheet { display: none; }
+
+/* ---------- 三個工具：同一個高度、同一種外框 ---------- */
+.phead__tools .gsw,
+.phead__tools .bell__wrap { position: relative; flex: 0 0 auto; border: 0; }
+.phead__tools .gsw[hidden], .phead__tools .bell__wrap[hidden] { display: none; }
+
+.phead__tools .gsw__b {
+  display: inline-flex; align-items: center; gap: 8px;
+  width: auto; height: var(--ctl); padding: 0 12px;
+  background: #fff; border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 13.5px; font-weight: 600; box-shadow: none;
+}
+.phead__tools .gsw__b:hover { background: #fff; border-color: var(--accent-line); color: var(--ink); }
+.phead__tools .gsw__b.open { border-color: var(--accent); background: #fff; color: var(--ink); }
+.phead__tools .gsw__ic, .phead__tools .ic__d { display: none; }
+.phead__tools .gsw__b .gsw__d { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; }
+.phead__tools .gsw__n { display: inline; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.phead__tools .gsw__cv { display: block; width: 14px; height: 14px; opacity: .55; transition: transform .2s var(--ease); }
+.phead__tools .gsw__b.open .gsw__cv { transform: rotate(180deg); }
+
+.phead__tools #searchBtn,
+.phead__tools .bell {
+  position: relative; display: grid; place-items: center;
+  width: var(--ctl); height: var(--ctl); padding: 0; align-self: center;
+  background: #fff; border: 1px solid var(--line-2); color: var(--ink-soft); box-shadow: none;
+}
+.phead__tools #searchBtn svg, .phead__tools .bell svg { width: 18px; height: 18px; }
+.phead__tools #searchBtn:hover, .phead__tools .bell:hover { border-color: var(--accent-line); color: var(--ink); background: #fff; }
+.phead__tools .bell.open, .phead__tools #searchBtn.open { border-color: var(--accent); color: var(--accent); }
+.phead__tools .bell__n {
+  position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center; font-size: 10.5px; font-weight: 700; line-height: 1;
+  background: var(--down); color: #fff; border: 2px solid var(--paper);
+}
+.phead__tools .bell__n[hidden] { display: none; }
+
+/* 電腦版：搜尋是一直都在的輸入框，不需要那顆圖示 */
+.phead__tools #searchBtn { display: none; }
+.phead__tools #searchDrawer {
+  position: relative; display: flex; align-items: center; align-self: center;
+  width: 230px; min-width: 0; max-width: none; height: var(--ctl); margin: 0; padding: 0 12px 0 34px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239DA2A9' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px 50% / 15px 15px;
+  border: 1px solid var(--line-2); box-shadow: none; animation: none;
+}
+.phead__tools #searchDrawer:focus-within { border-color: var(--accent); }
+.phead__tools #searchDrawer input {
+  width: 100%; height: 100%; padding: 0; border: 0; background: transparent;
+  font-size: 13.5px; color: var(--ink);
+}
+.phead__tools #searchDrawer input:focus { outline: none; }
+
+/* ---------- 下拉面板：從按鈕正下方浮出來，不推動任何內容 ---------- */
+/* 對齊按鈕右緣往左展開，所以不會蓋到同一行右邊的按鈕；
+   項目太多就在面板裡自己捲（max-height ＋ overflow），頁面不會被撐長。 */
+.phead__tools .gsw__p,
+.phead__tools .bell__panel {
+  position: absolute; top: calc(100% + 8px); right: 0; left: auto; z-index: 65;
+  display: block; width: 320px; max-height: min(64vh, 460px); overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 6px 0;
+  background: #fff; border: 1px solid var(--line); border-radius: 0;
+  box-shadow: var(--shadow-pop); animation: popIn .18s var(--out) both;
+}
+.phead__tools .gsw__p[hidden], .phead__tools .bell__panel[hidden] { display: none; }
+.phead__tools .bell__panel { width: 380px; padding: 0; }
+
+.phead__tools .gsw__i {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 10px 16px; margin: 0; border: 0; background: transparent; text-align: left; box-shadow: none;
+}
+.phead__tools .gsw__i:hover { background: var(--card-2); padding-left: 16px; }
+.phead__tools .gsw__i.on { background: var(--accent-wash); }
+.phead__tools .gsw__i .gsw__d { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; }
+.phead__tools .gsw__m { display: flex; flex-direction: column; min-width: 0; line-height: 1.4; }
+.phead__tools .gsw__m b { font-size: 14px; font-weight: 600; color: var(--ink); }
+.phead__tools .gsw__m i { font-style: normal; font-size: 12px; color: var(--ink-faint); }
+.phead__tools .gsw__more {
+  display: block; margin-top: 4px; padding: 10px 16px; border-top: 1px solid var(--line);
+  font-size: 13px; font-weight: 700; color: var(--accent);
+}
+
+.phead__tools .bell__h {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--line);
+}
+.phead__tools .bell__t { margin-right: auto; font-family: var(--sans); font-size: 14px; font-weight: 700; }
+.phead__tools .bell__list { max-height: none; overflow: visible; }
+.phead__tools .bell__i { padding: 12px 16px; }
+.phead__tools .bell__i:hover { padding-left: 16px; background: var(--card-2); }
+.phead__tools .bell__empty { padding: 28px 16px; }
+
+/* 面板開著時不要把內容壓暗、也不要擋住操作 */
+body.dw-on #view { opacity: 1; pointer-events: auto; }
 
 /* ============================================================
    內容
@@ -3244,19 +3314,10 @@ body.is-out .foot { display: none; }
   .main { margin-left: 0; padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom, 0px)); }
   body.rail-min { --rail: 0px; }
 
-  .top { min-height: 54px; padding: 0 var(--page-x); }
-  .top__brand {
-    display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto;
-    font-family: var(--serif); font-size: 16px; font-weight: 700; color: var(--ink); white-space: nowrap;
-  }
-  .top .gsw { min-width: 0; }
-  .top__brand .brand__m { width: 26px; height: 26px; flex: 0 0 26px; font-size: 13px; background: var(--rail-bg); color: #fff; }
-  .top__mini { display: none; }
-  body.is-admin header.top { display: flex; }
-
-  .phead { padding-top: 14px; align-items: flex-start; }
-  .phead__a { width: 100%; }
-  .phead__a .btn--go { margin-left: auto; }
+  /* 標題一行，工具另起一行排滿；下拉面板用整行的寬度 */
+  .phead { padding-top: 18px; align-items: flex-start; }
+  .phead__r { width: 100%; justify-content: space-between; }
+  .phead__tools { margin-left: auto; }
 
   .tabs {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
@@ -3312,6 +3373,24 @@ body.is-out .foot { display: none; }
   .toasts { bottom: calc(var(--tabs-h) + 16px); }
 }
 
+@media (max-width: 760px) {
+  /* 工具攤平到同一排；搜尋打開時自己佔下一整行，把內容往下推一行——
+     ⚠️ 不要做成浮層：浮在內容上會蓋住底下的標題和篩選。 */
+  .phead__r { flex-wrap: wrap; }
+  .phead__tools { display: contents; }
+  .phead__tools .gsw { margin-left: auto; }
+  .phead__tools #searchBtn { display: grid; }
+  .phead__tools #searchDrawer {
+    order: 9; flex: 1 0 100%; position: static;
+    width: 100%; max-width: none; height: 44px; box-shadow: none;
+  }
+  .phead__tools #searchDrawer[hidden] { display: none; }
+  .phead__tools .gsw__n { max-width: 96px; }
+  /* 手機上下拉面板用整排的寬度，不然右邊對齊按鈕會超出螢幕 */
+  .phead__tools .gsw, .phead__tools .bell__wrap { position: static; }
+  .phead__tools .gsw__p, .phead__tools .bell__panel { left: 0; right: 0; width: auto; }
+}
+
 @keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 @media (max-width: 640px) {
@@ -3321,7 +3400,12 @@ body.is-out .foot { display: none; }
   #view .kpi__ic { width: 26px; height: 26px; flex-basis: 26px; }
   #view .kpi__k { font-size: 12.5px; }
   #view .grid-form, #view .gnew { grid-template-columns: minmax(0, 1fr); }
-  #view .sec__tools { margin-left: 0; width: 100%; }
+  /* 標題和主要按鈕在第一行，篩選整行排在下面 */
+  #view .sec__tools { order: 3; margin-left: 0; width: 100%; }
+  #view .sec .fold__b { margin-left: auto; }
+  #view .bar--inline { width: 100%; flex-wrap: nowrap; }
+  #view .bar--inline .fsel { flex: 1 1 0; min-width: 0; }
+  #view .bar--inline .fsel select { flex: 1 1 auto; width: 100%; min-width: 0; }
   #view .sec__tools .fsel--q, #view .sec__tools .fsel--q input { width: 100%; min-width: 0; }
   #view .lg__m { display: none; }
   #view .lg__b { padding-left: var(--pad); }

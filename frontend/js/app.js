@@ -10,35 +10,12 @@
   var $view = document.getElementById('view');
   var DATA_CATS = {};   // 分類 id → 名稱，確認訊息要用
 
-  /* 抽屜不要浮在內容上面。
-     ------------------------------------------------------------
-     一開始是用 padding-top 把內容往下推，但那只有在頁面捲到最上面
-     才有用：捲動之後文件整體往下移，視窗還停在原本的文件位置，
-     看到的仍然是被蓋住的那一段（實測有 5 個元素被蓋到）。
+  /* 帳本清單與通知是**從按鈕往下浮出來的下拉面板**。
 
-     所以改成把面板**搬進版面裡**——放到頂欄和內容之間當一個真的區塊。
-     它佔的是真實的空間，不管捲到哪裡都不會壓到任何東西。
-
-     圖示模式維持一般下拉（小面板貼著按鈕），那是慣例，不搬。 */
-  function placePanel(panel) {
-    if (!panel) return;
-    var main = document.querySelector('.main');
-    var view = document.getElementById('view');
-    if (!main || !view) return;
-
-    if (!document.body.classList.contains('bar-text')) {
-      panel.classList.remove('inflow');
-      return;
-    }
-    /* ⚠️ 重繪會在原位生一個同 id 的新面板，搬走的舊的還在 main 裡，
-       於是 querySelector 查到的是文件順序在前的那一個（原位、關著的），
-       看起來就像「按了沒反應」。所以搬之前先把舊的清掉。 */
-    var stale = main.querySelector(':scope > #' + panel.id);
-    if (stale && stale !== panel) stale.remove();
-    if (panel.parentElement !== main) main.insertBefore(panel, view);
-    panel.classList.add('inflow');
-  }
-
+     ⚠️ 以前把它們搬進版面（頂列和內容之間），佔真實空間把內容往下推。
+     改版之後頁首多了標題那一段，搬進去的面板就插在標題底下，整頁往下跳——
+     使用者看到的就是「一點就跑版」。現在面板留在按鈕旁邊，用定位浮起來，
+     內容一格都不動；項目多的話面板自己捲動，不會把頁面撐長。 */
   /* 寬螢幕的搜尋是頂欄上一直都在的輸入框，窄螢幕才是「按圖示展開」的抽屜。
      ⚠️ 以前兩邊都靠 CSS 硬蓋：寬螢幕用 display:flex !important 蓋掉 [hidden]，
      結果那個輸入框看得見、打得了字，hidden 屬性卻是 true——
@@ -78,10 +55,6 @@
   var DRAWERS = ['#gswPanel', '#bellPanel'];
 
   function pushForDrawer() {
-    DRAWERS.forEach(function (sel) {
-      var e = document.querySelector(sel);
-      if (e) placePanel(e);
-    });
     var open = DRAWERS.map(function (sel) { return document.querySelector(sel); })
       .filter(function (e) { return e && !e.hidden; })[0];
     document.body.classList.toggle('dw-on', !!open);
@@ -112,16 +85,9 @@
     });
   })();
 
-  /* 頂欄的兩個方案。用網址挑：?bar=text 或 ?bar=icon，預設 text。
-     挑定之後把這段拿掉、只留選中的那一套樣式。 */
-  (function () {
-    var m = /[?&]bar=(text|icon)/.exec(location.search);
-    var pick = m ? m[1] : (function () {
-      try { return localStorage.getItem('fambudget.bar') || 'text'; } catch (e) { return 'text'; }
-    })();
-    if (m) { try { localStorage.setItem('fambudget.bar', pick); } catch (e) {} }
-    document.body.classList.add('bar-' + pick);
-  })();
+  /* ⚠️ 以前這裡用 body.bar-text／bar-icon 切換兩種頂列方案。
+     頂列已經併進頁首，只剩一種做法；那個 class 留著的話，
+     舊方案的規則（優先度比較高）會蓋掉新的工具列樣式。所以整段拿掉。 */
 
   /* 展示用帳號。mock 模式的登入頁會列出來，免得評審還要猜 email。
      接上真後端（API.mode === 'http'）之後就不顯示了。 */
@@ -1908,8 +1874,6 @@
     var k = document.getElementById('pkick');
     if (k) k.textContent = /data-scope=/.test(act || '')
       ? (SCOPE === 'family' ? '全家' : '我的') : navGroup();
-    var mini = document.getElementById('pmini');
-    if (mini) mini.textContent = t;
   }
 
   function navGroup() {
@@ -2296,7 +2260,6 @@
           }).join('') +
           '<a class="gsw__more" href="#/groups">管理帳本 →</a>' +
         '</div>';
-      // 重繪之後面板是新的，馬上搬到版面裡，避免留下同 id 的舊節點
       pushForDrawer();
     }).catch(function () { box.hidden = true; });
   }
@@ -2524,7 +2487,9 @@
       }
       return;
     }
-    if (!t.closest('#searchDrawer') && !t.closest('#searchBtn')) {
+    /* ⚠️ 點外面收起搜尋框**只在手機**。電腦版的搜尋框一直都在，
+       之前這裡沒分，點頁面任何地方就把電腦版的搜尋框藏掉，旁邊的按鈕跟著位移。 */
+    if (narrowBar.matches && !t.closest('#searchDrawer') && !t.closest('#searchBtn')) {
       var sd2 = document.getElementById('searchDrawer');
       if (sd2 && !sd2.hidden) {
         sd2.hidden = true;
@@ -2571,10 +2536,7 @@
         gp.hidden = !gp.hidden;
         document.getElementById('gswBtn').classList.toggle('open', !gp.hidden);
         document.body.classList.toggle('dw-on', !gp.hidden);
-        setTimeout(pushForDrawer, 0);
-        /* 抽屜在版面最上面。捲到下面才點開的話它會開在畫面外，
-           看起來像沒反應——所以直接回到頂端。 */
-        if (!gp.hidden) setTimeout(function () { window.scrollTo(0, 0); }, 40);
+        pushForDrawer();
       }
       return;
     }
@@ -3164,13 +3126,6 @@
   (function () {
     var src = document.querySelector('.rail .nav'), dst = document.getElementById('sheetNav');
     if (src && dst) dst.innerHTML = src.innerHTML;
-
-    var ph = document.getElementById('phead');
-    if (ph && 'IntersectionObserver' in global) {
-      new IntersectionObserver(function (es) {
-        document.body.classList.toggle('phead-gone', !es[0].isIntersecting);
-      }, { rootMargin: '-72px 0px 0px 0px' }).observe(ph);
-    }
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') sheetOpen(false);

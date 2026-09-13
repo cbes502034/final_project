@@ -19,8 +19,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/tokens.css?v=130">
-<link rel="stylesheet" href="css/app.css?v=130">
+<link rel="stylesheet" href="css/tokens.css?v=135">
+<link rel="stylesheet" href="css/app.css?v=135">
 </head>
 <body>
 
@@ -100,35 +100,34 @@
   </nav>
 
   <main class="main">
-    <header class="top">
-      <span class="top__brand" aria-hidden="true"><span class="brand__m">帳</span>家庭記帳</span>
-      <!-- 頁面標題捲出畫面之後，這裡才浮出一個小標題 -->
-      <div class="top__mini" id="pmini" aria-hidden="true"></div>
-      <span class="top__sp"></span>
-      <div class="gsw" id="gsw" hidden></div>
-      <button class="ic" id="searchBtn" title="搜尋" aria-label="搜尋">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      </button>
-      <div class="search" id="searchDrawer" hidden>
-        <input id="search" type="search" placeholder="搜尋店家或備註" autocomplete="off">
-      </div>
-      <div class="bell__wrap">
-        <button class="bell" id="bell" title="通知" aria-label="通知">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
-          <span class="bell__n" id="bellDot" hidden>0</span>
-        </button>
-        <div class="bell__panel" id="bellPanel" hidden></div>
-      </div>
-    </header>
-
-    <!-- 第一層標題：頁面。放在內容區，右邊可以放這一頁最主要的動作 -->
+    <!-- 第一層標題：頁面。
+         ⚠️ 原本上面還有一條獨立的頂列（帳本、搜尋、通知），跟這一段的標題各佔一橫幅，
+         中間空了一大塊。現在工具直接放在標題同一行的右邊，面板從按鈕往下浮出來。 -->
     <div class="phead" id="phead">
       <div class="phead__m">
         <div class="phead__k" id="pkick"></div>
-        <h1 class="phead__t" id="ptitle">我的總覽</h1>
+        <h1 class="phead__t" id="ptitle">總覽</h1>
         <p class="phead__s" id="psub" hidden></p>
       </div>
-      <div class="phead__a" id="pact" hidden></div>
+      <div class="phead__r">
+        <div class="phead__a" id="pact" hidden></div>
+        <div class="phead__tools">
+          <div class="gsw" id="gsw" hidden></div>
+          <button class="ic" id="searchBtn" title="搜尋" aria-label="搜尋">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </button>
+          <div class="search" id="searchDrawer" hidden>
+            <input id="search" type="search" placeholder="搜尋店家或備註" autocomplete="off">
+          </div>
+          <div class="bell__wrap">
+            <button class="bell" id="bell" title="通知" aria-label="通知">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
+              <span class="bell__n" id="bellDot" hidden>0</span>
+            </button>
+            <div class="bell__panel" id="bellPanel" hidden></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="view"></div>
@@ -165,10 +164,10 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=130"></script>
-<script src="js/data.js?v=130"></script>
-<script src="js/api.js?v=130"></script>
-<script src="js/notify.js?v=130"></script>
-<script src="js/app.js?v=130"></script>
+<script src="js/stars.js?v=135"></script>
+<script src="js/data.js?v=135"></script>
+<script src="js/api.js?v=135"></script>
+<script src="js/notify.js?v=135"></script>
+<script src="js/app.js?v=135"></script>
 </body>
 </html>

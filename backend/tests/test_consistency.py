@@ -1603,3 +1603,29 @@ def test_每一步導覽都找得到看得見的目標():
             if ('id="%s"' % token in html) or (token in html) or (token in app):
                 found = True
         assert found, "導覽步驟找不到目標：" + sel
+
+
+def test_下拉面板浮在按鈕下面_不搬進版面():
+    """帳本清單與通知面板曾經被搬進頂列和內容之間，佔真實空間把內容往下推。
+    頁首改版後它們插在標題底下，一點開整頁就往下跳。"""
+    app = read("frontend/js/app.js")
+    assert "function placePanel(" not in app, "又把下拉面板搬進版面了"
+    assert "classList.add('inflow')" not in app
+
+    html = read("frontend/index.html")
+    assert '<header class="top">' not in html, "頁首上方又多了一條獨立的頂列"
+    tools = html[html.index('class="phead__tools"'):html.index('<div id="view">')]
+    for part in ('id="gsw"', 'id="searchDrawer"', 'id="bell"'):
+        assert part in tools, "工具要跟標題在同一行：少了 " + part
+
+    css = read("frontend/css/app.css")
+    assert re.search(r"\.phead__tools \.gsw__p,\s*\.phead__tools \.bell__panel \{[^}]*position: absolute", css), \
+        "下拉面板應該用定位浮起來，不佔版面"
+    assert re.search(r"\.phead__tools \.gsw__p,\s*\.phead__tools \.bell__panel \{[^}]*overflow-y: auto", css), \
+        "項目多的時候面板要自己捲，不能把頁面撐長"
+
+
+def test_電腦版的搜尋框不會被點掉():
+    """點外面收起搜尋框只能在手機上。電腦版曾經點一下任何地方搜尋框就消失，旁邊的按鈕跟著位移。"""
+    app = read("frontend/js/app.js")
+    assert "if (narrowBar.matches && !t.closest('#searchDrawer') && !t.closest('#searchBtn'))" in app
