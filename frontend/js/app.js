@@ -1850,6 +1850,115 @@
      登入 / 註冊 / 個人資料
      ============================================================ */
 
+
+  /* ============================================================
+     登入前的主頁
+
+     它不是另一個路由，是**登入頁的第一個狀態**。按下「開始使用」
+     之後在原地換成表單——不換網址、不重新載入，所以沒有白屏，
+     那一下的連續感就是互動感的來源。
+
+     ⚠️ 這只是畫面順序，不是權限。真正的把關仍然在 paint() 的登入閘
+     以及後端；主頁本身什麼資料都沒有。
+     ============================================================ */
+  var gateStep = 'landing';           // landing ｜ login ｜ register
+
+  /* 一頁帳簿。用 SVG 畫，不外連圖檔：
+     它要跟著米白主題走，而且放大不會糊。 */
+  function ledgerArt() {
+    var rows = [
+      ['09-02', '早餐店', '55'],
+      ['09-02', '捷運', '32'],
+      ['09-03', '午餐', '120'],
+      ['09-05', '家樂福 週採買', '2,450'],
+      ['09-06', '加油站', '1,150']
+    ];
+    var y0 = 74, gap = 27;
+    var lines = rows.map(function (r, i) {
+      var y = y0 + i * gap;
+      return '<g class="lg__row" style="animation-delay:' + (260 + i * 90) + 'ms">' +
+        '<text class="lg__d" x="30" y="' + y + '">' + r[0] + '</text>' +
+        '<text class="lg__m" x="86" y="' + y + '">' + r[1] + '</text>' +
+        '<text class="lg__v" x="388" y="' + y + '">−' + r[2] + '</text>' +
+        '<line class="lg__rule" x1="24" y1="' + (y + 9) + '" x2="388" y2="' + (y + 9) + '"/>' +
+      '</g>';
+    }).join('');
+
+    return '<svg class="lg" viewBox="0 0 412 312" role="img" ' +
+        'aria-label="一頁帳簿：五筆支出、本月已花與還能花">' +
+      '<rect class="lg__paper" x="1" y="1" width="410" height="310"/>' +
+      /* 左邊那條裝訂線，帳簿紙才有的樣子 */
+      '<line class="lg__bind" x1="66" y1="1" x2="66" y2="311"/>' +
+      '<text class="lg__h" x="30" y="38">日期</text>' +
+      '<text class="lg__h" x="86" y="38">項目</text>' +
+      '<text class="lg__h lg__h--r" x="388" y="38">金額</text>' +
+      '<line class="lg__rule lg__rule--head" x1="24" y1="48" x2="388" y2="48"/>' +
+      lines +
+      /* 合計上面的雙線——這是帳簿的收尾寫法 */
+      '<line class="lg__dbl" x1="248" y1="222" x2="388" y2="222"/>' +
+      '<line class="lg__dbl" x1="248" y1="226" x2="388" y2="226"/>' +
+      '<text class="lg__t" x="248" y="248">本月已花</text>' +
+      '<text class="lg__sum" x="388" y="248" id="lgSum">0</text>' +
+      /* ⚠️ 這一欄才是重點。這類 App 的主頁幾乎都用「一個大數字」當主體，
+         而我們最清楚的一句話就是可再支出＝收入−存款目標−已花。 */
+      '<rect class="lg__hi" x="24" y="262" width="364" height="1"/>' +
+      '<text class="lg__lt" x="24" y="290">還能花</text>' +
+      '<text class="lg__lv" x="388" y="294" id="lgLeft">0</text>' +
+    '</svg>';
+  }
+
+  function vLanding() {
+    head('', '');
+    document.body.classList.add('is-out');
+    $view.innerHTML =
+      '<div class="lp">' +
+        '<div class="lp__l">' +
+          '<span class="lp__k">家庭記帳與財務控管</span>' +
+          /* ⚠️ 標題講**結果**，不講機制。
+             「打一句話就記好一筆帳」是說明文件的句型——它在講功能怎麼運作。
+             主頁要講的是使用者得到什麼：花錢的時候心裡有底。
+             機制降到副標，細節再降到下面那三點。 */
+          '<h1 class="lp__t">花錢，心裡有數</h1>' +
+          '<p class="lp__s">' +
+            '收入扣掉你想存的，剩下的才是能放心花的錢。<br>' +
+            '打開就看見這個月還剩多少，不用等月底對帳。' +
+          '</p>' +
+          /* 三點式細列：一行標題 ＋ 一行說明，用上框線分隔，不做成卡片。
+             這是這類 App 的共同做法，而且比一整段文字好掃。 */
+          '<ul class="lp__f">' +
+            '<li><b>一句話記好幾筆</b><i>「早餐55 中午吃飯320」送出就拆開，' +
+              '分類和金額都填好</i></li>' +
+            '<li><b>家人的支出看得見</b><i>誰花的、花在哪，不用互相問</i></li>' +
+            '<li><b>花超前先提醒</b><i>到你設的比例就通知，不用等月底才發現</i></li>' +
+          '</ul>' +
+          '<button class="lp__go" id="lpGo">' +
+            '<span>開始使用</span>' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+              'stroke-width="1.8"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>' +
+          '</button>' +
+          '<p class="lp__n">不用註冊也能試——裡面是示範資料</p>' +
+        '</div>' +
+        '<div class="lp__r">' + ledgerArt() + '</div>' +
+      '</div>';
+    countUp(document.getElementById('lgSum'), 3807, 900);
+    countUp(document.getElementById('lgLeft'), 26770, 1200);
+  }
+
+  /* 合計從 0 跑上去。⚠️ 用 requestAnimationFrame 不用 setInterval——
+     分頁切到背景時 rAF 會暫停，回來不會突然跳一大段。 */
+  function countUp(el, target, ms) {
+    if (!el) return;
+    var t0 = 0;
+    function step(t) {
+      if (!t0) t0 = t;
+      var p = Math.min(1, (t - t0) / ms);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased).toLocaleString('en-US');
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
   function authShell(title, sub, inner) {
     document.body.classList.add('is-out');
     $view.innerHTML =
@@ -1862,6 +1971,9 @@
   }
 
   function vLogin() {
+    /* 主頁是這一頁的第一個狀態。直接打 #/login 進來的人（例如按了
+       「登入」的書籤）就跳過主頁，不要再擋他一次。 */
+    if (gateStep === 'landing') { vLanding(); return; }
     head('登入', '');
     authShell('登入', '記一句話就記一筆帳，家人的支出一起看得見。',
       '<form class="gate__f" id="loginF">' +
@@ -1870,7 +1982,7 @@
         '<label class="fld"><span>密碼</span>' +
           '<input type="password" id="lgPw" autocomplete="current-password" required></label>' +
         '<button class="btn btn--go gate__go" type="submit">登入</button>' +
-        '<p class="gate__alt">還沒有帳號？<a href="#/register">建立一個</a></p>' +
+        '<p class="gate__alt">還沒有帳號？<a href="#/register" data-gate="register">建立一個</a></p>' +
       '</form>' +
       (API.mode === 'http' ? '' :
         '<div class="gate__demo"><b>展示資料</b>　密碼隨便打，滿 8 個字就好' +
@@ -1883,6 +1995,7 @@
   }
 
   function vRegister() {
+    gateStep = 'register';
     head('註冊', '');
     authShell('建立帳號', '註冊之後可以自己記帳，也可以加入家庭一起看。',
       '<form class="gate__f" id="regF">' +
@@ -1897,7 +2010,7 @@
           '<input type="number" id="rgGoal" min="0" value="0">' +
           '</label>' +
         '<button class="btn btn--go gate__go" type="submit">建立帳號</button>' +
-        '<p class="gate__alt">已經有帳號了？<a href="#/login">回去登入</a></p>' +
+        '<p class="gate__alt">已經有帳號了？<a href="#/login" data-gate="login">回去登入</a></p>' +
       '</form>');
   }
 
@@ -2242,6 +2355,25 @@
 
     var fold = t.closest('[data-fold]');
     if (fold) { foldToggle(fold.dataset.fold); return; }
+
+    /* 開始使用：原地換成登入表單，不跳轉。
+       已經登入的人不會走到這裡（登入閘會先把他送回首頁）。 */
+    if (t.closest('#lpGo')) {
+      gateStep = 'login';
+      vLogin();
+      var first = document.getElementById('lgEmail');
+      if (first) setTimeout(function () { first.focus(); }, 260);
+      return;
+    }
+
+    /* 登入 ↔ 註冊 也在原地換，不要為了切換表單重畫整頁 */
+    var swap = t.closest('[data-gate]');
+    if (swap) {
+      e.preventDefault();
+      gateStep = swap.dataset.gate;
+      (gateStep === 'register' ? vRegister : vLogin)();
+      return;
+    }
 
     /* ---- 搜尋抽屜 ---- */
     if (t.closest('#searchBtn') && !narrowBar.matches) return;   // 寬螢幕沒有這顆

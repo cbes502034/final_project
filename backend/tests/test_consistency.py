@@ -1071,3 +1071,45 @@ def test_帳本通知預設是關的():
     data = read("frontend/js/data.js")
     assert "notify: true" not in data, "種子資料裡有帳本預設開著通知"
     assert data.count("notify: false") >= 8, "帳本成員應該都明確標記 notify: false"
+
+
+def test_主頁不可以變成繞過登入的破口():
+    """主頁是**登入頁的第一個狀態**，不是一個新的公開路由。
+
+    如果把它加進 OPEN，沒登入的人就多一個能停留的地方；
+    而真正危險的是有人順手把別的頁也加進去。這裡把 OPEN 釘死。
+    """
+    app = read("frontend/js/app.js")
+    mo = re.search(r"var OPEN = \[([^\]]*)\]", app)
+    assert mo, "app.js 裡找不到 OPEN"
+    opens = re.findall(r"'([^']+)'", mo.group(1))
+    assert opens == ["login", "register"],         "沒登入能看的頁被改了：%s" % opens
+
+    assert "landing:" not in app, "主頁不該是一個獨立路由"
+
+
+def test_主頁到表單是原地渲染不是跳轉():
+    """使用者要的是「不用跳轉」——按下去就換，不要白屏。
+
+    所以按鈕不可以去改 location.hash，也不可以重新載入。
+    """
+    app = read("frontend/js/app.js")
+    mo = re.search(r"if \(t\.closest\('#lpGo'\)\) \{(.*?)\n      return;", app, re.S)
+    assert mo, "找不到「開始使用」的處理"
+    body = mo.group(1)
+    for bad in ("location.hash", "location.href", "location.replace", "reload"):
+        assert bad not in body, "「開始使用」去動網址了：" + bad
+    assert "vLogin()" in body, "應該直接重畫成登入表單"
+
+
+def test_主頁的插圖不外連圖檔():
+    """插圖用 SVG 畫在頁面裡：要跟著米白主題走、放大不能糊，
+    而且外連圖檔會多一個載入失敗的可能。
+    """
+    app = read("frontend/js/app.js")
+    mo = re.search(r"function ledgerArt\(\) \{(.*?)\n  \}", app, re.S)
+    assert mo, "找不到 ledgerArt"
+    body = mo.group(1)
+    assert "<svg" in body, "插圖不是 SVG"
+    for bad in ("<img", "url(", "http://", "https://", ".png", ".jpg", ".svg\""):
+        assert bad not in body, "插圖外連了資源：" + bad

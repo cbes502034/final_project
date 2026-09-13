@@ -2587,3 +2587,155 @@ body.dw-push #view { padding-top: 0; }
   color: var(--ink); font-family: var(--sans); font-size: 13.5px; line-height: 1.8;
 }
 .finf textarea:focus { outline: none; border-color: var(--accent); }
+
+/* ============================================================
+   登入前的主頁
+   ------------------------------------------------------------
+   左邊講話，右邊是一頁帳簿。
+
+   插圖用 SVG 不用圖檔：它要跟著米白主題走、放大不能糊，
+   而且一張畫上去的插畫會是整頁最不搭的東西——
+   這個系統的調性是文件感，不是插畫感。
+   ============================================================ */
+.lp {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 64px; align-items: center;
+  max-width: 1020px; margin: 0 auto; padding: 72px 32px 88px;
+}
+
+.lp__k {
+  display: block; font-family: var(--mono); font-size: 11px;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 22px;
+}
+.lp__t {
+  font-family: var(--serif); font-size: 46px; font-weight: 700;
+  line-height: 1.28; color: var(--ink); margin-bottom: 20px;
+  letter-spacing: .01em;
+}
+.lp__s {
+  font-size: 15px; line-height: 2.05; color: var(--ink-soft);
+  margin-bottom: 34px; max-width: 30em;
+}
+
+/* 主要動作。一條底線、一個箭頭，不用方塊也不用膠囊 */
+.lp__go {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 14px 2px 13px; background: transparent;
+  border: 0; border-bottom: 2px solid var(--accent);
+  border-radius: 0; cursor: pointer;
+  font-family: var(--serif); font-size: 18px; font-weight: 600;
+  color: var(--accent);
+  transition: gap .2s var(--out), color .16s var(--ease);
+}
+.lp__go svg { width: 20px; height: 20px; transition: transform .2s var(--out); }
+.lp__go:hover { gap: 18px; color: var(--accent-hi); }
+.lp__go:hover svg { transform: translateX(3px); }
+.lp__go:active { transform: translateY(1px); }
+
+/* 三點式賣點。上框線分隔，不做成卡片——一堆方塊就是這個專題一路在拿掉的東西 */
+.lp__f { list-style: none; margin: 0 0 34px; padding: 0; }
+.lp__f li {
+  display: grid; gap: 3px; padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.lp__f li:last-child { border-bottom: 1px solid var(--line); }
+.lp__f b {
+  font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink);
+}
+.lp__f i {
+  font-style: normal; font-size: 13px; line-height: 1.85; color: var(--ink-soft);
+}
+
+.lp__n { margin-top: 26px; font-size: 12px; color: var(--ink-dim); }
+
+/* 右邊：帳簿。底下墊一張，看起來是一疊紙而不是一個方框 */
+.lp__r { position: relative; }
+.lp__r::before {
+  content: ''; position: absolute; inset: 14px -12px -14px 12px;
+  background: var(--card-2); border: 1px solid var(--line);
+  box-shadow: var(--shadow-flat);
+}
+.lg {
+  position: relative; display: block; width: 100%; height: auto;
+  filter: drop-shadow(0 14px 30px rgba(60, 50, 35, .10));
+}
+
+.lg__paper { fill: var(--card); stroke: var(--line); stroke-width: 1; }
+.lg__bind { stroke: var(--accent-line); stroke-width: 1; }
+
+.lg__h {
+  font-family: var(--sans); font-size: 10px; letter-spacing: .1em;
+  fill: var(--ink-dim);
+}
+.lg__h--r { text-anchor: end; }
+
+.lg__d { font-family: var(--mono); font-size: 11px; fill: var(--ink-dim); }
+.lg__m { font-family: var(--sans); font-size: 12.5px; fill: var(--ink); }
+.lg__v {
+  font-family: var(--mono); font-size: 12.5px; fill: var(--ink);
+  text-anchor: end;
+}
+
+/* 格線自己畫出來。⚠️ dasharray 要比線長，不然收尾會露出一截 */
+.lg__rule {
+  stroke: var(--line); stroke-width: 1;
+  stroke-dasharray: 380; stroke-dashoffset: 380;
+  animation: ruleIn .5s var(--out) forwards;
+}
+.lg__rule--head { stroke: var(--line-2); animation-delay: 120ms; }
+
+.lg__row { opacity: 0; animation: rowIn .42s var(--out) forwards; }
+.lg__row .lg__rule { animation-delay: inherit; }
+
+.lg__dbl {
+  stroke: var(--ink-faint); stroke-width: 1;
+  opacity: 0; animation: fadeIn .4s ease 760ms forwards;
+}
+.lg__t {
+  font-family: var(--sans); font-size: 12px; fill: var(--ink-soft);
+  opacity: 0; animation: fadeIn .4s ease 820ms forwards;
+}
+.lg__sum {
+  font-family: var(--mono); font-size: 15px;
+  fill: var(--ink-soft); text-anchor: end;
+  opacity: 0; animation: fadeIn .4s ease 820ms forwards;
+}
+
+/* 還能花：整頁的主角。這類 App 都用一個大數字當視覺重心 */
+.lg__hi { fill: var(--accent-line); opacity: 0; animation: fadeIn .4s ease 900ms forwards; }
+.lg__lt {
+  font-family: var(--sans); font-size: 12.5px; fill: var(--ink-soft);
+  opacity: 0; animation: fadeIn .4s ease 960ms forwards;
+}
+.lg__lv {
+  font-family: var(--mono); font-size: 26px; font-weight: 500;
+  fill: var(--accent); text-anchor: end;
+  opacity: 0; animation: fadeIn .5s ease 960ms forwards;
+}
+
+@keyframes ruleIn { to { stroke-dashoffset: 0; } }
+@keyframes rowIn { from { opacity: 0; transform: translateX(-6px); }
+                   to { opacity: 1; transform: none; } }
+@keyframes fadeIn { to { opacity: 1; } }
+
+@media (max-width: 900px) {
+  .lp { grid-template-columns: 1fr; gap: 44px; padding: 46px 22px 64px; }
+  .lp__t { font-size: 34px; }
+  /* 手機上先看到字，帳簿放後面 */
+  .lp__r { order: 2; }
+  .lp__l { order: 1; }
+  .lp__r::before { inset: 10px -8px -10px 8px; }
+}
+
+@media (max-width: 480px) {
+  .lp__t { font-size: 28px; }
+  .lp__s { font-size: 14px; }
+}
+
+/* 會暈的人就不要動 */
+@media (prefers-reduced-motion: reduce) {
+  .lg__rule, .lg__row, .lg__dbl, .lg__t, .lg__sum {
+    animation: none; opacity: 1; stroke-dashoffset: 0;
+  }
+}
