@@ -1157,3 +1157,23 @@ def test_主頁的插圖不外連圖檔():
     assert "<svg" in body, "插圖不是 SVG"
     for bad in ("<img", "url(", "http://", "https://", ".png", ".jpg", ".svg\""):
         assert bad not in body, "插圖外連了資源：" + bad
+
+
+def test_每一個用到_monthly_的地方都要防著它是_null():
+    """summary 在選了單一帳本時回 monthly: null（不畫假圖）。
+
+    ⚠️ 這個防護漏掉過：家庭總覽加了 if (d.monthly)，統計頁沒加，
+    於是「選一本帳 → 打開統計」整頁變成「讀取失敗」，
+    而且本機剛好停在「全部帳本」所以測不出來——線上才爆。
+
+    所以規則改成：**呼叫端不用記得防**，barChart 自己接得住 null，
+    而任何 .monthly.map( 這種直接串下去的寫法都不允許。
+    """
+    app = read("frontend/js/app.js")
+
+    unguarded = re.findall(r"\.monthly\.map\(", app)
+    assert not unguarded, "有人直接對 monthly 串 .map()，它可能是 null"
+
+    mo = re.search(r"function barChart\(rows\) \{(.*?)\n    var max", app, re.S)
+    assert mo, "app.js 裡找不到 barChart"
+    assert "!rows" in mo.group(1), "barChart 沒有防住 null／空陣列"

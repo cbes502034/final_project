@@ -356,6 +356,14 @@
   }
 
   function barChart(rows) {
+    /* ⚠️ 選了單一帳本時 summary 會回 null——每個人的月數列沒有分帳本，
+       硬畫出來就是一張假的圖。這裡回一句話，不要讓整頁掛掉。
+
+       這個防護漏掉過一次：家庭總覽加了 if (d.monthly)，統計頁沒加，
+       於是「選了某一本帳 → 打開統計」整頁變成「讀取失敗」。 */
+    if (!rows || !rows.length) {
+      return emptyState('近 6 個月看不到', '月趨勢只有在「全部帳本」時算得出來。');
+    }
     var max = Math.max.apply(null, rows.map(function (r) { return Math.max(r.income, r.expense); })) || 1;
     return '<div class="bars">' + rows.map(function (r, i) {
       return '<div class="bars__g">' +
@@ -884,10 +892,19 @@
         }).join('') + '</div></div>';
 
       var rows = STAT.period === 'month'
-        ? d.monthly.map(function (r) { return { k: r.m, income: r.income, expense: r.expense }; })
-        : d.yearly.map(function (r) { return { k: r.y, income: r.income, expense: r.expense, partial: r.partial }; });
+        ? (d.monthly || []).map(function (r) { return { k: r.m, income: r.income, expense: r.expense }; })
+        : (d.yearly || []).map(function (r) { return { k: r.y, income: r.income, expense: r.expense, partial: r.partial }; });
 
-      h += '<div class="card rise"><div class="card__h"><span class="card__t">' +
+      /* 選了單一帳本、又在看「按月」的時候，月數列是 null——
+         與其給一張空表，不如講清楚為什麼。 */
+      if (STAT.period === 'month' && !d.monthly) {
+        h += '<div class="note"><div class="note__k">月趨勢只有在「全部帳本」時看得到</div>' +
+          '<p>每個人的月數列沒有分帳本，硬拆出來的數字會是錯的。' +
+          '下面的支出分類仍然是這一本帳的。</p></div>';
+      }
+
+      h += (STAT.period === 'month' && !d.monthly) ? '' :
+        '<div class="card rise"><div class="card__h"><span class="card__t">' +
         (STAT.period === 'month' ? '近 6 個月' : '近 3 年') + '收支對照</span></div>' +
         '<div class="tbl" style="border:0"><table><thead><tr>' +
         '<th>' + (STAT.period === 'month' ? '月份' : '年度') + '</th><th>收入</th><th>支出</th>' +
