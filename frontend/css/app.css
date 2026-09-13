@@ -2608,10 +2608,19 @@ body.dw-push #view { padding-top: 0; }
   letter-spacing: .18em; text-transform: uppercase;
   color: var(--ink-dim); margin-bottom: 22px;
 }
+/* 專題名稱。11 個字，字級要讓它在 446px 的欄寬裡放得下一行 */
 .lp__t {
-  font-family: var(--serif); font-size: 46px; font-weight: 700;
-  line-height: 1.28; color: var(--ink); margin-bottom: 20px;
-  letter-spacing: .01em;
+  font-family: var(--serif); font-size: 34px; font-weight: 700;
+  line-height: 1.35; color: var(--ink); margin-bottom: 18px;
+  letter-spacing: .02em;
+}
+.lp__rule {
+  width: 56px; height: 2px; background: var(--accent); margin-bottom: 18px;
+}
+/* 標語。比名稱小，但仍然是第二眼會看到的東西 */
+.lp__tag {
+  font-family: var(--serif); font-size: 21px; font-weight: 600;
+  color: var(--accent); margin-bottom: 16px; letter-spacing: .02em;
 }
 .lp__s {
   font-size: 15px; line-height: 2.05; color: var(--ink-soft);
@@ -2721,7 +2730,7 @@ body.dw-push #view { padding-top: 0; }
 
 @media (max-width: 900px) {
   .lp { grid-template-columns: 1fr; gap: 44px; padding: 46px 22px 64px; }
-  .lp__t { font-size: 34px; }
+  .lp__t { font-size: 30px; }
   /* 手機上先看到字，帳簿放後面 */
   .lp__r { order: 2; }
   .lp__l { order: 1; }
@@ -2729,7 +2738,8 @@ body.dw-push #view { padding-top: 0; }
 }
 
 @media (max-width: 480px) {
-  .lp__t { font-size: 28px; }
+  .lp__t { font-size: 25px; }
+  .lp__tag { font-size: 18px; }
   .lp__s { font-size: 14px; }
 }
 
