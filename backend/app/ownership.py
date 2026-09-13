@@ -79,12 +79,14 @@ MEMBERS: list[Member] = [
     Member(
         key="m1",
         label="成員1",
-        domain="認證與基礎建設",
+        domain="認證",
         branch="m1-auth",
         color="#6C9FFB",
         scope=(
-            "負責「你是誰」以及整個後端的地基。\n"
-            "屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層。\n"
+            "負責「你是誰」。\n"
+            "屬於他的：註冊登入登出、密碼、JWT、工作階段、個人資料與大頭貼。\n"
+            "地基（資料庫連線、設定、依賴注入、密碼雜湊、JWT 實作）"
+            "已經在 toolkit/ 裡寫好了，直接用就好，不用再造一次。\n"
             "verify-password 給「重大操作前再確認一次」用："
             "驗證密碼但不發新的 token。⚠️ 一定要做速率限制，"
             "否則它就是一支免費的密碼嘗試器。\n"
@@ -129,9 +131,13 @@ MEMBERS: list[Member] = [
             "屬於他的：明細的增刪改查、段落解析、單句解析、確認後寫入、nlp_parses 的寫入。\n"
             "⚠️ 明細的**修改與刪除只有本人可以**，監管者不行——監管是唯讀的。\n"
             "新增一筆時要順手寫一則通知給監管者（成員4 的 notifications 表）。\n"
-            "不屬於他的：分類體系的定義與 /api/categories（那是成員3 —— "
-            "分類由成員3 定義，成員2 只是把清單寫進 prompt）；"
-            "統計加總（那是成員3，前端和這裡都不做任何加總）。"
+            "帳本也在這裡：一本帳就是「這筆算在哪」的容器，跟記帳同一個脈絡。\n"
+            "常設帳本沒有結束；活動帳本有結束日，到了就結算、之後唯讀。\n"
+            "⚠️ 結算**不搬動任何一筆紀錄**，只是把那本帳標記結束。\n"
+            "⚠️ 帳本成員是可見範圍的其中一條路，但規則不要自己寫——\n"
+            "  一律呼叫 toolkit/scope.py，有測試擋著重寫。\n"
+            "分類也在這裡：它是記帳時要選的欄位，統計只是拿它分組。\n"
+            "不屬於他的：統計加總（那是成員3，前端和這裡都不做任何加總）。"
         ),
         routes=[
             ("GET", "/api/transactions"),
@@ -142,10 +148,26 @@ MEMBERS: list[Member] = [
             ("POST", "/api/nlp/parse-batch"),
             ("POST", "/api/nlp/confirm"),
             ("POST", "/api/nlp/confirm-batch"),
+            ("GET", "/api/categories"),
+            ("POST", "/api/categories"),
+            ("GET", "/api/groups"),
+            ("POST", "/api/groups"),
+            ("PATCH", "/api/groups/{gid}"),
+            ("DELETE", "/api/groups/{gid}"),
+            ("POST", "/api/groups/{gid}/members"),
+            ("DELETE", "/api/groups/{gid}/members/{user_id}"),
+            ("POST", "/api/groups/{gid}/settle"),
+            ("PATCH", "/api/groups/{gid}/notify"),
         ],
         files=[
             "app/routers/transactions.py",
             "app/routers/nlp.py",
+            "app/routers/categories.py",
+            "app/routers/groups.py",
+            "app/models/category.py",
+            "app/models/group.py",
+            "app/schemas/group.py",
+            "app/services/evaluation.py",
             "app/models/transaction.py",
             "app/models/nlp.py",
             "app/schemas/transaction.py",
@@ -160,12 +182,12 @@ MEMBERS: list[Member] = [
     Member(
         key="m3",
         label="成員3",
-        domain="數字與建議",
+        domain="數字",
         branch="m3-analytics",
         color="#5FB8D9",
         scope=(
             "負責所有「算出來的東西」，以及把那些數字講成人話。\n"
-            "屬於他的：分類體系、月年統計、預算、每月存款目標、財務建議。\n"
+            "屬於他的：月年統計、預算、每月存款目標、階段性提醒的門檻、財務建議。\n"
             "**整個系統只有這裡算錢** —— 路由不算、前端不算、模型更不算。\n"
             "每月存款目標可以**分群組設定**：不帶 groupId 是整體目標，帶了就是那個群組自己的目標。\n"
             "階段性提醒也在這裡：使用者自己設幾個百分比門檻（例如 50%／80%／100%），"
@@ -174,8 +196,6 @@ MEMBERS: list[Member] = [
             "不屬於他的：明細的寫入（那是成員2）；決定要算哪些人（那是成員4 的 permission）。"
         ),
         routes=[
-            ("GET", "/api/categories"),
-            ("POST", "/api/categories"),
             ("GET", "/api/summary"),
             ("GET", "/api/stats"),
             ("GET", "/api/budgets"),
@@ -191,8 +211,9 @@ MEMBERS: list[Member] = [
             ("POST", "/api/advices/generate"),
         ],
         files=[
-            "app/routers/categories.py",
             "app/routers/stats.py",
+            "app/routers/alerts.py",
+            "app/models/alert.py",
             "app/routers/budgets.py",
             "app/routers/advices.py",
             "app/models/budget.py",
@@ -212,23 +233,23 @@ MEMBERS: list[Member] = [
     Member(
         key="m4",
         label="成員4",
-        domain="家庭與可見範圍",
+        domain="家庭",
         branch="m4-access",
         color="#6EE7B7",
         scope=(
-            "負責「誰在這個家庭裡」以及「誰看得到誰的資料」，另外扛模型評測。\n"
+            "負責「誰在這個家庭裡」以及「誰看得到誰的資料」。\n"
             "屬於他的：家庭、成員角色、邀請碼、監管關係、權限計算、"
-            "唯讀監管檢視與即時通知、稽核紀錄、評測。\n"
+            "唯讀監管檢視與即時通知、零用金、稽核紀錄。\n"
             "⚠️ 監管是**唯讀**的：看得到，但不能改、不能刪，"
             "更不能登入對方的帳號。\n"
-            "群組也在這裡：一個家庭可以開好幾本帳（家用、旅遊基金、我自己的），每一筆記帳都屬於某一個群組。\n"
-            "⚠️ **可見範圍是兩道獨立的篩選，兩道都要過**：\n"
-            "  1. 這筆是誰記的 → 看 guardianships（自己 ＋ 我監管的人）\n"
-            "  2. 這筆在哪個群組 → 看 group_members（我在不在那個群組裡）\n"
-            "⚠️ **建立群組不看角色**：只要登入就可以開自己的帳本，member 也一樣。\n"
-            "家裡的階級管的是「誰看得到誰的錢」，"
-            "不是「你能不能替自己的開銷分類」。\n"
-            "只做一道的話會漏：我監管的小孩在一個我沒加入的群組記帳，那筆不該出現在我的清單上。\n"
+            "⚠️ **可見範圍是兩條路的聯集，過一條就看得到**：\n"
+            "  A. 這筆是誰記的 → guardianships（自己 ＋ 我監管的人），**跨所有帳本**\n"
+            "  B. 這筆在哪一本帳 → group_members（我在不在那本帳裡）\n"
+            "  A 是監管：不該被帳本切斷，否則被監管的人另開一本帳就躲掉了。\n"
+            "  B 是分享：把誰加進帳本，就是選擇讓他看到那一本。\n"
+            "⚠️ 寫成 AND 就變回交集了，那是早期版本的錯。規則寫在 toolkit/scope.py。\n"
+            "帳本本身（開、改、封存、結算、成員）屬於成員2——那是記帳的容器。\n"
+            "成員4 只管**可見範圍怎麼算**，不管帳本的 CRUD。\n"
             "零用金也在這裡：家長每個月給某個被監管者多少錢。\n"
             "⚠️ **零用金是設定，不是一筆支出紀錄。**\n"
             "  家長記一筆「給小孩 3000」，小孩再把那 3000 花掉記成支出，\n"
@@ -251,23 +272,17 @@ MEMBERS: list[Member] = [
             ("GET", "/api/notifications"),
             ("PATCH", "/api/notifications/{nid}"),
             ("PATCH", "/api/notifications"),
-            ("GET", "/api/groups"),
-            ("POST", "/api/groups"),
-            ("PATCH", "/api/groups/{gid}"),
-            ("DELETE", "/api/groups/{gid}"),
-            ("POST", "/api/groups/{gid}/members"),
-            ("DELETE", "/api/groups/{gid}/members/{user_id}"),
-            ("POST", "/api/groups/{gid}/settle"),
-            ("PATCH", "/api/groups/{gid}/notify"),
             ("GET", "/api/allowances"),
             ("PUT", "/api/allowance"),
         ],
         files=[
             "app/routers/family.py",
+            "app/routers/notifications.py",
             "app/models/family.py",
+            "app/models/guardianship.py",
+            "app/models/notification.py",
             "app/models/audit.py",
             "app/schemas/family.py",
-            "app/services/evaluation.py",
         ],
         shared=[
             "app/services/permission.py",

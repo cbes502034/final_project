@@ -204,10 +204,10 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 獨佔檔案 | 共用元件（要最先完成） |
 |---|---|---|---|---|---|
-| **成員1** | **認證與基礎建設** | `m1-auth` | 8 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
+| **成員1** | **認證** | `m1-auth` | 8 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
 | **成員2** | **記帳** | `m2-ledger` | 8 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
-| **成員3** | **數字與建議** | `m3-analytics` | 10 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
-| **成員4** | **家庭與可見範圍** | `m4-access` | 9 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
+| **成員3** | **數字** | `m3-analytics` | 10 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
+| **成員4** | **家庭** | `m4-access` | 9 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
 
 ### 切分原則
 
@@ -218,7 +218,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 ### 各領域的邊界
 
-#### 成員1 · 認證與基礎建設　`m1-auth`
+#### 成員1 · 認證　`m1-auth`
 
 負責「你是誰」以及整個後端的地基。
 屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層。
@@ -260,7 +260,7 @@ POST    /api/nlp/confirm
 POST    /api/nlp/confirm-batch
 ```
 
-#### 成員3 · 數字與建議　`m3-analytics`
+#### 成員3 · 數字　`m3-analytics`
 
 負責所有「算出來的東西」，以及把那些數字講成人話。
 屬於他的：分類體系、月年統計、預算、每月存款目標、財務建議。
@@ -284,7 +284,7 @@ GET     /api/advices
 POST    /api/advices/generate
 ```
 
-#### 成員4 · 家庭與可見範圍　`m4-access`
+#### 成員4 · 家庭　`m4-access`
 
 負責「誰在這個家庭裡」以及「誰看得到誰的資料」，另外扛模型評測。
 屬於他的：家庭、成員角色、邀請碼、監管關係、權限計算、稽核紀錄、評測。
