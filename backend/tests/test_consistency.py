@@ -726,3 +726,121 @@ def test_手冊的資料表要逐欄跟得上_data_js():
         "手冊的資料表落後 data.js：" + "、".join(missing[:8])
         + "\n重新產生那一段，不要手改"
     )
+
+
+# ===========================================================================
+# 示範資料的數字必須自洽
+# ===========================================================================
+#
+# 這幾支要用 node 把 data.js 讀進來算。理由是：這些數字錯掉的時候，
+# 畫面不會壞、也不會報錯，只會「兩個數字不一樣」——
+# 使用者要自己去加總才會發現，那就太遲了。
+
+def _load_data():
+    """用 node 把 data.js 讀成 JSON。沒有 node 就跳過。"""
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        import pytest
+        pytest.skip("這台機器沒有 node")
+
+    script = (
+        "global.window = {};"
+        "require(process.argv[2]);"
+        "process.stdout.write(JSON.stringify(window.DATA));"
+    )
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as fh:
+        fh.write(script)
+        tmp = fh.name
+    out = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js")],
+        capture_output=True, check=True)
+    return json.loads(out.stdout.decode("utf-8"))
+
+
+def test_明細加總要等於成員彙總():
+    """members[] 上的 income/expense，必須等於 transactions 加起來。
+
+    這兩份本來是各寫各的：KPI 讀彙總、圓餅圖讀明細，於是
+    「本月支出 41,230」下面那張圖加起來只有 32,770——
+    同一個畫面上兩個數字互相打臉，而且沒有任何錯誤訊息。
+    """
+    D = _load_data()
+    per = {}
+    for t in D["transactions"]:
+        if t["kind"] == "transfer":          # 轉帳不是收支
+            continue
+        per.setdefault(t["user"], {"income": 0, "expense": 0})
+        per[t["user"]][t["kind"]] += t["amount"]
+
+    bad = []
+    for m in D["members"]:
+        p = per.get(m["id"], {"income": 0, "expense": 0})
+        if p["income"] != m["income"]:
+            bad.append("%s 收入：彙總 %d ≠ 明細 %d" % (m["name"], m["income"], p["income"]))
+        if p["expense"] != m["expense"]:
+            bad.append("%s 支出：彙總 %d ≠ 明細 %d" % (m["name"], m["expense"], p["expense"]))
+    assert not bad, "\n".join(bad)
+
+
+def test_每個人的月數列最後一個月要等於本月彙總():
+    """近 6 個月那張圖的最後一根，必須等於它上面的 KPI。
+
+    以前 monthly 是一份固定的全家數列，個人總覽和家庭總覽拿到一樣的東西，
+    最後一個月是 131,000／96,400，跟個人 KPI（68,000／41,230）直接矛盾。
+    """
+    D = _load_data()
+    bad = []
+    for m in D["members"]:
+        series = m.get("monthly")
+        assert series, "%s 沒有 monthly 數列" % m["name"]
+        last = series[-1]
+        if last["income"] != m["income"] or last["expense"] != m["expense"]:
+            bad.append("%s 最後一個月 %d/%d ≠ 本月 %d/%d" % (
+                m["name"], last["income"], last["expense"], m["income"], m["expense"]))
+    assert not bad, "\n".join(bad)
+
+
+def test_建議引用的數字要對得上明細():
+    """建議是 LLM 寫的文字，但裡面的數字是後端算的——算錯就是說謊。"""
+    D = _load_data()
+    exp = [t for t in D["transactions"] if t["kind"] == "expense"]
+
+    def cat_total(cat_id, user=None):
+        return sum(t["amount"] for t in exp
+                   if t["cat"] == cat_id and (user is None or t["user"] == user))
+
+    assert cat_total("C03") == 18500, "居住應為 18,500（建議 A2 引用）"
+    assert cat_total("C05") == 7480, "娛樂應為 7,480（建議 A1 引用）"
+    assert cat_total("C05", "U3") == 6880, "宇涵的娛樂應為 6,880（建議 A1 引用）"
+    assert cat_total("C01", "U4") == 2340, "宇軒的餐飲應為 2,340（建議 A3 引用）"
+
+    total = sum(t["amount"] for t in exp)
+    assert total == 96400, "全家支出應為 96,400（建議 A4 引用），實際 %d" % total
+
+
+def test_統計不可以再讀成員的彙總欄位():
+    """summary 的收支一律從明細算。
+
+    回頭讀 members[].income/expense 就會讓 KPI 和圖表再次分家。
+    """
+    api = read("frontend/js/api.js")
+    mo = re.search(r"summary: function \(f\) \{(.*?)\n    \},", api, re.S)
+    assert mo, "api.js 裡找不到 summary"
+    body = mo.group(1)
+
+    assert "txSum(" in body, "summary 沒有用 txSum() 從明細算"
+    for bad in ("m.income", "m.expense", "mm.income :", "? m.income"):
+        assert bad not in body, "summary 又去讀彙總欄位了：" + bad
+
+
+def test_選了單一帳本時不可以畫近六個月():
+    """每個人的月數列沒有分帳本，硬畫出來就是一張假的圖。"""
+    api = read("frontend/js/api.js")
+    assert "var scoped = !(f.groupId && f.groupId !== 'all');" in api, \
+        "summary 沒有判斷是否只看單一帳本"
+    assert "}) : null;" in api, "選了單一帳本時 monthly 應該回 null"

@@ -329,6 +329,31 @@
       }).join('') + '</div></div>';
   }
 
+  /* 誰花的：一條橫的堆疊條 ＋ 一份名單。
+
+     家庭總覽真正多出來的問題是「這筆是誰花的」——
+     「錢花在什麼」個人總覽已經用圓餅回答了，再畫一次只是重複。 */
+  function memberBar(members, total) {
+    if (!members.length || !total) return emptyState('還沒有支出', '這個月還沒有人記到支出。');
+    var cols = ['var(--accent)', 'var(--accent-2)', 'var(--warn)', 'var(--info)',
+                'var(--down)', 'var(--up)'];
+    var rows = members.slice().sort(function (a, b) { return b.expense - a.expense; });
+    var bar = rows.map(function (u, i) {
+      var w = u.expense / total * 100;
+      return '<i style="width:' + w.toFixed(2) + '%;background:' + cols[i % cols.length] +
+        '" title="' + esc(u.name) + ' ' + money(u.expense) + '"></i>';
+    }).join('');
+    var list = rows.map(function (u, i) {
+      return '<div class="mshare__i">' +
+        '<span class="dot" style="background:' + cols[i % cols.length] + '"></span>' +
+        '<span class="mshare__n">' + esc(u.name) + '</span>' +
+        '<span class="mshare__p">' + pct(u.expense / total) + '</span>' +
+        '<b class="mshare__v num">' + money(u.expense) + '</b>' +
+      '</div>';
+    }).join('');
+    return '<div class="mshare"><div class="mshare__b">' + bar + '</div>' + list + '</div>';
+  }
+
   function barChart(rows) {
     var max = Math.max.apply(null, rows.map(function (r) { return Math.max(r.income, r.expense); })) || 1;
     return '<div class="bars">' + rows.map(function (r, i) {
@@ -479,6 +504,23 @@
     foldRestore();
     loadTx();
   }
+
+  FOLD_BUILD.famad = function (wrap) {
+    wrap.innerHTML = skeleton(2);
+    API.advices().then(function (d) {
+      var fam = (d.advices || []).filter(function (a) { return a.scope === 'family'; });
+      if (!fam.length) {
+        wrap.innerHTML = emptyState('這個月還沒有家庭層級的建議', '記帳累積得夠多才會產生。');
+        return;
+      }
+      wrap.innerHTML = '<div class="card">' + fam.slice(0, 3).map(function (a) {
+        return '<div class="fad fad--' + esc(a.level) + '">' +
+          '<div class="fad__t">' + esc(a.title) + '</div>' +
+          '<p class="fad__b">' + esc(a.body) + '</p></div>';
+      }).join('') +
+      '<a class="fad__more" href="#/advice">看完整建議與依據 →</a></div>';
+    }).catch(function (e) { wrap.innerHTML = errState(e); });
+  };
 
   FOLD_BUILD.entry = function (wrap) {
     /* ---- 模式切換：抽屜 ----
@@ -775,6 +817,23 @@
             '</article>';
         }).join('') + '</div>';
 
+        /* 錢花在什麼 ＋ 誰花的。兩張圖回答不同的問題，不重複。 */
+        h += '<div class="sec"><h2 class="sec__t">家庭支出分佈</h2>' +
+             '<span class="sec__n">WHERE &amp; WHO</span></div>';
+        h += '<div class="charts"><div class="card rise">' +
+               '<div class="card__h"><span class="card__t">花在什麼</span></div>' +
+               donut(d.byCat, d.expense) + '</div>' +
+             '<div class="card rise" style="animation-delay:80ms">' +
+               '<div class="card__h"><span class="card__t">誰花的</span></div>' +
+               memberBar(d.members, d.expense) + '</div></div>';
+
+        /* 近 6 個月：選了某一本帳的時候 summary 會回 null，
+           因為每個人的月數列沒有分帳本——寧可不畫，也不要畫一張假的。 */
+        if (d.monthly) {
+          h += '<div class="sec"><h2 class="sec__t">近 6 個月</h2></div>' +
+            '<div class="card rise">' + barChart(d.monthly) + '</div>';
+        }
+
         h += '<div class="sec"><h2 class="sec__t">超出預算的項目</h2></div>';
         var over = b.budgets.filter(function (x) { return x.over; });
         h += over.length ? '<div class="card">' + over.map(function (x) {
@@ -784,8 +843,14 @@
             '<div class="bgt__v is-over">' + money(x.used) + ' / ' + money(x.limit) +
             '（' + pct(x.pct) + '）</div></div>';
         }).join('') + '</div>' : emptyState('沒有超支項目', '本月所有分類都在預算內。');
+
+        /* 建議只放摘要，收合。
+           完整內容在「財務建議」那一頁（已經有條列收合＋搜尋），
+           這裡再塞一份就是第二次重複。 */
+        h += foldHead('famad', '這個月的建議', '看建議', 'ADVICE');
         h += '</div>';
         $view.innerHTML = h;
+        foldRestore();
         animate();
       }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }

@@ -804,21 +804,20 @@
         var wards = f.scope === 'family' ? wardsOf(s.me) : [];
         var earners = users.filter(function (u) { return wards.indexOf(u) < 0; });
 
-        var income = earners.reduce(function (n, u) {
-          var m = memberOf(u); return n + (m ? m.income : 0);
-        }, 0) + sum(added.filter(function (t) {
-          return earners.indexOf(t.user) >= 0;
-        }), 'income');
+        /* ⚠️ 一律從明細算，不要用 members[] 上的彙總欄位。
 
-        var wardIncome = wards.reduce(function (n, u) {
-          var m = memberOf(u); return n + (m ? m.income : 0);
-        }, 0) + sum(added.filter(function (t) {
-          return wards.indexOf(t.user) >= 0;
-        }), 'income');
+           這兩份本來是各寫各的：KPI 讀彙總、圓餅圖讀明細，於是
+           「本月支出 41,230」下面那張圖加起來只有 32,770——
+           同一個畫面上兩個數字互相打臉，而且沒有任何錯誤訊息。
 
-        var expense = users.reduce(function (n, u) {
-          var m = memberOf(u); return n + (m ? m.expense : 0);
-        }, 0) + sum(added, 'expense');
+           明細是唯一的事實來源（資料表註解也是這樣寫的）。 */
+        function txSum(uid, kind) {
+          return sum(tx.filter(function (t) { return t.user === uid; }), kind);
+        }
+
+        var income = earners.reduce(function (n, u) { return n + txSum(u, 'income'); }, 0);
+        var wardIncome = wards.reduce(function (n, u) { return n + txSum(u, 'income'); }, 0);
+        var expense = users.reduce(function (n, u) { return n + txSum(u, 'expense'); }, 0);
         var byCat = {};
         tx.filter(function (t) { return t.kind === 'expense'; }).forEach(function (t) {
           byCat[t.cat] = (byCat[t.cat] || 0) + t.amount;
@@ -836,6 +835,28 @@
         var rule = D.savingsRule;
         var level = ratio >= rule.overAt ? 'over' : (ratio >= rule.warnAt ? 'near' : 'safe');
 
+        /* 近 6 個月：按這個 scope 的人重算，不是丟一份固定的全家數列。
+
+           ⚠️ 以前這裡是 clone(D.monthly)——個人總覽和家庭總覽拿到一模一樣的
+           數字，而且最後一個月是「全家四個人」的 131,000／96,400，
+           跟它正上方的 KPI（個人 68,000／41,230）直接矛盾。
+
+           ⚠️ 選了某一本帳的時候回 null：每個人的月數列沒有分帳本，
+           硬畫出來就是一張假的圖。寧可不畫，也不要畫錯的。 */
+        var scoped = !(f.groupId && f.groupId !== 'all');
+        var monthly = scoped ? D.monthly.map(function (row) {
+          var inc = 0, exp = 0;
+          users.forEach(function (u) {
+            var mm = memberOf(u);
+            if (!mm || !mm.monthly) return;
+            var r = mm.monthly.filter(function (x) { return x.m === row.m; })[0];
+            if (!r) return;
+            if (earners.indexOf(u) >= 0) inc += r.income;
+            exp += r.expense;
+          });
+          return { m: row.m, income: inc, expense: exp };
+        }) : null;
+
         return {
           period: D.meta.period,
           scope: f.scope || 'me',
@@ -844,11 +865,9 @@
           allowance: wards.reduce(function (n, u) {
             return n + allowanceOf(s.me, u);
           }, 0),
-          wardSpend: wards.reduce(function (n, u) {
-            var m = memberOf(u); return n + (m ? m.expense : 0);
-          }, 0) + sum(added.filter(function (t) {
-            return wards.indexOf(t.user) >= 0;
-          }), 'expense'),
+          /* 被監管者花掉多少。⚠️ 一樣從明細算——
+             原本是「彙總 ＋ 新增的」，但彙總裡已經含新增的了，重複加一次。 */
+          wardSpend: wards.reduce(function (n, u) { return n + txSum(u, 'expense'); }, 0),
           rate: income ? (income - expense) / income : 0,
           count: tx.length,
           savings: {
@@ -866,17 +885,22 @@
             var cat = D.categories.filter(function (x) { return x.id === c; })[0];
             return { cat: c, name: cat.name, color: cat.color, amount: byCat[c] };
           }).sort(function (a, b) { return b.amount - a.amount; }),
-          monthly: clone(D.monthly),
+          monthly: monthly,
           yearly: clone(D.yearly),
           members: D.members.filter(function (m) { return users.indexOf(m.id) >= 0; })
             .map(function (m) {
-              var a = m.income - (m.savingsGoal || 0);
-              var r = a > 0 ? m.expense / a : (m.expense > 0 ? 2 : 0);
+              /* 這個人的數字也一樣從明細算 */
+              var inc = txSum(m.id, 'income');
+              var exp = txSum(m.id, 'expense');
+              var a = inc - (m.savingsGoal || 0);
+              var r = a > 0 ? exp / a : (exp > 0 ? 2 : 0);
               return Object.assign(clone(m), {
+                income: inc,
+                expense: exp,
                 allowance: a,
                 savingsRatio: r,
                 savingsLevel: r >= rule.overAt ? 'over' : (r >= rule.warnAt ? 'near' : 'safe'),
-                shortfall: Math.max(0, m.expense - a)
+                shortfall: Math.max(0, exp - a)
               });
             })
         };
