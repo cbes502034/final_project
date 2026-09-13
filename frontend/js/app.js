@@ -1205,15 +1205,13 @@
       }
 
       function gcard(g, i) {
-        /* ⚠️ 活動帳本不放圖示方塊——它用「活動 · 到 mm/dd」的標籤區別，
-           不需要再佔一格。常設帳本才有圖示。 */
-        var cols = g.kind === 'temp'
-          ? '1fr 150px 108px' : '44px 1fr 150px 108px';
+        /* ⚠️ 帳本沒有圖示方塊。
+
+           名字已經說清楚是哪一本了，再擺一個寫著同一個字的方塊只是佔位；
+           活動帳本另外有「活動 · 到 mm/dd」的標籤，更沒有理由。
+           顏色靠切換器上的小圓點就夠。 */
         return '<article class="row" style="animation-delay:' + ((i || 0) * 50) +
-          'ms;grid-template-columns:' + cols + '">' +
-          (g.kind === 'temp' ? '' :
-            '<div class="ava" style="background:' + esc(g.color) + '22;color:' + esc(g.color) +
-            ';border-color:' + esc(g.color) + '55">' + esc(g.icon) + '</div>') +
+          'ms;grid-template-columns:1fr 150px 108px">' +
           '<div class="row__m"><div class="row__top">' +
             '<span class="row__act" style="font-size:15px">' + esc(g.name) + '</span>' +
             (g.kind === 'temp'
@@ -2009,7 +2007,7 @@
       if (GROUP !== 'all' && !gs.some(function (g) { return g.id === GROUP; })) setGroup('all');
 
       var cur = GROUP === 'all'
-        ? { icon: '全', name: '全部帳本', color: 'var(--ink-faint)' }
+        ? { name: '全部帳本', color: 'var(--ink-faint)' }
         : gs.filter(function (g) { return g.id === GROUP; })[0];
 
       /* 兩種長相都畫出來，由 body 上的 class 決定顯示哪一種：

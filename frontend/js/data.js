@@ -54,14 +54,14 @@ window.DATA = {
      ⚠️ 臨時帳本**不是另一種實體**，就是一本帳，只是多了生命週期。
      拆成兩張表的話，成員、紀錄、統計、目標全部要寫兩份。 */
   groups: [
-    { id: 'G1', name: '家用', icon: '家', color: '#27405E', owner: 'U1',
+    { id: 'G1', name: '家用', color: '#27405E', owner: 'U1',
       kind: 'standing', created: '2026-01-05', note: '日常開銷，全家共用' },
-    { id: 'G2', name: '旅遊基金', icon: '旅', color: '#4A3F6B', owner: 'U1',
+    { id: 'G2', name: '旅遊基金', color: '#4A3F6B', owner: 'U1',
       kind: 'standing', created: '2026-03-01', note: '為了出國先存起來的錢' },
-    { id: 'G3', name: '宇涵的零用', icon: '涵', color: '#1F5E63', owner: 'U3',
+    { id: 'G3', name: '宇涵的零用', color: '#1F5E63', owner: 'U3',
       kind: 'standing', created: '2026-02-11', note: '打工收入與自己的開銷' },
     /* 到期日已經過了（示範資料的今天是 2026-09-10），畫面上會出現結算提示 */
-    { id: 'G4', name: '沖繩旅遊', icon: '沖', color: '#2F5D3A', owner: 'U1',
+    { id: 'G4', name: '沖繩旅遊', color: '#2F5D3A', owner: 'U1',
       kind: 'temp', endsOn: '2026-09-08', settledAt: null,
       created: '2026-08-20', note: '五天四夜，回來就結算' }
   ],
@@ -540,7 +540,6 @@ window.DATA = {
     { t: 'groups', label: '帳本', note: '★ 一個家庭可以開好幾本帳，各自有自己的存款目標',
       cols: [['id', 'BIGSERIAL', 'PK'], ['family_id', 'BIGINT', 'FK → families'],
              ['name', 'TEXT', '例如「家用」「旅遊基金」'],
-             ['icon', 'TEXT', '一個字，畫面上的圓標'],
              ['color', 'TEXT', '圖表與標籤的顏色'],
              ['created_by', 'BIGINT', 'FK → users'],
              ['created_at', 'TIMESTAMPTZ', ''],

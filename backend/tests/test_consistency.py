@@ -924,7 +924,7 @@ def test_現有帳本都用色盤裡的顏色():
     block = data[data.index("  groupColors: ["):data.index("]", data.index("  groupColors: ["))]
     palette = set(re.findall(r"hex: '(#[0-9A-Fa-f]{6})'", block))
 
-    used = re.findall(r"name: '[^']+', icon: '[^']+', color: '(#[0-9A-Fa-f]{6})'", data)
+    used = re.findall(r"name: '[^']+', color: '(#[0-9A-Fa-f]{6})', owner:", data)
     assert used, "找不到帳本的顏色"
     bad = [c for c in used if c not in palette]
     assert not bad, "這些帳本用了色盤外的顏色：" + "、".join(bad)
@@ -1039,17 +1039,31 @@ def test_活動帳本一定要有結束日():
         "建立活動帳本時沒有擋掉缺少結束日的情況"
 
 
-def test_活動帳本不放圖示():
-    """活動帳本用「活動 · 到 mm/dd」的標籤區別，不需要再佔一個圖示方塊。"""
+def test_帳本沒有圖示方塊():
+    """**所有**帳本都沒有圖示，不只活動帳本。
+
+    名字已經說清楚是哪一本了，再擺一個寫著同一個字的方塊只是佔位。
+    顏色靠切換器上的小圓點就夠。
+
+    這裡連欄位一起擋掉：一個沒有任何地方顯示的欄位，
+    下一個人會以為它有用而去填它——跟 can_write 同一種問題。
+    """
+    data = read("frontend/js/data.js")
+    block = data[data.index("  groups: ["):data.index("],", data.index("  groups: ["))]
+    assert "icon" not in block, "種子資料的帳本還帶著 icon"
+    assert "['icon'" not in data[data.index("{ t: 'groups'"):
+                                 data.index("{ t: 'group_members'")], \
+        "groups 的資料表還留著 icon 欄位"
+
     api = read("frontend/js/api.js")
-    assert "icon: kind === 'temp' ? '' :" in api, \
-        "建立活動帳本時仍然給了圖示"
+    mo = re.search(r"createGroup: function \(p\) \{(.*?)\n    \},", api, re.S)
+    assert mo, "api.js 裡找不到 createGroup"
+    assert "icon" not in mo.group(1), "建立帳本時還在產生 icon"
 
     app = read("frontend/js/app.js")
-    mo = re.search(r"function gcard\(g, i\) \{(.*?)\n      \}", app, re.S)
-    assert mo, "app.js 裡找不到 gcard"
-    assert "g.kind === 'temp' ? '' :" in mo.group(1), \
-        "帳本卡片沒有對活動帳本略過圖示方塊"
+    mo2 = re.search(r"function gcard\(g, i\) \{(.*?)\n      \}", app, re.S)
+    assert mo2, "app.js 裡找不到 gcard"
+    assert "g.icon" not in mo2.group(1), "帳本卡片還在畫圖示方塊"
 
 
 def test_帳本通知預設是關的():

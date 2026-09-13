@@ -658,9 +658,6 @@
 
         var g = {
           id: 'G' + n, name: name,
-          /* ⚠️ 活動帳本不放圖示——它用「活動 · 到 mm/dd」的標籤區別，
-             不需要再佔一個方塊。常設帳本才取名字的最後一個字當圖示。 */
-          icon: kind === 'temp' ? '' : (p.icon || name).slice(-1),
           color: p.color || (global.DATA.groupColors || [{}])[0].hex || '#27405E',
           owner: s.me,
           kind: kind,
