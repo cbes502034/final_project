@@ -126,11 +126,16 @@ MEMBERS: list[Member] = [
         ],
         files=[
             "app/routers/auth.py",
+            "app/routers/admin.py",
             "app/models/user.py",
             "app/schemas/auth.py",
         ],
         shared=[
             "app/services/llm/client.py",
+            "app/guards.py",
+            "app/cli.py",
+            "app/routers/_stub.py",
+            "app/models/_types.py",
         ],
         llm=(
             "共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證。"
@@ -481,12 +486,16 @@ def progress() -> dict[str, dict]:
         這支的用途是讓大家隨時知道「還剩幾支」。
     """
     from app.main import app  # 延後匯入，避免循環相依
+    from app.routers._stub import is_stub
 
     actual: set[tuple[str, str]] = set()
     for route in app.routes:
         methods = getattr(route, "methods", None)
         path = getattr(route, "path", None)
         if not methods or not path:
+            continue
+        # 掛上去但還是 @stub（回 501）的，算還沒做
+        if is_stub(getattr(route, "endpoint", None)):
             continue
         for verb in methods:
             if verb not in ("HEAD", "OPTIONS"):

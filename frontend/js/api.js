@@ -3136,8 +3136,10 @@
       e.message = '連不上後端｜出錯的函式：' + where(name);
     } else if (st >= 500 || st === 404 && /^Not Found$/i.test(e.message) || st === 405) {
       e.kind = 'backend';
-      e.message = (st === 501 ? '後端還沒做這一支' : '後端出錯（HTTP ' + st + '）') +
-        (e.message && !/^HTTP \d+/.test(e.message) && !/^Not Found$/i.test(e.message) ? '：' + e.message : '') +
+      /* 後端 501 的訊息本身就是「後端還沒做這一支：路由（成員）」，路由與負責人 where() 會再講一次，不重複 */
+      var detail = e.message && !/^HTTP \d+/.test(e.message) && !/^Not Found$/i.test(e.message) &&
+        !(st === 501 && /^後端還沒做這一支/.test(e.message)) ? '：' + e.message : '';
+      e.message = (st === 501 ? '後端還沒做這一支' : '後端出錯（HTTP ' + st + '）') + detail +
         '｜出錯的函式：' + where(name);
     } else {
       e.kind = 'business';

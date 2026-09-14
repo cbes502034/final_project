@@ -44,6 +44,7 @@ __all__ = [
     "conflict",
     "unprocessable",
     "service_unavailable",
+    "not_implemented",
     "safe_message",
 ]
 
@@ -196,6 +197,26 @@ def service_unavailable(detail: str = "服務暫時無法使用，請稍後再�
         前端可以提示使用者稍後再試。
     """
     return HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail)
+
+
+def not_implemented(route: str, owner: str = "") -> HTTPException:
+    """
+    501 —— **這一支還沒做。**
+
+    app/routers/ 裡每一支還沒寫完的路由都丟這個。前端（api.js）看到 501 會：
+      * 有前端備援的（語句解析、產生建議、登入裝置）先頂著
+      * 沒有的，錯誤訊息裡講出「是哪一支、哪條路由、誰負責」
+
+    參數
+        route (str): 例如 "GET /api/summary"
+        owner (str): 例如 "成員3"
+
+    範例
+        >>> not_implemented("GET /api/summary", "成員3").status_code
+        501
+    """
+    who = "（%s）" % owner if owner else ""
+    return HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "後端還沒做這一支：%s%s" % (route, who))
 
 
 def safe_message(exc: Exception, fallback: str = "系統發生錯誤") -> str:

@@ -13,8 +13,9 @@
 ===========================================================================
 有哪些工具
 ===========================================================================
-    config      設定（環境變數）        settings.database_url
-    db          資料庫                  Base / get_db / engine
+    config      設定（環境變數，分成員）  settings.database_url；python -m app.cli check-config
+    db          資料庫連線與交易          get_db / session_scope / @db_transaction / create_all
+    crud        增刪改查（任何一張表）    get / find / save / remove / to_dict
     passwords   密碼雜湊                hash_password / verify_password
     tokens      JWT                     make_access_token / read_access_token
     deps        FastAPI 依賴            current_user_id / paging

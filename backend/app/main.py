@@ -22,38 +22,24 @@ FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試�
 不需要寫前端也不需要 Postman。
 
 ===========================================================================
-你們要建的目錄（自己 mkdir，不要等人給）
+目錄（都建好了）
 ===========================================================================
     app/
-    ├── models/      SQLAlchemy 資料表    繼承 toolkit.db.Base
-    ├── schemas/     Pydantic 進出模型
-    ├── routers/     路由，一組一個檔案
-    └── services/    商業邏輯，路由只負責收送
+    ├── models/      SQLAlchemy 資料表（20 張，欄位跟 frontend/js/data.js 的 schema 對齊）
+    ├── schemas/     Pydantic 請求主體（欄位名字跟前端送的一樣）
+    ├── routers/     路由，一組一個檔案——每一支都先回 501，守衛與主體模型已經接好
+    ├── services/    商業邏輯（analytics 算錢、permission 可見範圍、llm 呼叫模型）
+    ├── guards.py    路由守衛（仿 MineMarket 的 AuthDecorator）
+    ├── cli.py       python -m app.cli：init-env、check-config、init-db、make-admin
+    └── toolkit/     已經寫好的工具：config、db、crud（增刪改查）、scope、ledger…
 
-誰負責哪一塊寫在 `app/ownership.py`，跑 `python -m app.ownership` 會印出來。
+誰負責哪一支寫在 `app/ownership.py`，`python -m app.ownership` 會列出每個人還剩幾支。
 
 ===========================================================================
-加一組路由的三個步驟
+做完一支路由
 ===========================================================================
-1. 建立 `app/routers/你的模組.py`：
-
-       from fastapi import APIRouter, Depends
-       from sqlalchemy.orm import Session
-       from app.toolkit.db import get_db
-       from app.toolkit.deps import current_user_id
-
-       router = APIRouter()
-
-       @router.get("/things")
-       def list_things(uid: int = Depends(current_user_id),
-                       db: Session = Depends(get_db)):
-           ...
-
-2. 在下面的 import 區塊解除註解
-3. 在下面的 include_router 區塊解除註解
-
-**這個檔案沒有單一主人**，四個人都會改。一次只加一行，衝突很好解，
-但改之前還是在群組講一聲比較好。
+在 app/routers/ 找到那個函式，把 `raise not_ready(...)` 換成實作，拿掉 `@stub`。
+這個檔案不用動——所有 router 已經掛上了（下面的 include_router）。
 """
 
 from fastapi import FastAPI
@@ -61,19 +47,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.toolkit.config import settings
 
-# ---------------------------------------------------------------------------
-# 路由寫好之後在這裡 import 進來
-#
-# from app.routers import auth          # 成員1
-# from app.routers import family        # 成員4
-# from app.routers import transactions  # 成員2
-# from app.routers import nlp           # 成員2
-# from app.routers import categories    # 成員3
-# from app.routers import stats         # 成員3
-# from app.routers import budgets       # 成員3
-# from app.routers import advices       # 成員3
-# ---------------------------------------------------------------------------
-
+from app import routers
 
 app = FastAPI(
     title="家庭記帳與財務控管系統 API",
@@ -111,21 +85,11 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# 路由寫好之後在這裡掛上
-#
-# prefix 會自動加在每支路由前面，所以 routers/auth.py 裡寫
-# @router.post("/login")，實際網址就是 /api/auth/login。
-# tags 是 /docs 頁面上的分組標籤。
-#
-# app.include_router(auth.router,         prefix="/api/auth", tags=["身分認證"])
-# app.include_router(family.router,       prefix="/api",      tags=["家庭與權限"])
-# app.include_router(transactions.router, prefix="/api",      tags=["記帳"])
-# app.include_router(nlp.router,          prefix="/api/nlp",  tags=["段落記帳"])
-# app.include_router(categories.router,   prefix="/api",      tags=["分類體系"])
-# app.include_router(stats.router,        prefix="/api",      tags=["統計"])
-# app.include_router(budgets.router,      prefix="/api",      tags=["預算與存款目標"])
-# app.include_router(advices.router,      prefix="/api",      tags=["財務建議"])
+# 路由：12 組全部掛上，prefix 一律 /api（每個檔案裡寫的是 /api 後面那段）。
+# 還沒做的那幾支會回 501，前端會講出是哪一支、誰負責。
 # ---------------------------------------------------------------------------
+for module in routers.ALL:
+    app.include_router(module.router, prefix="/api")
 
 
 @app.get("/healthz", tags=["系統"])

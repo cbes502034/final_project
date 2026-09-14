@@ -109,10 +109,10 @@ def hash_code(code: object) -> str:
     return hashlib.sha256(normalize_code(code).encode("utf-8")).hexdigest()
 
 
-def expires_at(now: datetime | None = None) -> datetime:
-    """從現在起算 INVITE_TTL_DAYS 天。"""
+def expires_at(now: datetime | None = None, days: int | None = None) -> datetime:
+    """從現在起算幾天（預設 INVITE_TTL_DAYS；路由傳 settings.invite_ttl_days）。"""
     now = now or datetime.now(timezone.utc)
-    return now + timedelta(days=INVITE_TTL_DAYS)
+    return now + timedelta(days=INVITE_TTL_DAYS if days is None else days)
 
 
 def clean_family_name(name: object) -> str:

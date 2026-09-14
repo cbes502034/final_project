@@ -46,7 +46,8 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # 先把資料表升到最新版（alembic/versions/），再啟動。沒有新版本時 upgrade 什麼都不做
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
       - key: PYTHON_VERSION
