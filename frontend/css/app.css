@@ -442,6 +442,10 @@
 }
 .err__t { font-size: 14px; font-weight: 600; color: var(--down); margin-bottom: 6px; }
 .err__s { font-size: 13px; color: var(--ink-soft); line-height: 1.8; }
+/* 出錯的是哪一支：函式、路由、負責的人。給組員看，要能直接複製 */
+.err__w { margin-top: 8px; font-size: 12.5px; color: var(--ink); overflow-wrap: anywhere; }
+.err__w code { font-family: var(--code); font-size: 12px; padding: 1px 6px; background: var(--sunk); border-radius: var(--r-xs); }
+.err__m { margin-top: 4px; font-size: 12px; color: var(--ink-faint); }
 
 /* ============================================================
    浮動提示
@@ -780,21 +784,6 @@ body.is-out .main {
 .gate__alt a { color: var(--accent-hi); text-decoration: none; }
 .gate__alt a:hover { text-decoration: underline; }
 
-.gate__demo {
-  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line);
-  font-size: 11.5px; color: var(--ink-dim);
-}
-.gate__demo b { color: var(--ink-faint); font-weight: 500; margin-right: 6px; }
-.gate__accs { display: grid; gap: 6px; margin-top: 11px; }
-.gate__acc {
-  display: flex; align-items: baseline; gap: 8px; width: 100%;
-  padding: 8px 11px; cursor: pointer; text-align: left;
-  background: var(--sunk); border: 1px solid var(--line);
-  border-radius: var(--r-card); color: var(--ink-soft); font-size: 12px;
-  transition: border-color .18s var(--ease), color .18s var(--ease);
-}
-.gate__acc span { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim); }
-.gate__acc:hover { border-color: var(--line-3); color: var(--ink); }
 
 /* 個人化設定要放主題預覽和理財選項，比登入框寬一點 */
 .gate__c--wide { width: min(540px, 100%); }
@@ -3222,6 +3211,43 @@ body.is-out .foot { display: none; }
   transition: color .16s var(--ease), border-color .16s var(--ease), background-color .16s var(--ease);
 }
 #view .mt__x:hover { color: var(--down); border-color: var(--down-wash); background: var(--down-wash); }
+/* 子女卡片上的三顆：照看、設為家長、移出。會折行，不要擠出卡片 */
+#view .mt__acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin-top: 10px; }
+#view .mt__acts .mt__x { margin-top: 0; }
+#view .mt__x--go:hover { color: var(--accent); border-color: var(--accent-line); background: var(--accent-wash); }
+
+/* 家庭自訂分類 */
+#view .fcat { display: flex; flex-direction: column; gap: 12px; }
+#view .fcat__h, #view .fcat__e { margin: 0; font-size: 13px; color: var(--ink-faint); line-height: 1.7; }
+#view .fcat__l { display: flex; flex-wrap: wrap; gap: 8px; }
+#view .fcat__l .chip small { margin-left: 6px; font-size: 11px; color: var(--ink-dim); }
+#view .fcat__f { display: flex; flex-wrap: wrap; gap: 8px; }
+#view .fcat__f input { flex: 1 1 140px; min-width: 0; }
+#view .fcat__f input, #view .fcat__f select {
+  height: var(--ctl); padding: 0 12px; font-size: 13.5px; color: var(--ink);
+  background: var(--sunk); border: 1px solid var(--line-2); border-radius: var(--r-input);
+}
+
+/* 每月預算：一個分類一格 */
+#view .bud { display: flex; flex-direction: column; gap: 12px; }
+#view .bud__h { margin: 0; font-size: 13px; color: var(--ink-faint); line-height: 1.7; }
+#view .bud__g { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+#view .bud__i { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#view .bud__i > span:first-child { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+#view .bud__i .money { height: 42px; }
+#view .bud__i .money input { font-size: 17px; }
+
+/* 登入中的裝置 */
+#view .sess { display: flex; flex-direction: column; }
+#view .sess__i { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 12px var(--pad, 18px); border-bottom: 1px solid var(--line); }
+#view .sess__i b { font-size: 14px; color: var(--ink); }
+#view .sess__i small { flex-basis: 100%; font-size: 12px; color: var(--ink-faint); }
+#view .sess__a { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px var(--pad, 18px); }
+#view .sess__a small { flex: 1 1 200px; font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; }
+
+/* 總覽沒有預算時整張卡可以點 */
+#view a.bnone { display: block; color: inherit; text-decoration: none; }
+#view a.bnone:hover { border-color: var(--accent-line); }
 #view .leave {
   display: flex; align-items: center; gap: 16px; margin-top: 32px;
   background: var(--card-2); box-shadow: none; border-style: dashed;

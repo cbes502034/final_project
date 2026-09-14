@@ -773,8 +773,11 @@ def test_手冊的資料表要逐欄跟得上_data_js():
 # 畫面不會壞、也不會報錯，只會「兩個數字不一樣」——
 # 使用者要自己去加總才會發現，那就太遲了。
 
-def _load_data():
-    """用 node 把 data.js 讀成 JSON。沒有 node 就跳過。"""
+def _load_data(seed=True):
+    """用 node 把 data.js（＋測試用的一家人）讀成 JSON。沒有 node 就跳過。
+
+    seed=False 讀的是前端真正載入的 data.js——那一份不能有任何假資料。
+    """
     import json
     import shutil
     import subprocess
@@ -787,15 +790,17 @@ def _load_data():
     script = (
         "global.window = { __FAMBUDGET_TODAY__: '2026-09-10' };"
         "require(process.argv[2]);"
+        "if (process.argv[3]) require(process.argv[3]);"
         "process.stdout.write(JSON.stringify(window.DATA));"
     )
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
                                      encoding="utf-8") as fh:
         fh.write(script)
         tmp = fh.name
-    out = subprocess.run(
-        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js")],
-        capture_output=True, check=True)
+    args = ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js")]
+    if seed:
+        args.append(os.path.join(REPO, "backend", "tests", "fixtures", "demo_seed.js"))
+    out = subprocess.run(args, capture_output=True, check=True)
     return json.loads(out.stdout.decode("utf-8"))
 
 
@@ -881,12 +886,18 @@ def test_統計不可以再讀成員的彙總欄位():
         assert bad not in body, "summary 又去讀彙總欄位了：" + bad
 
 
-def test_選了單一帳本時不可以畫近六個月():
-    """每個人的月數列沒有分帳本，硬畫出來就是一張假的圖。"""
+def test_月數列與年數列從明細算_選了帳本也對得起來():
+    """以前月數列是一份固定資料，所以選了帳本只能回 null（畫不出真的圖）。
+
+    假資料拿掉之後，數列一律從明細算、跟 KPI 同一套規則，選了帳本就只算那本帳。
+    ⚠️ 不可以再讀成員身上的 monthly 欄位——那是假資料時代的彙總。
+    """
     api = read("frontend/js/api.js")
-    assert "var scoped = !(f.groupId && f.groupId !== 'all');" in api, \
-        "summary 沒有判斷是否只看單一帳本"
-    assert "}) : null;" in api, "選了單一帳本時 monthly 應該回 null"
+    body = re.search(r"summary: function \(f\) \{(.*?)\n    \},", api, re.S).group(1)
+    assert "function rowFor(prefix)" in body and "oneGroup && t.group !== f.groupId" in body
+    assert "mm.monthly" not in body and "D.monthly" not in body and "D.yearly" not in body, \
+        "summary 又去讀固定的月／年數列了"
+    assert "partial: y === thisYear" in body, "今年要標未完整"
 
 
 # ===========================================================================
@@ -1005,7 +1016,8 @@ def test_現有帳本都用色盤裡的代號():
     palette = set(re.findall(r"id: '([a-z-]+)'", block))
     assert palette, "找不到帳本色盤"
 
-    used = re.findall(r"name: '[^']+', color: '([a-z-]+)', owner:", data)
+    seed = read("backend/tests/fixtures/demo_seed.js")
+    used = re.findall(r"name: '[^']+', color: '([a-z-]+)', owner:", seed)
     assert used, "找不到帳本的顏色"
     bad = [c for c in used if c not in palette]
     assert not bad, "這些帳本用了色盤外的代號：" + "、".join(bad)
@@ -1181,8 +1193,8 @@ def test_帳本沒有圖示方塊():
 
 def test_帳本通知預設是關的():
     """家用帳本本月 31 筆 × 3 個其他成員 = 93 則。預設開就是洗版。"""
-    data = read("frontend/js/data.js")
-    assert "notify: true" not in data, "種子資料裡有帳本預設開著通知"
+    data = read("backend/tests/fixtures/demo_seed.js")
+    assert "notify: true" not in data, "測試資料裡有帳本預設開著通知"
     assert data.count("notify: false") >= 8, "帳本成員應該都明確標記 notify: false"
 
 
@@ -1279,12 +1291,17 @@ global.localStorage = {
 global.document = { querySelector: () => null };      // 沒有 api-base → mock
 global.setTimeout = fn => setImmediate(fn);           // 不要真的等延遲
 
+// 測試用的一家人。前端的 data.js 沒有假資料了，測試自己帶（見 fixtures/demo_seed.js）
+const seedJs = require('path').join(require('path').dirname(dataJs), '..', '..', 'backend', 'tests', 'fixtures', 'demo_seed.js');
+
 function boot() {
   // 重新 require 等於重新整理頁面：closure 裡的 state 會歸零，只剩 localStorage
   delete require.cache[require.resolve(dataJs)];
+  delete require.cache[require.resolve(seedJs)];
   delete require.cache[require.resolve(apiJs)];
   global.window = { __FAMBUDGET_TODAY__: '2026-09-10' };
   require(dataJs);
+  require(seedJs);
   require(apiJs);
   return window.API;
 }
@@ -1330,9 +1347,9 @@ async function fails(p) {
   // 已經登入的人被停權：下一次請求就要被踢出去，不是等他下次登入
   await API.login({ email: 'admin@fambudget.tw', password: PW });
   await API.suspendUser('U4', '已登入中被停權');
-  const raw = JSON.parse(localStorage.getItem('fambudget.state.v1'));
+  const raw = JSON.parse(localStorage.getItem('fambudget.state.v2'));
   raw.me = 'U4'; raw.auth = { loggedIn: true };
-  localStorage.setItem('fambudget.state.v1', JSON.stringify(raw));
+  localStorage.setItem('fambudget.state.v2', JSON.stringify(raw));
   API = boot();
   out.authStateOfSuspended = await API.authState();
 
@@ -2098,11 +2115,13 @@ const store = new Map();
 global.localStorage = { getItem: k => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 global.document = { querySelector: () => null };
 global.setTimeout = fn => setImmediate(fn);
+const seedJs = require('path').join(require('path').dirname(dataJs), '..', '..', 'backend', 'tests', 'fixtures', 'demo_seed.js');
 function boot() {
   delete require.cache[require.resolve(dataJs)];
+  delete require.cache[require.resolve(seedJs)];
   delete require.cache[require.resolve(apiJs)];
   global.window = { __FAMBUDGET_TODAY__: '2026-09-10' };
-  require(dataJs); require(apiJs);
+  require(dataJs); require(seedJs); require(apiJs);
   return window.API;
 }
 async function fails(p) { try { await p; return null; } catch (e) { return { msg: e.message, status: e.status || null }; } }
@@ -2188,39 +2207,16 @@ def test_總覽最下面是今天的紀錄_只看不改():
         "今天是真實日期（data.js 的 fbToday），不是示範資料寫死的那一天"
 
 
-# ---------- 真實日期 ----------
-# 使用者說：「日期的部分需要針對真實的日期做設定，不是以假資料」。
-# 種子是用 2026-09-10 當今天寫的，載入時整份對齊到真正的今天。
-# 這裡用幾個刻意挑的日子驗：月中、月初（1 號，全部壓到今天）、跨年、閏年前的 2 月底。
+# ---------- 真實日期、沒有假資料 ----------
+# 使用者說：「日期要針對真實的日期」、「把範例帳號和前端上的假資料除掉」。
+# 前端載入的 data.js 只剩系統定義；測試用的一家人放在 fixtures/demo_seed.js。
 
-_REBASE_DRIVER = r"""
+_TODAY_DRIVER = r"""
 const dataJs = process.argv[2];
 const out = {};
-for (const day of ['2026-09-10', '2026-09-14', '2026-10-01', '2027-01-31', '2028-02-29', '2026-03-05']) {
-  delete require.cache[require.resolve(dataJs)];
-  global.window = { __FAMBUDGET_TODAY__: day };
-  require(dataJs);
-  const D = window.DATA;
-  const g4 = D.groups.find(g => g.id === 'G4');
-  out[day] = {
-    today: window.fbToday(),
-    period: D.meta.period,
-    updated: D.meta.updated.slice(0, 10),
-    txDates: D.transactions.map(t => t.date),
-    g4: { created: g4.created, endsOn: g4.endsOn },
-    monthly: D.monthly.map(x => x.m),
-    memberMonthly: D.members.filter(m => m.monthly).map(m => m.monthly[m.monthly.length - 1].m),
-    joined: D.members.map(m => m.joined),
-    since: D.guardianships.map(g => g.since),
-    audit: D.auditLogs.map(a => a.at),
-    yearly: D.yearly.map(y => y.y),
-    advPeriods: D.advices.map(a => a.period),
-    advBasis: D.advices.map(a => a.basis.join('|')).join('|'),
-    nlp: D.nlpDemo.map(x => x.out.date),
-    para: D.paragraphDemo.items.map(x => x.date),
-    expense: D.transactions.filter(t => t.kind === 'expense').reduce((n, t) => n + t.amount, 0)
-  };
-}
+global.window = { __FAMBUDGET_TODAY__: '2027-01-31' };
+require(dataJs);
+out.pinned = window.fbToday(); out.period = window.DATA.meta.period;
 delete require.cache[require.resolve(dataJs)];
 global.window = {};
 require(dataJs);
@@ -2229,7 +2225,7 @@ process.stdout.write(JSON.stringify(out));
 """
 
 
-def test_日期用真實的今天_示範資料跟著對齊():
+def test_日期用真實的今天():
     import datetime
     import json
     import shutil
@@ -2239,47 +2235,42 @@ def test_日期用真實的今天_示範資料跟著對齊():
     if not shutil.which("node"):
         pytest.skip("這台機器沒有 node")
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
-        fh.write(_REBASE_DRIVER)
+        fh.write(_TODAY_DRIVER)
         tmp = fh.name
     res = subprocess.run(["node", tmp, os.path.join(REPO, "frontend", "js", "data.js")], capture_output=True)
     assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
     out = json.loads(res.stdout.decode("utf-8"))
-
     assert out["real"] == datetime.date.today().isoformat(), "沒有指定的時候，今天就是電腦上的今天（本機時區）"
-    seed = out["2026-09-10"]
-    for day, r in out.items():
-        if day == "real":
-            continue
-        month = day[:7]
-        assert r["today"] == day and r["period"] == month and r["updated"] == day
-        for d in r["txDates"] + r["joined"] + r["since"] + [r["g4"]["created"], r["g4"]["endsOn"]]:
-            assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) and datetime.date.fromisoformat(d), day + "：日期格式壞掉了 " + d
-        assert all(d.startswith(month) and d <= day for d in r["txDates"]), \
-            day + "：本月的示範明細要落在 1 號到今天之間，不能跑到未來或上個月"
-        assert day in r["txDates"], day + "：要有今天的紀錄，總覽最下面才不會是空的"
-        assert r["expense"] == seed["expense"], "只移日子不改金額，本月總額才跟成員表對得起來"
-        assert r["monthly"][-1] == month and r["memberMonthly"] == [month] * len(r["memberMonthly"]), \
-            "每月統計的最後一個月就是這個月"
-        assert r["g4"]["endsOn"] < day and r["g4"]["created"] < r["g4"]["endsOn"], \
-            "沖繩那本要保持「過期、等人結算」，而且建立日在到期日之前"
-        assert all(j <= day for j in r["joined"]) and all(s <= day for s in r["since"]) \
-            and all(a[:10] <= day for a in r["audit"]), "加入日、監管起始、稽核時間都不能在未來"
-        assert r["yearly"][-1] == day[:4], "年度統計的最後一年就是今年"
-        assert set(r["advPeriods"]) == {month} and month in r["advBasis"], "建議的期間跟依據裡的月份也要對齊"
-        today = datetime.date.fromisoformat(day)
-        assert r["nlp"][2] == (today - datetime.timedelta(days=1)).isoformat(), "「昨天加油」的示範要是昨天"
-        assert set(r["para"]) == {day}, "「今天打工賺了」的示範要是今天"
-
-    assert out["2026-10-01"]["advBasis"].count("8 月 4,610 → 9 月 5,900 → 10 月 7,480") == 1, "文字裡的「幾月」也要跟著移"
-    assert out["2027-01-31"]["yearly"] == ["2025", "2026", "2027"]
+    assert out["pinned"] == "2027-01-31" and out["period"] == "2027-01", "這個月跟著今天走"
 
     api = read("frontend/js/api.js")
     app = read("frontend/js/app.js")
     assert "global.fbToday()" in re.search(r"function todayStr\(\) \{(.*?)\n  \}", api, re.S).group(1)
     for src, name in ((api, "api.js"), (app, "app.js")):
-        assert "meta.updated" not in src, name + " 不該再拿示範資料的更新時間當今天"
+        assert "meta.updated" not in src, name + " 不該再拿資料的更新時間當今天"
         assert "toISOString().slice(0, 10)" not in src, name + "：toISOString 是 UTC，台灣早上 8 點前會變成昨天"
-        assert "meta.period + '-10'" not in src, name + "：語句解析的預設日期是今天，不是寫死的 10 號"
+
+
+def test_前端沒有假資料_也沒有範例帳號():
+    D = _load_data(seed=False)
+    for key in ("members", "families", "guardianships", "groups", "groupMembers", "groupGoals", "alerts",
+                "allowances", "transactions", "budgets", "monthly", "yearly", "advices", "auditLogs", "nlpDemo"):
+        assert D[key] == [], "data.js 的 %s 還有假資料" % key
+    assert D["paragraphDemo"]["items"] == [] and not D["meta"]["family"]
+    assert "nlpEval" not in D, "假的評測數字要拿掉"
+    # 系統定義要留著，不然畫面沒東西選
+    for key in ("categories", "themes", "financeStyles", "financeGoals", "financeHabits", "groupColors",
+                "permissions", "platformPermissions", "schema", "relations", "savingsRule", "adviceRules"):
+        assert D[key], "系統定義 %s 不見了" % key
+
+    html = read("frontend/index.html")
+    assert "demo_seed" not in html, "前端不可以載入測試資料"
+    app = read("frontend/js/app.js")
+    for bad in ("data-demo", "DEMO", "gate__demo", "展示資料", "demo1234"):
+        assert bad not in app, "登入頁還有範例帳號：" + bad
+    for bad in ("jianguo@lin.tw", "林建國", "admin@fambudget.tw"):
+        for f in ("frontend/js/app.js", "frontend/js/api.js", "frontend/js/data.js", "frontend/index.html"):
+            assert bad not in read(f), "%s 還寫著範例帳號 %s" % (f, bad)
 
 
 def test_帳戶卡不再重複儀表板上的功能():
@@ -2739,9 +2730,9 @@ const tryIt = p => p.then(r => r, e => ({ error: e.message, status: e.status || 
   // 過期：直接把存起來的到期時間改成過去
   await API.login({ email: 'shufen@lin.tw', password: PW });
   const t2 = (await API.requestPasswordReset('shufen@lin.tw')).demoMail.link.split('/').pop();
-  const raw = JSON.parse(localStorage.getItem('fambudget.state.v1'));
+  const raw = JSON.parse(localStorage.getItem('fambudget.state.v2'));
   raw.resets.forEach(r => { if (r.token === t2) r.expiresAt = Date.now() - 1000; });
-  localStorage.setItem('fambudget.state.v1', JSON.stringify(raw));
+  localStorage.setItem('fambudget.state.v2', JSON.stringify(raw));
   API = boot();
   out.expired = await tryIt(API.confirmPasswordReset(t2, PW));
 

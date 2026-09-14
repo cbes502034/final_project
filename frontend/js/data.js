@@ -3,15 +3,21 @@
    ------------------------------------------------------------
    家庭記帳與財務控管系統
 
-   全部為模擬資料。人名、金額、店家皆為虛構示範樣本。
-   欄位結構即為後端 API 與資料表的契約草案。
+   ⚠️ 這裡**沒有任何假資料**：沒有範例帳號、沒有示範紀錄。
+   留下來的都是「系統定義」——分類、主題、理財習慣的選項、權限矩陣、
+   資料表草案（手冊的資料表區塊從這裡生出來）。
+   使用者、家庭、帳本、紀錄全部從註冊開始，由 API 建立。
+
+   mock 模式（index.html 的 api-base 留空）會把使用者自己建的資料存在這台瀏覽器；
+   接上真後端之後，這個檔案只剩系統定義在用。
+   測試用的一家人放在 backend/tests/fixtures/demo_seed.js，前端不會載入。
    ============================================================ */
 window.DATA = {
 
   meta: {
-    family: '林家',
-    period: '2026-09',
-    updated: '2026-09-10 14:20',
+    family: '',
+    period: '',          // 載入時設成真實的這個月（見檔案最後）
+    updated: '',
     currency: 'TWD'
   },
 
@@ -92,18 +98,7 @@ window.DATA = {
 
      ⚠️ 臨時帳本**不是另一種實體**，就是一本帳，只是多了生命週期。
      拆成兩張表的話，成員、紀錄、統計、目標全部要寫兩份。 */
-  groups: [
-    { id: 'G1', name: '家用', color: 'book-indigo', owner: 'U1',
-      kind: 'standing', created: '2026-01-05', note: '日常開銷，全家共用' },
-    { id: 'G2', name: '旅遊基金', color: 'book-violet', owner: 'U1',
-      kind: 'standing', created: '2026-03-01', note: '為了出國先存起來的錢' },
-    { id: 'G3', name: '宇涵的零用', color: 'book-teal', owner: 'U3',
-      kind: 'standing', created: '2026-02-11', note: '打工收入與自己的開銷' },
-    /* 到期日已經過了（種子寫的今天是 2026-09-10，載入時對齊真實日期，見檔案最後），畫面上會出現結算提示 */
-    { id: 'G4', name: '沖繩旅遊', color: 'book-moss', owner: 'U1',
-      kind: 'temp', endsOn: '2026-09-08', settledAt: null,
-      created: '2026-08-20', note: '五天四夜，回來就結算' }
-  ],
+  groups: [],
 
   /* 誰在哪一本帳裡。
 
@@ -124,42 +119,21 @@ window.DATA = {
      開著的話光家用本月就是 31 筆 × 3 個成員 = 93 則，那不是通知是洗版。
      ⚠️ 而且監管優先：父母既是監管者又在帳本裡時，只會收到一則。
         去重規則寫在 backend/app/toolkit/notify.py。 */
-  groupMembers: [
-    { group: 'G1', user: 'U1', notify: false }, { group: 'G1', user: 'U2', notify: false },
-    { group: 'G1', user: 'U3', notify: false }, { group: 'G1', user: 'U4', notify: false },
-    { group: 'G2', user: 'U1', notify: false }, { group: 'G2', user: 'U2', notify: false },
-    { group: 'G3', user: 'U3', notify: false }, { group: 'G3', user: 'U1', notify: false },
-    { group: 'G4', user: 'U1', notify: false }, { group: 'G4', user: 'U2', notify: false },
-    { group: 'G4', user: 'U3', notify: false }, { group: 'G4', user: 'U4', notify: false }
-  ],
+  groupMembers: [],
 
   /* 每月存款目標可以分帳本設。group 為 null = 不分帳本的整體目標。
      整體目標仍然是 members[].savingsGoal，這裡放的是「額外針對某一本帳」的。 */
-  groupGoals: [
-    { user: 'U1', group: 'G2', goal: 10000 },
-    { user: 'U2', group: 'G2', goal: 6000 },
-    { user: 'U3', group: 'G3', goal: 1500 }
-  ],
+  groupGoals: [],
 
   /* 階段性提醒：使用者自己設幾個百分比門檻。
      支出佔可支配上限的比例跨過門檻，就發一則通知（走既有的通知鈴鐺）。
      ⚠️ 同一個門檻一個月只會響一次，靠 firedPeriod 記住。 */
-  alerts: [
-    { id: 'AL1', user: 'U1', group: null, percent: 60,  enabled: true,  firedPeriod: null },
-    { id: 'AL2', user: 'U1', group: null, percent: 85,  enabled: true,  firedPeriod: null },
-    { id: 'AL3', user: 'U1', group: null, percent: 100, enabled: true,  firedPeriod: null },
-    { id: 'AL4', user: 'U1', group: 'G2', percent: 90,  enabled: true,  firedPeriod: null },
-    { id: 'AL5', user: 'U3', group: null, percent: 80,  enabled: true,  firedPeriod: null }
-  ],
+  alerts: [],
 
   /* 每月給被監管者多少零用金。
      ⚠️ 這是設定，不是支出紀錄——家長不要另外記一筆「給小孩 3000」，
      否則小孩把那 3000 花掉之後，同一筆錢會被算兩次。 */
-  allowances: [
-    { payer: 'U1', ward: 'U3', amount: 4000 },
-    { payer: 'U1', ward: 'U4', amount: 3000 },
-    { payer: 'U2', ward: 'U4', amount: 0 }
-  ],
+  allowances: [],
 
   /* ---------- 家庭成員與角色 ---------- */
   roles: [
@@ -173,43 +147,7 @@ window.DATA = {
 
   /* savingsGoal 是註冊時就要填的「每月想存多少」。
      可支配上限 = 收入 − 存款目標，支出超過就代表這個月存不到目標。 */
-  members: [
-    /* 平台管理員。⚠️ **刻意不屬於任何家庭，也不在任何帳本裡。**
-
-       他能停權，但讀不到任何一筆帳——這一點在畫面上就看得出來：
-       用他登入的時候，只有「平台管理」這一頁，沒有總覽、沒有記帳、沒有統計。
-       那不是藏起來，是他真的沒有那些資料。
-
-       停權是關門，不是配鑰匙。 */
-    { id: 'U0', name: '系統管理員', email: 'admin@fambudget.tw', role: null,
-      avatar: '管', age: null, isPlatformAdmin: true,
-      joined: '2026-01-01', income: 0, expense: 0, budget: 0, savingsGoal: 0 },
-    { id: 'U1', name: '林建國', email: 'jianguo@lin.tw', role: 'parent', familyId: 'F1', avatar: '國', age: 52,
-      joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000,
-      savingsGoal: 20000,
-      finance: { style: 'balanced', goals: ['house', 'education'],
-                 habits: ['mortgage', 'insurance'],
-                 note: '房貸還有十二年，小孩教育費是最優先的，旅遊可以省。' },
-      monthly: [{ m: '2026-04', income: 68000, expense: 39519 }, { m: '2026-05', income: 68000, expense: 37680 }, { m: '2026-06', income: 85000, expense: 44609 }, { m: '2026-07', income: 68000, expense: 50725 }, { m: '2026-08', income: 68000, expense: 41572 }, { m: '2026-09', income: 68000, expense: 41230 }] },
-    { id: 'U2', name: '陳淑芬', email: 'shufen@lin.tw', role: 'parent', familyId: 'F1', avatar: '芬', age: 49,
-      joined: '2026-01-05', income: 52000, expense: 38900, budget: 40000,
-      savingsGoal: 15000 ,
-      monthly: [{ m: '2026-04', income: 52000, expense: 37286 }, { m: '2026-05', income: 52000, expense: 35551 }, { m: '2026-06', income: 52000, expense: 42088 }, { m: '2026-07', income: 52000, expense: 47858 }, { m: '2026-08', income: 52000, expense: 39223 }, { m: '2026-09', income: 52000, expense: 38900 }] },
-    { id: 'U3', name: '林宇涵', email: 'yuhan@lin.tw', role: 'child', familyId: 'F1', avatar: '涵', age: 19,
-      joined: '2026-02-11', income: 8000, expense: 11450, budget: 10000,
-      savingsGoal: 2000 ,
-      monthly: [{ m: '2026-04', income: 8000, expense: 10975 }, { m: '2026-05', income: 8000, expense: 10464 }, { m: '2026-06', income: 8000, expense: 12388 }, { m: '2026-07', income: 8000, expense: 14087 }, { m: '2026-08', income: 8000, expense: 11545 }, { m: '2026-09', income: 8000, expense: 11450 }] },
-    { id: 'U4', name: '林宇軒', email: 'yuxuan@lin.tw', role: 'child', familyId: 'F1', avatar: '軒', age: 16,
-      joined: '2026-02-11', income: 3000, expense: 4820, budget: 4000,
-      savingsGoal: 500 ,
-      monthly: [{ m: '2026-04', income: 3000, expense: 4620 }, { m: '2026-05', income: 3000, expense: 4405 }, { m: '2026-06', income: 3000, expense: 5215 }, { m: '2026-07', income: 3000, expense: 5930 }, { m: '2026-08', income: 3000, expense: 4860 }, { m: '2026-09', income: 3000, expense: 4820 }] },
-    /* 還沒加入任何家庭的帳號——拿來示範「家庭綁定」。
-       用家長登入，到「家庭成員」輸入 yuzhen@mail.tw 就能邀請她；
-       或是用她登入，輸入家長產生的邀請碼加入。 */
-    { id: 'U5', name: '林玉珍', email: 'yuzhen@mail.tw', role: null, familyId: null, avatar: '珍', age: 74,
-      joined: '2026-09-01', income: 0, expense: 0, budget: 0, savingsGoal: 0,
-      monthly: [{ m: '2026-04', income: 0, expense: 0 }, { m: '2026-05', income: 0, expense: 0 }, { m: '2026-06', income: 0, expense: 0 }, { m: '2026-07', income: 0, expense: 0 }, { m: '2026-08', income: 0, expense: 0 }, { m: '2026-09', income: 0, expense: 0 }] }
-  ],
+  members: [],
 
   /* 超支警告的分級門檻。刻意讓使用者看得到，因為每個人對「接近」的定義不同 */
   savingsRule: {
@@ -220,16 +158,10 @@ window.DATA = {
 
   /* 家庭。一個人同時只屬於一個家庭（members[].familyId）。
      邀請與邀請碼不放種子資料——示範時現場產生。 */
-  families: [
-    { id: 'F1', name: '林家', createdBy: 'U1', createdAt: '2026-01-05' }
-  ],
+  families: [],
 
   /* 監管關係：家長看得到哪幾個孩子的紀錄。家長之間不用設，同一個家庭的家長互相看得到 */
-  guardianships: [
-    { guardian: 'U1', ward: 'U3', since: '2026-02-11', scope: '全部明細' },
-    { guardian: 'U1', ward: 'U4', since: '2026-02-11', scope: '全部明細' },
-    { guardian: 'U2', ward: 'U4', since: '2026-02-11', scope: '全部明細' }
-  ],
+  guardianships: [],
 
   /* ---------- 稽核紀錄 ----------
      誰做了什麼。⚠️ **停權一定要留下紀錄**——沒有稽核的停權就是任意封鎖，
@@ -237,14 +169,7 @@ window.DATA = {
 
      這張表只記「做了什麼動作」，不記金額；平台管理員讀得到它，
      但那不等於讀得到任何人的財務資料。 */
-  auditLogs: [
-    { id: 'A1003', actor: 'U1', action: 'grant_guardianship',
-      target: 'U4', at: '2026-02-11 09:20', note: '建立對林宇軒的監管' },
-    { id: 'A1002', actor: 'U1', action: 'change_role',
-      target: 'U3', at: '2026-02-11 09:18', note: '把林宇涵設為子女' },
-    { id: 'A1001', actor: 'U1', action: 'create_family',
-      target: null, at: '2026-01-05 21:04', note: '建立「林家」' }
-  ],
+  auditLogs: [],
 
   /* ---------- 分類體系 ---------- */
   categories: [
@@ -263,256 +188,31 @@ window.DATA = {
   ],
 
   /* ---------- 交易明細（核心表） ---------- */
-  transactions: [
-    { id: 'T1045', group: 'G1', user: 'U1', date: '2026-09-02', amount: 640, kind: 'expense',
-      cat: 'C01', merchant: '早餐店', note: '', source: 'manual' },
-    { id: 'T1046', group: 'G1', user: 'U1', date: '2026-09-04', amount: 980, kind: 'expense',
-      cat: 'C01', merchant: '家庭聚餐', note: '', source: 'manual' },
-    { id: 'T1047', group: 'G1', user: 'U1', date: '2026-09-06', amount: 1240, kind: 'expense',
-      cat: 'C01', merchant: '午餐（週）', note: '', source: 'manual' },
-    { id: 'T1048', group: 'G1', user: 'U1', date: '2026-09-03', amount: 1200, kind: 'expense',
-      cat: 'C04', merchant: '好市多 補貨', note: '', source: 'manual' },
-    { id: 'T1049', group: 'G1', user: 'U1', date: '2026-09-07', amount: 800, kind: 'expense',
-      cat: 'C07', merchant: '診所掛號', note: '', source: 'manual' },
-    { id: 'T1050', group: 'G1', user: 'U1', date: '2026-09-02', amount: 1200, kind: 'expense',
-      cat: 'C02', merchant: '停車費與捷運', note: '', source: 'manual' },
-    { id: 'T1051', group: 'G1', user: 'U1', date: '2026-09-09', amount: 900, kind: 'expense',
-      cat: 'C08', merchant: '保險費分攤', note: '', source: 'manual' },
-    { id: 'T1052', group: 'G1', user: 'U1', date: '2026-09-05', amount: 600, kind: 'expense',
-      cat: 'C05', merchant: '第四台月費', note: '', source: 'manual' },
-    { id: 'T1053', group: 'G1', user: 'U1', date: '2026-09-08', amount: 900, kind: 'expense',
-      cat: 'C06', merchant: '書籍', note: '', source: 'manual' },
-    { id: 'T1054', group: 'G1', user: 'U2', date: '2026-09-03', amount: 3200, kind: 'expense',
-      cat: 'C01', merchant: '市場採買', note: '', source: 'manual' },
-    { id: 'T1055', group: 'G1', user: 'U2', date: '2026-09-07', amount: 3000, kind: 'expense',
-      cat: 'C01', merchant: '外食與外送', note: '', source: 'manual' },
-    { id: 'T1056', group: 'G1', user: 'U2', date: '2026-09-04', amount: 5400, kind: 'expense',
-      cat: 'C04', merchant: '日用品補貨', note: '', source: 'manual' },
-    { id: 'T1057', group: 'G1', user: 'U2', date: '2026-09-06', amount: 3100, kind: 'expense',
-      cat: 'C02', merchant: '油錢與計程車', note: '', source: 'manual' },
-    { id: 'T1058', group: 'G1', user: 'U2', date: '2026-09-05', amount: 4800, kind: 'expense',
-      cat: 'C06', merchant: '才藝班學費', note: '', source: 'manual' },
-    { id: 'T1059', group: 'G1', user: 'U2', date: '2026-09-08', amount: 2350, kind: 'expense',
-      cat: 'C07', merchant: '藥局與回診', note: '', source: 'manual' },
-    { id: 'T1060', group: 'G1', user: 'U2', date: '2026-09-09', amount: 3000, kind: 'expense',
-      cat: 'C08', merchant: '孝親費', note: '', source: 'manual' },
-    { id: 'T1061', group: 'G3', user: 'U3', date: '2026-09-04', amount: 1980, kind: 'expense',
-      cat: 'C01', merchant: '外食', note: '', source: 'manual' },
-    { id: 'T1062', group: 'G3', user: 'U3', date: '2026-09-05', amount: 800, kind: 'expense',
-      cat: 'C02', merchant: '通勤', note: '', source: 'manual' },
-    { id: 'T1063', group: 'G3', user: 'U3', date: '2026-09-07', amount: 500, kind: 'expense',
-      cat: 'C04', merchant: '生活用品', note: '', source: 'manual' },
-    { id: 'T1064', group: 'G3', user: 'U3', date: '2026-09-09', amount: 400, kind: 'expense',
-      cat: 'C06', merchant: '參考書', note: '', source: 'manual' },
-    { id: 'T1065', group: 'G1', user: 'U4', date: '2026-09-03', amount: 1180, kind: 'expense',
-      cat: 'C01', merchant: '學校午餐', note: '', source: 'manual' },
-    { id: 'T1066', group: 'G1', user: 'U4', date: '2026-09-06', amount: 995, kind: 'expense',
-      cat: 'C01', merchant: '便利商店', note: '', source: 'manual' },
-    { id: 'T1067', group: 'G1', user: 'U4', date: '2026-09-05', amount: 630, kind: 'expense',
-      cat: 'C02', merchant: '公車儲值', note: '', source: 'manual' },
-    { id: 'T1068', group: 'G1', user: 'U4', date: '2026-09-07', amount: 700, kind: 'expense',
-      cat: 'C04', merchant: '盥洗用品', note: '', source: 'manual' },
-    { id: 'T1069', group: 'G1', user: 'U4', date: '2026-09-08', amount: 700, kind: 'expense',
-      cat: 'C08', merchant: '班費', note: '', source: 'manual' },
-    { id: 'T1044', group: 'G4', user: 'U1', date: '2026-09-09', amount: 12800, kind: 'expense',
-      cat: 'C02', merchant: '訂機票（訂金）', note: '暑假沖繩', source: 'manual' },
-    { id: 'T1043', group: 'G4', user: 'U2', date: '2026-09-06', amount: 4800, kind: 'expense',
-      cat: 'C08', merchant: '訂房訂金', note: '', source: 'manual' },
-    /* ⚠️ 帳本之間的轉帳，不是收入。
-       家用轉 15,000 到旅遊基金，錢沒有進到這個家，只是換了一本帳。
-       記成 income 的話收入會憑空多一筆——跟「零用金記成支出」同一種錯。
-       kind 是 'transfer' 的列不進任何收支加總。 */
-    { id: 'T1042', group: 'G2', user: 'U1', date: '2026-09-01', amount: 15000, kind: 'transfer',
-      cat: 'I04', merchant: '旅遊基金轉入', note: '每月提撥', source: 'manual' },
-    { id: 'T1041', group: 'G3', user: 'U3', date: '2026-09-10', amount: 1280, kind: 'expense',
-      cat: 'C05', merchant: '遊戲點數儲值', note: '', source: 'nlp',
-      raw: '剛剛儲值遊戲1280', parsed: { conf: 0.93, catConf: 0.88 } },
-    { id: 'T1040', group: 'G1', user: 'U1', date: '2026-09-10', amount: 320, kind: 'expense',
-      cat: 'C01', merchant: '公司附近自助餐', note: '午餐', source: 'nlp',
-      raw: '中午自助餐320', parsed: { conf: 0.97, catConf: 0.95 } },
-    { id: 'T1039', group: 'G1', user: 'U4', date: '2026-09-09', amount: 165, kind: 'expense',
-      cat: 'C01', merchant: '全家便利商店', note: '', source: 'nlp',
-      raw: '全家買了飲料跟麵包165', parsed: { conf: 0.96, catConf: 0.72 } },
-    { id: 'T1038', group: 'G1', user: 'U2', date: '2026-09-09', amount: 2450, kind: 'expense',
-      cat: 'C04', merchant: '家樂福', note: '週採買', source: 'manual' },
-    { id: 'T1037', group: 'G3', user: 'U3', date: '2026-09-08', amount: 890, kind: 'expense',
-      cat: 'C01', merchant: '燒烤店', note: '同學聚餐', source: 'manual' },
-    { id: 'T1036', group: 'G1', user: 'U1', date: '2026-09-08', amount: 1150, kind: 'expense',
-      cat: 'C02', merchant: '加油站', note: '', source: 'nlp',
-      raw: '加油1150', parsed: { conf: 0.98, catConf: 0.96 } },
-    { id: 'T1035', group: 'G1', user: 'U4', date: '2026-09-07', amount: 450, kind: 'expense',
-      cat: 'C06', merchant: '文具行', note: '參考書', source: 'manual' },
-    { id: 'T1034', group: 'G3', user: 'U3', date: '2026-09-06', amount: 2200, kind: 'expense',
-      cat: 'C05', merchant: '演唱會票', note: '', source: 'manual' },
-    { id: 'T1033', group: 'G1', user: 'U2', date: '2026-09-05', amount: 52000, kind: 'income',
-      cat: 'I01', merchant: '公司薪轉', note: '9月薪資', source: 'manual' },
-    { id: 'T1032', group: 'G1', user: 'U1', date: '2026-09-05', amount: 68000, kind: 'income',
-      cat: 'I01', merchant: '公司薪轉', note: '9月薪資', source: 'manual' },
-    { id: 'T1031', group: 'G1', user: 'U1', date: '2026-09-05', amount: 18500, kind: 'expense',
-      cat: 'C03', merchant: '房貸', note: '', source: 'manual' },
-    { id: 'T1030', group: 'G1', user: 'U4', date: '2026-09-04', amount: 3000, kind: 'income',
-      cat: 'I03', merchant: '零用錢', note: '', source: 'manual' },
-    { id: 'T1029', group: 'G3', user: 'U3', date: '2026-09-03', amount: 8000, kind: 'income',
-      cat: 'I03', merchant: '打工薪資', note: '', source: 'manual' },
-    { id: 'T1028', group: 'G3', user: 'U3', date: '2026-09-02', amount: 3400, kind: 'expense',
-      cat: 'C05', merchant: '線上訂閱', note: '三個平台', source: 'nlp',
-      raw: '訂閱費三個平台3400', parsed: { conf: 0.91, catConf: 0.84 } },
-    { id: 'T1027', group: 'G1', user: 'U2', date: '2026-09-02', amount: 6800, kind: 'expense',
-      cat: 'C07', merchant: '牙醫診所', note: '植牙分期', source: 'manual' }
-  ],
+  transactions: [],
 
   /* ---------- 自然語言記帳的解析範例（給前端展示，也是評測資料來源） ---------- */
-  nlpDemo: [
-    { raw: '今天午餐吃了120',
-      out: { date: '2026-09-10', amount: 120, kind: 'expense', cat: 'C01',
-             merchant: '', conf: 0.96, catConf: 0.94 },
-      note: '「今天」要換算成實際日期；「午餐」→ 餐飲' },
-    { raw: '全家買飲料跟麵包165',
-      out: { date: '2026-09-10', amount: 165, kind: 'expense', cat: 'C01',
-             merchant: '全家便利商店', conf: 0.96, catConf: 0.72 },
-      note: '「全家」是店名不是家人。分類信心較低——便利商店可能是餐飲也可能是日用品' },
-    { raw: '昨天加油1150悠遊卡付的',
-      out: { date: '2026-09-09', amount: 1150, kind: 'expense', cat: 'C02',
-             merchant: '加油站', conf: 0.94, catConf: 0.96 },
-      note: '「昨天」相對日期；付款方式要另存到 account 欄位' },
-    { raw: '媽媽給我兩千',
-      out: { date: '2026-09-10', amount: 2000, kind: 'income', cat: 'I03',
-             merchant: '', conf: 0.88, catConf: 0.79 },
-      note: '「兩千」中文數字；收入而非支出；「媽媽給」→ 零用金' },
-    { raw: '三個平台訂閱費共3400',
-      out: { date: '2026-09-10', amount: 3400, kind: 'expense', cat: 'C05',
-             merchant: '線上訂閱', conf: 0.91, catConf: 0.84 },
-      note: '「共」表示合計；訂閱歸娛樂還是其他，需要標註準則定義' }
-  ],
+  nlpDemo: [],
 
   /* ---------- 段落批次記帳的示範 ----------
      一段話裡可能有好幾筆。模型要先「切分」再逐筆抽欄位，
      切錯比抽錯更難發現，所以切分結果也要讓使用者確認。 */
-  paragraphDemo: {
-    raw: '早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500',
-    items: [
-      { seq: 1, span: '早上買早餐55',
-        date: '2026-09-10', amount: 55, kind: 'expense', cat: 'C01',
-        merchant: '', note: '早餐',
-        conf: { date: .92, amount: .98, kind: .97, cat: .95 }, missing: [] },
-      { seq: 2, span: '中午跟同事吃飯320',
-        date: '2026-09-10', amount: 320, kind: 'expense', cat: 'C01',
-        merchant: '', note: '與同事聚餐',
-        conf: { date: .92, amount: .98, kind: .97, cat: .93 }, missing: [] },
-      { seq: 3, span: '下午在全家買咖啡',
-        date: '2026-09-10', amount: null, kind: 'expense', cat: 'C01',
-        merchant: '全家便利商店', note: '咖啡',
-        conf: { date: .92, amount: 0, kind: .94, cat: .68 },
-        missing: ['amount'],
-        hint: '這一句沒有寫金額。「全家」判定為店名而非家人；便利商店的分類信心較低，可能是餐飲也可能是日用品。' },
-      { seq: 4, span: '晚上加油1200',
-        date: '2026-09-10', amount: 1200, kind: 'expense', cat: 'C02',
-        merchant: '加油站', note: '',
-        conf: { date: .92, amount: .98, kind: .97, cat: .96 }, missing: [] },
-      { seq: 5, span: '今天打工賺了1500',
-        date: '2026-09-10', amount: 1500, kind: 'income', cat: 'I03',
-        merchant: '', note: '打工',
-        conf: { date: .96, amount: .97, kind: .95, cat: .82 },
-        missing: [],
-        hint: '「賺了」判定為收入。零用金與其他收入的界線需要由分類準則定義。' }
-    ],
-    note: '這段話被切成 5 筆。切分本身也是模型的判斷 —— 若切錯（例如把兩筆合成一筆），' +
-          '欄位再準也沒用，所以切分結果同樣要讓使用者確認。'
-  },
+  paragraphDemo: { raw: '', items: [], note: '' },
 
   /* ---------- 預算（月／年兩個時間基準） ---------- */
   /* 預算只存「上限」。⚠️ **已花多少不存**，一律由 api.js 從明細現算。
 
-     以前這裡寫死了 used：林建國的交通寫 3,250，明細加起來卻是 15,150。
+     以前這裡寫死了 used：交通寫 3,250，明細加起來卻是 15,150。
      同一頁上「本月支出」從明細算、預算從這裡讀，兩個數字就各說各話——
      而且選了某一本帳時，支出變成 0，預算卻還是一整個月的數字。 */
-  budgets: [
-    { user: 'U1', period: 'month', cat: 'C01', limit: 5000 },
-    { user: 'U1', period: 'month', cat: 'C02', limit: 16000 },
-    { user: 'U1', period: 'month', cat: 'C03', limit: 20000 },
-    { user: 'U3', period: 'month', cat: 'C05', limit: 3000 },
-    { user: 'U3', period: 'month', cat: 'C01', limit: 4000 },
-    { user: 'U4', period: 'month', cat: 'C01', limit: 2000 },
-    { user: 'U4', period: 'month', cat: 'C06', limit: 1500 }
-  ],
+  budgets: [],
 
   /* ---------- 月度與年度統計 ---------- */
-  monthly: [
-    { m: '2026-04', income: 131000, expense: 92400 },
-    { m: '2026-05', income: 131000, expense: 88100 },
-    { m: '2026-06', income: 148000, expense: 104300 },
-    { m: '2026-07', income: 131000, expense: 118600 },
-    { m: '2026-08', income: 131000, expense: 97200 },
-    { m: '2026-09', income: 131000, expense: 96400 }
-  ],
+  monthly: [],
 
-  yearly: [
-    { y: '2024', income: 1428000, expense: 1102000 },
-    { y: '2025', income: 1512000, expense: 1188000 },
-    { y: '2026', income: 1180000, expense: 897000, partial: true }
-  ],
+  yearly: [],
 
   /* ---------- LLM 產生的財務控管建議 ---------- */
-  advices: [
-    { id: 'A1', scope: 'family', period: '2026-09', level: 'warn',
-      title: '娛樂支出連續三個月成長，主要來自宇涵',
-      body: '本月家庭娛樂支出 7,480 元，較 6 月成長 62%。其中宇涵佔 6,880 元（92%），' +
-            '已超出其個人娛樂預算 3,000 元的 129%。',
-      basis: ['宇涵 2026-09 娛樂類支出 6,880 元（預算 3,000 元）',
-              '家庭娛樂類：7 月 4,610 → 8 月 5,900 → 9 月 7,480'],
-      suggest: ['與宇涵討論調整娛樂預算上限，或改為每季檢視一次',
-                '訂閱類支出 3,400 元佔娛樂支出 45%，可檢視是否有重複或閒置的訂閱'],
-      conf: 0.92 },
-
-    { id: 'A2', scope: 'family', period: '2026-09', level: 'info',
-      title: '居住支出佔比穩定，房貸為最大單一項目',
-      body: '本月居住類 18,500 元，佔家庭總支出 19%，與前六個月平均 19.2% 一致。',
-      basis: ['2026-09 居住類 18,500 元 ÷ 總支出 96,400 元 = 19.2%'],
-      suggest: ['此項為固定支出，短期無調整空間，建議維持現狀觀察'],
-      conf: 0.97 },
-
-    /* 個人建議是寫給**本人**看的，所以用第二人稱、不點名。
-       家長在「全家」模式看得到監管對象的這一則，畫面上會標是誰的。 */
-    { id: 'A3', scope: 'user', user: 'U4', period: '2026-09', level: 'warn',
-      title: '餐飲花得比預算多一點',
-      body: '這個月餐飲 2,340 元，比預算 2,000 元多了 17%。' +
-            '照現在的速度，月底大約會到 7,020 元。',
-      basis: ['2026-09 餐飲類支出 2,340 元（預算 2,000 元）',
-              '前 10 天平均每日 234 元 × 30 天 = 7,020 元'],
-      suggest: ['看看最近幾筆外食，決定要少吃幾次，還是把預算調高'],
-      conf: 0.89 },
-
-    { id: 'A5', scope: 'user', user: 'U3', period: '2026-09', level: 'warn',
-      title: '娛樂的錢這個月花得比較多',
-      body: '這個月娛樂 6,880 元，是預算 3,000 元的 229%。',
-      basis: ['2026-09 娛樂類支出 6,880 元 ÷ 預算 3,000 元 = 229%'],
-      suggest: ['訂閱類佔了不少，可以檢查有沒有用不到的',
-                '如果這是常態，把娛樂預算調到比較實際的數字'],
-      conf: 0.9 },
-
-    { id: 'A6', scope: 'user', user: 'U1', period: '2026-09', level: 'info',
-      title: '交通費快用完這個月的預算',
-      body: '這個月交通 15,150 元，已經用掉預算 16,000 元的 95%。',
-      basis: ['2026-09 交通類支出 15,150 元 ÷ 預算 16,000 元 = 95%'],
-      suggest: ['月底前還有加油或停車的話，大概會稍微超過一點'],
-      conf: 0.93 },
-
-    { id: 'A7', scope: 'user', user: 'U2', period: '2026-09', level: 'ok',
-      title: '這個月存下了四分之一',
-      body: '收入 52,000 元、支出 38,900 元，存下 13,100 元。',
-      basis: ['2026-09 收入 52,000 元 − 支出 38,900 元 = 13,100 元',
-              '13,100 ÷ 52,000 = 25.2%'],
-      suggest: ['照這個節奏，每月存款目標可以維持不變'],
-      conf: 0.98 },
-
-    { id: 'A4', scope: 'family', period: '2026-09', level: 'ok',
-      title: '本月結餘為正，儲蓄率 26.4%',
-      body: '收入 131,000 元、支出 96,400 元，結餘 34,600 元。',
-      basis: ['2026-09 收入 131,000 元 − 支出 96,400 元 = 34,600 元',
-              '34,600 ÷ 131,000 = 26.4%'],
-      suggest: ['近六個月結餘率介於 9.5%–32.8%，本月屬中上水準'],
-      conf: 0.99 }
-  ],
+  advices: [],
 
   /* 系統對建議的邊界規則（畫面上會顯示，也是設計上的硬約束） */
   adviceRules: [
@@ -524,15 +224,6 @@ window.DATA = {
     { rule: '受監管者的建議同時送給監管者', why: '監管是本系統的設計目的，但必須雙方都看得到' }
   ],
 
-  /* ---------- 自然語言記帳的評測（明樺的工作） ---------- */
-  nlpEval: [
-    { task: '金額抽取', metric: 'Exact Match', base: 0.91, ft: 0.98, target: 0.97 },
-    { task: '日期解析（含相對日期）', metric: 'Exact Match', base: 0.74, ft: 0.94, target: 0.92 },
-    { task: '收支方向判定', metric: 'Accuracy', base: 0.88, ft: 0.97, target: 0.95 },
-    { task: '分類指派', metric: 'Macro-F1', base: 0.61, ft: 0.86, target: 0.85 },
-    { task: '店家名稱抽取', metric: 'F1', base: 0.55, ft: 0.81, target: 0.78 },
-    { task: '一次輸入完全正確率', metric: '全欄位皆對', base: 0.42, ft: 0.79, target: 0.75 }
-  ],
 
   /* ---------- 介面主題 ----------
      ⚠️ 這份清單是正本。themes.css 每一套都要有一個 [data-theme="id"]，
@@ -810,94 +501,21 @@ window.DATA = {
 
 
 /* ============================================================
-   示範資料對齊真實日期
+   今天是哪一天
    ------------------------------------------------------------
-   上面的種子資料是以 2026-09-10 當「今天」寫的。載入時整份搬到真正的今天，
-   不然「今天的紀錄」「這個月」「到期了沒」全部會跟日曆對不上。
-
-     · 月份（每月統計、帳本建立日、加入日…）   整月平移
-     · 本月的明細（原本 1～10 號）             壓進「1 號到今天」，10 號那幾筆就是今天記的
-     · 「今天」「昨天」這種相對日期（語句示範）  照天數平移
-
-   ⚠️ 只搬示範資料。使用者自己記的存在 localStorage，本來就是真的日期，不動。
-   ⚠️ 本月的總額不變：只移日子、不跨月，統計頁跟成員表的數字才對得起來。
+   app.js、api.js 都用 fbToday()，不要各自 new Date()：
+   toISOString() 是 UTC，台灣早上 8 點前會變成昨天。
    ⚠️ 測試要固定日期：載入前設 window.__FAMBUDGET_TODAY__ = 'YYYY-MM-DD'。
    ============================================================ */
 (function (D) {
-  var ANCHOR = { y: 2026, m: 9, d: 10 };
-
   function pad(n) { return (n < 10 ? '0' : '') + n; }
-  function ymd(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
-  function daysIn(y, m) { return new Date(y, m, 0).getDate(); }
-
-  /* 今天（本機時區）。app.js、api.js 都用這一支，不要各自 new Date() */
   window.fbToday = function () {
     var o = window.__FAMBUDGET_TODAY__;
     if (/^\d{4}-\d{2}-\d{2}$/.test(o || '')) return o;
     var n = new Date();
-    return ymd(n.getFullYear(), n.getMonth() + 1, n.getDate());
+    return n.getFullYear() + '-' + pad(n.getMonth() + 1) + '-' + pad(n.getDate());
   };
-
-  var today = window.fbToday();
-  var Y = +today.slice(0, 4), M = +today.slice(5, 7), R = +today.slice(8, 10);
-  var K = (Y * 12 + M) - (ANCHOR.y * 12 + ANCHOR.m);          // 平移幾個月
-  var seedMonth = ymd(ANCHOR.y, ANCHOR.m, 1).slice(0, 7);
-
-  function shiftMonth(ym) {
-    var t = (+ym.slice(0, 4)) * 12 + (+ym.slice(5, 7) - 1) + K;
-    return Math.floor(t / 12) + '-' + pad(t % 12 + 1);
-  }
-  /* 本月的日子壓進 1 號～今天：10 號 → 今天，其餘依序往前 */
-  function mapDay(d) {
-    return R >= ANCHOR.d ? d + (R - ANCHOR.d) : Math.max(1, Math.ceil(d * R / ANCHOR.d));
-  }
-  function shiftDate(s) {
-    if (!/^\d{4}-\d{2}-\d{2}/.test(s || '')) return s;
-    var rest = s.slice(10), ym = s.slice(0, 7), d = +s.slice(8, 10);
-    if (ym === seedMonth) return ymd(Y, M, mapDay(d)) + rest;
-    var nm = shiftMonth(ym);
-    return nm + '-' + pad(Math.min(d, daysIn(+nm.slice(0, 4), +nm.slice(5, 7)))) + rest;
-  }
-  /* 相對日期：「昨天」就是今天減一天 */
-  function shiftDays(s) {
-    var a = new Date(ANCHOR.y, ANCHOR.m - 1, ANCHOR.d), t = new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
-    var n = new Date(Y, M - 1, R + Math.round((t - a) / 86400000));
-    return ymd(n.getFullYear(), n.getMonth() + 1, n.getDate());
-  }
-  function shiftText(s) {
-    return String(s)
-      .replace(/\b\d{4}-\d{2}\b(?!-)/g, shiftMonth)
-      .replace(/(\d{1,2}) 月/g, function (_, m) { return ((+m - 1 + K) % 12 + 12) % 12 + 1 + ' 月'; });
-  }
-
-  var now = new Date();
-  D.meta.period = ymd(Y, M, 1).slice(0, 7);
+  var now = new Date(), today = window.fbToday();
+  D.meta.period = today.slice(0, 7);
   D.meta.updated = today + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
-  if (K === 0 && R === ANCHOR.d) return;                      // 剛好就是種子的那一天
-
-  D.transactions.forEach(function (t) { t.date = shiftDate(t.date); });
-  D.groups.forEach(function (g) {
-    g.created = shiftDate(g.created);
-    if (g.endsOn) {
-      g.endsOn = shiftDate(g.endsOn);
-      /* 沖繩那本要保持「已經過期、等人結算」，不然示範不到結算提示 */
-      if (g.endsOn >= today) g.endsOn = shiftDays(ymd(ANCHOR.y, ANCHOR.m, ANCHOR.d - 1));
-    }
-  });
-  D.members.forEach(function (m) {
-    m.joined = shiftDate(m.joined);
-    (m.monthly || []).forEach(function (x) { x.m = shiftMonth(x.m); });
-  });
-  D.families.forEach(function (f) { f.createdAt = shiftDate(f.createdAt); });
-  D.guardianships.forEach(function (g) { g.since = shiftDate(g.since); });
-  D.auditLogs.forEach(function (a) { a.at = shiftDate(a.at); });
-  D.monthly.forEach(function (x) { x.m = shiftMonth(x.m); });
-  D.yearly.forEach(function (x) { x.y = String(+x.y + Math.floor((ANCHOR.m - 1 + K) / 12)); });
-  D.advices.forEach(function (a) {
-    a.period = shiftMonth(a.period);
-    a.title = shiftText(a.title); a.body = shiftText(a.body);
-    a.basis = a.basis.map(shiftText); a.suggest = a.suggest.map(shiftText);
-  });
-  D.nlpDemo.forEach(function (x) { x.out.date = shiftDays(x.out.date); });
-  D.paragraphDemo.items.forEach(function (x) { x.date = shiftDays(x.date); });
 })(window.DATA);

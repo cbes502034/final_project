@@ -107,7 +107,9 @@
 
   var MODE = BASE ? 'http' : 'mock';
   var LATENCY = 240;
-  var KEY = 'fambudget.state.v1';
+  /* v2：拿掉假資料之後換新的鑰匙。舊的 v1 裡是示範帳號的資料（U1 林建國…），
+     新註冊的人會拿到一樣的 id，不換的話會把舊示範紀錄認成自己的。 */
+  var KEY = 'fambudget.state.v2';
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -130,12 +132,12 @@
   function load() {
     if (state) return state;
     var base = {
-      me: 'U1',                                   // 模擬目前登入者
+      me: null,                                   // 目前登入者（還沒登入是 null）
       transactions: clone(global.DATA.transactions),
       budgets: clone(global.DATA.budgets),
       goals: {},
       readNotify: [],
-      auth: { loggedIn: true },   // mock 預設已登入，不然一打開就被擋在登入頁
+      auth: { loggedIn: false },  // 一打開是登出狀態：沒有範例帳號，要自己註冊或登入
       patch: {},                  // 個人資料的改動（名字、大頭貼）
       newUsers: []                // 註冊進來的人
     };
@@ -143,6 +145,7 @@
       var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (saved) {
         if (saved.me) base.me = saved.me;
+        if (saved.budgets) base.budgets = saved.budgets;
         if (saved.extra) base.transactions = saved.extra.concat(base.transactions);
         if (saved.goals) base.goals = saved.goals;
         if (saved.readNotify) base.readNotify = saved.readNotify;
@@ -154,7 +157,8 @@
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
         ['newGroups', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed', 'txPatch', 'txGone', 'resets',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
-         'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians'].forEach(function (k) {
+         'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians',
+         'passwords', 'advices', 'customCategories', 'newGuardians', 'dissolved'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
         });
       }
@@ -167,6 +171,7 @@
     applyPatch(base.patch);
     applyMemberships(base.memberships);
     applyEndedGuardians(base.endedGuardians);
+    applyNewGuardians(base.newGuardians);
     state = base;
     return state;
   }
@@ -176,7 +181,13 @@
       localStorage.setItem(KEY, JSON.stringify({
         me: state.me, extra: extra, goals: state.goals || {},
         readNotify: state.readNotify || [],
-        auth: state.auth || { loggedIn: true },
+        auth: state.auth || { loggedIn: false },
+        budgets: state.budgets || [],
+        passwords: state.passwords || {},
+        advices: state.advices || [],
+        customCategories: state.customCategories || [],
+        newGuardians: state.newGuardians || [],
+        dissolved: state.dissolved || [],
         patch: state.patch || {},
         newUsers: state.newUsers || [],
         newGroups: state.newGroups || [],
@@ -328,9 +339,37 @@
     (list || []).forEach(function (e) {
       var g = global.DATA.guardianships;
       for (var i = g.length - 1; i >= 0; i--) {
-        if (g[i].guardian === e.guardian && g[i].ward === e.ward) g.splice(i, 1);
+        if (e.id ? gsId(g[i]) === e.id : (g[i].guardian === e.guardian && g[i].ward === e.ward)) g.splice(i, 1);
       }
     });
+  }
+
+  /* 這個瀏覽器建立的監管關係，重新整理之後補回 DATA.guardianships */
+  function applyNewGuardians(list) {
+    (list || []).forEach(function (g) {
+      if (!global.DATA.guardianships.some(function (x) { return gsId(x) === g.id; })) {
+        global.DATA.guardianships.push(clone(g));
+      }
+    });
+  }
+
+  /* 監管關係的 id。後端是自增主鍵；測試資料沒有 id，用「監管人-被監管人」代替 */
+  function gsId(g) { return g.id || ('GS-' + g.guardian + '-' + g.ward); }
+
+  /* 結束幾條監管關係。⚠️ 真後端是設 ended_at，不刪列——稽核要看得到歷史。
+     零用金跟著監管關係，一起歸零。 */
+  function endGuardians(s, rows) {
+    rows.forEach(function (g) {
+      var id = gsId(g);
+      if ((s.newGuardians || []).some(function (x) { return x.id === id; })) {
+        s.newGuardians = s.newGuardians.filter(function (x) { return x.id !== id; });
+      } else {
+        s.endedGuardians = (s.endedGuardians || []).concat([{ id: g.id || null, guardian: g.guardian, ward: g.ward }]);
+      }
+      s.allowancePatch = (s.allowancePatch || []).concat([{ payer: g.guardian, ward: g.ward, amount: 0 }]);
+    });
+    applyEndedGuardians(rows.map(function (g) { return { id: gsId(g) }; }));
+    return rows.length;
   }
 
   /* 一個人離開家庭時要一起收掉的東西。
@@ -343,10 +382,8 @@
     var m = memberOf(uid), famId = m.familyId;
     setMembership(s, uid, null, null);
 
-    var ended = global.DATA.guardianships.filter(function (g) { return g.guardian === uid || g.ward === uid; })
-      .map(function (g) { return { guardian: g.guardian, ward: g.ward }; });
-    s.endedGuardians = (s.endedGuardians || []).concat(ended);
-    applyEndedGuardians(ended);
+    var ended = global.DATA.guardianships.filter(function (g) { return g.guardian === uid || g.ward === uid; });
+    endGuardians(s, ended);
 
     var family = global.DATA.members.filter(function (x) { return x.familyId === famId; })
       .map(function (x) { return x.id; });
@@ -376,7 +413,9 @@
   }
 
   function allFamilies() {
-    return (global.DATA.families || []).concat((state && state.newFamilies) || []);
+    var gone = (state && state.dissolved) || [];
+    return (global.DATA.families || []).concat((state && state.newFamilies) || [])
+      .filter(function (f) { return gone.indexOf(f.id) < 0; });
   }
 
   function familyById(id) {
@@ -420,6 +459,38 @@
   }
 
   var INVITE_DAYS = 7;
+
+  /* mock 的密碼。⚠️ **這不是真的雜湊**，只是讓「打錯密碼會被擋」在瀏覽器裡也成立。
+     真後端用 toolkit/passwords.py（bcrypt），而且密碼只存在伺服器。 */
+  function pwHash(pw) {
+    var h = 2166136261, str = 'fambudget:' + String(pw || '');
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return 'mock$' + h.toString(16);
+  }
+  /* 沒有存過密碼的帳號（測試資料、更早註冊的）只檢查長度 */
+  function checkPw(s, uid, pw) {
+    var saved = (s.passwords || {})[uid];
+    return saved ? saved === pwHash(pw) : String(pw || '').length >= 8;
+  }
+
+  /* 分類：系統預設 ＋ 我們家自訂的。⚠️ 別人家的自訂分類看不到 */
+  function allCats(s) {
+    var fam = (memberOf(s.me) || {}).familyId;
+    return global.DATA.categories.map(function (c) { return Object.assign({ custom: false }, c); })
+      .concat((s.customCategories || []).filter(function (c) { return fam && c.familyId === fam; }));
+  }
+  /* 查一個分類。紀錄可能是家人記的自訂分類，所以不限我們家 */
+  function catOf(s, id) {
+    return global.DATA.categories.concat(s.customCategories || []).filter(function (c) { return c.id === id; })[0] || null;
+  }
+
+  function money(n) { return Number(Math.round(n || 0)).toLocaleString('en-US'); }
+
+  /* 往前或往後推幾個月：'2026-01' -1 → '2025-12' */
+  function shiftMonth(ym, delta) {
+    var t = (+ym.slice(0, 4)) * 12 + (+ym.slice(5, 7) - 1) + delta;
+    return Math.floor(t / 12) + '-' + ((t % 12) < 9 ? '0' : '') + (t % 12 + 1);
+  }
 
   /* 忘記密碼。跟 toolkit/password_reset.py 的 TOKEN_MINUTES／COOLDOWN_SECONDS／GENERIC_MESSAGE 一樣 */
   var RESET_MINUTES = 30;
@@ -613,10 +684,11 @@
   /* 跟我同帳本的人。我看得到他們**在共用帳本裡**的紀錄，
      但看不到他們記在別處的——這跟監管不一樣，監管是整個人。 */
   function coMembers(meId) {
-    var mine = visibleGroups(meId);
+    /* ⚠️ 以前只看 DATA.groupMembers（種子資料），自己開的帳本、後來加進來的人都不算——
+       有假資料的時候看不出來，拿掉之後同帳本的人就互相點不開了。 */
     var out = [meId];
-    global.DATA.groupMembers.forEach(function (m) {
-      if (mine.indexOf(m.group) >= 0 && out.indexOf(m.user) < 0) out.push(m.user);
+    visibleGroups(meId).forEach(function (gid) {
+      memberIdsOf(gid).forEach(function (u) { if (out.indexOf(u) < 0) out.push(u); });
     });
     return out;
   }
@@ -651,6 +723,62 @@
   function sum(list, kind) {
     return list.filter(function (t) { return t.kind === kind; })
       .reduce(function (n, t) { return n + t.amount; }, 0);
+  }
+
+  /* ---------- 一句話 → 一筆（mock 用的規則；真後端是模型） ---------- */
+  var ZH_NUM = { '零': 0, '一': 1, '二': 2, '兩': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+  var ZH_UNIT = { '十': 10, '百': 100, '千': 1000, '萬': 10000 };
+  /* 「兩千」「三百五十」「一萬二」→ 數字。阿拉伯數字優先 */
+  function amountOf(text) {
+    // 店名裡的數字不是金額（7-11 買咖啡 55 → 55）
+    var t = String(text).replace(/7-?11|711/gi, '').replace(/,/g, '');
+    var m = t.match(/(\d+(?:\.\d+)?)\s*(萬|千|k|K)?/);
+    if (m) return Math.round(Number(m[1]) * (m[2] === '萬' ? 10000 : (m[2] ? 1000 : 1))) || null;
+    // 中文數字至少要帶一個單位，「吃了一個便當」的「一」不是金額
+    var z = t.match(/[零一二兩三四五六七八九]*[十百千萬][零一二兩三四五六七八九十百千萬]*/);
+    if (!z) return null;
+    var total = 0, section = 0, number = 0, lastUnit = 0;
+    z[0].split('').forEach(function (ch) {
+      if (ch in ZH_NUM) { number = ZH_NUM[ch]; return; }
+      var u = ZH_UNIT[ch];
+      if (u === 10000) { total += (section + number) * 10000; section = 0; number = 0; lastUnit = 10000; return; }
+      section += (number || 1) * u; number = 0; lastUnit = u;
+    });
+    /* 「三百五」「一千二」「一萬二」：最後一個數字省略了單位，是上一個單位的十分之一。
+       「三百零五」有「零」，就是 5 本身 */
+    var tail = (number && lastUnit >= 100 && /[十百千萬][一二兩三四五六七八九]$/.test(z[0])) ? number * lastUnit / 10 : number;
+    return (total + section + tail) || null;
+  }
+  var CAT_RULES = [
+    ['I01', /薪水|薪資|月薪/], ['I02', /獎金|紅包|年終/], ['I03', /零用|媽媽給|爸爸給|給我/],
+    ['I04', /賺|打工|收入|入帳|退款/],
+    ['C02', /加油|捷運|公車|計程車|高鐵|火車|停車|油錢|悠遊卡|機票/],
+    ['C03', /房租|房貸|水費|電費|瓦斯|管理費|網路費/],
+    ['C07', /醫生|掛號|藥|牙醫|診所|醫院/],
+    ['C06', /書|補習|學費|課程|文具/],
+    ['C05', /電影|訂閱|遊戲|KTV|唱歌|旅遊|門票/],
+    ['C04', /超市|全聯|日用|衛生紙|洗衣|清潔|好市多/],
+    ['C01', /早餐|午餐|晚餐|宵夜|吃|飯|咖啡|飲料|麵包|便當|餐/]
+  ];
+  var MERCHANTS = ['全家', '7-11', '萊爾富', '全聯', '家樂福', '好市多', '星巴克', '麥當勞', '加油站'];
+  function parseLine(text) {
+    var t = String(text || '');
+    var amount = amountOf(t);
+    var rule = CAT_RULES.filter(function (r) { return r[1].test(t); })[0];
+    var cat = rule ? rule[0] : 'C08';
+    var kind = cat.charAt(0) === 'I' ? 'income' : 'expense';
+    var back = /前天/.test(t) ? 2 : (/昨天|昨晚/.test(t) ? 1 : 0);
+    var d = new Date(todayStr() + 'T12:00:00');
+    d.setDate(d.getDate() - back);
+    var date = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    var merchant = MERCHANTS.filter(function (x) { return t.indexOf(x) >= 0; })[0] || '';
+    var missing = amount ? [] : ['amount'];
+    return {
+      date: date, amount: amount, kind: kind, cat: cat, merchant: merchant, note: '',
+      conf: { date: back ? 0.9 : 0.8, amount: amount ? 0.9 : 0, kind: rule ? 0.85 : 0.6, cat: rule ? 0.75 : 0.3 },
+      missing: missing,
+      hint: amount ? (rule ? '' : '分類猜不出來，先放「其他」，確認時改一下。') : '這一句抓不到金額，補上才能存。'
+    };
   }
 
   /* ============================================================
@@ -699,12 +827,9 @@
         var u = global.DATA.members.filter(function (m) {
           return String(m.email || '').toLowerCase() === mail;
         })[0];
-        /* 真後端這兩種情況要回同一句話。
-           分開講等於送給攻擊者一支帳號列舉工具：
-           「這個 email 沒有註冊過」就是在確認哪些 email 有註冊。
-           這裡分開只是為了 demo 時看得懂自己打錯什麼。 */
-        if (!u) throw new Error('這個 email 沒有註冊過');
-        if (String(c.password || '').length < 8) throw new Error('密碼至少 8 個字');
+        /* ⚠️ 「沒有這個帳號」跟「密碼錯」回同一句話、同一個狀態碼。
+           分開講等於送給攻擊者一支帳號列舉工具。 */
+        if (!u || !checkPw(s, u.id, c.password)) throw oops('email 或密碼不對', 401);
 
         /* ⚠️ 停權必須真的擋得住登入，否則它只是畫面上的一個標籤。
            ⚠️ 而且要**在密碼驗證通過之後**才檢查——順序反過來的話，
@@ -740,6 +865,9 @@
         /* ⚠️ 存款目標搬到註冊後的個人化設定（PUT /api/savings-goal）。
            舊的前端還把它塞在註冊裡的話直接擋——默默吃掉，使用者會以為設好了。 */
         if (p.savingsGoal !== undefined) throw oops('存款目標不在註冊時設定，註冊完的個人化設定會問', 400);
+        if (global.DATA.members.some(function (m) { return String(m.email || '').toLowerCase() === mail; })) {
+          throw oops('這個 email 已經註冊過了', 409);
+        }
 
         var n = global.DATA.members.reduce(function (mx, m) {
           return Math.max(mx, Number(String(m.id).replace(/\D/g, '')) || 0);
@@ -756,6 +884,8 @@
         };
         global.DATA.members.push(u);
         s.newUsers = (s.newUsers || []).concat([clone(u)]);
+        s.passwords = s.passwords || {};
+        s.passwords[u.id] = pwHash(p.password);
         s.me = u.id;
         s.auth = { loggedIn: true };
         save();
@@ -962,6 +1092,8 @@
         if (!r || r.usedAt || Date.now() >= r.expiresAt) throw oops(RESET_INVALID, 400);
         if (String(password || '').length < 8) throw oops('密碼至少 8 個字', 422);
         r.usedAt = Date.now();
+        s.passwords = s.passwords || {};
+        s.passwords[r.userId] = pwHash(password);
         /* 改完密碼，所有裝置都要登出（連結可能是被別人拿去用的）。mock 只有這一個瀏覽器 */
         s.auth = { loggedIn: false };
         save();
@@ -970,9 +1102,29 @@
     },
 
     verifyPassword: function (pw) {
+      var s = load();
       return sleep(320).then(function () {
-        if (String(pw || '').length < 8) throw new Error('密碼不正確');
+        if (!checkPw(s, s.me, pw)) throw oops('密碼不正確', 401);
         return { ok: true };
+      });
+    },
+
+    /* 登入中的裝置。mock 只有這一個瀏覽器；真後端列 sessions 表裡還沒撤銷的 */
+    sessions: function () {
+      return sleep(160).then(function () {
+        var ua = (global.navigator && global.navigator.userAgent) || '';
+        var device = /iPhone|iPad|Android/i.test(ua) ? '手機瀏覽器' : (ua ? '電腦瀏覽器' : '這台裝置');
+        return { sessions: [{ id: 'this-device', device: device, current: true, lastActiveAt: new Date().toISOString() }] };
+      });
+    },
+
+    /* 登出所有裝置（包含這一台）。真後端把這個人所有 sessions 設 revoked_at */
+    logoutAll: function () {
+      var s = load();
+      return sleep(220).then(function () {
+        s.auth = { loggedIn: false };
+        save();
+        return { revoked: 1 };
       });
     },
 
@@ -1020,11 +1172,14 @@
     },
 
     changePassword: function (p) {
-      p = p || {};
+      var s = load(); p = p || {};
       return sleep(260).then(function () {
-        if (String(p.oldPassword || '').length < 8) throw new Error('目前的密碼不對');
-        if (String(p.newPassword || '').length < 8) throw new Error('新密碼至少 8 個字');
-        if (p.oldPassword === p.newPassword) throw new Error('新密碼不能跟舊的一樣');
+        if (!checkPw(s, s.me, p.oldPassword)) throw oops('目前的密碼不對', 400);
+        if (String(p.newPassword || '').length < 8) throw oops('新密碼至少 8 個字', 422);
+        if (p.oldPassword === p.newPassword) throw oops('新密碼不能跟舊的一樣', 400);
+        s.passwords = s.passwords || {};
+        s.passwords[s.me] = pwHash(p.newPassword);
+        save();
         return { ok: true };
       });
     },
@@ -1401,27 +1556,31 @@
         var rule = D.savingsRule;
         var level = ratio >= rule.overAt ? 'over' : (ratio >= rule.warnAt ? 'near' : 'safe');
 
-        /* 近 6 個月：按這個 scope 的人重算，不是丟一份固定的全家數列。
+        /* 近 6 個月、近 3 年：**從明細算**，跟正上方的 KPI 用同一套規則
+           （收入只算 earners，支出算全部的人；選了帳本就只算那本帳）。
 
-           ⚠️ 以前這裡是 clone(D.monthly)——個人總覽和家庭總覽拿到一模一樣的
-           數字，而且最後一個月是「全家四個人」的 131,000／96,400，
-           跟它正上方的 KPI（個人 68,000／41,230）直接矛盾。
-
-           ⚠️ 選了某一本帳的時候回 null：每個人的月數列沒有分帳本，
-           硬畫出來就是一張假的圖。寧可不畫，也不要畫錯的。 */
-        var scoped = !(f.groupId && f.groupId !== 'all');
-        var monthly = scoped ? D.monthly.map(function (row) {
-          var inc = 0, exp = 0;
-          users.forEach(function (u) {
-            var mm = memberOf(u);
-            if (!mm || !mm.monthly) return;
-            var r = mm.monthly.filter(function (x) { return x.m === row.m; })[0];
-            if (!r) return;
-            if (earners.indexOf(u) >= 0) inc += r.income;
-            exp += r.expense;
+           ⚠️ 以前是讀一份固定的數列——個人總覽和家庭總覽拿到一模一樣的數字，
+           最後一個月跟 KPI 直接矛盾；選了帳本時也只能回 null。 */
+        var oneGroup = f.groupId && f.groupId !== 'all';
+        function rowFor(prefix) {
+          var list = s.transactions.filter(function (t) {
+            if (oneGroup && t.group !== f.groupId) return false;
+            return users.indexOf(t.user) >= 0 && t.date.indexOf(prefix) === 0;
           });
-          return { m: row.m, income: inc, expense: exp };
-        }) : null;
+          return {
+            income: sum(list.filter(function (t) { return earners.indexOf(t.user) >= 0; }), 'income'),
+            expense: sum(list, 'expense')
+          };
+        }
+        var monthly = [5, 4, 3, 2, 1, 0].map(function (back) {
+          var ym = shiftMonth(D.meta.period, -back);
+          return Object.assign({ m: ym }, rowFor(ym));
+        });
+        var thisYear = +D.meta.period.slice(0, 4);
+        var yearly = [thisYear - 2, thisYear - 1, thisYear].map(function (y) {
+          // 今年還沒過完：畫面要標「未完整」，不然會被拿去跟整年比
+          return Object.assign({ y: String(y), partial: y === thisYear }, rowFor(String(y)));
+        });
 
         return {
           period: D.meta.period,
@@ -1448,20 +1607,11 @@
             rule: clone(rule)
           },
           byCat: Object.keys(byCat).map(function (c) {
-            var cat = D.categories.filter(function (x) { return x.id === c; })[0];
+            var cat = catOf(s, c) || { name: '（找不到的分類）', color: 'cat-other' };
             return { cat: c, name: cat.name, color: cat.color, amount: byCat[c] };
           }).sort(function (a, b) { return b.amount - a.amount; }),
           monthly: monthly,
-          /* ⚠️ 年度數列是「全家所有人」的合計，沒有按人拆。
-             所以只有這次統計剛好涵蓋全家每一個人時才給；
-             看「我」、或家長只監管其中幾位時回 null——
-             否則「我・按年」會拿到全家的數字，跟個人的月資料對不起來。 */
-          yearly: (function () {
-            var all = D.members.filter(function (m) { return !m.isPlatformAdmin; })
-              .map(function (m) { return m.id; });
-            var covers = scoped && all.every(function (id) { return users.indexOf(id) >= 0; });
-            return covers ? clone(D.yearly) : null;
-          })(),
+          yearly: yearly,
           members: D.members.filter(function (m) { return users.indexOf(m.id) >= 0; })
             .map(function (m) {
               /* 這個人的數字也一樣從明細算 */
@@ -1543,7 +1693,7 @@
         });
         return {
           transactions: rows.map(function (t) {
-            var c = D.categories.filter(function (x) { return x.id === t.cat; })[0];
+            var c = catOf(s, t.cat);
             return Object.assign(clone(t), {
               userName: memberOf(t.user).name,
               catName: c ? c.name : '',
@@ -1555,54 +1705,33 @@
       });
     },
 
-    /* ★ 自然語言記帳：只解析、不寫入。使用者確認後才呼叫 confirm */
+    /* ★ 自然語言記帳：只解析、不寫入。使用者確認後才呼叫 confirm
+       mock 沒有模型，用 parseLine() 的規則頂著——真後端由模型負責，並回每一欄的信心度。 */
     nlpParse: function (text) {
-      var D = global.DATA;
-      return sleep(900).then(function () {
-        var demo = D.nlpDemo.filter(function (x) { return x.raw === text; })[0];
-        if (demo) return { raw: text, out: clone(demo.out), note: demo.note, matched: true };
-        // 沒對到示範句時做一個很陽春的示意解析（真後端由模型負責）
-        var m = String(text).match(/(\d+)/);
-        var amt = m ? Number(m[1]) : 0;
+      return sleep(700).then(function () {
+        var t = String(text || '').trim();
+        if (!t) throw oops('先寫一句話', 422);
+        var it = parseLine(t);
         return {
-          raw: text, matched: false,
-          out: { date: todayStr(), amount: amt, kind: 'expense',
-                 cat: 'C08', merchant: '', conf: amt ? 0.55 : 0.2, catConf: 0.3 },
-          note: 'mock 模式只做示意解析。真後端由模型負責，並會回傳每個欄位的信心度。'
+          raw: t, matched: false,
+          out: { date: it.date, amount: it.amount || 0, kind: it.kind, cat: it.cat, merchant: it.merchant,
+                 conf: it.conf.amount, catConf: it.conf.cat },
+          note: 'mock 模式用規則解析。真後端由模型負責，並會回傳每個欄位的信心度。'
         };
       });
     },
 
     /* ★ 段落解析：一段話可能有好幾筆，模型要先切分再逐筆抽欄位 */
     nlpParseBatch: function (text) {
-      var D = global.DATA;
-      return sleep(1500).then(function () {
-        var demo = D.paragraphDemo;
-        if (String(text).trim() === demo.raw) {
-          return { raw: text, matched: true, items: clone(demo.items), note: demo.note };
-        }
-        // 沒對到示範段落時做陽春切分（真後端由模型負責）
-        var parts = String(text).split(/[，,。；;\n]+/).map(function (x) { return x.trim(); })
-                     .filter(function (x) { return x.length > 1; });
-        var items = parts.map(function (p, i) {
-          var m = p.match(/(\d+)/);
-          var amt = m ? Number(m[1]) : null;
-          var income = /賺|收入|薪|給我|入帳/.test(p);
-          return {
-            seq: i + 1, span: p,
-            date: todayStr(),
-            amount: amt,
-            kind: income ? 'income' : 'expense',
-            cat: income ? 'I04' : 'C08',
-            merchant: '', note: '',
-            conf: { date: .5, amount: amt ? .6 : 0, kind: .55, cat: .3 },
-            missing: amt === null ? ['amount'] : [],
-            hint: amt === null ? '這一句抓不到金額。' : ''
-          };
-        });
+      return sleep(1100).then(function () {
+        var t = String(text || '').trim();
+        if (!t) throw oops('先寫一段話', 422);
+        var parts = t.split(/[，,。；;、\n]+|(?:然後|接著|還有)/).map(function (x) { return x.trim(); })
+          .filter(function (x) { return x.length > 1; });
+        var items = parts.map(function (part, i) { return Object.assign({ seq: i + 1, span: part }, parseLine(part)); });
         return {
-          raw: text, matched: false, items: items,
-          note: 'mock 模式只做陽春切分。真後端由模型負責切分與抽欄位，並回傳每一欄的信心度。'
+          raw: t, matched: false, items: items,
+          note: 'mock 模式用規則切分與抽欄位。真後端由模型負責，並回傳每一欄的信心度。'
         };
       });
     },
@@ -1747,7 +1876,7 @@
         });
         /* 分類要跟收支方向對得上：支出不能選「薪資」 */
         var kind = next.kind || t.kind, cat = next.cat || t.cat;
-        var c = D.categories.filter(function (x) { return x.id === cat; })[0];
+        var c = catOf(s, cat);
         if (!c) throw oops('沒有這個分類', 400);
         if (c.kind !== kind) {
           if ('cat' in p) throw oops('「' + c.name + '」是' + (c.kind === 'income' ? '收入' : '支出') + '的分類，跟收支方向對不上', 400);
@@ -1767,7 +1896,7 @@
           s.txPatch[t.id] = Object.assign(s.txPatch[t.id] || {}, next, { updatedAt: t.updatedAt });
         }
         save();
-        var cc = D.categories.filter(function (x) { return x.id === t.cat; })[0] || {};
+        var cc = catOf(s, t.cat) || {};
         return Object.assign(clone(t), {
           userName: (memberOf(t.user) || {}).name || '', catName: cc.name || '', catColor: cc.color || ''
         });
@@ -1897,7 +2026,7 @@
           .filter(function (t) { return wards.indexOf(t.user) >= 0; })
           .map(function (t) {
             var m = memberOf(t.user) || {};
-            var c = D.categories.filter(function (x) { return x.id === t.cat; })[0] || {};
+            var c = catOf(s, t.cat) || {};
             var ts = stamp(t);
             return {
               id: 'NT' + t.id,
@@ -1981,9 +2110,9 @@
           }), 'expense');
         }
         return {
-          budgets: D.budgets.filter(function (b) { return vis.indexOf(b.user) >= 0; })
+          budgets: (s.budgets || []).filter(function (b) { return vis.indexOf(b.user) >= 0 && b.period === 'month'; })
             .map(function (b) {
-              var c = D.categories.filter(function (x) { return x.id === b.cat; })[0];
+              var c = catOf(s, b.cat) || { name: '（找不到的分類）', color: 'cat-other' };
               var u = used(b.user, b.cat);
               return Object.assign(clone(b), {
                 used: u,
@@ -1992,6 +2121,27 @@
               });
             }).sort(function (a, b) { return b.pct - a.pct; })
         };
+      });
+    },
+
+    /* 設定預算：PUT /api/budgets。只能設自己的；limit 0 = 拿掉這個分類的預算 */
+    setBudget: function (p) {
+      var s = load(); p = p || {};
+      return sleep(220).then(function () {
+        var c = catOf(s, p.cat);
+        if (!c || c.kind !== 'expense') throw oops('預算只能設在支出分類', 400);
+        var v = Number(p.limit);
+        if (!isFinite(v) || v < 0) throw oops('預算要是 0 以上的數字', 422);
+        var period = p.period || 'month';
+        if (period !== 'month' && period !== 'year') throw oops('period 只能是 month 或 year', 400);
+        s.budgets = (s.budgets || []).filter(function (b) {
+          return !(b.user === s.me && b.cat === p.cat && b.period === period);
+        });
+        if (v > 0) s.budgets.push({ user: s.me, period: period, cat: p.cat, limit: v });
+        save();
+        return v > 0
+          ? { user: s.me, period: period, cat: p.cat, limit: v, catName: c.name }
+          : { user: s.me, period: period, cat: p.cat, limit: 0, deleted: true, catName: c.name };
       });
     },
 
@@ -2004,7 +2154,7 @@
                   'family' 全家的建議 ＋ 我監管的人的個人建議（家長才有）
            ⚠️ 子女不會拿到全家的建議——那幾則是寫給家長看的，裡面會點名。 */
         var fam = f.scope === 'family' && vis.length > 1;
-        var rows = D.advices.filter(function (a) {
+        var rows = D.advices.concat(s.advices || []).filter(function (a) {
           if (a.scope === 'family') return fam;
           if (a.user === s.me) return !fam;
           return fam && vis.indexOf(a.user) >= 0;
@@ -2017,6 +2167,75 @@
           }),
           rules: clone(D.adviceRules)
         };
+      });
+    },
+
+    /* 產生這個月的財務建議：POST /api/advices/generate
+       真後端：analytics 先從資料庫算好數字 → 餵給模型「只做敘述」→ Pydantic 驗證 → 存進 advices。
+       mock 沒有模型，用規則把**同一批數字**寫成句子。數字一律從明細算，跟統計頁同一個來源。 */
+    generateAdvices: function (p) {
+      p = p || {};
+      var s = load(), D = global.DATA;
+      var scope = p.scope === 'family' ? 'family' : 'me';
+      var me = memberOf(s.me) || {};
+      if (scope === 'family' && !(isParentOf(s, me.familyId) && visibleUsers(s.me).length > 1)) {
+        return Promise.reject(oops('全家的建議只有家長、而且照看著家人時才能產生', 403));
+      }
+      return Promise.all([mock.summary({ scope: scope }), mock.budgets({})]).then(function (r) {
+        return sleep(700).then(function () {
+          var sm = r[0], bd = r[1].budgets || [];
+          var period = D.meta.period, who = scope === 'family' ? null : s.me;
+          var head = { scope: scope === 'family' ? 'family' : 'user', user: who, period: period,
+                       generatedAt: localStamp(new Date()) };
+          var out = [];
+          function add(level, title, body, basis, suggest, conf) {
+            out.push(Object.assign({ id: 'AV' + Date.now() + '-' + out.length, level: level, title: title,
+              body: body, basis: basis, suggest: suggest, conf: conf }, head));
+          }
+          if (!sm.count) {
+            add('info', '這個月還沒有紀錄', '記幾筆之後，建議才有數字可以說。',
+              [period + ' 紀錄 0 筆'], ['先把今天花的記下來，一段話就能記好幾筆'], 1);
+          } else {
+            var sv = sm.savings;
+            var basis = ['收入 ' + money(sm.income) + ' − 每月想存 ' + money(sv.goal) + ' ＝ 可以花 ' + money(sv.allowance),
+                         '支出 ' + money(sm.expense) + ' ÷ 可以花 ' + money(sv.allowance) + ' ＝ ' + Math.round(sv.ratio * 100) + '%'];
+            if (sv.level === 'over') {
+              add('warn', '這個月存不到目標了', '支出 ' + money(sm.expense) + ' 元，比可以花的多了 ' + money(sv.shortfall) + ' 元。',
+                basis, ['看看花最多的分類能不能先緩一緩', '或把這個月的存款目標調低一點'], 0.95);
+            } else if (sv.level === 'near') {
+              add('warn', '快用完這個月可以花的', '已經用掉 ' + Math.round(sv.ratio * 100) + '%，剩 ' + money(sv.left) + ' 元。',
+                basis, ['接下來大筆的支出先想一下'], 0.93);
+            } else {
+              add('ok', '這個月的進度正常', '到目前花了可以花的 ' + Math.round(sv.ratio * 100) + '%，照這個速度存得到目標。',
+                basis, ['維持現在的節奏就好'], 0.9);
+            }
+            if (sm.byCat.length && sm.expense) {
+              var top = sm.byCat[0];
+              add('info', top.name + '是這個月花最多的', top.name + ' ' + money(top.amount) + ' 元，佔支出 ' +
+                Math.round(top.amount / sm.expense * 100) + '%。',
+                [top.name + ' ' + money(top.amount) + ' ÷ 支出 ' + money(sm.expense)], ['點進統計看是哪幾筆'], 0.9);
+            }
+            bd.filter(function (b) { return b.over && (scope === 'family' || b.user === s.me); }).forEach(function (b) {
+              add('warn', '「' + b.catName + '」超過預算', b.catName + ' 花了 ' + money(b.used) + ' 元，預算 ' + money(b.limit) + ' 元。',
+                [b.catName + ' ' + money(b.used) + ' ÷ 預算 ' + money(b.limit) + ' ＝ ' + Math.round(b.pct * 100) + '%'],
+                ['決定要少花，還是把預算調到比較實際的數字'], 0.92);
+            });
+            if (scope === 'family' && sm.allowance > 0) {
+              add(sm.wardSpend > sm.allowance ? 'warn' : 'info', '孩子的花費與零用金',
+                '照看的孩子這個月花了 ' + money(sm.wardSpend) + ' 元，零用金是 ' + money(sm.allowance) + ' 元。',
+                ['支出 ' + money(sm.wardSpend) + ' ÷ 零用金 ' + money(sm.allowance)], ['跟孩子一起看看錢花到哪裡'], 0.88);
+            }
+          }
+          // 同一個月、同一個範圍再產生一次：蓋掉舊的，不要疊出兩份
+          s.advices = (s.advices || []).filter(function (a) {
+            return !(a.period === period && a.scope === head.scope && (a.user || null) === who);
+          }).concat(out);
+          save();
+          return {
+            generatedAt: head.generatedAt,
+            advices: out.map(function (a) { return Object.assign(clone(a), { userName: a.user ? memberOf(a.user).name : null }); })
+          };
+        });
       });
     },
 
@@ -2057,6 +2276,7 @@
             return fam && (memberOf(g.guardian) || {}).familyId === fam.id;
           }).map(function (g) {
             return Object.assign(clone(g), {
+              id: gsId(g),
               guardianName: memberOf(g.guardian).name,
               wardName: memberOf(g.ward).name
             });
@@ -2265,6 +2485,116 @@
       });
     },
 
+    /* 監管關係：GET /api/guardianships。同一個家庭的都列出來——
+       ⚠️ 監管必須雙向可見，被照看的人一定看得到是誰在看。 */
+    guardianships: function () {
+      var s = load(), D = global.DATA;
+      return sleep(160).then(function () {
+        var fam = familyOf(s.me);
+        return {
+          guardianships: D.guardianships.filter(function (g) {
+            return fam && (memberOf(g.guardian) || {}).familyId === fam.id;
+          }).map(function (g) {
+            return Object.assign(clone(g), { id: gsId(g), guardianName: memberOf(g.guardian).name,
+              wardName: memberOf(g.ward).name, mine: g.guardian === s.me });
+          })
+        };
+      });
+    },
+
+    /* 開始照看一個孩子：POST /api/guardianships { wardId }。監管人一定是自己——
+       ⚠️ 不能替別的家長建立監管，那等於替他決定要看誰。 */
+    createGuardianship: function (p) {
+      var s = load(); p = p || {};
+      return sleep(240).then(function () {
+        var me = memberOf(s.me), ward = memberOf(p.wardId);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以照看家人', 403);
+        if (p.guardianId && p.guardianId !== s.me) throw oops('只能設定「我」照看誰，不能替別的家長設定', 403);
+        if (!ward || ward.familyId !== me.familyId) throw oops('這個家庭裡沒有這個人', 404);
+        if (ward.role !== 'child') throw oops('只能照看子女；家長之間本來就看得到彼此', 422);
+        if (global.DATA.guardianships.some(function (g) { return g.guardian === s.me && g.ward === ward.id; })) {
+          throw oops('你已經在照看' + ward.name + '了', 409);
+        }
+        var row = { id: 'GS' + Date.now(), guardian: s.me, ward: ward.id, since: todayStr(), scope: '全部明細' };
+        s.newGuardians = (s.newGuardians || []).concat([row]);
+        global.DATA.guardianships.push(clone(row));
+        pushAudit(s, 'grant_guardianship', ward.id, '開始照看' + ward.name);
+        save();
+        return Object.assign(clone(row), { guardianName: me.name, wardName: ward.name, mine: true });
+      });
+    },
+
+    /* 解除監管：DELETE /api/guardianships/{id}。監管人自己，或同一個家庭的其他家長 */
+    endGuardianship: function (id) {
+      var s = load();
+      return sleep(240).then(function () {
+        var g = global.DATA.guardianships.filter(function (x) { return gsId(x) === id; })[0];
+        if (!g) throw oops('找不到這個監管關係', 404);
+        var me = memberOf(s.me), ward = memberOf(g.ward) || {};
+        if (g.guardian !== s.me && !isParentOf(s, ward.familyId)) throw oops('只有家長可以解除監管', 403);
+        endGuardians(s, [g]);
+        pushAudit(s, 'end_guardianship', g.ward, (g.guardian === s.me ? '停止照看' : '解除' + memberOf(g.guardian).name + '對') + (ward.name || '') + (g.guardian === s.me ? '' : '的監管'));
+        save();
+        return { id: id, ended: true };
+      });
+    },
+
+    /* 改角色：PATCH /api/family/members/{id} { role }
+       · 家長可以把子女設為家長
+       · 家長可以把**自己**改成子女，但家裡要還有別的家長
+       · ⚠️ 不能把另一位家長降成子女——那跟「移除另一位家長」是同一件事 */
+    changeMemberRole: function (uid, role) {
+      var s = load();
+      return sleep(260).then(function () {
+        var me = memberOf(s.me), who = memberOf(uid);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以改角色', 403);
+        if (!who || who.familyId !== me.familyId) throw oops('這個家庭裡沒有這個人', 404);
+        if (role !== 'parent' && role !== 'child') throw oops('角色只能是家長或子女', 422);
+        if (who.role === role) return { id: uid, role: role, changed: false };
+        var parents = global.DATA.members.filter(function (x) { return x.familyId === me.familyId && x.role === 'parent'; });
+        if (role === 'child') {
+          if (uid !== s.me) throw oops('不能把另一位家長改成子女，他只能自己調整', 403);
+          if (parents.length < 2) throw oops('你是唯一的家長，先把另一位家人設為家長', 409);
+          endGuardians(s, global.DATA.guardianships.filter(function (g) { return g.guardian === uid; }));
+        } else {
+          // 設為家長：他被照看的關係一起結束（家長之間本來就看得到）
+          endGuardians(s, global.DATA.guardianships.filter(function (g) { return g.ward === uid; }));
+        }
+        setMembership(s, uid, me.familyId, role);
+        pushAudit(s, 'change_role', uid, '把' + who.name + '設為' + (role === 'parent' ? '家長' : '子女'));
+        save();
+        return { id: uid, role: role, changed: true };
+      });
+    },
+
+    /* 解散家庭：DELETE /api/family
+       · 只有家長，而且**是唯一的家長**——還有別的家長時，一個人不能替另一位家長決定解散，
+         你可以自己退出（家裡還有別的家長，退出不會卡住）
+       · 每個人都離開家庭：監管關係、零用金結束，家人之間的帳本互相移出，邀請與邀請碼作廢
+       · ⚠️ **紀錄一筆都不刪**，每一筆仍在記帳的人自己的收支明細裡 */
+    dissolveFamily: function () {
+      var s = load();
+      return sleep(320).then(function () {
+        var me = memberOf(s.me);
+        if (!me.familyId) throw oops('你目前沒有加入任何家庭', 404);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以解散家庭', 403);
+        var famId = me.familyId, fam = familyById(famId);
+        var people = global.DATA.members.filter(function (x) { return x.familyId === famId; });
+        var others = people.filter(function (x) { return x.role === 'parent' && x.id !== s.me; });
+        if (others.length) {
+          throw oops('家裡還有其他家長（' + others.map(function (x) { return x.name; }).join('、') + '），不能一個人解散。你可以自己退出家庭', 409);
+        }
+        people.filter(function (x) { return x.id !== s.me; }).forEach(function (x) { detachFromFamily(s, x.id); });
+        detachFromFamily(s, s.me);
+        (s.invites || []).forEach(function (i) { if (i.familyId === famId && i.status === 'pending') i.status = 'cancelled'; });
+        (s.codes || []).forEach(function (c) { if (c.familyId === famId && c.status === 'pending') c.status = 'cancelled'; });
+        s.dissolved = (s.dissolved || []).concat([famId]);
+        pushAudit(s, 'dissolve_family', null, '解散「' + fam.name + '」（' + people.length + ' 人離開）');
+        save();
+        return { dissolved: true, family: { id: famId, name: fam.name }, released: people.length };
+      });
+    },
+
     /* 被邀請的人婉拒，或是發邀請那一家的家長取消 */
     declineInvite: function (id) {
       var s = load();
@@ -2282,7 +2612,28 @@
 
 
     categories: function () {
-      return sleep(120).then(function () { return { categories: clone(global.DATA.categories) }; });
+      var s = load();
+      return sleep(120).then(function () { return { categories: clone(allCats(s)) }; });
+    },
+
+    /* 新增家庭自訂分類：POST /api/categories。家長才能加，全家共用 */
+    createCategory: function (p) {
+      var s = load(); p = p || {};
+      return sleep(220).then(function () {
+        var me = memberOf(s.me);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以新增家庭的分類', 403);
+        var name = String(p.name || '').replace(/\s+/g, ' ').trim();
+        if (!name || name.length > 10) throw oops('分類名稱要 1～10 個字', 422);
+        if (p.kind !== 'expense' && p.kind !== 'income') throw oops('要選支出或收入', 422);
+        if (allCats(s).some(function (c) { return c.kind === p.kind && c.name === name; })) {
+          throw oops('已經有「' + name + '」這個分類了', 409);
+        }
+        var c = { id: 'CX' + Date.now(), name: name, kind: p.kind, color: 'cat-other',
+                  icon: name.charAt(0), familyId: me.familyId, custom: true };
+        s.customCategories = (s.customCategories || []).concat([c]);
+        save();
+        return clone(c);
+      });
     },
 
 
@@ -2293,6 +2644,20 @@
       return sleep(120).then(function () { return { reset: true }; });
     }
   };
+
+  /* 登入閘：mock 也跟真後端一樣，沒登入就 401。
+     ⚠️ 沒有這一層的話，登出之後某個畫面還在打 API，mock 會拿著 me = null 往下跑，
+     錯在「讀不到 null 的 name」這種看不出原因的地方。 */
+  var MOCK_PUBLIC = ['authState', 'login', 'register', 'logout', 'requestPasswordReset', 'confirmPasswordReset', 'reset'];
+  Object.keys(mock).forEach(function (name) {
+    if (MOCK_PUBLIC.indexOf(name) >= 0) return;
+    var fn = mock[name];
+    mock[name] = function () {
+      var st = load();
+      if (!st.auth || !st.auth.loggedIn || !memberOf(st.me)) return Promise.reject(oops('請先登入', 401));
+      return fn.apply(mock, arguments);
+    };
+  });
 
   /* ============================================================
      http 轉接器
@@ -2492,75 +2857,190 @@
     removeMember:      function (u)     { return req('/api/family/members/' + u, { method: 'DELETE' }); },
     leaveFamily:       function ()      { return req('/api/family/members/' + 'me', { method: 'DELETE' }); },
     categories:        function ()      { return req('/api/categories'); },
+    createCategory:    function (p)     { return req('/api/categories', { method: 'POST', body: p }); },
+    setBudget:         function (p)     { return req('/api/budgets', { method: 'PUT', body: p }); },
+    generateAdvices:   function (p)     { return req('/api/advices/generate', { method: 'POST', body: p || {} }); },
+    guardianships:     function ()      { return req('/api/guardianships'); },
+    createGuardianship: function (p)    { return req('/api/guardianships', { method: 'POST', body: p }); },
+    endGuardianship:   function (i)     { return req('/api/guardianships/' + encodeURIComponent(i), { method: 'DELETE' }); },
+    changeMemberRole:  function (u, r)  { return req('/api/family/members/' + encodeURIComponent(u), { method: 'PATCH', body: { role: r } }); },
+    dissolveFamily:    function ()      { return req('/api/family', { method: 'DELETE' }); },
+    sessions:          function ()      { return req('/api/auth/sessions'); },
+    logoutAll:         function ()      {
+      return req('/api/auth/logout-all', { method: 'POST' }).then(function (d) { setTokens(null); return d; });
+    },
     reset:             function ()      { return Promise.resolve({ reset: false, note: '真後端不提供重置' }); }
   };
 
   var impl = MODE === 'http' ? http : mock;
 
-  global.API = {
-    mode: MODE, base: BASE,
-    me:                function ()     { return impl.me(); },
-    authState:         function ()     { return impl.authState(); },
-    login:             function (c)    { return impl.login(c); },
-    register:          function (p)    { return impl.register(p); },
-    logout:            function ()     { return impl.logout(); },
-    updateProfile:     function (p)    { return impl.updateProfile(p); },
-    uploadAvatar:      function (d)    { return impl.uploadAvatar(d); },
-    deleteAvatar:      function ()     { return impl.deleteAvatar(); },
-    financeProfile:    function ()     { return impl.financeProfile(); },
-    setFinanceProfile: function (p)    { return impl.setFinanceProfile(p); },
-    changePassword:    function (p)    { return impl.changePassword(p); },
-    adminUsers:        function ()     { return impl.adminUsers(); },
-    suspendUser:       function (u, r) { return impl.suspendUser(u, r); },
-    unsuspendUser:     function (u)    { return impl.unsuspendUser(u); },
-    audit:             function ()     { return impl.audit(); },
-    verifyPassword:    function (pw)   { return impl.verifyPassword(pw); },
-    requestPasswordReset: function (e) { return impl.requestPasswordReset(e); },
-    confirmPasswordReset: function (t, pw) { return impl.confirmPasswordReset(t, pw); },
-    summary:           function (f)    { return impl.summary(f); },
-    transactions:      function (f)    { return impl.transactions(f); },
-    nlpParse:          function (t)    { return impl.nlpParse(t); },
-    nlpParseBatch:     function (t)    { return impl.nlpParseBatch(t); },
-    nlpConfirm:        function (p)    { return impl.nlpConfirm(p); },
-    nlpConfirmBatch:   function (i)    { return impl.nlpConfirmBatch(i); },
-    createTransaction: function (p)    { return impl.createTransaction(p); },
-    deleteTransaction: function (i)    { return impl.deleteTransaction(i); },
-    deleteTransactions: function (ids) { return impl.deleteTransactions(ids); },
-    updateTransaction: function (i, p) { return impl.updateTransaction(i, p); },
-    notifications:     function (f)    { return impl.notifications(f); },
-    readNotification:  function (i)    { return impl.readNotification(i); },
-    readNotifications: function (u)    { return impl.readNotifications(u); },
-    groups:            function (f)    { return impl.groups(f); },
-    createGroup:       function (p)    { return impl.createGroup(p); },
-    settleGroup:       function (g)    { return impl.settleGroup(g); },
-    setGroupNotify:    function (g, on){ return impl.setGroupNotify(g, on); },
-    updateGroup:       function (g, p) { return impl.updateGroup(g, p); },
-    archiveGroup:      function (g)    { return impl.archiveGroup(g); },
-    removeGroup:       function (g)    { return impl.removeGroup(g); },
-    addGroupMember:    function (g, u) { return impl.addGroupMember(g, u); },
-    removeGroupMember: function (g, u) { return impl.removeGroupMember(g, u); },
-    allowances:        function ()     { return impl.allowances(); },
-    setAllowance:      function (w, a) { return impl.setAllowance(w, a); },
-    savingsGoals:      function ()     { return impl.savingsGoals(); },
-    alerts:            function ()     { return impl.alerts(); },
-    createAlert:       function (p)    { return impl.createAlert(p); },
-    updateAlert:       function (a, p) { return impl.updateAlert(a, p); },
-    deleteAlert:       function (a)    { return impl.deleteAlert(a); },
-    budgets:           function (f)    { return impl.budgets(f); },
-    setSavingsGoal:    function (u, g, gid) { return impl.setSavingsGoal(u, g, gid); },
-    advices:           function (f)    { return impl.advices(f); },
-    members:           function ()     { return impl.members(); },
-    createFamily:      function (p)    { return impl.createFamily(p); },
-    createInviteCode:  function (p)    { return impl.createInviteCode(p); },
-    joinFamily:        function (p)    { return impl.joinFamily(p); },
-    lookupUser:        function (e)    { return impl.lookupUser(e); },
-    invites:           function ()     { return impl.invites(); },
-    sendInvite:        function (p)    { return impl.sendInvite(p); },
-    acceptInvite:      function (i)    { return impl.acceptInvite(i); },
-    declineInvite:     function (i)    { return impl.declineInvite(i); },
-    removeMember:      function (u)    { return impl.removeMember(u); },
-    leaveFamily:       function ()     { return impl.leaveFamily(); },
-    categories:        function ()     { return impl.categories(); },
-    reset:             function ()     { return impl.reset(); }
+  /* ============================================================
+     對外的 API
+     ------------------------------------------------------------
+     每一支都登記「打哪條路由、歸哪位成員」。出錯的時候，錯誤上會帶著：
+       e.fn     'API.summary'
+       e.route  'GET /api/summary'
+       e.owner  '成員3'
+       e.kind   'business'  後端照規則擋下來（400／403／409…），訊息就是給使用者看的
+                'backend'   後端壞了或還沒做（5xx、404／405 路由不存在、501）
+                'network'   連不上後端
+                'shape'     回應的形狀不對（少了畫面要用的欄位）
+     backend／network／shape 會把「是哪一支出錯」接在訊息後面——
+     前提是前端沒問題：這三種都是「照契約打過去，拿回來的不對」。
+
+     ⚠️ 新增一支 API：mock、http 各寫一個，再在 FN 這裡登記一行。
+        路由與負責人跟 backend/app/ownership.py 對齊，有測試擋。
+     ============================================================ */
+  var FN = {
+    me:                 ['GET /api/auth/me', '成員1'],
+    authState:          [null, '前端'],
+    login:              ['POST /api/auth/login', '成員1'],
+    register:           ['POST /api/auth/register', '成員1'],
+    logout:             ['POST /api/auth/logout', '成員1'],
+    updateProfile:      ['PATCH /api/auth/me', '成員1'],
+    uploadAvatar:       ['PUT /api/auth/me/avatar', '成員1'],
+    deleteAvatar:       ['DELETE /api/auth/me/avatar', '成員1'],
+    financeProfile:     ['GET /api/auth/me/finance', '成員1'],
+    setFinanceProfile:  ['PUT /api/auth/me/finance', '成員1'],
+    changePassword:     ['PATCH /api/auth/password', '成員1'],
+    verifyPassword:     ['POST /api/auth/verify-password', '成員1'],
+    requestPasswordReset: ['POST /api/auth/password-reset', '成員1'],
+    confirmPasswordReset: ['POST /api/auth/password-reset/confirm', '成員1'],
+    sessions:           ['GET /api/auth/sessions', '成員1'],
+    logoutAll:          ['POST /api/auth/logout-all', '成員1'],
+    adminUsers:         ['GET /api/admin/users', '成員1'],
+    suspendUser:        ['POST /api/admin/users/{user_id}/suspend', '成員1'],
+    unsuspendUser:      ['DELETE /api/admin/users/{user_id}/suspend', '成員1'],
+
+    transactions:       ['GET /api/transactions', '成員2'],
+    createTransaction:  ['POST /api/transactions', '成員2'],
+    updateTransaction:  ['PATCH /api/transactions/{tx_id}', '成員2'],
+    deleteTransaction:  ['DELETE /api/transactions/{tx_id}', '成員2'],
+    deleteTransactions: ['DELETE /api/transactions', '成員2'],
+    nlpParse:           ['POST /api/nlp/parse', '成員2'],
+    nlpParseBatch:      ['POST /api/nlp/parse-batch', '成員2'],
+    nlpConfirm:         ['POST /api/nlp/confirm', '成員2'],
+    nlpConfirmBatch:    ['POST /api/nlp/confirm-batch', '成員2'],
+    categories:         ['GET /api/categories', '成員2'],
+    createCategory:     ['POST /api/categories', '成員2'],
+    groups:             ['GET /api/groups', '成員2'],
+    createGroup:        ['POST /api/groups', '成員2'],
+    updateGroup:        ['PATCH /api/groups/{gid}', '成員2'],
+    archiveGroup:       ['DELETE /api/groups/{gid}', '成員2'],
+    removeGroup:        ['DELETE /api/groups/{gid}', '成員2'],
+    addGroupMember:     ['POST /api/groups/{gid}/members', '成員2'],
+    removeGroupMember:  ['DELETE /api/groups/{gid}/members/{user_id}', '成員2'],
+    settleGroup:        ['POST /api/groups/{gid}/settle', '成員2'],
+    setGroupNotify:     ['PATCH /api/groups/{gid}/notify', '成員2'],
+
+    summary:            ['GET /api/summary', '成員3'],
+    budgets:            ['GET /api/budgets', '成員3'],
+    setBudget:          ['PUT /api/budgets', '成員3'],
+    savingsGoals:       ['GET /api/savings-goals', '成員3'],
+    setSavingsGoal:     ['PUT /api/savings-goal', '成員3'],
+    alerts:             ['GET /api/alerts', '成員3'],
+    createAlert:        ['POST /api/alerts', '成員3'],
+    updateAlert:        ['PATCH /api/alerts/{aid}', '成員3'],
+    deleteAlert:        ['DELETE /api/alerts/{aid}', '成員3'],
+    advices:            ['GET /api/advices', '成員3'],
+    generateAdvices:    ['POST /api/advices/generate', '成員3'],
+
+    members:            ['GET /api/family', '成員4'],
+    createFamily:       ['POST /api/family', '成員4'],
+    dissolveFamily:     ['DELETE /api/family', '成員4'],
+    createInviteCode:   ['POST /api/family/invite', '成員4'],
+    joinFamily:         ['POST /api/family/join', '成員4'],
+    lookupUser:         ['GET /api/family/lookup', '成員4'],
+    invites:            ['GET /api/family/invites', '成員4'],
+    sendInvite:         ['POST /api/family/invites', '成員4'],
+    acceptInvite:       ['POST /api/family/invites/{invite_id}/accept', '成員4'],
+    declineInvite:      ['DELETE /api/family/invites/{invite_id}', '成員4'],
+    changeMemberRole:   ['PATCH /api/family/members/{user_id}', '成員4'],
+    removeMember:       ['DELETE /api/family/members/{user_id}', '成員4'],
+    leaveFamily:        ['DELETE /api/family/members/{user_id}', '成員4'],
+    guardianships:      ['GET /api/guardianships', '成員4'],
+    createGuardianship: ['POST /api/guardianships', '成員4'],
+    endGuardianship:    ['DELETE /api/guardianships/{gid}', '成員4'],
+    notifications:      ['GET /api/notifications', '成員4'],
+    readNotification:   ['PATCH /api/notifications/{nid}', '成員4'],
+    readNotifications:  ['PATCH /api/notifications', '成員4'],
+    allowances:         ['GET /api/allowances', '成員4'],
+    setAllowance:       ['PUT /api/allowance', '成員4'],
+    audit:              ['GET /api/audit', '成員4'],
+
+    reset:              [null, '前端']
   };
+
+  /* 畫面一定會讀的欄位。少了任何一個，畫面會在很後面的地方壞掉（讀不到 undefined 的 map），
+     看不出是哪一支回錯——所以在這裡先檢查，直接指出是哪一支。 */
+  var SHAPE = {
+    me: ['user'], login: ['user'], register: ['user'],
+    financeProfile: ['finance', 'styles', 'goals', 'habits'],
+    requestPasswordReset: ['ok', 'message'], sessions: ['sessions'],
+    adminUsers: ['users'], audit: ['logs'],
+    transactions: ['transactions', 'total'], createTransaction: ['id'], updateTransaction: ['id'],
+    deleteTransactions: ['deleted'], nlpParse: ['out'], nlpParseBatch: ['items'],
+    categories: ['categories'], groups: ['groups'], createGroup: ['id'],
+    summary: ['income', 'expense', 'savings', 'byCat', 'monthly', 'yearly'],
+    budgets: ['budgets'], savingsGoals: ['goals'], alerts: ['alerts'],
+    advices: ['advices'], generateAdvices: ['advices'],
+    members: ['family', 'members', 'guardianships'], invites: ['received', 'sent', 'codes'],
+    guardianships: ['guardianships'], createGuardianship: ['id'],
+    notifications: ['notifications', 'unread'], allowances: ['allowances'], lookupUser: ['user', 'status']
+  };
+
+  function where(name) {
+    var info = FN[name] || [];
+    return 'API.' + name + (info[0] ? '（' + info[0] + '，' + info[1] + '）' : '');
+  }
+
+  function tag(e, name) {
+    if (!(e instanceof Error)) e = new Error(String(e));
+    if (e.fn) return e;                                 // 已經標過（例如 A 裡面呼叫了 B）
+    var info = FN[name] || [];
+    e.fn = 'API.' + name; e.route = info[0] || null; e.owner = info[1] || null;
+    var st = e.status || 0;
+    if (e.kind === 'shape') {
+      // 已經在下面組好訊息
+    } else if (!st && (e.name === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(e.message))) {
+      e.kind = 'network';
+      e.message = '連不上後端｜出錯的函式：' + where(name);
+    } else if (st >= 500 || st === 404 && /^Not Found$/i.test(e.message) || st === 405) {
+      e.kind = 'backend';
+      e.message = (st === 501 ? '後端還沒做這一支' : '後端出錯（HTTP ' + st + '）') +
+        (e.message && !/^HTTP \d+/.test(e.message) && !/^Not Found$/i.test(e.message) ? '：' + e.message : '') +
+        '｜出錯的函式：' + where(name);
+    } else {
+      e.kind = 'business';
+    }
+    return e;
+  }
+
+  function call(name, args) {
+    var fn = impl[name];
+    if (typeof fn !== 'function') {
+      var miss = new Error('前端的 ' + (MODE === 'http' ? 'http' : 'mock') + ' 轉接器少了這一支｜出錯的函式：' + where(name));
+      miss.kind = 'backend';
+      return Promise.reject(tag(miss, name));
+    }
+    var out;
+    try { out = fn.apply(impl, args); } catch (e) { return Promise.reject(tag(e, name)); }
+    return Promise.resolve(out).then(function (res) {
+      var need = SHAPE[name];
+      if (need) {
+        var lack = need.filter(function (k) { return !res || !(k in res); });
+        if (lack.length) {
+          var bad = new Error('回應少了 ' + lack.join('、') + '｜出錯的函式：' + where(name));
+          bad.kind = 'shape';
+          throw bad;
+        }
+      }
+      return res;
+    }).catch(function (e) { throw tag(e, name); });
+  }
+
+  global.API = { mode: MODE, base: BASE, routes: FN, where: where };
+  Object.keys(FN).forEach(function (name) {
+    global.API[name] = function () { return call(name, Array.prototype.slice.call(arguments)); };
+  });
 })(window);

@@ -10,6 +10,22 @@
   var $view = document.getElementById('view');
   var DATA_CATS = {};   // 分類 id → 名稱，確認訊息要用
 
+  /* 分類清單：系統預設 ＋ 我們家自訂的。⚠️ 從 API.categories() 拿，不要直接讀 DATA——
+     自訂分類只有 API 知道。登入後、新增分類後由 loadCats() 更新。 */
+  var CATS = [];
+  function cats(kind) {
+    var list = CATS.length ? CATS : ((global.DATA && global.DATA.categories) || []);
+    return kind ? list.filter(function (c) { return c.kind === kind; }) : list;
+  }
+  function loadCats() {
+    return API.categories().then(function (d) {
+      CATS = d.categories || [];
+      DATA_CATS = {};
+      CATS.forEach(function (c) { DATA_CATS[c.id] = c.name; });
+      return CATS;
+    });
+  }
+
   /* 帳本清單與通知是**從按鈕往下浮出來的下拉面板**。
 
      ⚠️ 以前把它們搬進版面（頂列和內容之間），佔真實空間把內容往下推。
@@ -93,18 +109,6 @@
   }
   applyTheme(currentTheme());
 
-  /* 展示用帳號。mock 模式的登入頁會列出來，免得評審還要猜 email。
-     接上真後端（API.mode === 'http'）之後就不顯示了。 */
-  var DEMO = [
-    { name: '林建國 · 家長',   email: 'jianguo@lin.tw' },
-    { name: '陳淑芬 · 家長',   email: 'shufen@lin.tw' },
-    { name: '林宇涵 · 子女',   email: 'yuhan@lin.tw' },
-    { name: '林宇軒 · 子女',   email: 'yuxuan@lin.tw' },
-    /* 還沒加入家庭——用家長登入邀請她，或用她登入輸入邀請碼 */
-    { name: '林玉珍 · 還沒加入家庭', email: 'yuzhen@mail.tw' },
-    /* ⚠️ 用他登入會看到完全不同的首頁——那正是這個角色的重點 */
-    { name: '系統管理員 · 平台', email: 'admin@fambudget.tw' }
-  ];
   var $title = document.getElementById('ptitle');
   var $sub = document.getElementById('psub');
   var $search = document.getElementById('search');
@@ -256,10 +260,35 @@
       'stroke="currentColor" stroke-width="1.4"><path d="M3 3h18v18H3z"/><path d="M8 12h8"/></svg>' +
       '<div class="empty__t">' + esc(t) + '</div><div class="empty__s">' + esc(s) + '</div></div>';
   }
+  /* 讀取失敗的畫面。API 的錯誤會帶著「哪一支、哪條路由、誰負責」（見 api.js 的 FN），
+     這裡把它攤開——前提是前端沒問題：照契約打過去，拿回來的不對。 */
   function errState(e) {
-    return '<div class="err"><div class="err__t">讀取失敗</div><div class="err__s">' +
-      esc(e && e.message ? e.message : String(e)) + '<br>目前模式：<b>' + API.mode + '</b></div></div>';
+    e = e || {};
+    var msg = String(e.message || e).split('｜出錯的函式：')[0];
+    var title = e.kind === 'network' ? '連不上後端'
+      : (e.kind === 'backend' || e.kind === 'shape') ? '後端回應有問題' : '讀取失敗';
+    return '<div class="err"><div class="err__t">' + title + '</div><div class="err__s">' + esc(msg) +
+      (e.fn ? '<div class="err__w">出錯的函式 <code>' + esc(e.fn) + '</code>' +
+        (e.route ? '　<code>' + esc(e.route) + '</code>' : '') +
+        (e.owner ? '　負責：' + esc(e.owner) : '') + '</div>' : '') +
+      '<div class="err__m">目前：' + (API.mode === 'http' ? '已連接後端 ' + esc(API.base) : '還沒連接後端（資料存在這台瀏覽器）') + '</div>' +
+      '</div></div>';
   }
+
+  /* 畫面程式本身出錯（不是 API）：一樣講出是哪一支函式、第幾行，不要默默壞掉 */
+  function frontFault(err, fallback) {
+    var stack = String((err && err.stack) || '');
+    var mo = stack.match(/at (\S+) \(([^)]*?):(\d+):\d+\)/) || stack.match(/^(\S+)@(.*?):(\d+):\d+/m);
+    var spot = mo ? mo[1] + '（' + String(mo[2]).split('/').pop() + ' 第 ' + mo[3] + ' 行）' : (fallback || '');
+    return '畫面程式出錯：' + ((err && err.message) || err) + (spot ? '｜出錯的函式：' + spot : '');
+  }
+  global.addEventListener('error', function (ev) {
+    toast(frontFault(ev.error || ev.message, ev.filename ? String(ev.filename).split('/').pop() + ' 第 ' + ev.lineno + ' 行' : ''), 'err');
+  });
+  global.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason;
+    toast(r && r.fn ? r.message : frontFault(r), 'err');
+  });
 
   /* ============================================================
      共用小零件
@@ -289,7 +318,7 @@
 
   function num(v) { return Number(Math.round(v || 0)).toLocaleString('en-US'); }
 
-  /* 「林建國」叫「建國」，兩個字的名字就整個叫 */
+  /* 三個字的名字叫後兩個字（王小明 → 小明），兩個字的名字就整個叫 */
   function callName(name) {
     name = String(name || '');
     return name.length === 3 ? name.slice(1) : name;
@@ -301,7 +330,6 @@
   }
 
   /* 「今天」是哪一天：真實日期（本機時區），mock 跟真後端都一樣。
-     示範資料在 data.js 載入時已經對齊到今天，所以「今天的紀錄」不會是空的。
      ⚠️ 不要自己 new Date().toISOString()——那是 UTC，早上 8 點前會變成昨天。 */
   function todayKey() {
     return global.fbToday();
@@ -477,7 +505,7 @@
                 '<div class="bcard__v">' + num(x.used) + '<small> / ' + num(x.limit) + '</small></div>' +
               '</div>';
             }).join('') + '</div>'
-          : '<div class="card">' + emptyState('還沒有設定預算', '替常花的分類設個上限，花到一定程度就會提醒你。') + '</div>';
+          : '<a class="card bnone" href="#/profile">' + emptyState('還沒有設定預算', '到「個人資料 › 每月預算」替常花的分類設個上限 ›') + '</a>';
 
         if (fam) {
           h += '<div class="sec"><h2 class="sec__t">每個人的這個月</h2></div>' +
@@ -898,8 +926,8 @@
 
   function renderMode() {
     // 確認訊息要顯示分類名稱，先把對照表備好
-    if (!Object.keys(DATA_CATS).length && global.DATA) {
-      (global.DATA.categories || []).forEach(function (c) { DATA_CATS[c.id] = c.name; });
+    if (!Object.keys(DATA_CATS).length) {
+      cats().forEach(function (c) { DATA_CATS[c.id] = c.name; });
     }
     var box = document.getElementById('entryBox');
     if (!box) return;
@@ -928,7 +956,7 @@
       'placeholder="例如：早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500"></textarea>' +
       '<div class="nlp__row">' +
         '<button class="btn btn--go" id="paraGo">解析這段話</button>' +
-        '<button class="chip" id="paraEx">用示範段落試試</button>' +
+        '<button class="chip" id="paraEx">填一段範例看看</button>' +
       '</div>' +
       '<div id="paraOut"></div></div>';
   }
@@ -959,7 +987,7 @@
   }
 
   function batchRow(it, i) {
-    var cats = global.DATA.categories.filter(function (c) { return c.kind === it.kind; });
+    var kc = cats(it.kind);
     function miss(f) { return it.missing && it.missing.indexOf(f) >= 0; }
     function cell(field, inner, conf) {
       var low = conf !== undefined && conf > 0 && conf < 0.85;
@@ -981,7 +1009,7 @@
            '<option value="expense"' + (it.kind === 'expense' ? ' selected' : '') + '>支出</option>' +
            '<option value="income"' + (it.kind === 'income' ? ' selected' : '') + '>收入</option>' +
            '</select>', it.conf.kind) +
-      cell('cat', '<select data-b="cat">' + cats.map(function (c) {
+      cell('cat', '<select data-b="cat">' + kc.map(function (c) {
              return '<option value="' + c.id + '"' + (c.id === it.cat ? ' selected' : '') +
                '>' + esc(c.name) + '</option>';
            }).join('') + '</select>', it.conf.cat) +
@@ -1038,7 +1066,7 @@
      單筆手動
      ============================================================ */
   function singleHTML() {
-    var cats = global.DATA.categories.filter(function (c) { return c.kind === 'expense'; });
+    var ec = cats('expense');
     var today = todayKey();
     return '<div class="card">' +
       '<div class="card__h"><span class="card__t">單筆手動輸入</span>' +
@@ -1049,7 +1077,7 @@
         '<div class="prs__f"><label>收支</label><select data-s="kind">' +
           '<option value="expense">支出</option><option value="income">收入</option></select></div>' +
         '<div class="prs__f"><label>分類</label><select data-s="cat">' +
-          cats.map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('') +
+          ec.map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('') +
           '</select></div>' +
         '<div class="prs__f"><label>店家</label><input data-s="merchant" type="text" placeholder="選填"></div>' +
         '<div class="prs__f"><label>備註</label><input data-s="note" type="text" placeholder="選填"></div>' +
@@ -1155,7 +1183,7 @@
   var txEdOn = false, txEdRow = null;
 
   function txEdCats(kind, cur) {
-    return global.DATA.categories.filter(function (c) { return c.kind === kind; }).map(function (c) {
+    return cats(kind).map(function (c) {
       return '<option value="' + esc(c.id) + '"' + (c.id === cur ? ' selected' : '') + '>' + esc(c.name) + '</option>';
     }).join('');
   }
@@ -1338,6 +1366,7 @@
             '<div id="advHint"></div>' +
             '<div class="sec"><h2 class="sec__t">' + (sc === 'family' ? '全家的建議' : '給你的建議') + '</h2>' +
               '<span class="sec__n">' + ADV.length + ' 則</span>' +
+              '<button class="btn btn--sm btn--go" id="advGen" data-gen-scope="' + sc + '">產生這個月的建議</button>' +
               '<div class="sec__tools"><label class="fsel fsel--q">' +
                 '<input type="search" id="advq" placeholder="搜尋建議" aria-label="搜尋建議" ' +
                   'value="' + esc(ADVQ) + '" autocomplete="off"></label></div></div>' +
@@ -1375,7 +1404,7 @@
     if (!rows.length) {
       box.innerHTML = ADVQ.trim()
         ? emptyState('沒有符合的建議', '換個關鍵字試試。')
-        : emptyState('這個月還沒有建議', '記帳的資料多一點，建議就會出現。');
+        : emptyState('這個月還沒有建議', '按「產生這個月的建議」，系統會用這個月的數字寫給你。');
       return;
     }
 
@@ -1538,23 +1567,67 @@
         '</div>' +
         (u.id === d.me ? '' : full ? '<span class="mt__go">看紀錄</span>'
           : shared ? '<span class="mt__go mt__go--part">看共用帳本</span>' : '') +
-        /* 家長可以把子女移出；另一位家長只能自己退出，所以家長的卡片沒有這顆 */
+        /* 家長對子女：開始／停止照看、設為家長、移出家庭。
+           另一位家長只能自己退出，所以家長的卡片沒有這些 */
         (parent && u.role === 'child' && u.id !== d.me
-          ? '<button class="mt__x" data-member-remove="' + esc(u.id) + '" data-name="' + esc(u.name) + '">移出家庭</button>'
+          ? '<div class="mt__acts">' +
+              (function () {
+                var mine = d.guardianships.filter(function (g) { return g.guardian === d.me && g.ward === u.id; })[0];
+                return mine
+                  ? '<button class="mt__x" data-gs-end="' + esc(mine.id) + '" data-name="' + esc(u.name) + '">停止照看</button>'
+                  : '<button class="mt__x mt__x--go" data-gs-start="' + esc(u.id) + '" data-name="' + esc(u.name) + '">開始照看</button>';
+              })() +
+              '<button class="mt__x mt__x--go" data-role-parent="' + esc(u.id) + '" data-name="' + esc(u.name) + '">設為家長</button>' +
+              '<button class="mt__x" data-member-remove="' + esc(u.id) + '" data-name="' + esc(u.name) + '">移出家庭</button>' +
+            '</div>'
           : '') +
       '</article>';
     }).join('') + '</div>' +
 
-    /* 退出家庭：放在最下面、安靜一點。任何人都可以退出 */
-    '<div class="card leave">' +
-      '<div class="leave__m"><b>退出「' + esc(d.family.name) + '」</b>' +
-        '<small>你的紀錄會留著；退出後你跟家人之間就互相看不到了。</small></div>' +
-      '<button class="btn btn--sm btn--danger" data-family-leave data-name="' + esc(d.family.name) + '">退出家庭</button>' +
-    '</div></div>';
+    (parent ? foldHead('fcat', '家庭自訂分類', '管理', '', null) : '') +
+
+    /* 最下面、安靜一點：
+         唯一的家長 → 解散家庭（他不能丟下其他人自己退出）
+         其他人     → 退出家庭 */
+    (function () {
+      var parents = d.members.filter(function (x) { return x.role === 'parent'; });
+      var sole = parent && parents.length === 1;
+      return sole
+        ? '<div class="card leave">' +
+            '<div class="leave__m"><b>解散「' + esc(d.family.name) + '」</b>' +
+              '<small>你是唯一的家長。解散之後每個人都離開這個家庭，監管與零用金結束；每一筆紀錄都留在記的人自己那裡。</small></div>' +
+            '<button class="btn btn--sm btn--danger" data-family-dissolve data-name="' + esc(d.family.name) + '">解散家庭</button>' +
+          '</div>'
+        : '<div class="card leave">' +
+            '<div class="leave__m"><b>退出「' + esc(d.family.name) + '」</b>' +
+              '<small>你的紀錄會留著；退出後你跟家人之間就互相看不到了。</small></div>' +
+            '<button class="btn btn--sm btn--danger" data-family-leave data-name="' + esc(d.family.name) + '">退出家庭</button>' +
+          '</div>';
+    })() + '</div>';
 
     $view.innerHTML = h;
     foldRestore();
   }
+
+  /* 家庭自訂分類：家長加，全家記帳時都選得到 */
+  FOLD_BUILD.fcat = function (wrap) {
+    wrap.innerHTML = skeleton(2);
+    loadCats().then(function (list) {
+      var mine = list.filter(function (c) { return c.custom; });
+      wrap.innerHTML = '<div class="card fcat">' +
+        '<p class="fcat__h">系統分類不夠用的時候再加。加了之後，全家記帳、預算、統計都用得到。</p>' +
+        (mine.length
+          ? '<div class="fcat__l">' + mine.map(function (c) {
+              return '<span class="chip">' + esc(c.name) + '<small>' + (c.kind === 'income' ? '收入' : '支出') + '</small></span>';
+            }).join('') + '</div>'
+          : '<p class="fcat__e">還沒有自訂分類。</p>') +
+        '<form class="fcat__f" id="catNewF">' +
+          '<input type="text" id="catName" maxlength="10" placeholder="例如 寵物" aria-label="分類名稱" required>' +
+          '<select id="catKind" aria-label="支出或收入"><option value="expense">支出</option><option value="income">收入</option></select>' +
+          '<button class="btn btn--go btn--sm" type="submit">新增</button>' +
+        '</form></div>';
+    }).catch(function (e) { wrap.innerHTML = errState(e); });
+  };
 
   /* 邀請家人的面板：展開的時候才畫 */
   FOLD_BUILD.finv = function (wrap) {
@@ -2584,7 +2657,7 @@
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
               'stroke-width="1.8"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>' +
           '</button>' +
-          '<p class="lp__n">不用註冊也能試——裡面是示範資料</p>' +
+          '<p class="lp__n">第一次來？下一步可以建立帳號</p>' +
         '</div>' +
         '<div class="lp__r">' + ledgerArt() + '</div>' +
       '</div>';
@@ -2632,15 +2705,7 @@
         '<a class="gate__fp" href="#/forgot">忘記密碼？</a>' +
         '<button class="btn btn--go gate__go" type="submit">登入</button>' +
         '<p class="gate__alt">還沒有帳號？<a href="#/register" data-gate="register">建立一個</a></p>' +
-      '</form>' +
-      (API.mode === 'http' ? '' :
-        '<div class="gate__demo"><b>展示資料</b>　密碼隨便打，滿 8 個字就好' +
-        '<div class="gate__accs">' +
-          DEMO.map(function (d) {
-            return '<button class="gate__acc" data-demo="' + esc(d.email) + '">' +
-              esc(d.name) + '<span>' + esc(d.email) + '</span></button>';
-          }).join('') +
-        '</div></div>'));
+      '</form>');
   }
 
   function vRegister() {
@@ -2866,6 +2931,9 @@
               '<input type="password" id="pwNew" autocomplete="new-password" placeholder="至少 8 個字" required></label>' +
             '<div class="form__act"><button class="btn btn--sm" type="submit">更改密碼</button></div>' +
           '</form>' +
+
+          '<div class="sec"><h2 class="sec__t">登入中的裝置</h2></div>' +
+          '<div class="card card--flush" id="sessBox">' + skeleton(1) + '</div>' +
         '</section>' +
 
         '<section class="duo__c">' +
@@ -2878,6 +2946,7 @@
             '<div class="plan__h">只有你自己能設定。改完離開欄位就會存好</div>' +
           '</div>' +
           '<div class="card card--flush" id="alertBox">' + skeleton(2) + '</div>' +
+          foldHead('bud', '每月預算', '設定') +
           foldHead('fin', '理財習慣', '填寫') +
         '</section>' +
       '</div>' +
@@ -2901,8 +2970,41 @@
       if (onCard && onCard.scrollIntoView) onCard.parentNode.scrollLeft = onCard.offsetLeft - 8;
       foldRestore();
       paintAlerts();
+      paintSessions();
     });
   }
+
+  /* 登入中的裝置：GET /api/auth/sessions，「登出所有裝置」走 POST /api/auth/logout-all */
+  function paintSessions() {
+    var box = document.getElementById('sessBox');
+    if (!box) return;
+    API.sessions().then(function (d) {
+      box.innerHTML = '<div class="sess">' + (d.sessions || []).map(function (x) {
+        return '<div class="sess__i"><b>' + esc(x.device || '裝置') + '</b>' +
+          (x.current ? '<span class="pill pill--safe">這一台</span>' : '') +
+          '<small>' + (x.lastActiveAt ? '最近活動 ' + esc(String(x.lastActiveAt).slice(0, 16).replace('T', ' ')) : '') + '</small></div>';
+      }).join('') + '</div>' +
+      '<div class="sess__a"><small>手機掉了、借別人的電腦忘了登出，按這裡全部登出（包含這一台）。</small>' +
+        '<button class="btn btn--sm btn--danger" id="logoutAll">登出所有裝置</button></div>';
+    }).catch(function (e) { box.innerHTML = errState(e); });
+  }
+
+  /* 每月預算：一個支出分類一格。0 = 不設。改完離開欄位就存 */
+  FOLD_BUILD.bud = function (wrap) {
+    wrap.innerHTML = skeleton(3);
+    Promise.all([API.me(), API.budgets({})]).then(function (r) {
+      var me = r[0].user.id;
+      var have = {};
+      (r[1].budgets || []).forEach(function (b) { if (b.user === me) have[b.cat] = b.limit; });
+      wrap.innerHTML = '<div class="card bud">' +
+        '<p class="bud__h">替常花的分類設一個每月上限。總覽會顯示用了幾成，財務建議也會提醒超過的分類。填 0 就是不設。</p>' +
+        '<div class="bud__g">' + cats('expense').map(function (c) {
+          return '<label class="bud__i"><span><i class="dot" style="background:' + tint(c.color) + '"></i>' + esc(c.name) + '</span>' +
+            '<span class="money"><i>NT$</i><input type="number" min="0" step="100" inputmode="numeric" data-budget="' + esc(c.id) + '" ' +
+              'value="' + (have[c.id] || '') + '" placeholder="0" aria-label="' + esc(c.name) + '的每月預算"></span></label>';
+        }).join('') + '</div></div>';
+    }).catch(function (e) { wrap.innerHTML = errState(e); });
+  };
 
   /* 每一張預覽自己掛著 data-theme，裡面的顏色、圓角、字就是那一套的——
      不用另外準備截圖，主題改了預覽自動跟著變。 */
@@ -3195,7 +3297,17 @@
         if (!admin && page === 'admin') { location.hash = '#/'; return; }
         /* 還沒走完註冊後的個人化設定：先帶去設定（每一步都能跳過，不是關卡） */
         if (!admin && !m.user.onboardedAt && page !== 'setup') { location.hash = '#/setup'; return; }
-        render();
+        /* 分類（含家庭自訂）先拿到，記帳、統計的下拉才完整。拿不到也照畫，用系統預設 */
+        return (admin || CATS.length ? Promise.resolve() : loadCats().catch(function (e) { toast(e.message, 'err'); }))
+          .then(render);
+      }).catch(function (e) {
+        /* 權杖失效（後端說沒登入）→ 回登入頁；其他錯誤直接講出是哪一支 */
+        if (e && e.status === 401) {
+          API.logout().then(function () { ME = null; CATS = []; location.hash = '#/login'; paint(); });
+          return;
+        }
+        document.body.classList.remove('is-out');
+        $view.innerHTML = '<div class="page">' + errState(e) + '</div>';
       });
 
       function render() {
@@ -3326,6 +3438,66 @@
       });
       return;
     }
+    /* ---- 監管、角色、解散 ---- */
+    var gsStart = t.closest('[data-gs-start]');
+    if (gsStart) {
+      var wName = gsStart.dataset.name;
+      gsStart.disabled = true;
+      API.createGuardianship({ wardId: gsStart.dataset.gsStart }).then(function () {
+        vMembers(); toast('開始照看' + wName + '。' + wName + '看得到是你在照看', 'ok');
+      }).catch(function (err) { gsStart.disabled = false; toast(err.message || '沒有設定成功', 'err'); });
+      return;
+    }
+    var gsEnd = t.closest('[data-gs-end]');
+    if (gsEnd) {
+      var eName = gsEnd.dataset.name, gsId = gsEnd.dataset.gsEnd;
+      danger({
+        title: '停止照看' + eName,
+        detail: '之後你就看不到' + eName + '記的帳，給' + eName + '的零用金也會歸零。<br>紀錄<b>一筆都不會刪</b>，隨時可以再開始照看。',
+        level: 'password',
+        ok: '停止照看',
+        onOk: function () {
+          API.endGuardianship(gsId).then(function () {
+            vMembers(); toast('已停止照看' + eName, 'ok');
+          }).catch(function (err) { toast(err.message || '沒有解除成功', 'err'); });
+        }
+      });
+      return;
+    }
+    var rp = t.closest('[data-role-parent]');
+    if (rp) {
+      var rName = rp.dataset.name, rId = rp.dataset.roleParent;
+      danger({
+        title: '把' + rName + '設為家長',
+        detail: rName + '會跟你一樣可以邀請家人、設定預算，你們之間互相看得到彼此的紀錄。<br>' +
+                '⚠️ 設為家長之後，你<b>不能再把他改回子女</b>，只有他自己能調整。原本對他的照看會結束。',
+        level: 'password',
+        ok: '設為家長',
+        onOk: function () {
+          API.changeMemberRole(rId, 'parent').then(function () {
+            vMembers(); toast(rName + ' 現在是家長', 'ok');
+          }).catch(function (err) { toast(err.message || '沒有改成功', 'err'); });
+        }
+      });
+      return;
+    }
+    if (t.closest('[data-family-dissolve]')) {
+      var dName = t.closest('[data-family-dissolve]').dataset.name;
+      danger({
+        title: '解散「' + dName + '」',
+        detail: '每個人都會離開這個家庭：監管關係、零用金結束，家人之間的帳本互相移出，還沒用的邀請與邀請碼作廢。<br>' +
+                '<b>紀錄一筆都不會刪</b>，每一筆都還在記的人自己的收支明細裡。這個動作<b>不能復原</b>。',
+        level: 'full',
+        ok: '解散家庭',
+        onOk: function () {
+          API.dissolveFamily().then(function (r) {
+            afterFamilyChange('「' + dName + '」已經解散，' + r.released + ' 人離開');
+          }).catch(function (err) { toast(err.message || '解散失敗', 'err'); });
+        }
+      });
+      return;
+    }
+
     if (t.closest('[data-family-leave]')) {
       var famName = t.closest('[data-family-leave]').dataset.name;
       danger({
@@ -3346,6 +3518,19 @@
     var open = t.closest('[data-open]');
     if (open && !t.closest('input') && !t.closest('label')) {
       location.hash = '#/member/' + open.dataset.open;
+      return;
+    }
+
+    if (t.closest('#logoutAll')) {
+      API.logoutAll().then(function () {
+        if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
+        ME = null; CATS = [];
+        document.body.classList.remove('is-admin', 'role-child');
+        document.body.classList.add('is-out');
+        location.hash = '#/login';
+        paint();
+        toast('所有裝置都登出了', 'ok');
+      }).catch(function (err) { toast(err.message || '沒有登出成功', 'err'); });
       return;
     }
 
@@ -3727,13 +3912,6 @@
       return;
     }
 
-    var demo = t.closest('[data-demo]');
-    if (demo) {
-      document.getElementById('lgEmail').value = demo.dataset.demo;
-      document.getElementById('lgPw').value = 'demo1234';
-      document.getElementById('lgPw').focus();
-      return;
-    }
 
     if (t.closest('#avaDel')) {
       API.deleteAvatar().then(function () {
@@ -3757,6 +3935,19 @@
       });
       renderMode();
       toast(MODE === 'para' ? '已切換到段落記帳' : '已切換到單筆手動', 'ok');
+      return;
+    }
+
+    var ag = t.closest('#advGen');
+    if (ag) {
+      ag.disabled = true; ag.textContent = '產生中…';
+      API.generateAdvices({ scope: ag.dataset.genScope }).then(function (r) {
+        vAdvice();
+        toast('產生了 ' + r.advices.length + ' 則建議', 'ok');
+      }).catch(function (err) {
+        ag.disabled = false; ag.textContent = '產生這個月的建議';
+        toast(err.message || '沒有產生成功', 'err');
+      });
       return;
     }
 
@@ -4067,6 +4258,19 @@
       return;
     }
 
+    if (f.id === 'catNewF') {
+      e.preventDefault();
+      busy(f, true, '新增中…');
+      API.createCategory({ name: document.getElementById('catName').value, kind: document.getElementById('catKind').value })
+        .then(function (c) {
+          busy(f, false);
+          toast('加好了「' + c.name + '」，全家記帳都選得到', 'ok');
+          var wrap = document.getElementById('fold-fcat');
+          if (wrap) FOLD_BUILD.fcat(wrap);
+        }).catch(function (err) { busy(f, false); toast(err.message || '新增失敗', 'err'); });
+      return;
+    }
+
     if (f.id === 'famNewF') {
       e.preventDefault();
       busy(f, true, '建立中…');
@@ -4255,6 +4459,16 @@
       return;
     }
 
+    var bi = e.target.closest ? e.target.closest('[data-budget]') : null;
+    if (bi) {
+      var bv = Number(bi.value || 0);
+      if (isNaN(bv) || bv < 0) { toast('預算要是 0 以上的數字', 'err'); return; }
+      API.setBudget({ cat: bi.dataset.budget, limit: bv, period: 'month' }).then(function (r) {
+        toast(r.deleted ? '「' + r.catName + '」不設預算了' : '「' + r.catName + '」每月預算 ' + money(bv), 'ok');
+      }).catch(function (err) { toast(err.message || '沒有存成功', 'err'); });
+      return;
+    }
+
     var g = e.target.closest ? e.target.closest('[data-goal]') : null;
     if (g) {
       var v = Number(g.value);
@@ -4325,7 +4539,10 @@
   /* 更早的版本有一個顯示 API 模式的小徽章。那是給開發者看的，
      介面上已經拿掉——這裡留一個保險，元素不在就不要炸。 */
   var $mode = document.getElementById('mode');
-  if ($mode) $mode.textContent = API.mode === 'http' ? API.base : '示範資料';
+  if ($mode) $mode.textContent = API.mode === 'http' ? API.base : '瀏覽器內的資料';
+  /* 頁尾說清楚資料在哪：沒接後端時，資料只存在這台瀏覽器 */
+  var $foot = document.querySelector('.foot');
+  if ($foot) $foot.textContent = '家庭記帳　·　' + (API.mode === 'http' ? '已連接後端' : '還沒連接後端：資料只存在這台瀏覽器');
   API.authState().then(function (a) {
     if (a.loggedIn) { paintWho(); paintGroups(); }
     paint();
