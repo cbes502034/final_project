@@ -217,6 +217,12 @@
 
   /* 示範資料的「今天」。真後端用伺服器時間，這裡跟著示範期間走，
      不然示範資料會因為你哪一天打開而表現不同。 */
+  /* 同一天之內的先後：新記的 id 帶毫秒時間，種子資料是流水號 */
+  function txOrder(t) {
+    var n = Number(String(t.id).replace(/\D/g, '')) || 0;
+    return n;
+  }
+
   function todayStr() {
     return (global.DATA.meta.updated || '').slice(0, 10) ||
       new Date().toISOString().slice(0, 10);
@@ -1359,6 +1365,12 @@
           if (!canSeeRow(t, vis, vgs)) return false;
           if (f.groupId && f.groupId !== 'all' && t.group !== f.groupId) return false;
           if (f.userId && f.userId !== 'all' && t.user !== f.userId) return false;
+          /* ⚠️ from／to／categoryId 早就在契約裡、也在上面的白名單裡，
+             但以前這裡沒有真的篩——傳了等於沒傳，mock 下看不出來。
+             日期是 YYYY-MM-DD 字串，直接比大小就對；兩端都包含。 */
+          if (f.from && t.date < f.from) return false;
+          if (f.to && t.date > f.to) return false;
+          if (f.categoryId && t.cat !== f.categoryId) return false;
           if (f.kind && f.kind !== 'all' && t.kind !== f.kind) return false;
           if (f.source && f.source !== 'all' && (t.source || 'manual') !== f.source) return false;
           if (f.q) {
@@ -1367,7 +1379,11 @@
           }
           return true;
         });
-        rows.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+        /* 新的在前。同一天的用記帳先後排——真後端有 created_at，mock 用 id 推 */
+        rows.sort(function (a, b) {
+          if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+          return txOrder(b) - txOrder(a);
+        });
         return {
           transactions: rows.map(function (t) {
             var c = D.categories.filter(function (x) { return x.id === t.cat; })[0];

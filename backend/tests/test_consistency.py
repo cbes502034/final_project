@@ -1069,7 +1069,7 @@ def test_監管的通知不受帳本限制():
 def test_總覽統計建議各自回答一個問題_不重複():
     """三頁照**問題**分工，每樣資料只出現在一個地方：
 
-        總覽       這個月現在怎樣   大數字卡（還可以花＋收支結餘）、功能按鈕、預算（全家模式多每個人）
+        總覽       這個月現在怎樣   疊卡（還可以花＋收入支出）、常用功能、預算、今天的紀錄（全家模式多每個人）
         統計       過去的趨勢       月／年對照、趨勢、分類圓餅
         財務建議   那該怎麼辦       建議清單
 
@@ -1550,7 +1550,7 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
 
     # 平台管理員沒有財務頁：帳號選單裡的「個人資料／家庭成員」和記一筆都不給
     css = read("frontend/css/app.css")
-    assert "body.is-admin .acctm__i[data-nav]" in css
+    assert "body.is-admin .acctm__habit" in css and "body.is-admin .acctm__fam" in css
     assert "body.is-admin .appbar__add" in css
 
 
@@ -2153,3 +2153,99 @@ def test_總覽照銀行_App_疊卡_常用功能_底部分頁():
         assert tab in bar, "底部分頁少了 " + tab
     css = read("frontend/css/app.css")
     assert "body.is-admin .tabbar" in css and "body.is-out .tabbar" in css, "平台管理員與還沒登入不該有底部分頁"
+
+
+# ===========================================================================
+# 總覽：今天的紀錄 ／ 右上角：我的帳戶卡
+# ===========================================================================
+
+def test_總覽最下面是今天的紀錄_只看不改():
+    """使用者要的是「一打開 App 就看得到今天的記帳動向」。
+
+    ⚠️ 只放今天，不是把收支明細搬過來：沒有篩選、沒有刪除、沒有表格。
+    """
+    app = read("frontend/js/app.js")
+    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "from: todayKey(), to: todayKey()" in home, "今天的紀錄要用日期範圍去問，不是拿全部回來自己挑"
+    assert home.rindex("todayCard(") > home.index("預算使用狀況"), "今天的紀錄放在最下面"
+    card = re.search(r"function todayCard\(rows, fam\) \{(.*?)\n  \}", app, re.S).group(1)
+    for bad in ("data-del", "<input", "<select", "txTable("):
+        assert bad not in card, "今天的紀錄只看不改，不該有 " + bad
+    assert "fam ? '' : '<div class=\"tdy__go\">" in card, "全家模式沒有記帳，空的時候也不放記一筆"
+
+    key = re.search(r"function todayKey\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "API.mode !== 'http'" in key and "meta.updated" in key, \
+        "mock 的今天要跟示範資料同一天，不然今天的紀錄永遠是空的"
+
+
+def test_帳戶卡不再重複儀表板上的功能():
+    """右上角點開原本是一串連結，跟常用功能幾乎一樣。
+
+    現在放的是儀表板上沒有的：這個月記帳天數、家人、快速換主題。
+    進個人資料和家庭成員是點「名字」和「家人那一列」，不另外列成選項。
+    """
+    html = read("frontend/index.html")
+    menu = html[html.index('id="acctPanel"'):html.index("</header>")]
+    for label in ("收支明細", "帳本", "統計", "財務建議", ">個人資料<", ">家庭成員<"):
+        assert label not in menu, "帳戶卡又列出了儀表板上已經有的：" + label
+    assert len(re.findall(r'data-nav="', menu)) <= 2
+    for part in ('id="acctHabit"', 'id="acctFam"', 'id="acctThemes"'):
+        assert part in menu, "帳戶卡少了 " + part
+
+    app = read("frontend/js/app.js")
+    paint = re.search(r"function paintAcct\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "data-theme-pick" in paint and 'data-theme="' in paint, "主題小圓點要能直接換，而且自己掛著那一套的顏色"
+    assert "isPlatformAdmin" in paint, "平台管理員沒有帳也沒有家庭，不要去問"
+    mark = re.search(r"function markTheme\(id\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert ".acctm__sw" in mark, "在帳戶卡換主題之後，設定頁的「使用中」也要跟著變（反過來也是）"
+    menu_fn = re.search(r"function acctMenu\(on\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "paintAcct()" in menu_fn, "打開的時候才去問資料，不要每一頁都先算好"
+
+
+_TXF_DRIVER = _THEME_DRIVER.split("(async () => {")[0] + r"""
+(async () => {
+  const out = {}, PW = 'password123';
+  const API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  const all = (await API.transactions({ userId: 'U1' })).transactions;
+  const day = (await API.transactions({ userId: 'U1', from: '2026-09-10', to: '2026-09-10' })).transactions;
+  const range = (await API.transactions({ userId: 'U1', from: '2026-09-03', to: '2026-09-05' })).transactions;
+  const none = (await API.transactions({ userId: 'U1', from: '2026-09-11', to: '2026-09-01' })).transactions;
+  const cat = all[0].cat;
+  const byCat = (await API.transactions({ userId: 'U1', categoryId: cat })).transactions;
+  out.allN = all.length;
+  out.dayDates = [...new Set(day.map(t => t.date))];
+  out.dayN = day.length;
+  out.rangeOk = range.length > 0 && range.every(t => t.date >= '2026-09-03' && t.date <= '2026-09-05');
+  out.rangeHasEnds = range.some(t => t.date === '2026-09-03') && range.some(t => t.date === '2026-09-05');
+  out.noneN = none.length;
+  out.catOk = byCat.length > 0 && byCat.every(t => t.cat === cat) && byCat.length < all.length;
+  out.sorted = all.every((t, i) => i === 0 || all[i - 1].date >= t.date);
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+def test_明細的日期與分類篩選真的有篩():
+    """⚠️ from／to／categoryId 早就寫在契約和白名單裡，mock 卻沒有真的篩——
+    傳了等於沒傳，在 mock 下完全看不出來。「今天的紀錄」要靠它，所以補上並釘住。"""
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_TXF_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    out = json.loads(res.stdout.decode("utf-8"))
+    assert out["dayDates"] == ["2026-09-10"] and out["dayN"] < out["allN"], "from=to 只該回那一天"
+    assert out["rangeOk"] and out["rangeHasEnds"], "日期範圍兩端都要包含"
+    assert out["noneN"] == 0
+    assert out["catOk"], "categoryId 沒有篩"
+    assert out["sorted"], "明細要新的在前"

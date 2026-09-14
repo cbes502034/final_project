@@ -142,7 +142,7 @@
       d: '收支明細',
       q: ['userId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page'],
       res: '{\n  "transactions": [\n    {\n      "id": "T1040", "user": "U1", "date": "2026-09-10",\n      "amount": 320, "kind": "expense", "cat": "C01",\n      "merchant": "公司附近自助餐", "note": "午餐",\n      "source": "nlp", "raw": "中午自助餐320",\n      "parsed": { "conf": 0.97, "catConf": 0.95 }\n    }\n  ],\n  "total": 14\n}',
-      note: '不帶 <code>userId</code> 回傳「你看得到的所有人」；帶了但沒權限看那個人 → <b>回 403 而不是空陣列</b>（空陣列會讓人以為對方沒記帳）。' },
+      note: '不帶 <code>userId</code> 回傳「你看得到的所有人」；帶了但沒權限看那個人 → <b>回 403 而不是空陣列</b>（空陣列會讓人以為對方沒記帳）。<br><code>from</code>／<code>to</code> 兩端都包含，新的在前。總覽的「今天的紀錄」就是 <code>from=to=今天</code>，帳戶卡的記帳天數是這個月一號到今天。' },
     { n: 16, o: 'm2', m: 'POST', p: '/api/transactions', a: '登入',
       d: '手動新增。單筆手動模式走這支',
       body: '{\n  "date": "2026-09-10",\n  "amount": 250,\n  "kind": "expense",\n  "cat": "C01",\n  "merchant": "全家便利商店",\n  "note": ""\n}',

@@ -29,9 +29,9 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/tokens.css?v=140">
-<link rel="stylesheet" href="css/app.css?v=140">
-<link rel="stylesheet" href="css/themes.css?v=140">
+<link rel="stylesheet" href="css/tokens.css?v=141">
+<link rel="stylesheet" href="css/app.css?v=141">
+<link rel="stylesheet" href="css/themes.css?v=141">
 </head>
 <body>
 
@@ -64,13 +64,21 @@
         <button class="acctm__b" id="acctBtn" aria-expanded="false" aria-controls="acctPanel" aria-label="我的帳號">
           <span id="who"></span><svg class="acctm__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
+        <!-- 我的帳戶卡：放儀表板上「沒有」的東西——
+             記帳習慣、家人、快速換主題。功能入口都在儀表板上，這裡不再列一次。 -->
         <div class="acctm__p" id="acctPanel" hidden>
-          <div class="acctm__h" id="whoCard"></div>
-          <button class="acctm__i" data-nav="profile"><svg class="acctm__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V20"/></svg><span>個人資料</span></button>
-          <button class="acctm__i acctm__i--fam" data-nav="members"><svg class="acctm__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.3"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20"/><path d="M15.5 14.5h1.5a3.5 3.5 0 0 1 3.5 3.5v2"/></svg><span>家庭成員</span></button>
-          <a class="acctm__i" href="docs/guide.html"><svg class="acctm__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5S10 5 7 5H4v13h3c3 0 5 1.5 5 1.5S14 18 17 18h3V5h-3c-3 0-5 1.5-5 1.5z"/><path d="M12 6.5v13"/></svg><span>使用說明</span></a>
-          <a class="acctm__i" href="docs/index.html"><svg class="acctm__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg><span>專題文件</span></a>
-          <button class="acctm__i acctm__i--out" id="logout"><svg class="acctm__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg><span>登出</span></button>
+          <button type="button" class="acctm__h" id="whoCard" data-nav="profile"></button>
+          <div class="acctm__habit" id="acctHabit"></div>
+          <button type="button" class="acctm__fam" id="acctFam" data-nav="members"></button>
+          <div class="acctm__row">
+            <div class="acctm__k">主題</div>
+            <div class="acctm__sws" id="acctThemes"></div>
+          </div>
+          <div class="acctm__ft">
+            <a href="docs/guide.html">使用說明</a>
+            <a href="docs/index.html">專題文件</a>
+            <button type="button" class="acctm__out" id="logout"><svg class="acctm__oi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg><span>登出</span></button>
+          </div>
         </div>
       </div>
     </div>
@@ -115,10 +123,10 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=140"></script>
-<script src="js/data.js?v=140"></script>
-<script src="js/api.js?v=140"></script>
-<script src="js/notify.js?v=140"></script>
-<script src="js/app.js?v=140"></script>
+<script src="js/stars.js?v=141"></script>
+<script src="js/data.js?v=141"></script>
+<script src="js/api.js?v=141"></script>
+<script src="js/notify.js?v=141"></script>
+<script src="js/app.js?v=141"></script>
 </body>
 </html>

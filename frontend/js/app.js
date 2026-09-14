@@ -228,7 +228,7 @@
     if (!p) return;
     if (on === undefined) on = p.hidden;
     if (b) { b.setAttribute('aria-expanded', on ? 'true' : 'false'); b.classList.toggle('open', !!on); }
-    if (on) slideOpen(p); else slideClose(p);
+    if (on) { paintAcct(); slideOpen(p); } else slideClose(p);
   }
   var draft = null;                       // 自然語言解析後、尚未確認的暫存
 
@@ -310,8 +310,21 @@
     return h < 11 ? '早安' : (h < 17 ? '午安' : '晚上好');
   }
 
-  function todayText() {
+  /* 「今天」是哪一天。
+     ⚠️ mock 的示範資料停在某一天（DATA.meta.updated），如果拿電腦的日期，
+     總覽的「今天的紀錄」永遠是空的、問候語的日期也跟資料對不上。
+     接上真後端之後，今天就是真的今天。 */
+  function todayKey() {
+    if (API.mode !== 'http') {
+      var k = String((global.DATA.meta && global.DATA.meta.updated) || '').slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) return k;
+    }
     var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+
+  function todayText() {
+    var d = new Date(todayKey() + 'T12:00:00');
     return (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日　星期' + '日一二三四五六'.charAt(d.getDay());
   }
 
@@ -356,13 +369,14 @@
   /* ============================================================
      01 總覽：儀表板
 
-     像銀行 App 的首頁：沒有側欄，所有功能都嵌在這一頁上。
-       1. 大數字卡   這個月還可以花多少，收入／支出／結餘並排在卡片裡
-       2. 功能按鈕   記一筆、收支明細、帳本、統計、財務建議、家庭成員、個人資料、使用說明
-       3. 預算       一個分類一張小卡
-       全家模式再加「每個人的這個月」
+     照富邦新版的首頁：沒有側欄，所有功能都嵌在這一頁上。
+       1. 疊卡       後面露出收入、支出，最前面是這個月還可以花
+       2. 常用功能   收支明細、帳本、統計、財務建議、家庭成員、個人資料、使用說明（電腦版多一顆記一筆）
+       3. 預算       一個分類一張小卡，右上角「看統計 ›」
+       4. 今天       今天記的每一筆——一打開就知道今天的動向
+       全家模式在預算後面多「每個人的這個月」，今天的紀錄也換成全家的
 
-     ⚠️ 趨勢圖在「統計」、每一筆在「收支明細」，這裡不重複放。
+     ⚠️ 趨勢圖在「統計」、完整明細與篩選在「收支明細」，這裡不重複放。
      ============================================================ */
   var TILE_IC = {
     add: '<path d="M12 5v14M5 12h14"/>',
@@ -397,9 +411,14 @@
         API.budgets({ groupId: GROUP }),
         API.groups({}).catch(function () { return { groups: [] }; }),
         API.advices({ scope: sc }).catch(function () { return { advices: [] }; }),
-        API.members().catch(function () { return { members: [], family: null }; })
+        API.members().catch(function () { return { members: [], family: null }; }),
+        /* 今天的紀錄：我的模式只看自己，全家模式看全家（下面再濾成統計算進去的那幾個人） */
+        API.transactions(Object.assign({ from: todayKey(), to: todayKey(), groupId: GROUP },
+          fam ? {} : { userId: m.user.id })).catch(function () { return { transactions: [] }; })
       ]).then(function (r) {
         var d = r[0], b = r[1], gs = r[2].groups || [], ads = r[3].advices || [], fm = r[4];
+        var ids = d.members ? d.members.map(function (u) { return u.id; }) : [m.user.id];
+        var today = (r[5].transactions || []).filter(function (t) { return !fam || ids.indexOf(t.user) >= 0; });
         head(fam ? '全家這個月' : greeting() + '，' + callName(m.user.name),
              fam ? d.members.length + ' 位家人的收支' : todayText(),
              scopeSeg(m));
@@ -482,6 +501,9 @@
             '<div class="card mshare-card">' + memberBar(d.members, d.expense) + '</div>';
         }
 
+        /* 4. 今天的紀錄：一打開就看得到今天的動向 */
+        h += todayCard(today, fam);
+
         $view.innerHTML = h + '</div>';
         animate();
 
@@ -497,6 +519,46 @@
         }).catch(function () {});
       });
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  /* 今天的紀錄。上面一條是今天花了多少、收了多少，下面是一筆一筆。
+     ⚠️ 只放今天：完整的明細在「收支明細」，這裡不做篩選、不做刪除。 */
+  function todayCard(rows, fam) {
+    var MAX = 6, spent = 0, got = 0;
+    rows.forEach(function (t) {
+      if (t.kind === 'income') got += t.amount;
+      else if (t.kind === 'expense') spent += t.amount;
+    });
+    var d = new Date(todayKey() + 'T12:00:00');
+    var h = '<div class="sec"><h2 class="sec__t">' + (fam ? '全家今天的紀錄' : '今天的紀錄') + '</h2>' +
+      (rows.length ? '<span class="sec__n">' + rows.length + ' 筆</span>' : '') +
+      '<a class="sec__link" href="#/entry">看全部 ›</a></div>';
+
+    if (!rows.length) {
+      return h + '<div class="card tdy tdy--empty">' +
+        emptyState('今天還沒有記帳', fam ? '家人今天記的帳會出現在這裡。' : '花了什麼，說一句話就記好了。') +
+        (fam ? '' : '<div class="tdy__go"><button class="btn btn--go btn--sm" data-quick="entry">記一筆</button></div>') +
+      '</div>';
+    }
+
+    return h + '<div class="card card--flush tdy">' +
+      '<div class="tdy__sum">' +
+        '<span class="tdy__day">' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日</span>' +
+        '<span>支出 <b class="is-out">' + num(spent) + '</b></span>' +
+        '<span>收入 <b class="is-in">' + num(got) + '</b></span>' +
+      '</div>' +
+      '<ul class="tdy__l">' + rows.slice(0, MAX).map(function (t) {
+        var sign = t.kind === 'income' ? '+' : t.kind === 'expense' ? '−' : '';
+        return '<li><a class="tdy__i" href="#/entry">' +
+          '<span class="tdy__ic" style="--c:' + tint(t.catColor) + '">' + esc((t.catName || '記').charAt(0)) + '</span>' +
+          '<span class="tdy__m"><b>' + esc(t.merchant || t.catName) + '</b>' +
+            '<small>' + esc(t.catName) + (fam ? ' · ' + esc(t.userName) : '') +
+              (t.note ? ' · ' + esc(t.note) : '') + '</small></span>' +
+          '<span class="tdy__a is-' + esc(t.kind) + '">' + sign + num(t.amount) + '</span>' +
+        '</a></li>';
+      }).join('') + '</ul>' +
+      (rows.length > MAX ? '<a class="tdy__more" href="#/entry">還有 ' + (rows.length - MAX) + ' 筆，看全部 ›</a>' : '') +
+    '</div>';
   }
 
   var LEVEL_TW = { safe: '進度穩穩的', near: '快到上限了', over: '超出計畫' };
@@ -953,7 +1015,7 @@
      ============================================================ */
   function singleHTML() {
     var cats = global.DATA.categories.filter(function (c) { return c.kind === 'expense'; });
-    var today = global.DATA.meta.period + '-10';
+    var today = todayKey();
     return '<div class="card">' +
       '<div class="card__h"><span class="card__t">單筆手動輸入</span>' +
       '<span class="card__s">不經過模型，欄位自己填</span></div>' +
@@ -1958,8 +2020,8 @@
       t: '通知',
       b: '家人記帳、或是你花到設定的比例時，這裡會亮。' },
     { sel: '#acctBtn', hash: '#/',
-      t: '你的設定在這裡',
-      b: '每月想存多少、花到幾成提醒你，都在個人資料裡。' }
+      t: '你的帳戶卡',
+      b: '點頭貼看這個月記了幾天、快速換主題；點名字進個人資料。' }
   ];
     var tourAt = -1;
 
@@ -2508,8 +2570,59 @@
     }).join('');
   }
 
+  /* ---------------------------------------------------------
+     我的帳戶卡（右上角頭貼點開）
+
+     ⚠️ 以前這裡是一串連結：個人資料、家庭成員、使用說明……
+     跟儀表板上的常用功能幾乎一樣，等於同一件事放兩個地方。
+     現在只放儀表板上「沒有」的：
+       · 這個月記帳的天數（一格一天，看得出習慣）
+       · 家人（頭像疊在一起，點了進家庭成員）
+       · 快速換主題（八個小圓點，按一下就換）
+     --------------------------------------------------------- */
+  function paintAcct() {
+    var sw = document.getElementById('acctThemes');
+    var cur = currentTheme();
+    if (sw) sw.innerHTML = (global.DATA.themes || []).map(function (t) {
+      var on = t.id === cur;
+      return '<button type="button" class="acctm__sw' + (on ? ' on' : '') + '" data-theme-pick="' + esc(t.id) + '" ' +
+        'data-theme="' + esc(t.id) + '" title="' + esc(t.name) + '" aria-label="換成' + esc(t.name) + '" ' +
+        'aria-pressed="' + on + '"></button>';
+    }).join('');
+
+    var habit = document.getElementById('acctHabit'), fam = document.getElementById('acctFam');
+    if (!habit || !fam) return;
+    API.me().then(function (m) {
+      if (m.user.isPlatformAdmin) return;          // 平台管理員沒有帳，也不屬於任何家庭
+      var day = todayKey(), first = day.slice(0, 8) + '01';
+      return Promise.all([
+        API.transactions({ userId: m.user.id, from: first, to: day }),
+        API.members().catch(function () { return { members: [], family: null }; })
+      ]).then(function (r) {
+        var seen = {};
+        r[0].transactions.forEach(function (t) { seen[t.date] = true; });
+        var n = Number(day.slice(8)), got = 0, cells = '';
+        for (var i = 1; i <= n; i++) {
+          var k = day.slice(0, 8) + ('0' + i).slice(-2);
+          if (seen[k]) got++;
+          cells += '<i' + (seen[k] ? ' class="on"' : '') + ' title="' + Number(day.slice(5, 7)) + '/' + i +
+            (seen[k] ? ' 有記帳' : '') + '"></i>';
+        }
+        habit.innerHTML = '<div class="acctm__k">這個月記帳 <b>' + got + '</b><span> / ' + n + ' 天</span></div>' +
+          '<div class="acctm__cal" aria-hidden="true">' + cells + '</div>';
+
+        var fm = r[1];
+        fam.innerHTML = fm.family
+          ? '<span class="acctm__fm"><span class="acctm__k">' + esc(fm.family.name) + '</span>' +
+              '<small>' + fm.members.length + ' 位家人</small></span>' +
+            '<span class="acctm__avs">' + fm.members.slice(0, 5).map(function (u) { return ava(u); }).join('') + '</span>'
+          : '<span class="acctm__fm"><span class="acctm__k">還沒有加入家庭</span><small>建立一個，或輸入邀請碼</small></span>';
+      });
+    }).catch(function () {});
+  }
+
   function markTheme(id) {
-    Array.prototype.forEach.call(document.querySelectorAll('.thm__i'), function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll('.thm__i, .acctm__sw'), function (b) {
       var on = b.dataset.themePick === id;
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -2667,10 +2780,14 @@
   function paintWho() {
     API.me().then(function (m) {
       ME = m;
-      /* 帳號選單最上面：頭貼、全名、身分 */
+      /* 帳戶卡最上面：頭貼、全名、身分 · 家庭。整塊點下去是個人資料 */
+      var role = ROLE_TW[m.user.role] || (m.user.isPlatformAdmin ? '平台管理員' : '還沒有家庭');
       var card = ava(m.user, 'ava--md') +
         '<span class="acct__m"><b class="acct__n">' + esc(m.user.name) + '</b>' +
-          '<span class="acct__r">' + esc(ROLE_TW[m.user.role] || (m.user.isPlatformAdmin ? '平台管理員' : '還沒有家庭')) + '</span></span>';
+          '<span class="acct__r">' + esc(role) + (m.family ? ' · ' + esc(m.family.name) : '') + '</span></span>' +
+        '<span class="acctm__to">個人資料' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+          'stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>';
       var w = document.getElementById('who');
       if (w) w.innerHTML = ava(m.user, 'ava--sm') + '<span class="acctm__n">' + esc(callName(m.user.name)) + '</span>';
       var wc = document.getElementById('whoCard');

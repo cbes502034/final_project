@@ -3248,7 +3248,8 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 .acctm__ic { width: 18px; height: 18px; color: var(--ink-faint); }
 .acctm__i--out { margin-top: 6px; border-top: 1px solid var(--line); color: var(--down); }
 .acctm__i--out .acctm__ic { color: var(--down); }
-body.is-admin .acctm__i[data-nav] { display: none; }
+body.is-admin .acctm__habit, body.is-admin .acctm__fam, body.is-admin .acctm__to { display: none; }
+body.is-admin .acctm__h { pointer-events: none; }
 
 .phead { padding-top: 22px; }
 .phead__t { font-family: var(--display); }
@@ -3501,4 +3502,116 @@ body.is-admin .acctm__i[data-nav] { display: none; }
   #view .bgrid { grid-template-columns: minmax(0, 1fr); }
   #view .thm__row { grid-auto-columns: 150px; }
   .thm__pv { height: 176px; }
+}
+
+
+/* ============================================================
+   我的帳戶卡（右上角頭貼點開）
+   ------------------------------------------------------------
+   不再是一串跟儀表板重複的連結，而是一張「關於我」的小卡：
+   記帳習慣、家人、快速換主題。
+   ============================================================ */
+.acctm__p { width: 312px; padding: 0; }
+.acctm__h {
+  display: flex; align-items: center; gap: 12px; width: 100%; margin: 0; padding: 16px;
+  text-align: left; color: var(--ink); cursor: pointer;
+  background: linear-gradient(135deg, var(--accent-wash), var(--card) 80%);
+  border: 0; border-bottom: 1px solid var(--line);
+  transition: background-color .16s var(--ease);
+}
+.acctm__h:hover { background: var(--accent-wash); }
+.acctm__h .acct__m { flex: 1 1 auto; }
+.acctm__to { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.acctm__to svg { width: 14px; height: 14px; }
+.acctm__k { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.acctm__k b { font-size: 16px; color: var(--ink); margin-left: 2px; }
+.acctm__k span { color: var(--ink-faint); font-weight: 500; }
+
+.acctm__habit { min-height: 92px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.acctm__cal { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
+.acctm__cal i { display: block; aspect-ratio: 1; background: var(--sunk); border-radius: var(--r-xs); }
+.acctm__cal i.on { background: var(--accent); }
+.acctm__cal i:last-child { box-shadow: inset 0 0 0 2px var(--accent-line); }
+
+.acctm__fam {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 60px; margin: 0; padding: 10px 16px;
+  text-align: left; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line); cursor: pointer;
+}
+.acctm__fam:hover { background: var(--card-2); }
+.acctm__fm { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.acctm__fm small { font-size: 12px; color: var(--ink-faint); }
+.acctm__avs { display: flex; margin-left: auto; padding-left: 8px; }
+.acctm__avs .ava { width: 30px; height: 30px; flex: 0 0 30px; margin-left: -8px; font-size: 12px; font-weight: 700;
+  color: var(--accent-hi); background: var(--accent-wash); border: 2px solid var(--card); }
+
+.acctm__row { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.acctm__sws { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; margin-top: 10px; color: var(--ink); }
+/* 每一顆自己掛著 data-theme：左上是那一套的底色，右下是主色；形狀也是那一套的圓角 */
+.acctm__sw {
+  display: block; width: 100%; aspect-ratio: 1; padding: 0; cursor: pointer;
+  background: linear-gradient(135deg, var(--band) 0 50%, var(--accent) 50% 100%);
+  border: 1px solid var(--line-2); border-radius: var(--r-pill);
+  transition: transform .18s var(--back);
+}
+.acctm__sw:hover { transform: scale(1.12); }
+.acctm__sw.on { outline: 2px solid currentColor; outline-offset: 2px; }
+
+.acctm__ft { display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 16px; }
+.acctm__ft a { font-size: 13px; color: var(--ink-soft); text-decoration: none; }
+.acctm__ft a:hover { color: var(--accent); }
+.acctm__out {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; margin-left: auto; padding: 0 12px;
+  font-size: 13px; font-weight: 700; color: var(--down); background: var(--down-wash);
+  border: 0; border-radius: var(--r-pill);
+}
+.acctm__out:hover { background: color-mix(in srgb, var(--down) 16%, var(--card)); }
+.acctm__oi { width: 15px; height: 15px; }
+
+/* ============================================================
+   總覽：今天的紀錄
+   ============================================================ */
+#view .tdy { margin-bottom: var(--gap); }
+#view .tdy__sum {
+  display: flex; align-items: baseline; gap: 6px 18px; flex-wrap: wrap;
+  padding: 12px var(--pad); font-size: 13px; color: var(--ink-faint);
+  background: var(--card-2); border-bottom: 1px solid var(--line);
+}
+#view .tdy__day { margin-right: auto; font-weight: 700; color: var(--ink-soft); }
+#view .tdy__sum b { margin-left: 4px; font-size: 15px; font-weight: 700; color: var(--ink); }
+#view .tdy__sum b.is-out { color: var(--down); }
+#view .tdy__sum b.is-in { color: var(--up); }
+#view .tdy__l { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+#view .tdy__l li { border-bottom: 1px solid var(--line); }
+#view .tdy__l li:nth-child(odd) { border-right: 1px solid var(--line); }
+#view .tdy__i {
+  display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px var(--pad);
+  color: var(--ink); text-decoration: none; transition: background-color .14s var(--ease);
+}
+#view .tdy__i:hover { background: var(--card-2); color: var(--ink); }
+#view .tdy__ic {
+  width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center;
+  font-size: 14px; font-weight: 700; color: var(--c);
+  background: color-mix(in srgb, var(--c) 13%, var(--card)); border-radius: var(--r-icon);
+}
+#view .tdy__m { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+#view .tdy__m b { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view .tdy__m small { font-size: 12px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view .tdy__a { flex: 0 0 auto; font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+#view .tdy__a.is-expense { color: var(--down); }
+#view .tdy__a.is-income { color: var(--up); }
+#view .tdy__more {
+  display: block; padding: 12px var(--pad); text-align: center;
+  font-size: 13.5px; font-weight: 600; color: var(--accent); text-decoration: none;
+}
+#view .tdy__more:hover { background: var(--card-2); }
+#view .tdy--empty { text-align: center; }
+#view .tdy__go { margin-top: -8px; padding-bottom: 8px; }
+
+/* 手機、平板：面板固定在畫面上，但要貼著右邊的頭貼，不要跑到左邊去 */
+@media (max-width: 900px) {
+  .acctm__p { left: auto; right: 12px; width: min(312px, calc(100vw - 24px)); }
+}
+@media (max-width: 760px) {
+  #view .tdy__l { grid-template-columns: minmax(0, 1fr); }
+  #view .tdy__l li:nth-child(odd) { border-right: 0; }
 }
