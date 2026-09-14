@@ -47,3 +47,45 @@
     }
   });
 })();
+
+/* ============================================================
+   <details> 打開往下拉開、收起往上收回
+
+   瀏覽器原生的 <details> 是瞬間開關。攔下 summary 的點擊，
+   自己播高度動畫：打開是先設 open 再從摘要的高度長到全高；
+   收起是先縮回摘要的高度，播完才拿掉 open。
+   ============================================================ */
+(function () {
+  'use strict';
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!Element.prototype.animate) return;
+
+  document.addEventListener('click', function (e) {
+    var sm = e.target.closest ? e.target.closest('summary') : null;
+    if (!sm || !sm.parentElement || sm.parentElement.tagName !== 'DETAILS') return;
+    var d = sm.parentElement;
+    if (d.__anim) return;
+    e.preventDefault();
+
+    var from = d.getBoundingClientRect().height;
+    var closing = d.open;
+    if (!closing) d.open = true;
+    var to = closing ? sm.getBoundingClientRect().height : d.getBoundingClientRect().height;
+    var cs = getComputedStyle(d);
+    if (closing) {
+      to += parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    }
+
+    d.style.overflow = 'hidden';
+    var a = d.animate([{ height: from + 'px' }, { height: to + 'px' }], {
+      duration: closing ? 220 : 300,
+      easing: closing ? 'cubic-bezier(.4,0,.2,1)' : 'cubic-bezier(.16,1,.3,1)'
+    });
+    d.__anim = a;
+    a.onfinish = a.oncancel = function () {
+      if (closing) d.open = false;
+      d.style.overflow = '';
+      d.__anim = null;
+    };
+  });
+})();

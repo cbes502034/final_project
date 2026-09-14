@@ -1783,3 +1783,117 @@ def test_邀請碼只能用一次_而且大小寫空白都吃得下():
     assert out["strangerMembers"] == [m for m in out["strangerMembers"] if m.startswith("U")] \
         and len(out["strangerMembers"]) == 1, "沒有家庭的人不該看到別人家的成員"
     assert out["addStranger"], "別人家的人被加進了自己家的帳本"
+
+
+# ===========================================================================
+# 移出家庭、退出家庭
+# ===========================================================================
+_LEAVE_DRIVER = _ADMIN_DRIVER.split("(async () => {")[0] + r"""
+(async () => {
+  const out = {}, PW = 'password123';
+  let API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.removeSpouse = await fails(API.removeMember('U2'));
+  out.remove = await API.removeMember('U3');
+  out.u1Visible = (await API.me()).visible;
+  out.u1Members = (await API.members()).members.map(m => m.id);
+  out.u1Allowances = (await API.allowances()).allowances.map(a => a.wardId);
+  out.u1Ledgers = (await API.groups({})).groups.map(g => [g.id, g.members]);
+  await API.login({ email: 'yuhan@lin.tw', password: PW });
+  out.u3Family = (await API.members()).family;
+  out.u3Ledgers = (await API.groups({})).groups.map(g => [g.id, g.members]);
+  out.u3Tx = (await API.transactions({ userId: 'U3' })).total;
+  out.childRemove = await fails(API.removeMember('U4'));
+  API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.reloadMembers = (await API.members()).members.map(m => m.id);
+  await API.login({ email: 'yuxuan@lin.tw', password: PW });
+  out.childLeave = await API.leaveFamily();
+  await API.login({ email: 'shufen@lin.tw', password: PW });
+  out.parentLeave = await API.leaveFamily();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  await API.sendInvite({ userId: 'U5', role: 'child' });
+  await API.login({ email: 'yuzhen@mail.tw', password: PW });
+  await API.acceptInvite((await API.invites()).received[0].id);
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.lastParent = await fails(API.leaveFamily());
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+def _run_leave_flow():
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        import pytest
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_LEAVE_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    return json.loads(res.stdout.decode("utf-8"))
+
+
+def test_家長只能移出子女_不能移除另一位家長():
+    out = _run_leave_flow()
+    assert out["removeSpouse"] and out["removeSpouse"]["status"] == 403
+    assert out["childRemove"] and out["childRemove"]["status"] == 403
+
+
+def test_移出之後彼此看不到_但紀錄都還在():
+    """人離開了，家人還看得到他後來記的每一筆——這就是不收掉監管與共用帳本的後果。"""
+    out = _run_leave_flow()
+    assert "U3" not in out["u1Visible"] and "U3" not in out["u1Members"]
+    assert "U3" not in out["u1Allowances"], "監管關係結束了，零用金還在"
+    for gid, members in out["u1Ledgers"]:
+        assert "U3" not in members, "林宇涵還在家人的帳本 %s 裡" % gid
+    for gid, members in out["u3Ledgers"]:
+        assert members == ["U3"], "林宇涵自己開的帳本 %s 裡還有家人：%s" % (gid, members)
+    assert out["u3Family"] is None
+    assert out["u3Tx"] == 9, "移出家庭不可以刪紀錄"
+    assert out["reloadMembers"] == ["U1", "U2", "U4"], "重新整理之後移出的狀態不見了"
+
+
+def test_任何人都能退出_唯一的家長要先處理其他成員():
+    out = _run_leave_flow()
+    assert out["childLeave"]["left"] and out["parentLeave"]["left"]
+    assert out["lastParent"] and out["lastParent"]["status"] == 409
+
+
+def test_點了才長出來的東西_打開和收起都有動畫():
+    """使用者要的是往下拉開、往上收回，兩個方向都要。
+
+    ⚠️ 只用 CSS 做不到收起：hidden 一設下去元素就消失，沒有時間播動畫。
+    所以收起一律走 slideClose（先播完再藏），不能直接寫 el.hidden = true。
+    """
+    app = read("frontend/js/app.js")
+    assert "function slideOpen(el)" in app and "function slideClose(el, done)" in app
+
+    def body(name):
+        mo = re.search(r"function %s\([^)]*\) \{(.*?)\n  \}" % name, app, re.S)
+        assert mo, "找不到 " + name
+        return mo.group(1)
+
+    assert "slideClose(wrap)" in body("foldToggle") and "slideOpen(wrap)" in body("foldToggle")
+    assert "slideAway(" in body("ledgerToggle") and "slideOpen(" in body("ledgerToggle")
+    assert "panel.animate" in body("sheetOpen"), "更多面板收起要滑下去"
+    for bad in ("gp.hidden = !gp.hidden", "gp2.hidden = true", "sd.hidden = !sd.hidden",
+                "sd2.hidden = true", "mp.hidden = !mp.hidden", "mp2.hidden = true", "wrap.hidden = !on"):
+        assert bad not in app, "還有直接瞬間開關的寫法：" + bad
+
+    notify = read("frontend/js/notify.js")
+    assert "__slide.close(panel" in notify, "通知面板收起沒有動畫"
+
+    docs = read("frontend/docs/docs.js")
+    assert "closing" in docs and "d.animate(" in docs, "文件的 <details> 收起沒有動畫"
+    assert "docs.js" in read("frontend/docs/guide.html"), "使用說明沒有載入 docs.js"
+
+    assert "prefers-reduced-motion" in app and "prefers-reduced-motion" in docs, \
+        "使用者關掉動態效果時要尊重"

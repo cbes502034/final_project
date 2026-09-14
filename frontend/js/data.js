@@ -751,6 +751,9 @@ window.DATA = {
     { action: '建立家庭、邀請家人', parent: 'Y', child: 'N' },
     { action: '決定被邀請的人是家長或子女', parent: 'Y', child: 'N' },
     { action: '用邀請碼或邀請加入家庭', parent: 'Y', child: 'Y' },
+    { action: '把子女移出家庭', parent: 'Y', child: 'N' },
+    { action: '移除另一位家長', parent: 'N', child: 'N' },
+    { action: '自己退出家庭', parent: 'Y（唯一的家長要先處理其他成員）', child: 'Y' },
     { action: '建立監管關係', parent: 'Y', child: 'N' },
     /* 帳本不看角色：誰都可以開自己的帳本。
        ⚠️ 這是刻意的——記帳的分類方式是個人的事，不該由家裡的階級決定。 */

@@ -121,14 +121,121 @@
   }
   var STAT = { period: 'month' };
 
-  /* 手機「更多」面板 */
+  /* ============================================================
+     展開與收起的動畫
+
+     點了才長出來的東西，一律「往下拉開、往上收回」，兩個方向都有。
+       版面裡的區塊   高度從 0 長到內容高度；收起時縮回 0，下面的內容跟著移動
+       浮動的下拉     從按鈕往下滑出、往上收回，不推動任何內容
+
+     ⚠️ 只用 CSS 做不到「收起」：hidden 一設下去元素就消失了，沒有時間播動畫。
+        所以收起是先播完，再設 hidden。
+     ⚠️ 使用者在系統設定裡關掉動態效果（prefers-reduced-motion）就直接開關。
+     ============================================================ */
+  var MOTION = !(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  function floating(el) {
+    var p = getComputedStyle(el).position;
+    return p === 'absolute' || p === 'fixed';
+  }
+
+  function slideOpen(el) {
+    if (!el) return;
+    el.hidden = false;
+    if (el.__slide) { el.__slide.cancel(); el.__slide = null; }
+    if (!MOTION || !el.animate) return;
+    var a;
+    if (floating(el)) {
+      a = el.animate([
+        { opacity: 0, transform: 'translateY(-10px)', clipPath: 'inset(0 0 100% 0)' },
+        { opacity: 1, transform: 'none', clipPath: 'inset(0 0 0 0)' }
+      ], { duration: 240, easing: 'cubic-bezier(.16,1,.3,1)' });
+    } else {
+      var cs = getComputedStyle(el);
+      var h = el.getBoundingClientRect().height;
+      el.style.overflow = 'hidden';
+      a = el.animate([
+        { height: '0px', opacity: 0, marginTop: '0px', marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' },
+        { height: h + 'px', opacity: 1, marginTop: cs.marginTop, marginBottom: cs.marginBottom,
+          paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom }
+      ], { duration: 300, easing: 'cubic-bezier(.16,1,.3,1)' });
+    }
+    el.__slide = a;
+    a.onfinish = a.oncancel = function () { el.style.overflow = ''; if (el.__slide === a) el.__slide = null; };
+  }
+
+  function slideClose(el, done) {
+    if (!el || el.hidden) { if (done) done(); return; }
+    if (el.__slide) { el.__slide.cancel(); el.__slide = null; }
+    if (!MOTION || !el.animate) { el.hidden = true; if (done) done(); return; }
+    var a;
+    if (floating(el)) {
+      a = el.animate([
+        { opacity: 1, transform: 'none', clipPath: 'inset(0 0 0 0)' },
+        { opacity: 0, transform: 'translateY(-10px)', clipPath: 'inset(0 0 100% 0)' }
+      ], { duration: 180, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    } else {
+      var cs = getComputedStyle(el);
+      el.style.overflow = 'hidden';
+      a = el.animate([
+        { height: el.getBoundingClientRect().height + 'px', opacity: 1, marginTop: cs.marginTop,
+          marginBottom: cs.marginBottom, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom },
+        { height: '0px', opacity: 0, marginTop: '0px', marginBottom: '0px', paddingTop: '0px', paddingBottom: '0px' }
+      ], { duration: 220, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+    }
+    el.__slide = a;
+    var ended = false;
+    function finish() {
+      /* 收到一半又被打開（slideOpen 換掉了 __slide）就不要藏起來 */
+      if (ended || el.__slide !== a) return;
+      ended = true;
+      el.hidden = true;
+      el.style.overflow = '';
+      a.cancel();
+      el.__slide = null;
+      if (done) done();
+    }
+    a.onfinish = finish;
+    /* 保險：動畫被瀏覽器暫停或中斷時，狀態也不能卡在「半開」 */
+    setTimeout(finish, a.effect.getTiming().duration + 250);
+  }
+
+  /* 從 DOM 拿掉的區塊（帳本、財務建議的展開內容）：收完再移除 */
+  function slideAway(el, done) {
+    if (!el) { if (done) done(); return; }
+    slideClose(el, function () { el.remove(); if (done) done(); });
+  }
+
+  global.__slide = { open: slideOpen, close: slideClose };
+
+  /* 手機「更多」面板：從底部滑上來、滑下去 */
   function sheetOpen(on) {
     var sh = document.getElementById('sheet');
     if (!sh) return;
-    sh.hidden = !on;
-    document.body.classList.toggle('sheet-on', !!on);
     var b = document.getElementById('moreBtn');
     if (b) b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    var panel = sh.querySelector('.sheet__p'), bg = sh.querySelector('.sheet__bg');
+    if (on) {
+      sh.hidden = false;
+      document.body.classList.add('sheet-on');
+      if (MOTION && panel && panel.animate) {
+        panel.animate([{ transform: 'translateY(100%)' }, { transform: 'none' }],
+          { duration: 300, easing: 'cubic-bezier(.16,1,.3,1)' });
+        if (bg) bg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240 });
+      }
+      return;
+    }
+    if (sh.hidden) return;
+    document.body.classList.remove('sheet-on');
+    if (!MOTION || !panel || !panel.animate) { sh.hidden = true; return; }
+    var a = panel.animate([{ transform: 'none' }, { transform: 'translateY(100%)' }],
+      { duration: 220, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    if (bg) bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: 'forwards' });
+    a.onfinish = function () {
+      sh.hidden = true;
+      panel.getAnimations().forEach(function (x) { x.cancel(); });
+      if (bg) bg.getAnimations().forEach(function (x) { x.cancel(); });
+    };
   }
   var draft = null;                       // 自然語言解析後、尚未確認的暫存
 
@@ -570,14 +677,16 @@
     if (!wrap) return;
     var on = !FOLD[id];
     FOLD[id] = on;
-    wrap.hidden = !on;
     if (btn) {
       btn.classList.toggle('on', on);
       btn.setAttribute('aria-expanded', on ? 'true' : 'false');
       var t = btn.querySelector('.fold__t');
       if (t) t.textContent = on ? '收起' : (btn.dataset.label || '展開');
     }
-    if (on && !wrap.innerHTML) foldFill(id, wrap);
+    if (!on) { slideClose(wrap); return; }
+    wrap.hidden = false;
+    if (!wrap.innerHTML) foldFill(id, wrap);
+    slideOpen(wrap);
   }
 
   var MODE = 'para';          // 'para' 段落批次 ｜ 'single' 單筆手動。兩者互斥
@@ -1007,19 +1116,21 @@
           '<svg class="ad__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
         '</button>' +
-        (open
-          ? '<div class="ad__b">' +
-              '<p>' + esc(a.body) + '</p>' +
-              '<div class="ad__k">依據</div><ul>' +
-                (a.basis || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') +
-              '</ul>' +
-              '<div class="ad__k">建議</div><ul>' +
-                (a.suggest || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') +
-              '</ul>' +
-            '</div>'
-          : '') +
+        (open ? advBody(a) : '') +
       '</div>';
     }).join('');
+  }
+
+  function advBody(a) {
+    return '<div class="ad__b">' +
+      '<p>' + esc(a.body) + '</p>' +
+      '<div class="ad__k">依據</div><ul>' +
+        (a.basis || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') +
+      '</ul>' +
+      '<div class="ad__k">建議</div><ul>' +
+        (a.suggest || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') +
+      '</ul>' +
+    '</div>';
   }
 
 
@@ -1153,8 +1264,19 @@
         '</div>' +
         (u.id === d.me ? '' : full ? '<span class="mt__go">看紀錄</span>'
           : shared ? '<span class="mt__go mt__go--part">看共用帳本</span>' : '') +
+        /* 家長可以把子女移出；另一位家長只能自己退出，所以家長的卡片沒有這顆 */
+        (parent && u.role === 'child' && u.id !== d.me
+          ? '<button class="mt__x" data-member-remove="' + esc(u.id) + '" data-name="' + esc(u.name) + '">移出家庭</button>'
+          : '') +
       '</article>';
-    }).join('') + '</div></div>';
+    }).join('') + '</div>' +
+
+    /* 退出家庭：放在最下面、安靜一點。任何人都可以退出 */
+    '<div class="card leave">' +
+      '<div class="leave__m"><b>退出「' + esc(d.family.name) + '」</b>' +
+        '<small>你的紀錄會留著；退出後你跟家人之間就互相看不到了。</small></div>' +
+      '<button class="btn btn--sm btn--danger" data-family-leave data-name="' + esc(d.family.name) + '">退出家庭</button>' +
+    '</div></div>';
 
     $view.innerHTML = h;
     foldRestore();
@@ -1515,11 +1637,28 @@
   function ledgerToggle(id) {
     var prev = LG.open;
     LG.open = (prev === id) ? null : id;
-    [prev, LG.open].forEach(function (gid) {
-      if (!gid || !LG.byId[gid]) return;
-      var node = document.querySelector('.lg[data-lgid="' + gid + '"]');
-      if (node) node.outerHTML = ledgerRow(LG.byId[gid]);
-    });
+
+    function rowOf(gid) { return document.querySelector('.lg[data-lgid="' + gid + '"]'); }
+    function mark(node, on) {
+      node.classList.toggle('on', on);
+      var h = node.querySelector('.lg__h');
+      if (h) h.setAttribute('aria-expanded', on ? 'true' : 'false');
+    }
+
+    // 收起原本開著的那一本：先播完往上收，再從 DOM 拿掉
+    if (prev) {
+      var pn = rowOf(prev);
+      if (pn) { mark(pn, false); slideAway(pn.querySelector('.lg__b')); }
+    }
+    // 打開新的那一本
+    if (LG.open && LG.byId[LG.open]) {
+      var nn = rowOf(LG.open);
+      if (nn) {
+        mark(nn, true);
+        nn.insertAdjacentHTML('beforeend', ledgerBody(LG.byId[LG.open]));
+        slideOpen(nn.lastElementChild);
+      }
+    }
   }
 
 
@@ -2037,7 +2176,8 @@
     suspend_user: '停權帳號', unsuspend_user: '解除停權',
     grant_guardianship: '建立監管關係', end_guardianship: '解除監管',
     change_role: '變更角色', create_family: '建立家庭', view_ward: '查看被監管者',
-    invite_member: '邀請家人', join_family: '加入家庭'
+    invite_member: '邀請家人', join_family: '加入家庭',
+    remove_member: '移出家庭', leave_family: '退出家庭'
   };
 
   /* ---------- 共用 ---------- */
@@ -2582,6 +2722,43 @@
 
     /* 成員那一列點下去看他的紀錄。
        存款目標的輸入框也在這一列裡，點它不能跳走。 */
+    /* 移出家庭（家長 → 子女）。⚠️ 要放在 data-open 前面：
+       按鈕在成員卡片裡，卡片本身點了會進那個人的紀錄 */
+    var mrm = t.closest('[data-member-remove]');
+    if (mrm) {
+      var rmId = mrm.dataset.memberRemove, rmName = mrm.dataset.name;
+      danger({
+        title: '把' + rmName + '移出家庭',
+        detail: '他的紀錄<b>一筆都不會刪</b>。<br>' +
+                '你們之間的監管關係、零用金會結束，他也會離開家人開的帳本——之後彼此就看不到了。',
+        level: 'password',
+        ok: '確定移出',
+        onOk: function () {
+          API.removeMember(rmId).then(function () {
+            paintGroups(); vMembers();
+            toast(rmName + ' 已經移出家庭', 'ok');
+          }).catch(function (err) { toast(err.message || '移除失敗', 'err'); });
+        }
+      });
+      return;
+    }
+    if (t.closest('[data-family-leave]')) {
+      var famName = t.closest('[data-family-leave]').dataset.name;
+      danger({
+        title: '退出「' + famName + '」',
+        detail: '你的紀錄<b>一筆都不會刪</b>，之後也可以再被邀請回來。<br>' +
+                '退出後你跟家人之間就互相看不到了，你也會離開家人開的帳本。',
+        level: 'password',
+        ok: '確定退出',
+        onOk: function () {
+          API.leaveFamily().then(function () {
+            afterFamilyChange('已經退出「' + famName + '」');
+          }).catch(function (err) { toast(err.message || '退出失敗', 'err'); });
+        }
+      });
+      return;
+    }
+
     var open = t.closest('[data-open]');
     if (open && !t.closest('input') && !t.closest('label')) {
       location.hash = '#/member/' + open.dataset.open;
@@ -2608,8 +2785,24 @@
     /* ---- 財務建議：點一則展開，再點收起 ---- */
     var adv = t.closest('[data-adv]');
     if (adv) {
+      var prevAd = ADVOPEN;
       ADVOPEN = (ADVOPEN === adv.dataset.adv) ? null : adv.dataset.adv;
-      paintAdvices();
+      var list = document.getElementById('advList');
+      var rowAd = function (id) {
+        var b = list && list.querySelector('[data-adv="' + id + '"]');
+        return b ? b.parentNode : null;
+      };
+      if (prevAd && rowAd(prevAd)) {
+        rowAd(prevAd).classList.remove('on');
+        slideAway(rowAd(prevAd).querySelector('.ad__b'));
+      }
+      if (ADVOPEN && rowAd(ADVOPEN)) {
+        var one = ADV.filter(function (x) { return x.id === ADVOPEN; })[0];
+        var box = rowAd(ADVOPEN);
+        box.classList.add('on');
+        box.insertAdjacentHTML('beforeend', advBody(one));
+        slideOpen(box.lastElementChild);
+      }
       return;
     }
 
@@ -2617,16 +2810,17 @@
     if (t.closest('#modeBtn') && !t.closest('[data-help]')) {
       var mp = document.getElementById('modePanel');
       if (mp) {
-        mp.hidden = !mp.hidden;
-        document.getElementById('modeBtn').classList.toggle('open', !mp.hidden);
+        var opening = mp.hidden;
+        document.getElementById('modeBtn').classList.toggle('open', opening);
+        if (opening) slideOpen(mp); else slideClose(mp);
       }
       return;
     }
     if (!t.closest('.mbar')) {
       var mp2 = document.getElementById('modePanel');
       if (mp2 && !mp2.hidden) {
-        mp2.hidden = true;
         document.getElementById('modeBtn').classList.remove('open');
+        slideClose(mp2);
       }
     }
 
@@ -2658,11 +2852,14 @@
       var sd = document.getElementById('searchDrawer');
       var sb = document.getElementById('searchBtn');
       if (sd) {
-        sd.hidden = !sd.hidden;
-        sb.classList.toggle('open', !sd.hidden);
-        document.body.classList.toggle('dw-on', !sd.hidden);
-        setTimeout(pushForDrawer, 0);
-        if (!sd.hidden) document.getElementById('search').focus();
+        if (sd.hidden) {
+          sb.classList.add('open');
+          slideOpen(sd);
+          document.getElementById('search').focus();
+        } else {
+          sb.classList.remove('open');
+          slideClose(sd);
+        }
       }
       return;
     }
@@ -2671,10 +2868,8 @@
     if (narrowBar.matches && !t.closest('#searchDrawer') && !t.closest('#searchBtn')) {
       var sd2 = document.getElementById('searchDrawer');
       if (sd2 && !sd2.hidden) {
-        sd2.hidden = true;
         document.getElementById('searchBtn').classList.remove('open');
-        document.body.classList.remove('dw-on');
-        pushForDrawer();
+        slideClose(sd2);
       }
     }
 
@@ -2712,30 +2907,25 @@
     if (t.closest('#gswBtn')) {
       var gp = document.getElementById('gswPanel');
       if (gp) {
-        gp.hidden = !gp.hidden;
-        document.getElementById('gswBtn').classList.toggle('open', !gp.hidden);
-        document.body.classList.toggle('dw-on', !gp.hidden);
-        pushForDrawer();
+        var gOpen = gp.hidden;
+        document.getElementById('gswBtn').classList.toggle('open', gOpen);
+        if (gOpen) slideOpen(gp); else slideClose(gp);
       }
       return;
     }
     var gpick = t.closest('[data-group]');
     if (gpick) {
       setGroup(gpick.dataset.group);
-      document.body.classList.remove('dw-on');
-      pushForDrawer();
-      paintGroups();
-      paint();
+      // 先把面板往上收完，再重畫——不然一換帳本面板就瞬間消失
+      slideClose(document.getElementById('gswPanel'), function () { paintGroups(); paint(); });
       return;
     }
     if (!t.closest('#gsw')) {
       var gp2 = document.getElementById('gswPanel');
       if (gp2 && !gp2.hidden) {
-        gp2.hidden = true;
         var gb = document.getElementById('gswBtn');
         if (gb) gb.classList.remove('open');
-        document.body.classList.remove('dw-on');
-        pushForDrawer();
+        slideClose(gp2);
       }
     }
 

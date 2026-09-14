@@ -3518,3 +3518,40 @@ body.is-out .foot { display: none; }
   #view .code__v { font-size: 21px; }
   #view .found__a { width: 100%; justify-content: space-between; margin-left: 0; }
 }
+
+
+/* ============================================================
+   展開與收起：由 app.js 的 slideOpen／slideClose 播
+   ------------------------------------------------------------
+   原本這幾個元素各自掛著「出現」的 CSS 動畫（riseIn、popIn、foldIn），
+   只有打開有效果、收起是瞬間消失。現在兩個方向都交給 JS，
+   這裡把舊的拿掉，不然打開時會同時播兩種動畫。
+   ============================================================ */
+#view .fold__p,
+#view .lg__b,
+#view .adl .ad__b,
+.mbar__p,
+.phead__tools .gsw__p,
+.phead__tools .bell__panel,
+.phead__tools #searchDrawer,
+.sheet__p,
+.sheet__bg { animation: none; }
+
+/* 家庭成員：移出、退出 */
+#view .mt__x {
+  margin-top: 10px; padding: 4px 10px; font-size: 12.5px; font-weight: 600;
+  color: var(--ink-faint); background: transparent; border: 1px solid transparent;
+  transition: color .16s var(--ease), border-color .16s var(--ease), background-color .16s var(--ease);
+}
+#view .mt__x:hover { color: var(--down); border-color: var(--down-wash); background: var(--down-wash); }
+#view .leave {
+  display: flex; align-items: center; gap: 16px; margin-top: 32px;
+  background: var(--card-2); box-shadow: none; border-style: dashed;
+}
+#view .leave__m { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.5; }
+#view .leave__m b { font-size: 15px; color: var(--ink); }
+#view .leave__m small { font-size: 13px; color: var(--ink-faint); }
+@media (max-width: 640px) {
+  #view .leave { flex-direction: column; align-items: stretch; }
+  #view .leave .btn { align-self: flex-end; }
+}

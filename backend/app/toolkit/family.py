@@ -55,6 +55,8 @@ __all__ = [
     "require_can_invite",
     "lookup_status",
     "require_joinable",
+    "require_can_remove",
+    "require_can_leave",
 ]
 
 #: 邀請多久之後失效。
@@ -166,3 +168,36 @@ def require_joinable(status: object, expires: datetime, now: datetime | None = N
         raise ValueError("這個邀請不能用")
     if now >= expires:
         raise ValueError("這個邀請已經過期了，請家人重新邀請一次")
+
+
+def require_can_remove(me: object, my_role: object, target: object, target_role: object) -> None:
+    """家長把某個人移出家庭之前的檢查。不行就丟 Forbidden／ValueError。
+
+    ⚠️ **家長不能移除另一位家長。** 另一位家長只能自己退出——
+    不然兩個人意見不合時，一方就能把另一方踢出家門。
+
+    >>> require_can_remove("U1", "parent", "U3", "child")
+    """
+    if my_role != "parent":
+        raise Forbidden("只有家長可以移除成員")
+    if me == target:
+        raise ValueError("要離開請用「退出家庭」")
+    if target_role != "child":
+        raise Forbidden("另一位家長只能自己退出，不能被移除")
+
+
+def require_can_leave(my_role: object, other_parents: int, other_members: int) -> None:
+    """自己退出家庭之前的檢查。
+
+    任何人都可以退出——這是自由意願。唯一的例外：
+    **唯一的家長**不能在家裡還有其他人的時候退出，孩子會留在一個沒人能管理的家。
+
+    >>> require_can_leave("child", 0, 3)
+    >>> require_can_leave("parent", 0, 0)          # 家裡只剩自己，可以
+    >>> require_can_leave("parent", 0, 2)
+    Traceback (most recent call last):
+    ...
+    ValueError: 你是這個家唯一的家長。先邀請另一位家長，或把其他成員移出，才能退出
+    """
+    if my_role == "parent" and other_parents == 0 and other_members > 0:
+        raise ValueError("你是這個家唯一的家長。先邀請另一位家長，或把其他成員移出，才能退出")

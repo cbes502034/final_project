@@ -290,7 +290,7 @@
             <tr><td class="num">B1</td><td>建立家庭</td><td>建立的人成為家長；一個人同時只屬於一個家庭</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B2</td><td>邀請家人</td><td>兩種方式：<b>邀請碼</b>（只能用一次、七天過期），或<b>輸入完整 email 找人送出邀請</b>。身分由家長決定</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B3</td><td>角色指派</td><td>parent / child 兩種</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B4</td><td>移除成員</td><td>只有家長可以。資料保留，標記 removed</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B4</td><td>移除成員、退出家庭</td><td>家長可以把子女移出；任何人可以自己退出。資料保留，監管與共用帳本一起結束</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B5</td><td>建立監管關係</td><td>指定「誰看得到誰」，只有家長可設</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B6</td><td>解除監管</td><td>設 <code>ended_at</code> 而非刪除，稽核要看得到歷史</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B7</td><td>家長之間互相看得到</td><td>同一個家庭的家長看得到彼此的紀錄（唯讀）；看子女一樣要有監管關係</td><td><span class="tag tag--m">M</span></td></tr>
@@ -323,6 +323,9 @@
             <tr><td>建立家庭、邀請家人</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
             <tr><td>決定被邀請的人是家長或子女</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
             <tr><td>用邀請碼或邀請加入家庭</td><td>✓</td><td>✓</td></tr>
+            <tr><td>把子女移出家庭</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td><b>移除另一位家長</b></td><td><b style="color:var(--down)">✗</b></td><td><b style="color:var(--down)">✗</b></td></tr>
+            <tr><td>自己退出家庭</td><td>✓（唯一的家長要先處理其他成員）</td><td>✓</td></tr>
             <tr><td>建立監管關係</td><td>✓</td><td><b style="color:var(--down)">✗</b></td></tr>
             <tr><td>建立帳本</td><td>✓</td><td>✓</td></tr>
             <tr><td>管理自己建的帳本</td><td>✓</td><td>✓</td></tr>
@@ -661,7 +664,7 @@
             <tr><td class="num">71</td><td class="tight">POST</td><td class="rt">/api/family/invites/{invite_id}/accept</td><td class="tight">被邀請的人</td><td>接受邀請，加入家庭</td></tr>
             <tr><td class="num">72</td><td class="tight">DELETE</td><td class="rt">/api/family/invites/{invite_id}</td><td class="tight">被邀請的人／家長</td><td>婉拒（被邀請的人）或取消（發邀請那一家的家長）</td></tr>
             <tr><td class="num">50</td><td class="tight">PATCH</td><td class="rt">/api/family/members/{userId}</td><td class="tight">家長</td><td>修改成員角色</td></tr>
-            <tr><td class="num">51</td><td class="tight">DELETE</td><td class="rt">/api/family/members/{userId}</td><td class="tight">家長</td><td>移除成員（標記 removed，不刪資料）</td></tr>
+            <tr><td class="num">51</td><td class="tight">DELETE</td><td class="rt">/api/family/members/{userId}</td><td class="tight">家長／本人</td><td>家長把子女移出；寫 <code>me</code> 就是自己退出</td></tr>
             <tr><td class="num">52</td><td class="tight">GET</td><td class="rt">/api/guardianships</td><td class="tight">登入</td><td>監管關係。<b>被監管者也看得到</b></td></tr>
             <tr><td class="num">53</td><td class="tight">POST</td><td class="rt">/api/guardianships</td><td class="tight">家長</td><td>建立監管關係</td></tr>
             <tr><td class="num">54</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{id}</td><td class="tight">家長</td><td>解除監管（設 <code>ended_at</code>，不刪除）</td></tr>
@@ -1226,6 +1229,6 @@
 })();
 
 </script>
-<script src="docs.js?v=1"></script>
+<script src="docs.js?v=3"></script>
 </body>
 </html>

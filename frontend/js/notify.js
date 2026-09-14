@@ -206,16 +206,18 @@
     dot.hidden = state.unread === 0;
     btn.classList.toggle('has', state.unread > 0);
 
-    panel.hidden = !state.open;
+    var wasHidden = panel.hidden;
     btn.classList.toggle('open', state.open);
-    document.body.classList.toggle('dw-on', state.open);
-    if (global.__pushForDrawer) global.__pushForDrawer();
     if (!state.open) {
       // 關起來就把內容清掉。留著的話，換人之後 DOM 裡還躺著
       // 上一個使用者的記帳明細 —— 看不到不等於不在。
-      panel.innerHTML = '';
+      // 先往上收完再清，不然內容一清面板就瞬間變空白。
+      var clear = function () { if (!state.open) panel.innerHTML = ''; };
+      if (global.__slide && !wasHidden) global.__slide.close(panel, clear);
+      else { panel.hidden = true; clear(); }
       return;
     }
+    panel.hidden = false;
 
     var h = '<div class="bell__h">' +
       '<span class="bell__t">通知</span>' +
@@ -241,6 +243,7 @@
     }
 
     panel.innerHTML = h;
+    if (wasHidden && global.__slide) global.__slide.open(panel);
   }
 
   /* ---------------------------------------------------------

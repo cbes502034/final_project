@@ -35,6 +35,7 @@
    GET    /api/family/invites         我收到的邀請 ＋ 我們家送出去還沒回覆的
    POST   /api/family/invites         用帳號邀請（家長；body: { userId, role }）
    POST   /api/family/invites/{id}/accept   接受邀請
+   DELETE /api/family/members/{id}    家長把子女移出家庭；{id} 寫 me 就是自己退出
    DELETE /api/family/invites/{id}   被邀請的人婉拒，或家長取消
    PATCH  /api/family/members/{id}    改角色（家長）
    DELETE /api/family/members/{id}    移除成員（家長）
@@ -150,7 +151,7 @@
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
         ['newGroups', 'groupPatch', 'joined', 'left', 'archived',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
-         'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes'].forEach(function (k) {
+         'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
         });
       }
@@ -159,6 +160,7 @@
     applyUsers(base.newUsers);
     applyPatch(base.patch);
     applyMemberships(base.memberships);
+    applyEndedGuardians(base.endedGuardians);
     state = base;
     return state;
   }
@@ -186,7 +188,8 @@
         newFamilies: state.newFamilies || [],
         memberships: state.memberships || {},
         invites: state.invites || [],
-        codes: state.codes || []
+        codes: state.codes || [],
+        endedGuardians: state.endedGuardians || []
       }));
     } catch (e) {}
   }
@@ -273,6 +276,48 @@
       var m = memberOf(id);
       if (m) { m.familyId = map[id].familyId; m.role = map[id].role; }
     });
+  }
+
+  /* 結束的監管關係：從 DATA.guardianships 拿掉。
+     ⚠️ 真後端是設 ended_at，不是刪列——稽核要看得到歷史。 */
+  function applyEndedGuardians(list) {
+    (list || []).forEach(function (e) {
+      var g = global.DATA.guardianships;
+      for (var i = g.length - 1; i >= 0; i--) {
+        if (g[i].guardian === e.guardian && g[i].ward === e.ward) g.splice(i, 1);
+      }
+    });
+  }
+
+  /* 一個人離開家庭時要一起收掉的東西。
+     ⚠️ **紀錄一筆都不刪**。收掉的是「還能互相看到」的那些關係：
+       · 他當監管人、或他被監管的關係 → 結束（零用金跟著監管關係，一起結束）
+       · 他開的帳本 → 家人移出；家人開的帳本 → 他移出
+       · 他送出去還沒回覆的邀請 → 取消
+     不收的話，人離開了，家人還是看得到他後來記的每一筆。 */
+  function detachFromFamily(s, uid) {
+    var m = memberOf(uid), famId = m.familyId;
+    setMembership(s, uid, null, null);
+
+    var ended = global.DATA.guardianships.filter(function (g) { return g.guardian === uid || g.ward === uid; })
+      .map(function (g) { return { guardian: g.guardian, ward: g.ward }; });
+    s.endedGuardians = (s.endedGuardians || []).concat(ended);
+    applyEndedGuardians(ended);
+
+    var family = global.DATA.members.filter(function (x) { return x.familyId === famId; })
+      .map(function (x) { return x.id; });
+    allGroups(true).forEach(function (g) {
+      var inside = memberIdsOf(g.id);
+      var out = [];
+      if (g.owner === uid) out = inside.filter(function (u) { return family.indexOf(u) >= 0; });
+      else if (inside.indexOf(uid) >= 0 && family.indexOf(g.owner) >= 0) out = [uid];
+      out.forEach(function (u) { s.left = (s.left || []).concat([{ group: g.id, user: u }]); });
+    });
+
+    (s.invites || []).forEach(function (i) {
+      if (i.inviter === uid && i.status === 'pending') i.status = 'cancelled';
+    });
+    return { ended: ended.length };
   }
 
   function allFamilies() {
@@ -1894,6 +1939,45 @@
       });
     },
 
+    /* 家長把**子女**移出家庭。
+       ⚠️ 家長不能移除另一位家長——另一位家長只能自己退出，
+          不然兩個人吵架時，一方就能把另一方踢出家門。 */
+    removeMember: function (uid) {
+      var s = load();
+      return sleep(300).then(function () {
+        var me = memberOf(s.me), who = memberOf(uid);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以移除成員', 403);
+        if (!who || who.familyId !== me.familyId) throw oops('這個家庭裡沒有這個人', 404);
+        if (uid === s.me) throw oops('要離開請用「退出家庭」');
+        if (who.role !== 'child') throw oops('另一位家長只能自己退出，不能被移除', 403);
+        var fam = familyById(me.familyId);
+        var r = detachFromFamily(s, uid);
+        pushAudit(s, 'remove_member', uid, '把' + who.name + '移出「' + fam.name + '」');
+        save();
+        return { id: uid, removed: true, endedGuardianships: r.ended };
+      });
+    },
+
+    /* 自己退出家庭。任何人都可以——這是自由意願。
+       ⚠️ 唯一的家長不能在家裡還有其他人的時候退出，孩子會留在一個沒有人能管理的家。 */
+    leaveFamily: function () {
+      var s = load();
+      return sleep(300).then(function () {
+        var me = memberOf(s.me);
+        if (!me.familyId) throw oops('你目前沒有加入任何家庭');
+        var fam = familyById(me.familyId);
+        var others = global.DATA.members.filter(function (x) { return x.familyId === me.familyId && x.id !== s.me; });
+        var otherParents = others.filter(function (x) { return x.role === 'parent'; });
+        if (me.role === 'parent' && !otherParents.length && others.length) {
+          throw oops('你是這個家唯一的家長。先邀請另一位家長，或把其他成員移出，才能退出', 409);
+        }
+        detachFromFamily(s, s.me);
+        pushAudit(s, 'leave_family', s.me, '退出「' + fam.name + '」');
+        save();
+        return { left: true, family: { id: fam.id, name: fam.name } };
+      });
+    },
+
     /* 被邀請的人婉拒，或是發邀請那一家的家長取消 */
     declineInvite: function (id) {
       var s = load();
@@ -2113,6 +2197,8 @@
     sendInvite:        function (p)     { return req('/api/family/invites', { method: 'POST', body: p }); },
     acceptInvite:      function (i)     { return req('/api/family/invites/' + i + '/accept', { method: 'POST' }); },
     declineInvite:     function (i)     { return req('/api/family/invites/' + i, { method: 'DELETE' }); },
+    removeMember:      function (u)     { return req('/api/family/members/' + u, { method: 'DELETE' }); },
+    leaveFamily:       function ()      { return req('/api/family/members/' + 'me', { method: 'DELETE' }); },
     categories:        function ()      { return req('/api/categories'); },
     reset:             function ()      { return Promise.resolve({ reset: false, note: '真後端不提供重置' }); }
   };
@@ -2175,6 +2261,8 @@
     sendInvite:        function (p)    { return impl.sendInvite(p); },
     acceptInvite:      function (i)    { return impl.acceptInvite(i); },
     declineInvite:     function (i)    { return impl.declineInvite(i); },
+    removeMember:      function (u)    { return impl.removeMember(u); },
+    leaveFamily:       function ()     { return impl.leaveFamily(); },
     categories:        function ()     { return impl.categories(); },
     reset:             function ()     { return impl.reset(); }
   };

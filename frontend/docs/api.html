@@ -127,8 +127,9 @@
       note: '比對前先正規化：去掉空白與 -、轉大寫，所以 k7qm 3xwp 也能用。' },
     { n: 50, o: 'm4', m: 'PATCH', p: '/api/family/members/{userId}', a: '家長',
       d: '修改成員角色', body: '{ "role": "parent" }' },
-    { n: 51, o: 'm4', m: 'DELETE', p: '/api/family/members/{userId}', a: '家長',
-      d: '移除成員（標記 removed，不刪資料）' },
+    { n: 51, o: 'm4', m: 'DELETE', p: '/api/family/members/{userId}', a: '家長／本人',
+      d: '家長把子女移出家庭；{userId} 寫 me 就是自己退出',
+      note: '⚠️ <b>家長只能移除子女</b>，另一位家長只能自己退出，不然一方就能把另一方踢出家門。<code>{userId}</code> 寫 <code>me</code> 就是自己退出：任何人都可以，但唯一的家長在家裡還有其他人時不行（409）。<br>⚠️ <b>紀錄一筆都不刪</b>，family_members 標記 removed。要一起收掉的是「還能互相看到」的關係：他相關的監管關係設 ended_at（零用金跟著結束）、他開的帳本移出家人、家人開的帳本移出他、他送出的邀請取消。工具在 toolkit/family.py 的 require_can_remove／require_can_leave。' },
     { n: 52, o: 'm4', m: 'GET', p: '/api/guardianships', a: '登入',
       d: '監管關係。被監管者也看得到',
       note: '<b>監管必須雙向可見。</b>系統不提供「隱藏監管」的選項——偷偷監看家人的消費會破壞信任。' },
@@ -421,6 +422,6 @@
   render();
 })();
 </script>
-<script src="docs.js?v=1"></script>
+<script src="docs.js?v=3"></script>
 </body>
 </html>

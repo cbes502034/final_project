@@ -246,7 +246,7 @@ final_project/
 | 71 | POST | `/api/family/invites/{invite_id}/accept` | 成員4 | 被邀請的人 | 接受邀請，加入家庭 |
 | 72 | DELETE | `/api/family/invites/{invite_id}` | 成員4 | 被邀請的人／家長 | 婉拒（被邀請的人）或取消（發邀請那一家的家長） |
 | 50 | PATCH | `/api/family/members/{userId}` | 成員4 | 家長 | 修改成員角色 |
-| 51 | DELETE | `/api/family/members/{userId}` | 成員4 | 家長 | 移除成員（標記 removed，不刪資料） |
+| 51 | DELETE | `/api/family/members/{userId}` | 成員4 | 家長／本人 | 家長把子女移出家庭；寫 `me` 就是自己退出。不刪資料 |
 | 52 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
 | 53 | POST | `/api/guardianships` | 成員4 | 家長 | 建立監管關係 |
 | 54 | DELETE | `/api/guardianships/{id}` | 成員4 | 家長 | 解除監管（設 `ended_at`，不刪除） |

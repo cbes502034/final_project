@@ -733,3 +733,22 @@ def test_邀請用過_取消_過期都不能再用():
     with pytest.raises(ValueError):
         family.require_joinable("pending", now, now)
     assert family.expires_at(now) == later
+
+
+
+def test_家長只能移除子女():
+    family.require_can_remove("U1", "parent", "U3", "child")
+    with pytest.raises(scope.Forbidden):
+        family.require_can_remove("U1", "parent", "U2", "parent")
+    with pytest.raises(scope.Forbidden):
+        family.require_can_remove("U3", "child", "U4", "child")
+    with pytest.raises(ValueError):
+        family.require_can_remove("U1", "parent", "U1", "parent")
+
+
+def test_唯一的家長不能丟下其他成員():
+    family.require_can_leave("child", 0, 3)
+    family.require_can_leave("parent", 1, 3)
+    family.require_can_leave("parent", 0, 0)
+    with pytest.raises(ValueError):
+        family.require_can_leave("parent", 0, 2)
