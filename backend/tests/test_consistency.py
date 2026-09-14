@@ -1069,7 +1069,7 @@ def test_監管的通知不受帳本限制():
 def test_總覽統計建議各自回答一個問題_不重複():
     """三頁照**問題**分工，每樣資料只出現在一個地方：
 
-        總覽       這個月現在怎樣   四個數字、存款目標、預算（全家模式多每個人）
+        總覽       這個月現在怎樣   大數字卡（還可以花＋收支結餘）、功能按鈕、預算（全家模式多每個人）
         統計       過去的趨勢       月／年對照、趨勢、分類圓餅
         財務建議   那該怎麼辦       建議清單
 
@@ -1096,13 +1096,24 @@ def test_總覽統計建議各自回答一個問題_不重複():
 
 
 def test_全家模式只整理資訊不能編輯():
-    """家庭是整理資訊，沒有「記一筆」，也沒有任何輸入框。"""
+    """家庭是整理資訊，沒有「記一筆」，也沒有任何輸入框。
+
+    「記一筆」出現在三個地方：儀表板的第一顆按鈕、電腦版頂列、手機右下角的圓鈕。
+    全家模式三個都要收起來——記帳永遠是記自己的。
+    """
     app = read("frontend/js/app.js")
     home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "data-quick" not in home, "總覽的頁首不該再放「記一筆」（側欄與手機底部已經有了）"
-    for fn in ("memberTable", "budgetTable", "goalCard"):
+    assert "fam ? null : { quick: true" in home, "全家模式的儀表板不該有「記一筆」按鈕"
+    assert "<input" not in home and "<select" not in home, "總覽出現了可以編輯的欄位"
+    for fn in ("memberTable", "tile"):
         body = re.search(r"function %s\(.*?\) \{(.*?)\n  \}" % fn, app, re.S).group(1)
         assert "<input" not in body and "<select" not in body, "%s 裡出現了可以編輯的欄位" % fn
+
+    head = re.search(r"function head\(t, sub, act\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "classList.toggle('in-family'" in head, "切到全家時 body 要標記 in-family"
+    css = read("frontend/css/app.css")
+    assert "body.in-family .appbar__add" in css, "全家模式頂列的「記一筆」沒有收起來"
+    assert "body.in-family .fab" in css, "全家模式手機右下角的「記一筆」沒有收起來"
 
 
 def test_子女只有我的模式():
@@ -1502,21 +1513,45 @@ def test_輸入框不可以留著星空主題的深色底():
     assert not leftovers, "還有星空主題留下來的深色底：\n" + "\n".join(leftovers)
 
 
-def test_管理員的側欄項目不可以自己指定_display():
-    """⚠️ 瀏覽器實測時抓到的。
+def test_沒有側欄_原本的每個功能都嵌在儀表板上():
+    """像銀行 App：沒有側欄，總覽就是儀表板。
 
-    寫成 `body.is-admin .nav__lb--admin { display: block }` 的話，
-    它的優先度會蓋過「窄螢幕藏分組標題」「側欄收合藏標題」這兩條既有規則——
-    手機的橫向導覽列上就冒出一個被擠成直排的「平／台」。
-    正確做法是只在「不是管理員」時藏，其餘交給一般 .nav__lb / .nav__i 的規則。
+    以前側欄（電腦）＋底部分頁與「更多」面板（手機）兩套導覽並存；
+    現在只有一套——總覽上的功能按鈕，加上右上角的帳號選單。
+    這個測試確保拆掉側欄的時候，沒有哪一頁因此變得「進不去」。
     """
+    html = read("frontend/index.html")
+    for gone in ('class="rail"', 'class="tabs"', 'id="sheet"', 'id="moreBtn"', 'id="logout2"'):
+        assert gone not in html, "側欄／手機底部分頁還留著：" + gone
+    assert 'class="appbar"' in html and 'id="acctPanel"' in html
+
+    app = read("frontend/js/app.js")
+    assert "sheetOpen" not in app and "fambudget.rail" not in app, "側欄與「更多」面板的程式沒拆乾淨"
+    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    tiles = set(re.findall(r"nav: '(\w+)'", home))
+
+    menu = re.search(r'<div class="acctm__p" id="acctPanel" hidden>(.*?)\n        </div>', html, re.S).group(1)
+    in_menu = set(re.findall(r'data-nav="(\w+)"', menu))
+
+    routes = re.search(r"var ROUTES = \{(.*?)\};", app, re.S).group(1)
+    pages = set(re.findall(r"(\w+): v\w+", routes))
+    # 登入／註冊沒登入才看得到；member 是從家庭成員點進去的；admin 只有平台管理員（登入就直接導過去）
+    need = pages - {"login", "register", "member", "admin"}
+    missing = need - tiles - in_menu
+    assert not missing, "這些頁面拆掉側欄之後進不去了：%s" % sorted(missing)
+    assert "quick: true" in home, "儀表板上要有「記一筆」"
+    assert "docs/guide.html" in home and 'href="docs/guide.html"' in menu
+    assert 'href="docs/index.html"' in menu and 'id="logout"' in menu
+
+    # 其他頁面要能回到總覽；總覽本身不需要那顆鈕
+    assert 'id="homeBtn"' in html
+    route = re.search(r"function render\(\) \{(.*?)\n      \}", app, re.S).group(1)
+    assert "hb.hidden = page === ''" in route
+
+    # 平台管理員沒有財務頁：帳號選單裡的「個人資料／家庭成員」和記一筆都不給
     css = read("frontend/css/app.css")
-    bad = re.findall(
-        r"body\.is-admin[^{,]*\.nav__(?:lb|i)--admin[^{]*\{[^}]*display:\s*(?:block|flex|grid)",
-        css)
-    assert not bad, "管理員的側欄項目被強制指定 display，會蓋掉響應式規則：\n" + "\n".join(bad)
-    assert "body:not(.is-admin) .nav__lb--admin" in css
-    assert "body:not(.is-admin) .nav__i--admin" in css
+    assert "body.is-admin .acctm__i[data-nav]" in css
+    assert "body.is-admin .appbar__add" in css
 
 
 def test_平台管理員與一般使用者的頁面互不相通():
@@ -1647,14 +1682,20 @@ def test_下拉面板浮在按鈕下面_不搬進版面():
     html = read("frontend/index.html")
     assert '<header class="top">' not in html, "頁首上方又多了一條獨立的頂列"
     tools = html[html.index('class="phead__tools"'):html.index('<div id="view">')]
-    for part in ('id="gsw"', 'id="searchDrawer"', 'id="bell"'):
-        assert part in tools, "工具要跟標題在同一行：少了 " + part
+    for part in ('id="gsw"', 'id="searchDrawer"'):
+        assert part in tools, "帳本與搜尋要跟標題在同一行：少了 " + part
+    # 通知每一頁都用得到，跟帳號選單一起放在頂列
+    bar = html[html.index('<header class="appbar">'):html.index('</header>')]
+    for part in ('id="bell"', 'id="bellPanel"', 'id="acctPanel"'):
+        assert part in bar, "頂列少了 " + part
 
     css = read("frontend/css/app.css")
-    assert re.search(r"\.phead__tools \.gsw__p,\s*\.phead__tools \.bell__panel \{[^}]*position: absolute", css), \
-        "下拉面板應該用定位浮起來，不佔版面"
-    assert re.search(r"\.phead__tools \.gsw__p,\s*\.phead__tools \.bell__panel \{[^}]*overflow-y: auto", css), \
-        "項目多的時候面板要自己捲，不能把頁面撐長"
+    for sel in (r"\.phead__tools \.gsw__p,\s*\.phead__tools \.bell__panel", r"\.appbar \.bell__panel"):
+        rule = re.search(sel + r" \{([^}]*)\}", css)
+        assert rule, "找不到 " + sel
+        assert "position: absolute" in rule.group(1), "下拉面板應該用定位浮起來，不佔版面：" + sel
+        assert "overflow-y: auto" in rule.group(1), "項目多的時候面板要自己捲，不能把頁面撐長：" + sel
+    assert re.search(r"\.acctm__p \{[^}]*position: absolute", css), "帳號選單也要浮起來"
 
 
 def test_電腦版的搜尋框不會被點掉():
@@ -1883,7 +1924,8 @@ def test_點了才長出來的東西_打開和收起都有動畫():
 
     assert "slideClose(wrap)" in body("foldToggle") and "slideOpen(wrap)" in body("foldToggle")
     assert "slideAway(" in body("ledgerToggle") and "slideOpen(" in body("ledgerToggle")
-    assert "panel.animate" in body("sheetOpen"), "更多面板收起要滑下去"
+    assert "slideOpen(p)" in body("acctMenu") and "slideClose(p)" in body("acctMenu"), \
+        "帳號選單要往下拉開、往上收回"
     for bad in ("gp.hidden = !gp.hidden", "gp2.hidden = true", "sd.hidden = !sd.hidden",
                 "sd2.hidden = true", "mp.hidden = !mp.hidden", "mp2.hidden = true", "wrap.hidden = !on"):
         assert bad not in app, "還有直接瞬間開關的寫法：" + bad
