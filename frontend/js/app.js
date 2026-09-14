@@ -3942,6 +3942,16 @@
     if (ag) {
       ag.disabled = true; ag.textContent = '產生中…';
       API.generateAdvices({ scope: ag.dataset.genScope }).then(function (r) {
+        if (r.fallback) {
+          /* 後端的建議還沒接上：前端用同一批數字寫的，不會存起來，所以直接畫，不重新讀 */
+          ADV = r.advices || [];
+          ag.disabled = false; ag.textContent = '產生這個月的建議';
+          var hint = document.getElementById('advHint');
+          if (hint) hint.innerHTML = '<div class="nudge"><b>先用前端的規則寫的</b><span>' + esc(r.note || '') + '</span></div>';
+          paintAdvices();
+          toast('產生了 ' + ADV.length + ' 則建議（後端還沒接上，不會存）', 'ok');
+          return;
+        }
         vAdvice();
         toast('產生了 ' + r.advices.length + ' 則建議', 'ok');
       }).catch(function (err) {
@@ -3968,6 +3978,8 @@
       API.nlpParseBatch(txt).then(function (r) {
         pgo.disabled = false; pgo.textContent = '解析這段話';
         renderBatch(r);
+        // 後端的模型還沒接上時，前端用規則頂著——講清楚，免得以為是模型的品質
+        if (r.fallback) toast(r.note, 'ok');
       }).catch(function (err) {
         pgo.disabled = false; pgo.textContent = '解析這段話';
         toast('解析失敗：' + err.message, 'err');

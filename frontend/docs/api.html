@@ -40,7 +40,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>71 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>70 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -95,7 +95,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">71 ROUTES · 4 MODULES</div>
+    <div class="mono">70 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -154,6 +154,10 @@
     { n: 47, o: 'm4', m: 'POST', p: '/api/family', a: '登入',
       d: '建立家庭，建立的人成為家長。body: { name }',
       note: '已經在家庭裡的人不能再建立。一個人同時只屬於一個家庭。' },
+    { n: 76, o: 'm4', m: 'DELETE', p: '/api/family', a: '家長',
+      d: '解散家庭（只有唯一的家長能解散）',
+      res: '{\n  "dissolved": true,\n  "family": { "id": "F1", "name": "王家" },\n  "released": 3\n}',
+      note: '⚠️ <b>只有唯一的家長能解散</b>：還有別的家長時回 409——一個人不能替另一位家長決定，那時你可以自己退出。<br>每個人都離開家庭：監管關係設 ended_at（零用金一起結束）、家人之間的帳本互相移出、還沒用的邀請與邀請碼作廢；<b>紀錄一筆都不刪</b>。同一個資料庫交易裡做。工具在 <code>toolkit/family.py</code> 的 <code>require_can_dissolve</code>。' },
     { n: 48, o: 'm4', m: 'POST', p: '/api/family/invite', a: '家長',
       d: '產生邀請碼。body: { role }',
       body: '{ "role": "child" }',
@@ -223,15 +227,9 @@
       d: '個人／家庭摘要', q: ['scope=me|family', 'period=2026-09'],
       res: '{\n  "period": "2026-09", "scope": "me",\n  "income": 68000, "expense": 41230,\n  "net": 26770, "rate": 0.39, "count": 4,\n  "savings": {\n    "goal": 20000, "allowance": 48000, "used": 41230,\n    "left": 6770, "ratio": 0.86, "level": "near",\n    "shortfall": 0, "actual": 26770\n  }\n}',
       note: '<b>金額一律由後端算。</b>前端自己加總看起來比較快，但只要有兩個地方各自加總，數字對不起來只是時間問題——這個專案在原型階段就踩過一次。' },
-    { n: 34, o: 'm3', m: 'GET', p: '/api/stats', a: '登入',
-      d: '月或年統計', q: ['periodType=month|year', 'from', 'to'],
-      note: '年度統計在當年度要標示<b>「未完整」</b>，不要讓使用者拿未完整年度直接跟完整年度比，會誤判「今年支出變少了」。' },
     { n: 35, o: 'm3', m: 'GET', p: '/api/budgets', a: '登入', d: '預算與使用率' },
     { n: 36, o: 'm3', m: 'PUT', p: '/api/budgets', a: '本人', d: '設定預算',
       body: '{ "categoryId": 1, "period": "2026-09", "amount": 8000 }' },
-    { n: 37, o: 'm3', m: 'GET', p: '/api/savings-goal', a: '登入',
-      d: '每月存款目標與達成狀態',
-      res: '可支配上限 = 本月收入 − 每月存款目標\n使用率     = 支出 ÷ 可支配上限\n\n< 80%        達標中\n80% ~ 100%   接近上限\n> 100%       存不到目標，算出短少多少' },
     { n: 38, o: 'm3', m: 'PUT', p: '/api/savings-goal', a: '本人',
       d: '設定每月存款目標（註冊後的個人化設定也走這支）',
       body: '{ "userId": 3, "goal": 2000, "period": "2026-09" }',

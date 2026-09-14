@@ -69,7 +69,7 @@
         <div class="mchip"><span>線上原型</span><b><a href="https://fambudget-web.onrender.com" target="_blank" rel="noopener">fambudget-web</a></b></div>
         <div class="mchip"><span>原始碼</span><b class="mono">cbes502034/final_project</b></div>
         <div class="mchip"><span>技術棧</span><b>FastAPI · PostgreSQL · 純靜態前端</b></div>
-        <div class="mchip"><span>API</span><b>71 支路由</b></div>
+        <div class="mchip"><span>API</span><b>70 支路由</b></div>
         <div class="mchip"><span>資料表</span><b>19 張</b></div>
       </div>
     </header>
@@ -569,7 +569,7 @@
     <section class="sec" id="api">
       <div class="sec__h"><span class="sec__n">05</span><h2>API 目錄：按人員分類</h2></div>
       <p class="sec__lead">
-        共 <b>71 支路由</b>。權限標示：公開 / 登入 / 家長 / 監管者 / 平台。
+        共 <b>70 支路由</b>。權限標示：公開 / 登入 / 家長 / 監管者 / 平台。
         <span class="tag tag--llm">★</span> 代表與 LLM 直接相關。
       </p>
 
@@ -586,12 +586,12 @@
         </div>
         <div class="card" style="border-top:2px solid var(--m3)">
           <div class="mvc__k" style="color:var(--m3)">成員3　<span style="opacity:.7">m3-analytics</span></div>
-          <div class="mvc__t">數字 · 13 支</div>
+          <div class="mvc__t">數字 · 11 支</div>
           <p style="font-size:13px;color:var(--ink-soft)"><b>整個系統只有這裡算錢</b>。分類體系也由這裡定義，是第 1 週唯一要凍結的跨模組契約。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m4)">
           <div class="mvc__k" style="color:var(--m4)">成員4　<span style="opacity:.7">m4-access</span></div>
-          <div class="mvc__t">家庭 · 20 支</div>
+          <div class="mvc__t">家庭 · 21 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">回答「你能看到什麼」。<code>permission.py</code> 是共用元件，成員2 與成員3 的查詢都要用，第 1 週要最優先完成。</p>
         </div>
       </div>
@@ -661,10 +661,8 @@
             <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約</td></tr>
             <tr><td class="num">24</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">家長</td><td>新增家庭自訂分類</td></tr>
             <tr><td class="num">33</td><td class="tight">GET</td><td class="rt">/api/summary</td><td class="tight">登入</td><td>摘要。<code>scope=me|family</code>、<code>period=2026-09</code></td></tr>
-            <tr><td class="num">34</td><td class="tight">GET</td><td class="rt">/api/stats</td><td class="tight">登入</td><td>統計。<code>periodType=month|year</code>。當年度要標「未完整」</td></tr>
             <tr><td class="num">35</td><td class="tight">GET</td><td class="rt">/api/budgets</td><td class="tight">登入</td><td>預算與使用率</td></tr>
             <tr><td class="num">36</td><td class="tight">PUT</td><td class="rt">/api/budgets</td><td class="tight">本人</td><td>設定預算</td></tr>
-            <tr><td class="num">37</td><td class="tight">GET</td><td class="rt">/api/savings-goal</td><td class="tight">登入</td><td><b>每月存款目標與達成狀態</b></td></tr>
             <tr><td class="num">38</td><td class="tight">PUT</td><td class="rt">/api/savings-goal</td><td class="tight">本人</td><td><b>設定每月存款目標</b>（註冊後的個人化設定也走這支）。監管者不能代設</td></tr>
             <tr><td class="num">44</td><td class="tight">GET</td><td class="rt">/api/advices</td><td class="tight">登入</td><td>建議清單。每條都帶 <code>basis_json</code> 讓使用者驗算</td></tr>
             <tr><td class="num">45</td><td class="tight">POST</td><td class="rt">/api/advices/generate <span class="tag tag--llm">★</span></td><td class="tight">家長</td><td>重新產生。<b>後端先算好數字再餵給模型</b></td></tr>
@@ -684,6 +682,7 @@
           <tbody>
             <tr><td class="num">46</td><td class="tight">GET</td><td class="rt">/api/family</td><td class="tight">登入</td><td>家庭資訊、成員清單、角色</td></tr>
             <tr><td class="num">47</td><td class="tight">POST</td><td class="rt">/api/family</td><td class="tight">登入</td><td>建立家庭，建立的人成為家長</td></tr>
+            <tr><td class="num">76</td><td class="tight">DELETE</td><td class="rt">/api/family</td><td class="tight">家長</td><td>解散家庭。<b>只有唯一的家長能解散</b>；每個人離開、紀錄都不刪</td></tr>
             <tr><td class="num">48</td><td class="tight">POST</td><td class="rt">/api/family/invite</td><td class="tight">家長</td><td>產生邀請碼</td></tr>
             <tr><td class="num">49</td><td class="tight">POST</td><td class="rt">/api/family/join</td><td class="tight">登入</td><td>用邀請碼加入家庭</td></tr>
             <tr><td class="num">68</td><td class="tight">GET</td><td class="rt">/api/family/lookup</td><td class="tight">家長</td><td>用完整 email 找人，準備邀請他加入家庭</td></tr>
@@ -1025,7 +1024,7 @@
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · 四人 × 一個月專題</div>
-      <div class="mono">71 API · 20 TABLES · 14 SCREENS</div>
+      <div class="mono">70 API · 20 TABLES · 14 SCREENS</div>
     </footer>
 
   </div>
@@ -1052,13 +1051,13 @@
       { k: '畫面', items: ['段落記帳', '單筆手動', '缺欄位提示'] },
       { k: 'LLM', llm: true, items: ['段落切分策略', '欄位抽取 prompt', '低信心判準'] }
     ]},
-    { dom: '數字', c: 'var(--m3)', api: '13 支', branch: 'm3-analytics', groups: [
+    { dom: '數字', c: 'var(--m3)', api: '11 支', branch: 'm3-analytics', groups: [
       { k: '資料表', items: ['categories', 'budgets', 'savings_goals', 'advices'] },
       { k: 'API', items: [{ t: '分類體系 ⚑', flag: true }, '摘要與統計', '預算與存款目標', '財務建議'] },
       { k: '畫面', items: ['總覽（我／全家）', '統計圖表', '建議卡片'] },
       { k: 'LLM', llm: true, items: ['建議生成 prompt', '邊界規則'] }
     ]},
-    { dom: '家庭', c: 'var(--m4)', api: '20 支', branch: 'm4-access', groups: [
+    { dom: '家庭', c: 'var(--m4)', api: '21 支', branch: 'm4-access', groups: [
       { k: '資料表', items: ['families', 'family_members', 'guardianships', 'audit_logs', 'notifications'] },
       { k: 'API', items: ['家庭綁定（邀請碼、用帳號邀請）', '成員角色', '監管關係'] },
       { k: '畫面', items: ['家庭成員與邀請', '監管通知鈴鐺', '成員紀錄（唯讀）'] },

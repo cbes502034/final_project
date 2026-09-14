@@ -819,6 +819,44 @@ def test_一次刪多筆的_id_清單():
         ledger.clean_ids(",".join("T%d" % i for i in range(ledger.MAX_BATCH + 1)))
 
 
+def test_解散家庭只有唯一的家長可以():
+    family.require_can_dissolve("parent", 0)
+    with pytest.raises(scope.Forbidden):
+        family.require_can_dissolve("child", 0)
+    with pytest.raises(ValueError):
+        family.require_can_dissolve("parent", 1)       # 不能替另一位家長決定
+
+
+def test_改角色_不能把另一位家長降成子女():
+    family.require_can_change_role("U1", "parent", "U3", "child", "parent", 1)   # 子女設為家長
+    family.require_can_change_role("U1", "parent", "U1", "parent", "child", 2)   # 自己改成子女，還有別的家長
+    with pytest.raises(scope.Forbidden):
+        family.require_can_change_role("U1", "parent", "U2", "parent", "child", 2)
+    with pytest.raises(ValueError):
+        family.require_can_change_role("U1", "parent", "U1", "parent", "child", 1)  # 唯一的家長
+    with pytest.raises(scope.Forbidden):
+        family.require_can_change_role("U3", "child", "U3", "child", "parent", 1)   # 子女不能自己升
+    with pytest.raises(ValueError):
+        family.require_can_change_role("U1", "parent", "U3", "child", "admin", 1)
+
+
+def test_照看與解除監管():
+    family.require_can_guard("U1", "parent", "child", True)
+    for args, exc in ((("U3", "child", "child", True), scope.Forbidden),
+                      (("U1", "parent", "parent", True), ValueError),
+                      (("U1", "parent", "child", False), LookupError)):
+        with pytest.raises(exc):
+            family.require_can_guard(*args)
+    with pytest.raises(ValueError):
+        family.require_can_guard("U1", "parent", "child", True, already=True)
+    family.require_can_end_guard("U1", "parent", "U1", True)
+    family.require_can_end_guard("U2", "parent", "U1", True)          # 同一家的另一位家長
+    with pytest.raises(scope.Forbidden):
+        family.require_can_end_guard("U3", "child", "U1", True)         # 被照看的人不能自己解除
+    with pytest.raises(scope.Forbidden):
+        family.require_can_end_guard("U9", "parent", "U1", False)
+
+
 def test_沒有家長的家不能加入():
     family.require_has_parent(2)
     with pytest.raises(ValueError):

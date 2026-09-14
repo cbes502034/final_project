@@ -96,8 +96,8 @@ python -m app.ownership      # 印出分工表並檢查一致性
 |---|---|---|---|---|---|
 | **成員1** | **認證** | `m1-auth` | 19 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
 | **成員2** | **記帳** | `m2-ledger` | 19 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
-| **成員3** | **數字** | `m3-analytics` | 13 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
-| **成員4** | **家庭** | `m4-access` | 20 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
+| **成員3** | **數字** | `m3-analytics` | 11 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
+| **成員4** | **家庭** | `m4-access` | 21 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
 
 ### 切分原則
 
@@ -181,14 +181,12 @@ PATCH  /api/groups/{gid}/notify
 
 **LLM 工作**：財務建議的 prompt 與邊界規則。順序不能顛倒：先用 analytics 算好數字，再餵給模型敘述，模型不做任何算術。
 
-**路由（13 支）**
+**路由（11 支）**
 
 ```
 GET    /api/summary
-GET    /api/stats
 GET    /api/budgets
 PUT    /api/budgets
-GET    /api/savings-goal
 PUT    /api/savings-goal
 GET    /api/savings-goals
 GET    /api/alerts
@@ -207,11 +205,12 @@ POST   /api/advices/generate
 
 **LLM 工作**：模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1。**留出集必須 100% 人工標註**，否則量到的是「多像那個老師」而不是「多正確」。
 
-**路由（20 支）**
+**路由（21 支）**
 
 ```
 GET    /api/family
 POST   /api/family
+DELETE /api/family
 POST   /api/family/invite
 POST   /api/family/join
 GET    /api/family/lookup

@@ -176,7 +176,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **71 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **70 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -241,6 +241,7 @@ final_project/
 |---|---|---|---|---|---|
 | 46 | GET | `/api/family` | 成員4 | 登入 | 家庭資訊、成員清單、角色 |
 | 47 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立的人成為家長。已經在家庭裡就不行 |
+| 76 | DELETE | `/api/family` | 成員4 | 家長 | 解散家庭。**只有唯一的家長能解散**；每個人離開、紀錄都不刪 |
 | 48 | POST | `/api/family/invite` | 成員4 | 家長 | 產生邀請碼。body: { role }，只能用一次、七天過期 |
 | 49 | POST | `/api/family/join` | 成員4 | 登入 | 用邀請碼加入家庭 |
 | 68 | GET | `/api/family/lookup` | 成員4 | 家長 | 用完整 email 找人，準備邀請他加入家庭 |
@@ -344,10 +345,8 @@ final_project/
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
 | 33 | GET | `/api/summary` | 成員3 | 登入 | 摘要。`scope=me\|family`、`period=2026-09` |
-| 34 | GET | `/api/stats` | 成員3 | 登入 | 統計。`periodType=month\|year`、`from`、`to` |
 | 35 | GET | `/api/budgets` | 成員3 | 登入 | 預算與使用率 |
 | 36 | PUT | `/api/budgets` | 成員3 | 本人 | 設定預算 |
-| 37 | GET | `/api/savings-goal` | 成員3 | 登入 | **每月存款目標與達成狀態** |
 | 38 | PUT | `/api/savings-goal` | 成員3 | 本人 | **設定每月存款目標**（註冊後的個人化設定也走這支）。⚠️ 只有本人能設，監管者不能代設 |
 | 39 | GET | `/api/savings-goals` | 成員3 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
 | 40 | GET | `/api/alerts` | 成員3 | 登入 | 我設定的階段性提醒門檻 |
@@ -442,8 +441,8 @@ python -m app.ownership      # 印出分工表並檢查一致性
 |---|---|---|---|---|---|---|
 | **成員1** | **認證** | `m1-auth` | 19 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 19 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
-| **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 總覽（我／全家）、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
-| **成員4** | **家庭** | `m4-access` | 20 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
+| **成員3** | **數字** | `m3-analytics` | 11 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 總覽（我／全家）、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
+| **成員4** | **家庭** | `m4-access` | 21 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
 
 ### 切分原則
 
@@ -454,7 +453,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 ### 為什麼路由數不是 10 / 10 / 10 / 5 這種平均切法
 
-因為**路由數不是工作量**，但它也不能差太多。這一版是 19 / 19 / 13 / 20，
+因為**路由數不是工作量**，但它也不能差太多。這一版是 19 / 19 / 11 / 21，
 差距控制在合理範圍，同時讓每個領域維持概念上的完整。
 
 成員3 的路由最少，是刻意的：他那一條的重量不在路由數，而在**整個系統只有他算錢**，
@@ -538,14 +537,12 @@ PATCH  /api/groups/{gid}/notify
 **整個系統只有這裡算錢** —— 路由不算、前端不算、模型更不算。
 不屬於他的：明細的寫入（那是成員2）；決定要算哪些人（那是成員4 的 permission）。
 
-**路由（13 支）**
+**路由（11 支）**
 
 ```
 GET    /api/summary
-GET    /api/stats
 GET    /api/budgets
 PUT    /api/budgets
-GET    /api/savings-goal
 PUT    /api/savings-goal
 GET    /api/savings-goals
 GET    /api/alerts
@@ -562,11 +559,12 @@ POST   /api/advices/generate
 屬於他的：家庭、成員角色、家庭綁定（邀請碼與用帳號邀請）、監管關係、權限計算、稽核紀錄、評測。
 不屬於他的：登入本身（那是成員1）。成員1 回答「你是誰」，成員4 回答「你能看到什麼」。
 
-**路由（20 支）**
+**路由（21 支）**
 
 ```
 GET    /api/family
 POST   /api/family
+DELETE /api/family
 POST   /api/family/invite
 POST   /api/family/join
 GET    /api/family/lookup

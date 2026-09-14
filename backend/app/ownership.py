@@ -209,7 +209,8 @@ MEMBERS: list[Member] = [
         scope=(
             "負責所有「算出來的東西」，以及把那些數字講成人話。\n"
             "屬於他的：月年統計、預算、每月存款目標、階段性提醒的門檻、財務建議。\n"
-            "**整個系統只有這裡算錢** —— 路由不算、前端不算、模型更不算。\n"
+            "**整個系統只有這裡加總錢** —— 模型不算，前端只做衍生（結餘、比例、預算百分比）。\n"
+            "  GET /api/stats、GET /api/savings-goal 已經拿掉：前端從 summary、savings-goals 自己取。\n"
             "每月存款目標可以**分群組設定**：不帶 groupId 是整體目標，帶了就是那個群組自己的目標。\n"
             "階段性提醒也在這裡：使用者自己設幾個百分比門檻（例如 50%／80%／100%），"
             "支出跨過門檻就發一則通知。\n"
@@ -218,10 +219,8 @@ MEMBERS: list[Member] = [
         ),
         routes=[
             ("GET", "/api/summary"),
-            ("GET", "/api/stats"),
             ("GET", "/api/budgets"),
             ("PUT", "/api/budgets"),
-            ("GET", "/api/savings-goal"),
             ("PUT", "/api/savings-goal"),
             ("GET", "/api/savings-goals"),
             ("GET", "/api/alerts"),
@@ -265,7 +264,11 @@ MEMBERS: list[Member] = [
             "⚠️ 身分（家長／子女）由發邀請的家長決定，被邀請的人不能自己選。\n"
             "⚠️ 用帳號找人只接受完整 email，不做模糊搜尋，也不回任何財務資料。\n"
             "⚠️ 邀請碼只能用一次、七天過期、資料庫只存雜湊。工具在 toolkit/family.py。\n"
-            "移出與退出：家長只能移除子女，另一位家長只能自己退出；唯一的家長在家裡還有人時不能退出。\n"
+            "移出、退出、解散：家長只能移除子女，另一位家長只能自己退出；唯一的家長在家裡還有人時不能退出，\n"
+            "  改用解散（DELETE /api/family，只有唯一的家長能解散）。\n"
+            "角色：家長可以把子女設為家長；不能把另一位家長降成子女，只有他自己能調整。\n"
+            "監管：家長按「開始照看」建立，監管人一定是自己；監管人或同家的家長可以解除，被照看的人不行。\n"
+            "  規則都在 toolkit/family.py。\n"
             "⚠️ 離開不刪紀錄，但監管關係、共用帳本、他送出的邀請要在同一個交易裡一起收掉。\n"
             "⚠️ 監管是**唯讀**的：看得到，但不能改、不能刪，"
             "更不能登入對方的帳號。\n"
@@ -290,6 +293,7 @@ MEMBERS: list[Member] = [
         routes=[
             ("GET", "/api/family"),
             ("POST", "/api/family"),
+            ("DELETE", "/api/family"),
             ("POST", "/api/family/invite"),
             ("POST", "/api/family/join"),
             ("GET", "/api/family/lookup"),

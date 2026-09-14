@@ -2855,3 +2855,46 @@ def test_忘記密碼的頁面_設定與文件():
     assert "{ n: 75, o: 'm1', m: 'POST', p: '/api/auth/password-reset/confirm'" in api_html
     guide = read("frontend/docs/guide.html")
     assert "忘記密碼怎麼辦" in guide
+
+
+# ===========================================================================
+# 前端每一支 API 都登記了路由與負責人；每一條後端路由前端都有對應
+# ===========================================================================
+
+def test_前端的_API_清單跟分工表一對一():
+    """使用者要求：出錯時要指出是哪個 function。那份對照（api.js 的 FN）要跟 ownership.py 一致——
+    登記錯了，錯誤訊息就會指向錯的人。
+
+    反過來也要檢查：後端有、前端沒有對應的路由，代表那個功能畫面上用不到（功能不完整）。
+    這一條抓到過監管關係、改角色、預算、產生建議、自訂分類、登入裝置這六塊。
+    """
+    from app.ownership import all_routes
+
+    api = read("frontend/js/api.js")
+    block = api[api.index("  var FN = {"):api.index("  };", api.index("  var FN = {"))]
+    fn = dict((name, (route, owner)) for name, route, owner in
+              re.findall(r"^    (\w+):\s+\[(?:'([^']+)'|null), '([^']+)'\]", block, re.M))
+    routes = all_routes()
+    labels = {"%s %s" % k: v.label for k, v in routes.items()}
+    bad = []
+    for name, (route, owner) in fn.items():
+        if not route:
+            assert owner == "前端", name
+            continue
+        if route not in labels:
+            bad.append("%s 登記的 %s 不在 ownership.py" % (name, route))
+        elif labels[route] != owner:
+            bad.append("%s 登記給 %s，ownership.py 是 %s" % (name, owner, labels[route]))
+    assert not bad, "；".join(bad)
+
+    used = {r for r, _ in fn.values() if r}
+    missing = sorted(set(labels) - used)
+    # 這幾支是前端的底層自己處理的：token 續期、登出時撤銷
+    handled = {"POST /api/auth/refresh"}
+    assert "send('/api/auth/refresh'" in api, "http 轉接器要會自動續期"
+    assert not (set(missing) - handled), "後端有、前端沒有對應的 API：" + "、".join(sorted(set(missing) - handled))
+
+    for name in fn:
+        assert re.search(r"^    %s: function \(" % name, api, re.M), "mock 少了 " + name
+        if fn[name][0]:
+            assert re.search(r"^    %s:\s+function \(" % name, api[api.index("  var http = {"):], re.M), "http 轉接器少了 " + name

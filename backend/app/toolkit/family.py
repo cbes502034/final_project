@@ -32,6 +32,22 @@
 
     family.require_can_invite(me_role)        # 不是家長就丟 Forbidden
     family.require_joinable(invite, now)      # 用過、過期、被取消就丟 ValueError
+
+    family.require_can_dissolve(my_role, other_parents)            # DELETE /api/family
+    family.require_can_change_role(me, my_role, target, target_role, new_role, parent_count)
+    family.require_can_guard(me, my_role, ward_role, same_family)   # POST /api/guardianships
+    family.require_can_end_guard(me, my_role, guardian, same_family) # DELETE /api/guardianships/{id}
+
+===========================================================================
+離開家庭的三條路（都不刪任何一筆紀錄）
+===========================================================================
+    移出    家長把子女移出                         require_can_remove
+    退出    自己離開；唯一的家長在家裡還有人時不行   require_can_leave
+    解散    唯一的家長一次讓所有人離開             require_can_dissolve
+            ⚠️ 還有別的家長時不能解散——一個人不能替另一位家長決定。
+               那時你本來就可以自己退出（家裡還有家長，退出不會卡住）。
+    三條路都要在同一個交易裡收掉：監管關係（設 ended_at，零用金一起結束）、
+    家人之間的帳本成員、還沒用的邀請與邀請碼。
 """
 
 from __future__ import annotations
@@ -56,6 +72,10 @@ __all__ = [
     "lookup_status",
     "require_joinable",
     "require_can_remove",
+    "require_can_dissolve",
+    "require_can_change_role",
+    "require_can_guard",
+    "require_can_end_guard",
     "require_can_leave",
     "require_has_parent",
 ]
@@ -202,6 +222,85 @@ def require_can_leave(my_role: object, other_parents: int, other_members: int) -
     """
     if my_role == "parent" and other_parents == 0 and other_members > 0:
         raise ValueError("你是這個家唯一的家長。先邀請另一位家長，或把其他成員移出，才能退出")
+
+
+def require_can_dissolve(my_role: object, other_parents: int) -> None:
+    """解散家庭之前的檢查：只有家長，而且是**唯一的家長**。
+
+    >>> require_can_dissolve("parent", 0)
+    >>> require_can_dissolve("parent", 1)
+    Traceback (most recent call last):
+    ...
+    ValueError: 家裡還有其他家長，不能一個人解散。你可以自己退出家庭
+    """
+    if my_role != "parent":
+        raise Forbidden("只有家長可以解散家庭")
+    if other_parents > 0:
+        raise ValueError("家裡還有其他家長，不能一個人解散。你可以自己退出家庭")
+
+
+def require_can_change_role(me: object, my_role: object, target: object, target_role: object,
+                            new_role: object, parent_count: int) -> None:
+    """改家庭角色之前的檢查（PATCH /api/family/members/{id}）。
+
+    * 家長可以把子女設為家長
+    * 家長可以把**自己**改成子女，但家裡要還有別的家長
+    * ⚠️ 不能把另一位家長改成子女——那跟「移除另一位家長」是同一件事
+
+    設為家長時，他被照看的關係要一起結束（家長之間本來就看得到）；
+    自己改成子女時，他照看別人的關係要一起結束。
+
+    >>> require_can_change_role("U1", "parent", "U3", "child", "parent", 1)
+    >>> require_can_change_role("U1", "parent", "U1", "parent", "child", 1)
+    Traceback (most recent call last):
+    ...
+    ValueError: 你是唯一的家長，先把另一位家人設為家長
+    """
+    if my_role != "parent":
+        raise Forbidden("只有家長可以改角色")
+    clean_role(new_role)
+    if new_role == target_role:
+        return
+    if new_role == "child":
+        if me != target:
+            raise Forbidden("不能把另一位家長改成子女，他只能自己調整")
+        if parent_count < 2:
+            raise ValueError("你是唯一的家長，先把另一位家人設為家長")
+
+
+def require_can_guard(me: object, my_role: object, ward_role: object, same_family: bool,
+                      already: bool = False) -> None:
+    """開始照看一個人之前的檢查（POST /api/guardianships）。監管人一定是自己。
+
+    >>> require_can_guard("U1", "parent", "child", True)
+    >>> require_can_guard("U1", "parent", "parent", True)
+    Traceback (most recent call last):
+    ...
+    ValueError: 只能照看子女；家長之間本來就看得到彼此
+    """
+    if my_role != "parent":
+        raise Forbidden("只有家長可以照看家人")
+    if not same_family:
+        raise LookupError("這個家庭裡沒有這個人")
+    if ward_role != "child":
+        raise ValueError("只能照看子女；家長之間本來就看得到彼此")
+    if already:
+        raise ValueError("已經在照看這個人了")
+
+
+def require_can_end_guard(me: object, my_role: object, guardian: object, same_family: bool) -> None:
+    """解除監管之前的檢查（DELETE /api/guardianships/{id}）：監管人自己，或同一個家庭的家長。
+
+    ⚠️ 被照看的人不能自己解除——他可以退出家庭，但監管的意義就是「不是他說停就停」。
+    也正因為這樣，監管一定要雙向可見。
+
+    >>> require_can_end_guard("U1", "parent", "U1", True)
+    >>> require_can_end_guard("U2", "parent", "U1", True)     # 同一家的另一位家長也可以
+    """
+    if me == guardian:
+        return
+    if my_role != "parent" or not same_family:
+        raise Forbidden("只有家長可以解除監管")
 
 
 def require_has_parent(parent_count: int) -> None:

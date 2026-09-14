@@ -107,7 +107,7 @@
 
   var MODE = BASE ? 'http' : 'mock';
   var LATENCY = 240;
-  /* v2：拿掉假資料之後換新的鑰匙。舊的 v1 裡是示範帳號的資料（U1 林建國…），
+  /* v2：拿掉假資料之後換新的鑰匙。舊的 v1 裡是示範帳號的資料（U1、U2…），
      新註冊的人會拿到一樣的 id，不換的話會把舊示範紀錄認成自己的。 */
   var KEY = 'fambudget.state.v2';
 
@@ -723,6 +723,57 @@
   function sum(list, kind) {
     return list.filter(function (t) { return t.kind === kind; })
       .reduce(function (n, t) { return n + t.amount; }, 0);
+  }
+
+  /* ---------- 財務建議的規則（mock 用；真後端是「算好的數字 → 模型敘述」） ----------
+     sm 是 summary 的回應、bd 是 budgets 的清單。**數字一律來自這兩支**，這裡只負責寫成句子。
+     http 模式下 POST /api/advices/generate 還沒做好時，前端也用這一支先頂著（見 FALLBACK）。 */
+  function buildAdvices(sm, bd, scope, meId, period) {
+    var who = scope === 'family' ? null : meId;
+    var head = { scope: scope === 'family' ? 'family' : 'user', user: who, period: period,
+                 generatedAt: localStamp(new Date()) };
+    var out = [];
+    // 後端的 summary 可能沒帶 count（前端代勞的欄位），有收支就當作有紀錄
+    var count = 'count' in sm ? sm.count : ((sm.income || sm.expense) ? 1 : 0);
+    function add(level, title, body, basis, suggest, conf) {
+      out.push(Object.assign({ id: 'AV' + Date.now() + '-' + out.length, level: level, title: title,
+        body: body, basis: basis, suggest: suggest, conf: conf }, head));
+    }
+    if (!count) {
+      add('info', '這個月還沒有紀錄', '記幾筆之後，建議才有數字可以說。',
+        [period + ' 紀錄 0 筆'], ['先把今天花的記下來，一段話就能記好幾筆'], 1);
+    } else {
+      var sv = sm.savings;
+      var basis = ['收入 ' + money(sm.income) + ' − 每月想存 ' + money(sv.goal) + ' ＝ 可以花 ' + money(sv.allowance),
+                   '支出 ' + money(sm.expense) + ' ÷ 可以花 ' + money(sv.allowance) + ' ＝ ' + Math.round(sv.ratio * 100) + '%'];
+      if (sv.level === 'over') {
+        add('warn', '這個月存不到目標了', '支出 ' + money(sm.expense) + ' 元，比可以花的多了 ' + money(sv.shortfall) + ' 元。',
+          basis, ['看看花最多的分類能不能先緩一緩', '或把這個月的存款目標調低一點'], 0.95);
+      } else if (sv.level === 'near') {
+        add('warn', '快用完這個月可以花的', '已經用掉 ' + Math.round(sv.ratio * 100) + '%，剩 ' + money(sv.left) + ' 元。',
+          basis, ['接下來大筆的支出先想一下'], 0.93);
+      } else {
+        add('ok', '這個月的進度正常', '到目前花了可以花的 ' + Math.round(sv.ratio * 100) + '%，照這個速度存得到目標。',
+          basis, ['維持現在的節奏就好'], 0.9);
+      }
+      if (sm.byCat.length && sm.expense) {
+        var top = sm.byCat[0];
+        add('info', top.name + '是這個月花最多的', top.name + ' ' + money(top.amount) + ' 元，佔支出 ' +
+          Math.round(top.amount / sm.expense * 100) + '%。',
+          [top.name + ' ' + money(top.amount) + ' ÷ 支出 ' + money(sm.expense)], ['點進統計看是哪幾筆'], 0.9);
+      }
+      bd.filter(function (b) { return b.over && (scope === 'family' || b.user === meId); }).forEach(function (b) {
+        add('warn', '「' + b.catName + '」超過預算', b.catName + ' 花了 ' + money(b.used) + ' 元，預算 ' + money(b.limit) + ' 元。',
+          [b.catName + ' ' + money(b.used) + ' ÷ 預算 ' + money(b.limit) + ' ＝ ' + Math.round(b.pct * 100) + '%'],
+          ['決定要少花，還是把預算調到比較實際的數字'], 0.92);
+      });
+      if (scope === 'family' && sm.allowance > 0) {
+        add(sm.wardSpend > sm.allowance ? 'warn' : 'info', '孩子的花費與零用金',
+          '照看的孩子這個月花了 ' + money(sm.wardSpend) + ' 元，零用金是 ' + money(sm.allowance) + ' 元。',
+          ['支出 ' + money(sm.wardSpend) + ' ÷ 零用金 ' + money(sm.allowance)], ['跟孩子一起看看錢花到哪裡'], 0.88);
+      }
+    }
+    return { advices: out, head: head };
   }
 
   /* ---------- 一句話 → 一筆（mock 用的規則；真後端是模型） ---------- */
@@ -2185,47 +2236,8 @@
         return sleep(700).then(function () {
           var sm = r[0], bd = r[1].budgets || [];
           var period = D.meta.period, who = scope === 'family' ? null : s.me;
-          var head = { scope: scope === 'family' ? 'family' : 'user', user: who, period: period,
-                       generatedAt: localStamp(new Date()) };
-          var out = [];
-          function add(level, title, body, basis, suggest, conf) {
-            out.push(Object.assign({ id: 'AV' + Date.now() + '-' + out.length, level: level, title: title,
-              body: body, basis: basis, suggest: suggest, conf: conf }, head));
-          }
-          if (!sm.count) {
-            add('info', '這個月還沒有紀錄', '記幾筆之後，建議才有數字可以說。',
-              [period + ' 紀錄 0 筆'], ['先把今天花的記下來，一段話就能記好幾筆'], 1);
-          } else {
-            var sv = sm.savings;
-            var basis = ['收入 ' + money(sm.income) + ' − 每月想存 ' + money(sv.goal) + ' ＝ 可以花 ' + money(sv.allowance),
-                         '支出 ' + money(sm.expense) + ' ÷ 可以花 ' + money(sv.allowance) + ' ＝ ' + Math.round(sv.ratio * 100) + '%'];
-            if (sv.level === 'over') {
-              add('warn', '這個月存不到目標了', '支出 ' + money(sm.expense) + ' 元，比可以花的多了 ' + money(sv.shortfall) + ' 元。',
-                basis, ['看看花最多的分類能不能先緩一緩', '或把這個月的存款目標調低一點'], 0.95);
-            } else if (sv.level === 'near') {
-              add('warn', '快用完這個月可以花的', '已經用掉 ' + Math.round(sv.ratio * 100) + '%，剩 ' + money(sv.left) + ' 元。',
-                basis, ['接下來大筆的支出先想一下'], 0.93);
-            } else {
-              add('ok', '這個月的進度正常', '到目前花了可以花的 ' + Math.round(sv.ratio * 100) + '%，照這個速度存得到目標。',
-                basis, ['維持現在的節奏就好'], 0.9);
-            }
-            if (sm.byCat.length && sm.expense) {
-              var top = sm.byCat[0];
-              add('info', top.name + '是這個月花最多的', top.name + ' ' + money(top.amount) + ' 元，佔支出 ' +
-                Math.round(top.amount / sm.expense * 100) + '%。',
-                [top.name + ' ' + money(top.amount) + ' ÷ 支出 ' + money(sm.expense)], ['點進統計看是哪幾筆'], 0.9);
-            }
-            bd.filter(function (b) { return b.over && (scope === 'family' || b.user === s.me); }).forEach(function (b) {
-              add('warn', '「' + b.catName + '」超過預算', b.catName + ' 花了 ' + money(b.used) + ' 元，預算 ' + money(b.limit) + ' 元。',
-                [b.catName + ' ' + money(b.used) + ' ÷ 預算 ' + money(b.limit) + ' ＝ ' + Math.round(b.pct * 100) + '%'],
-                ['決定要少花，還是把預算調到比較實際的數字'], 0.92);
-            });
-            if (scope === 'family' && sm.allowance > 0) {
-              add(sm.wardSpend > sm.allowance ? 'warn' : 'info', '孩子的花費與零用金',
-                '照看的孩子這個月花了 ' + money(sm.wardSpend) + ' 元，零用金是 ' + money(sm.allowance) + ' 元。',
-                ['支出 ' + money(sm.wardSpend) + ' ÷ 零用金 ' + money(sm.allowance)], ['跟孩子一起看看錢花到哪裡'], 0.88);
-            }
-          }
+          var built = buildAdvices(sm, bd, scope, s.me, period);
+          var out = built.advices, head = built.head;
           // 同一個月、同一個範圍再產生一次：蓋掉舊的，不要疊出兩份
           s.advices = (s.advices || []).filter(function (a) {
             return !(a.period === period && a.scope === head.scope && (a.user || null) === who);
@@ -2981,12 +2993,129 @@
     transactions: ['transactions', 'total'], createTransaction: ['id'], updateTransaction: ['id'],
     deleteTransactions: ['deleted'], nlpParse: ['out'], nlpParseBatch: ['items'],
     categories: ['categories'], groups: ['groups'], createGroup: ['id'],
-    summary: ['income', 'expense', 'savings', 'byCat', 'monthly', 'yearly'],
+    summary: ['income', 'expense', 'byCat', 'monthly', 'yearly'],
     budgets: ['budgets'], savingsGoals: ['goals'], alerts: ['alerts'],
     advices: ['advices'], generateAdvices: ['advices'],
     members: ['family', 'members', 'guardianships'], invites: ['received', 'sent', 'codes'],
     guardianships: ['guardianships'], createGuardianship: ['id'],
     notifications: ['notifications', 'unread'], allowances: ['allowances'], lookupUser: ['user', 'status']
+  };
+
+  /* ============================================================
+     前端代勞
+     ------------------------------------------------------------
+     後端只要回「查資料庫才拿得到」的東西；下面這些前端補得出來，後端可以不帶：
+
+       衍生欄位  summary 的 net／rate／savings.*（用 income、expense、goal 算）
+                budgets[].pct／over（用 used、limit 算）
+       名稱對照  transactions／budgets／notifications 的 catName、catColor、userName
+                guardianships 的 guardianName／wardName、advices 的 userName
+                （用 GET /api/categories 與 GET /api/family 的清單對）
+       備援      後端這幾支還沒做（501／404／405）或連不上時，前端先頂著：
+                nlpParse／nlpParseBatch → 前端規則解析（寫入還是走後端）
+                generateAdvices          → 用 summary＋budgets 在前端寫成句子（不會存）
+                sessions                 → 只列這一台
+
+     ⚠️ 權限、可見範圍、密碼、金額加總、寫入**一律是後端的**，前端不代勞——
+        那些放前端等於任何人改一下瀏覽器就能繞過。
+     ============================================================ */
+  var LOOKUP = { cats: null, people: null, me: null };
+  /* 家庭、分類、名字改了，對照表要重拿 */
+  var LOOKUP_STALE = ['createCategory', 'createFamily', 'joinFamily', 'acceptInvite', 'removeMember',
+    'leaveFamily', 'dissolveFamily', 'changeMemberRole', 'updateProfile', 'login', 'logout', 'register'];
+
+  function lookups() {
+    var jobs = [];
+    if (!LOOKUP.cats) jobs.push(impl.categories().then(function (d) { LOOKUP.cats = d.categories || []; }, function () { LOOKUP.cats = global.DATA.categories || []; }));
+    if (!LOOKUP.people) jobs.push(impl.members().then(function (d) { LOOKUP.people = d.members || []; LOOKUP.me = d.me; }, function () { LOOKUP.people = []; }));
+    return Promise.all(jobs);
+  }
+  function catName(id) { return ((LOOKUP.cats || []).filter(function (c) { return c.id === id; })[0] || {}); }
+  function personName(id) { return ((LOOKUP.people || []).filter(function (m) { return m.id === id; })[0] || {}).name || ''; }
+
+  function needsNames(list, keys) {
+    return (list || []).some(function (x) { return keys.some(function (k) { return !(k in x); }); });
+  }
+
+  function fillIn(name, res) {
+    if (!res || typeof res !== 'object') return Promise.resolve(res);
+    if (name === 'summary') {
+      var rule = (res.savings && res.savings.rule) || global.DATA.savingsRule;
+      var sv = res.savings = res.savings || {};
+      if (!('net' in res)) res.net = res.income - res.expense;
+      if (!('rate' in res)) res.rate = res.income ? (res.income - res.expense) / res.income : 0;
+      if (!('goal' in sv)) sv.goal = 0;
+      if (!('allowance' in sv)) sv.allowance = res.income - sv.goal;
+      if (!('used' in sv)) sv.used = res.expense;
+      if (!('left' in sv)) sv.left = sv.allowance - res.expense;
+      if (!('ratio' in sv)) sv.ratio = sv.allowance > 0 ? res.expense / sv.allowance : (res.expense > 0 ? 2 : 0);
+      if (!('level' in sv)) sv.level = sv.ratio >= rule.overAt ? 'over' : (sv.ratio >= rule.warnAt ? 'near' : 'safe');
+      if (!('shortfall' in sv)) sv.shortfall = Math.max(0, res.expense - sv.allowance);
+      if (!('actual' in sv)) sv.actual = res.income - res.expense;
+      if (!sv.rule) sv.rule = rule;
+      if (!needsNames(res.byCat, ['name', 'color'])) return Promise.resolve(res);
+      return lookups().then(function () {
+        res.byCat.forEach(function (c) { var k = catName(c.cat); if (!('name' in c)) c.name = k.name || c.cat; if (!('color' in c)) c.color = k.color || 'cat-other'; });
+        return res;
+      });
+    }
+    if (name === 'budgets') {
+      (res.budgets || []).forEach(function (b) {
+        if (!('pct' in b)) b.pct = b.limit ? b.used / b.limit : 0;
+        if (!('over' in b)) b.over = b.used > b.limit;
+      });
+      if (!needsNames(res.budgets, ['catName', 'catColor', 'userName'])) return Promise.resolve(res);
+      return lookups().then(function () {
+        res.budgets.forEach(function (b) { var k = catName(b.cat); b.catName = b.catName || k.name || b.cat; b.catColor = b.catColor || k.color || 'cat-other'; b.userName = b.userName || personName(b.user); });
+        return res;
+      });
+    }
+    var rows = name === 'transactions' ? res.transactions : name === 'notifications' ? res.notifications
+      : name === 'guardianships' ? res.guardianships : name === 'advices' ? res.advices : null;
+    if (!rows) return Promise.resolve(res);
+    var keys = { transactions: ['catName', 'catColor', 'userName'], notifications: ['actorName'],
+                 guardianships: ['guardianName', 'wardName'], advices: ['userName'] }[name];
+    if (!needsNames(rows, keys)) return Promise.resolve(res);
+    return lookups().then(function () {
+      rows.forEach(function (x) {
+        if (name === 'transactions') { var k = catName(x.cat); if (!('catName' in x)) x.catName = k.name || ''; if (!('catColor' in x)) x.catColor = k.color || 'cat-other'; if (!('userName' in x)) x.userName = personName(x.user); }
+        if (name === 'notifications') { if (!('actorName' in x)) x.actorName = x.actorId ? personName(x.actorId) : null; if (x.cat && !('catName' in x)) x.catName = catName(x.cat).name || ''; }
+        if (name === 'guardianships') { if (!('guardianName' in x)) x.guardianName = personName(x.guardian); if (!('wardName' in x)) x.wardName = personName(x.ward); if (!('mine' in x)) x.mine = x.guardian === LOOKUP.me; }
+        if (name === 'advices') { if (!('userName' in x)) x.userName = x.user ? personName(x.user) : null; }
+      });
+      return res;
+    });
+  }
+
+  /* 後端還沒做這一支（或連不上）時，前端先頂著。回傳 null = 這一支沒有備援，照常報錯 */
+  var FALLBACK = {
+    nlpParse: function (args) {
+      var t = String(args[0] || '').trim(), it = parseLine(t);
+      return { raw: t, matched: false, fallback: true,
+        out: { date: it.date, amount: it.amount || 0, kind: it.kind, cat: it.cat, merchant: it.merchant, conf: it.conf.amount, catConf: it.conf.cat },
+        note: '後端的解析還沒接上，先用前端的規則解析。確認寫入還是存到後端。' };
+    },
+    nlpParseBatch: function (args) {
+      var t = String(args[0] || '').trim();
+      var items = t.split(/[，,。；;、\n]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 1; })
+        .map(function (part, i) { return Object.assign({ seq: i + 1, span: part }, parseLine(part)); });
+      return { raw: t, matched: false, fallback: true, items: items,
+        note: '後端的解析還沒接上，先用前端的規則切分。確認寫入還是存到後端。' };
+    },
+    generateAdvices: function (args) {
+      var scope = (args[0] || {}).scope === 'family' ? 'family' : 'me';
+      return Promise.all([global.API.summary({ scope: scope }), global.API.budgets({}), global.API.me()]).then(function (r) {
+        var built = buildAdvices(r[0], r[1].budgets || [], scope, r[2].user.id, r[0].period || global.DATA.meta.period);
+        return { fallback: true, generatedAt: built.head.generatedAt,
+          advices: built.advices.map(function (a) { return Object.assign(a, { userName: a.user ? r[2].user.name : null }); }),
+          note: '後端的建議還沒接上，這幾則是前端用同一批數字寫的，不會存起來。' };
+      });
+    },
+    sessions: function () {
+      var ua = (global.navigator && global.navigator.userAgent) || '';
+      return { fallback: true, sessions: [{ id: 'this-device', current: true, lastActiveAt: new Date().toISOString(),
+        device: /iPhone|iPad|Android/i.test(ua) ? '手機瀏覽器' : '電腦瀏覽器' }] };
+    }
   };
 
   function where(name) {
@@ -3025,7 +3154,15 @@
     }
     var out;
     try { out = fn.apply(impl, args); } catch (e) { return Promise.reject(tag(e, name)); }
-    return Promise.resolve(out).then(function (res) {
+    return Promise.resolve(out).catch(function (e) {
+      /* 後端還沒做（501／404／405）或連不上：有備援的就先頂著 */
+      var st = e && e.status;
+      var notReady = st === 501 || st === 405 || (st === 404 && /^Not Found$/i.test(e.message)) ||
+        (!st && e && (e.name === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(e.message)));
+      if (notReady && FALLBACK[name]) return FALLBACK[name](args);
+      throw e;
+    }).then(function (res) {
+      if (LOOKUP_STALE.indexOf(name) >= 0) { LOOKUP.cats = null; LOOKUP.people = null; }
       var need = SHAPE[name];
       if (need) {
         var lack = need.filter(function (k) { return !res || !(k in res); });
@@ -3035,7 +3172,7 @@
           throw bad;
         }
       }
-      return res;
+      return fillIn(name, res);
     }).catch(function (e) { throw tag(e, name); });
   }
 
