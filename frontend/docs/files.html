@@ -233,7 +233,7 @@ PostgreSQL
             <tr><td><span class="fname">frontend/index.html</span></td><td>整個系統的畫面骨架。新增一個畫面要在這裡加導覽項目</td><td class="tight">前端</td></tr>
             <tr><td><span class="fname">frontend/js/api.js</span></td><td>★ <b>唯一的資料入口</b>。mock 與 http 兩套實作簽名完全相同，切換只改 <code>&lt;meta name="api-base"&gt;</code></td><td class="tight">前端</td></tr>
             <tr><td><span class="fname">frontend/js/app.js</span></td><td>每個畫面怎麼畫、怎麼互動。<b>不直接 fetch</b>，一律走 api.js</td><td class="tight">前端</td></tr>
-            <tr><td><span class="fname">frontend/js/data.js</span></td><td>示範資料，同時是資料表草案（<code>schema</code>／<code>relations</code>）。手冊的資料表區塊就是從這裡生出來的</td><td class="tight">前端</td></tr>
+            <tr><td><span class="fname">frontend/js/data.js</span></td><td>示範資料，同時是資料表草案（<code>schema</code>／<code>relations</code>）。手冊的資料表區塊就是從這裡生出來的。示範紀錄載入時會<b>對齊到真實的今天</b>（<code>fbToday()</code>），測試用 <code>__FAMBUDGET_TODAY__</code> 固定日期</td><td class="tight">前端</td></tr>
             <tr><td><span class="fname">frontend/docs/</span></td><td>這些說明文件本身，也是靜態網頁</td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">backend/app/main.py</span></td><td>只負責組裝：掛 CORS、掛路由。<b>不寫任何業務邏輯</b></td><td class="tight">後端</td></tr>
             <tr><td><span class="fname">backend/app/ownership.py</span></td><td>★ 誰負責哪些路由、哪些檔案、排程到哪。<code>python -m app.ownership</code> 印出分工表</td><td class="tight">共同</td></tr>
@@ -274,7 +274,7 @@ PostgreSQL
             <tr><td><span class="fname">family.py</span></td><td>家庭綁定：邀請碼、用帳號邀請；沒有家長的家不能加入</td><td><code>require_has_parent</code>、<code>new_code</code>、<code>hash_code</code>、<code>lookup_status</code>、<code>require_joinable</code></td></tr>
             <tr><td><span class="fname">profile.py</span></td><td>把理財習慣安全地組成 prompt 背景（隔離注入）</td><td><code>to_prompt_block</code>、<code>clean_note</code></td></tr>
             <tr><td><span class="fname">notify.py</span></td><td>通知發給誰，同一筆對同一個人只發一則</td><td><code>recipients_for</code></td></tr>
-            <tr><td><span class="fname">ledger.py</span></td><td>帳本結算後唯讀、移除的條件（移除不刪紀錄）</td><td><code>require_open</code>、<code>require_removable</code></td></tr>
+            <tr><td><span class="fname">ledger.py</span></td><td>帳本結算後唯讀、移除的條件（移除不刪紀錄）；紀錄的修改與多筆刪除（只有本人、結算過的不行、全有全無）</td><td><code>require_open</code>、<code>require_removable</code>、<code>clean_patch</code>、<code>require_editable</code>、<code>clean_ids</code></td></tr>
             <tr><td><span class="fname">theme.py</span></td><td>介面主題：只收清單裡的 id</td><td><code>THEMES</code>、<code>clean_theme</code></td></tr>
             <tr><td><span class="fname">roles.py</span></td><td>角色能做哪些治理動作（不管可見範圍）；平台管理員的停權規則</td><td><code>can_govern</code>、<code>require_govern</code>、<code>can_set_goal_for</code>、<code>require_platform</code>、<code>clean_suspend_reason</code>、<code>require_active</code></td></tr>
           </tbody>

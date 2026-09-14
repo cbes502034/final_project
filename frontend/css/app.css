@@ -1752,6 +1752,60 @@ input[type="password"], input[type="search"], select, textarea {
 }
 .del:hover { opacity: 1; text-decoration-color: var(--down); }
 
+/* 修改：跟刪除同一種長相（文字、沒有框），用主色。放在刪除左邊，常用的在前面 */
+.txr__ed {
+  padding: 2px 0; margin-right: 14px; background: transparent; border: 0; box-shadow: none;
+  color: var(--accent); font-size: 12.5px;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+  transition: text-decoration-color .16s var(--ease);
+}
+.txr__ed:hover { text-decoration-color: currentColor; }
+/* 結算過的帳本：自己的紀錄也不能動，講清楚為什麼沒有按鈕 */
+.txr__lock { font-size: 12px; color: var(--ink-dim); }
+
+/* 分類寫在項目底下：只有手機用（桌機有自己的分類欄） */
+.txr__cm { display: none; }
+
+/* 手機：五欄擠在 330px 裡，修改、刪除會被推到畫面外要橫著捲才找得到。
+   收掉年份、分類欄（分類改寫在項目上方），兩顆按鈕直著排。 */
+@media (max-width: 560px) {
+  #view .txr td, #view .txt thead th { padding-left: 8px; padding-right: 8px; }
+  .txr__y, .txr__c { display: none; }
+  .txr__t { min-width: 0; }
+  .txr__cm { display: block; font-size: 11.5px; line-height: 1.5; }
+  .txr__x .txr__ed, .txr__x .del { display: block; margin: 0 0 0 auto; padding: 3px 0 5px; }
+}
+
+/* ---------- 多筆刪除 ---------- */
+.txr__ck { width: 1%; padding-right: 0 !important; }
+.txr__ck input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); cursor: pointer; vertical-align: top; }
+.txr[data-pickrow] { cursor: pointer; }
+.txr.is-picked, .txr.is-picked:hover { background: var(--accent-wash); }
+
+/* 勾選列：吸在頂欄下面，勾到清單底部也看得到「刪除 N 筆」 */
+.pkb {
+  position: sticky; top: calc(var(--appbar-h, 64px) + 8px); z-index: 6;
+  display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 10px 12px 10px 16px;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+}
+.pkb__n { font-size: 13.5px; color: var(--ink-soft); }
+.pkb__n b { color: var(--ink); font-family: var(--mono); font-size: 15px; }
+.pkb__sp { flex: 1 1 auto; }
+
+/* ---------- 修改一筆 ---------- */
+.txe .hp__c { width: min(540px, 100%); }
+.txe__g { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.txe__w { grid-column: 1 / -1; }
+.txe__raw {
+  font-size: 13px !important; line-height: 1.7 !important; color: var(--ink) !important;
+  background: var(--sunk); padding: 10px 14px; border-radius: var(--r-input);
+}
+.txe__raw span { display: block; font-size: 12px; color: var(--ink-dim); }
+.txe .hp__d { gap: 10px; }
+.txe .prs__f input, .txe .prs__f select { width: 100%; min-width: 0; }
+
 /* ---------- 篩選：標題 ＋ 下拉 ---------- */
 .bar {
   display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
@@ -1782,7 +1836,7 @@ input[type="password"], input[type="search"], select, textarea {
   .txr td, .txt thead th { padding-left: 10px; padding-right: 10px; }
 }
 @media (max-width: 640px) {
-  .txr__u, .txr__s, .txt thead th:nth-child(4), .txt thead th:nth-child(5) { display: none; }
+  .txr__u, .txr__s { display: none; }
 }
 
 /* 搜尋欄位不放裝飾用的放大鏡——placeholder 已經說明它是什麼了 */
@@ -2530,6 +2584,11 @@ body.is-out .foot { display: none; }
 #view .sec__tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
 #view .sec .fold__b, #view .sec__link { margin-left: auto; }
 #view .sec__tools ~ .fold__b { margin-left: 0; }
+#view .sec__x { display: flex; }
+#view .pk__t { min-width: 6.4em; justify-content: center; }
+#view .sec__x ~ .fold__b { margin-left: 0; }
+/* 篩選的標題（收支、來源）不可以斷行——擠的時候斷成一個字一行 */
+#view .fsel > span { white-space: nowrap; flex: none; }
 #view .sec__link { font-size: 13.5px; font-weight: 600; color: var(--accent); text-decoration: none; }
 #view .sec__link:hover { color: var(--accent-hi); }
 
@@ -2959,6 +3018,8 @@ body.is-out .foot { display: none; }
   /* 標題和主要按鈕在第一行，篩選整行排在下面 */
   #view .sec__tools { order: 3; margin-left: 0; width: 100%; }
   #view .sec .fold__b { margin-left: auto; }
+  #view .sec__x { margin-left: auto; }
+  #view .sec__x ~ .fold__b { margin-left: 0; }
   #view .bar--inline { width: 100%; flex-wrap: nowrap; }
   #view .bar--inline .fsel { flex: 1 1 0; min-width: 0; }
   #view .bar--inline .fsel select { flex: 1 1 auto; width: 100%; min-width: 0; }

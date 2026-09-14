@@ -141,6 +141,7 @@ MEMBERS: list[Member] = [
             "負責「記一筆帳」這個動作，從文字進來到寫進資料庫。★ 這是整個系統的核心。\n"
             "屬於他的：明細的增刪改查、段落解析、單句解析、確認後寫入、nlp_parses 的寫入。\n"
             "⚠️ 明細的**修改與刪除只有本人可以**，監管者不行——監管是唯讀的。\n"
+            "  結算過的帳本裡的紀錄不能改、不能刪（409）。一次刪多筆（DELETE /api/transactions?ids=）全部成功或全部不動。\n"
             "新增一筆時要順手寫一則通知給監管者（成員4 的 notifications 表）。\n"
             "帳本也在這裡：一本帳就是「這筆算在哪」的容器，跟記帳同一個脈絡。\n"
             "常設帳本沒有結束；活動帳本有結束日，到了由建立者手動結算，之後唯讀（不能再記，回 409）。\n"
@@ -157,6 +158,7 @@ MEMBERS: list[Member] = [
             ("POST", "/api/transactions"),
             ("PATCH", "/api/transactions/{tx_id}"),
             ("DELETE", "/api/transactions/{tx_id}"),
+            ("DELETE", "/api/transactions"),
             ("POST", "/api/nlp/parse"),
             ("POST", "/api/nlp/parse-batch"),
             ("POST", "/api/nlp/confirm"),

@@ -40,7 +40,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>68 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>69 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -95,7 +95,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">68 ROUTES · 4 MODULES</div>
+    <div class="mono">69 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -173,8 +173,19 @@
       d: '手動新增。單筆手動模式走這支',
       body: '{\n  "date": "2026-09-10",\n  "amount": 250,\n  "kind": "expense",\n  "cat": "C01",\n  "merchant": "全家便利商店",\n  "note": ""\n}',
       note: '<b>不經過模型</b>，寫入的 <code>source</code> 記成 <code>manual</code>。只有經過模型的資料才走 <code>/api/nlp/confirm</code>，否則 <code>nlp_parses</code> 這張評測用的表會被手動資料汙染。' },
-    { n: 17, o: 'm2', m: 'PATCH', p: '/api/transactions/{id}', a: '本人', d: '修改' },
-    { n: 18, o: 'm2', m: 'DELETE', p: '/api/transactions/{id}', a: '本人', d: '刪除' },
+    { n: 17, o: 'm2', m: 'PATCH', p: '/api/transactions/{id}', a: '本人',
+      d: '修改一筆。只送要改的欄位',
+      body: '{\n  "amount": 180,\n  "cat": "C01",\n  "note": "午餐＋飲料"\n}',
+      res: '{\n  "id": "T1040", "date": "2026-09-10", "amount": 180,\n  "kind": "expense", "cat": "C01", "note": "午餐＋飲料",\n  "source": "nlp", "updatedAt": "2026-09-14T09:12:00+08:00"\n}',
+      note: '可以改：<code>date</code>、<code>amount</code>、<code>kind</code>、<code>cat</code>、<code>merchant</code>、<code>note</code>、<code>groupId</code>。<b>不認得的欄位回 400</b>（例如 <code>source</code>、<code>user</code>），不要默默忽略。<br>⚠️ <b>只有本人</b>（403），監管是唯讀的；<b>結算過的帳本裡的紀錄不能改</b>（409），換到結算過的帳本也不行。<br>改的是模型解析出來的那筆（<code>source=nlp</code>）時，把改過的值寫進 <code>nlp_parses.user_corrected</code>——那就是模型抓錯的標註。工具在 <code>toolkit/ledger.py</code> 的 <code>clean_patch</code>／<code>require_editable</code>。' },
+    { n: 18, o: 'm2', m: 'DELETE', p: '/api/transactions/{id}', a: '本人',
+      d: '刪除一筆',
+      res: '{ "deleted": "T1040" }',
+      note: '只有本人（403）；結算過的帳本裡的紀錄不能刪（409）。' },
+    { n: 73, o: 'm2', m: 'DELETE', p: '/api/transactions', a: '本人',
+      d: '一次刪多筆（收支明細勾選後刪除）', q: ['ids'],
+      res: '{ "deleted": ["T1040", "N1757812345678"] }',
+      note: '<code>?ids=T1040,N1757812345678</code>，逗號分隔、最多 100 筆。<br>⚠️ <b>全部成功或全部不動</b>：其中一筆是別人的（403）、找不到（404）、在結算過的帳本裡（409），就一筆都不刪，同一個資料庫交易裡做。<br>⚠️ <b>沒帶 ids 一定要回 400</b>，絕對不能當成「不篩選」——那等於把整本帳刪光。工具在 <code>toolkit/ledger.py</code> 的 <code>clean_ids</code>。' },
     { n: 23, o: 'm2', m: 'GET', p: '/api/categories', a: '登入',
       d: '分類體系（系統預設 + 家庭自訂）',
       note: '<b>分類體系是唯一的跨模組阻塞點</b>：成員3 定義，成員2 要寫進 prompt，成員4 做建議時要用。第 1 週就要凍結。' },

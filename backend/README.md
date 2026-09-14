@@ -95,7 +95,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 | 成員 | 領域 | 分支 | 路由 | 獨佔檔案 | 共用元件（要最先完成） |
 |---|---|---|---|---|---|
 | **成員1** | **認證** | `m1-auth` | 17 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
-| **成員2** | **記帳** | `m2-ledger` | 18 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
+| **成員2** | **記帳** | `m2-ledger` | 19 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
 | **成員4** | **家庭** | `m4-access` | 20 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
 
@@ -146,13 +146,14 @@ DELETE /api/admin/users/{user_id}/suspend
 
 **LLM 工作**：段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準。切分比抽欄位更難，而且切錯比抽錯更難發現。
 
-**路由（18 支）**
+**路由（19 支）**
 
 ```
 GET    /api/transactions
 POST   /api/transactions
 PATCH  /api/transactions/{tx_id}
 DELETE /api/transactions/{tx_id}
+DELETE /api/transactions
 POST   /api/nlp/parse
 POST   /api/nlp/parse-batch
 POST   /api/nlp/confirm

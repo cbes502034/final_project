@@ -69,7 +69,7 @@
         <div class="mchip"><span>線上原型</span><b><a href="https://fambudget-web.onrender.com" target="_blank" rel="noopener">fambudget-web</a></b></div>
         <div class="mchip"><span>原始碼</span><b class="mono">cbes502034/final_project</b></div>
         <div class="mchip"><span>技術棧</span><b>FastAPI · PostgreSQL · 純靜態前端</b></div>
-        <div class="mchip"><span>API</span><b>68 支路由</b></div>
+        <div class="mchip"><span>API</span><b>69 支路由</b></div>
         <div class="mchip"><span>資料表</span><b>19 張</b></div>
       </div>
     </header>
@@ -568,7 +568,7 @@
     <section class="sec" id="api">
       <div class="sec__h"><span class="sec__n">05</span><h2>API 目錄：按人員分類</h2></div>
       <p class="sec__lead">
-        共 <b>68 支路由</b>。權限標示：公開 / 登入 / 家長 / 監管者 / 平台。
+        共 <b>69 支路由</b>。權限標示：公開 / 登入 / 家長 / 監管者 / 平台。
         <span class="tag tag--llm">★</span> 代表與 LLM 直接相關。
       </p>
 
@@ -580,7 +580,7 @@
         </div>
         <div class="card" style="border-top:2px solid var(--m2)">
           <div class="mvc__k" style="color:var(--m2)">成員2　<span style="opacity:.7">m2-ledger</span></div>
-          <div class="mvc__t">記帳 · 18 支</div>
+          <div class="mvc__t">記帳 · 19 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">四支 nlp 路由是<b>整個系統的核心</b>。解析與寫入刻意分兩步，模型永遠不碰資料庫。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m3)">
@@ -634,8 +634,9 @@
           <tbody>
             <tr><td class="num">15</td><td class="tight">GET</td><td class="rt">/api/transactions</td><td class="tight">登入</td><td>明細。可帶 <code>userId</code> / <code>from</code> / <code>to</code> / <code>categoryId</code> / <code>kind</code> / <code>source</code> / <code>q</code> / <code>page</code></td></tr>
             <tr><td class="num">16</td><td class="tight">POST</td><td class="rt">/api/transactions</td><td class="tight">登入</td><td>手動新增。<b>單筆手動走這支</b>，不經過模型，<code>source</code> 記成 <code>manual</code></td></tr>
-            <tr><td class="num">17</td><td class="tight">PATCH</td><td class="rt">/api/transactions/{id}</td><td class="tight">本人</td><td>修改。監管者只能看，不能改也不能刪</td></tr>
-            <tr><td class="num">18</td><td class="tight">DELETE</td><td class="rt">/api/transactions/{id}</td><td class="tight">本人</td><td>刪除。<b>只有本人</b>，監管者不行</td></tr>
+            <tr><td class="num">17</td><td class="tight">PATCH</td><td class="rt">/api/transactions/{id}</td><td class="tight">本人</td><td>修改。監管者只能看，不能改也不能刪；結算過的帳本裡的不能改</td></tr>
+            <tr><td class="num">18</td><td class="tight">DELETE</td><td class="rt">/api/transactions/{id}</td><td class="tight">本人</td><td>刪除一筆。<b>只有本人</b>，監管者不行</td></tr>
+            <tr><td class="num">73</td><td class="tight">DELETE</td><td class="rt">/api/transactions?ids=</td><td class="tight">本人</td><td>一次刪多筆，最多 100 筆。<b>全部成功或全部不動</b></td></tr>
             <tr><td class="num">19</td><td class="tight">POST</td><td class="rt">/api/nlp/parse <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td>單句：一句話 → 一筆。<b>只解析，不寫入</b></td></tr>
             <tr><td class="num">20</td><td class="tight">POST</td><td class="rt">/api/nlp/parse-batch <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td><b>段落：一段話 → 切成 N 筆</b>。只解析，不寫入</td></tr>
             <tr><td class="num">21</td><td class="tight">POST</td><td class="rt">/api/nlp/confirm <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td>單筆確認後寫入，同時記錄修正。<code>source</code> 記成 <code>nlp</code></td></tr>
@@ -1021,7 +1022,7 @@
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · 四人 × 一個月專題</div>
-      <div class="mono">68 API · 19 TABLES · 11 SCREENS</div>
+      <div class="mono">69 API · 19 TABLES · 11 SCREENS</div>
     </footer>
 
   </div>
@@ -1042,7 +1043,7 @@
       { k: '畫面', items: ['註冊與登入', '個人資料與大頭貼'] },
       { k: '共用', llm: true, items: ['core 設定與資料庫', 'core 密碼與 JWT', 'core 依賴注入', 'llm 呼叫層'] }
     ]},
-    { dom: '記帳', c: 'var(--m2)', api: '18 支', branch: 'm2-ledger', groups: [
+    { dom: '記帳', c: 'var(--m2)', api: '19 支', branch: 'm2-ledger', groups: [
       { k: '資料表', items: ['transactions', 'accounts', 'nlp_parses'] },
       { k: 'API', items: ['明細 CRUD', 'nlp 單句解析', 'nlp 段落解析', 'nlp 確認寫入'] },
       { k: '畫面', items: ['段落記帳', '單筆手動', '缺欄位提示'] },

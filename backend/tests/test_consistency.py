@@ -785,7 +785,7 @@ def _load_data():
         pytest.skip("這台機器沒有 node")
 
     script = (
-        "global.window = {};"
+        "global.window = { __FAMBUDGET_TODAY__: '2026-09-10' };"
         "require(process.argv[2]);"
         "process.stdout.write(JSON.stringify(window.DATA));"
     )
@@ -1273,7 +1273,7 @@ function boot() {
   // 重新 require 等於重新整理頁面：closure 裡的 state 會歸零，只剩 localStorage
   delete require.cache[require.resolve(dataJs)];
   delete require.cache[require.resolve(apiJs)];
-  global.window = {};
+  global.window = { __FAMBUDGET_TODAY__: '2026-09-10' };
   require(dataJs);
   require(apiJs);
   return window.API;
@@ -2090,7 +2090,7 @@ global.setTimeout = fn => setImmediate(fn);
 function boot() {
   delete require.cache[require.resolve(dataJs)];
   delete require.cache[require.resolve(apiJs)];
-  global.window = {};
+  global.window = { __FAMBUDGET_TODAY__: '2026-09-10' };
   require(dataJs); require(apiJs);
   return window.API;
 }
@@ -2173,8 +2173,102 @@ def test_總覽最下面是今天的紀錄_只看不改():
     assert "fam ? '' : '<div class=\"tdy__go\">" in card, "全家模式沒有記帳，空的時候也不放記一筆"
 
     key = re.search(r"function todayKey\(\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "API.mode !== 'http'" in key and "meta.updated" in key, \
-        "mock 的今天要跟示範資料同一天，不然今天的紀錄永遠是空的"
+    assert "fbToday()" in key and "meta.updated" not in key, \
+        "今天是真實日期（data.js 的 fbToday），不是示範資料寫死的那一天"
+
+
+# ---------- 真實日期 ----------
+# 使用者說：「日期的部分需要針對真實的日期做設定，不是以假資料」。
+# 種子是用 2026-09-10 當今天寫的，載入時整份對齊到真正的今天。
+# 這裡用幾個刻意挑的日子驗：月中、月初（1 號，全部壓到今天）、跨年、閏年前的 2 月底。
+
+_REBASE_DRIVER = r"""
+const dataJs = process.argv[2];
+const out = {};
+for (const day of ['2026-09-10', '2026-09-14', '2026-10-01', '2027-01-31', '2028-02-29', '2026-03-05']) {
+  delete require.cache[require.resolve(dataJs)];
+  global.window = { __FAMBUDGET_TODAY__: day };
+  require(dataJs);
+  const D = window.DATA;
+  const g4 = D.groups.find(g => g.id === 'G4');
+  out[day] = {
+    today: window.fbToday(),
+    period: D.meta.period,
+    updated: D.meta.updated.slice(0, 10),
+    txDates: D.transactions.map(t => t.date),
+    g4: { created: g4.created, endsOn: g4.endsOn },
+    monthly: D.monthly.map(x => x.m),
+    memberMonthly: D.members.filter(m => m.monthly).map(m => m.monthly[m.monthly.length - 1].m),
+    joined: D.members.map(m => m.joined),
+    since: D.guardianships.map(g => g.since),
+    audit: D.auditLogs.map(a => a.at),
+    yearly: D.yearly.map(y => y.y),
+    advPeriods: D.advices.map(a => a.period),
+    advBasis: D.advices.map(a => a.basis.join('|')).join('|'),
+    nlp: D.nlpDemo.map(x => x.out.date),
+    para: D.paragraphDemo.items.map(x => x.date),
+    expense: D.transactions.filter(t => t.kind === 'expense').reduce((n, t) => n + t.amount, 0)
+  };
+}
+delete require.cache[require.resolve(dataJs)];
+global.window = {};
+require(dataJs);
+out.real = window.fbToday();
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def test_日期用真實的今天_示範資料跟著對齊():
+    import datetime
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_REBASE_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(["node", tmp, os.path.join(REPO, "frontend", "js", "data.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    out = json.loads(res.stdout.decode("utf-8"))
+
+    assert out["real"] == datetime.date.today().isoformat(), "沒有指定的時候，今天就是電腦上的今天（本機時區）"
+    seed = out["2026-09-10"]
+    for day, r in out.items():
+        if day == "real":
+            continue
+        month = day[:7]
+        assert r["today"] == day and r["period"] == month and r["updated"] == day
+        for d in r["txDates"] + r["joined"] + r["since"] + [r["g4"]["created"], r["g4"]["endsOn"]]:
+            assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) and datetime.date.fromisoformat(d), day + "：日期格式壞掉了 " + d
+        assert all(d.startswith(month) and d <= day for d in r["txDates"]), \
+            day + "：本月的示範明細要落在 1 號到今天之間，不能跑到未來或上個月"
+        assert day in r["txDates"], day + "：要有今天的紀錄，總覽最下面才不會是空的"
+        assert r["expense"] == seed["expense"], "只移日子不改金額，本月總額才跟成員表對得起來"
+        assert r["monthly"][-1] == month and r["memberMonthly"] == [month] * len(r["memberMonthly"]), \
+            "每月統計的最後一個月就是這個月"
+        assert r["g4"]["endsOn"] < day and r["g4"]["created"] < r["g4"]["endsOn"], \
+            "沖繩那本要保持「過期、等人結算」，而且建立日在到期日之前"
+        assert all(j <= day for j in r["joined"]) and all(s <= day for s in r["since"]) \
+            and all(a[:10] <= day for a in r["audit"]), "加入日、監管起始、稽核時間都不能在未來"
+        assert r["yearly"][-1] == day[:4], "年度統計的最後一年就是今年"
+        assert set(r["advPeriods"]) == {month} and month in r["advBasis"], "建議的期間跟依據裡的月份也要對齊"
+        today = datetime.date.fromisoformat(day)
+        assert r["nlp"][2] == (today - datetime.timedelta(days=1)).isoformat(), "「昨天加油」的示範要是昨天"
+        assert set(r["para"]) == {day}, "「今天打工賺了」的示範要是今天"
+
+    assert out["2026-10-01"]["advBasis"].count("8 月 4,610 → 9 月 5,900 → 10 月 7,480") == 1, "文字裡的「幾月」也要跟著移"
+    assert out["2027-01-31"]["yearly"] == ["2025", "2026", "2027"]
+
+    api = read("frontend/js/api.js")
+    app = read("frontend/js/app.js")
+    assert "global.fbToday()" in re.search(r"function todayStr\(\) \{(.*?)\n  \}", api, re.S).group(1)
+    for src, name in ((api, "api.js"), (app, "app.js")):
+        assert "meta.updated" not in src, name + " 不該再拿示範資料的更新時間當今天"
+        assert "toISOString().slice(0, 10)" not in src, name + "：toISOString 是 UTC，台灣早上 8 點前會變成昨天"
+        assert "meta.period + '-10'" not in src, name + "：語句解析的預設日期是今天，不是寫死的 10 號"
 
 
 def test_帳戶卡不再重複儀表板上的功能():
@@ -2452,3 +2546,152 @@ def test_帳本移除與移出的說明前後一致():
     app = read("frontend/js/app.js")
     h = app.index("t.closest('[data-gremove]')")
     assert "level: 'full'" in app[h:h + 1200], "移除不能復原，要輸入確認碼才執行"
+
+
+# ===========================================================================
+# 收支明細：修改一筆、一次刪多筆
+# ===========================================================================
+# 使用者要的：「多筆記帳刪除還有修改記帳的功能」。
+# 行為要真的跑過——「刪了但重新整理又回來」「十筆刪到一半才發現有別人的」
+# 都是程式字串看起來完全正確、行為完全錯的情況。
+
+_TXEDIT_DRIVER = _THEME_DRIVER.split("(async () => {")[0] + r"""
+const tryIt = p => p.then(r => r, e => ({ error: e.message, status: e.status || null }));
+const txOf = async (API, id) => (await API.transactions({})).transactions.find(t => t.id === id) || null;
+(async () => {
+  const out = {}, PW = 'password123';
+  let API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  const exp0 = (await API.summary({ scope: 'me', groupId: 'all' })).expense;
+
+  // ---- 修改 ----
+  out.edit = await tryIt(API.updateTransaction('T1045', { amount: 700, note: '  早餐  加蛋 ', date: '2026-09-03' }));
+  out.editKindOnly = await tryIt(API.updateTransaction('T1046', { kind: 'income' }));
+  out.others = await tryIt(API.updateTransaction('T1065', { amount: 1 }));          // 宇軒的：監管是唯讀的
+  out.unknown = await tryIt(API.updateTransaction('T1045', { source: 'manual' }));
+  out.empty = await tryIt(API.updateTransaction('T1045', {}));
+  out.zero = await tryIt(API.updateTransaction('T1045', { amount: 0 }));
+  out.badDate = await tryIt(API.updateTransaction('T1045', { date: '2026-02-30' }));
+  out.catMismatch = await tryIt(API.updateTransaction('T1045', { cat: 'I01' }));
+  out.notMine = await tryIt(API.updateTransaction('T1045', { groupId: 'G99' }));      // 我沒加入（或不存在）的帳本
+  out.moved = await tryIt(API.updateTransaction('T1047', { groupId: 'G2' }));
+  const n1 = await API.createTransaction({ date: '2026-09-10', amount: 50, kind: 'expense', cat: 'C01' });
+  out.editNew = await tryIt(API.updateTransaction(n1.id, { amount: 55 }));
+
+  API = boot();                                                                     // 重新整理
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.afterReload = await txOf(API, 'T1045');
+  out.kindAfterReload = await txOf(API, 'T1046');
+  out.newAfterReload = await txOf(API, n1.id);
+
+  // ---- 結算過的帳本：不能改、不能刪、不能搬進去 ----
+  await API.settleGroup('G4');
+  out.editSettled = await tryIt(API.updateTransaction('T1044', { amount: 1 }));
+  out.deleteSettled = await tryIt(API.deleteTransaction('T1044'));
+  out.moveIntoSettled = await tryIt(API.updateTransaction('T1048', { groupId: 'G4' }));
+
+  // ---- 一次刪多筆：全部成功或全部不動 ----
+  const before = (await API.transactions({})).total;
+  out.mixedOthers = await tryIt(API.deleteTransactions(['T1048', 'T1065']));
+  out.mixedSettled = await tryIt(API.deleteTransactions(['T1048', 'T1044']));
+  out.mixedMissing = await tryIt(API.deleteTransactions(['T1048', 'NOPE']));
+  out.emptyIds = await tryIt(API.deleteTransactions([]));
+  out.tooMany = await tryIt(API.deleteTransactions(Array.from({ length: 101 }, (_, i) => 'X' + i)));
+  out.untouched = (await API.transactions({})).total === before && !!(await txOf(API, 'T1048'));
+  const n2 = await API.createTransaction({ date: '2026-09-10', amount: 70, kind: 'expense', cat: 'C01' });
+  out.bulk = await tryIt(API.deleteTransactions(['T1048', n2.id, 'T1048']));
+  out.single = await tryIt(API.deleteTransaction('T1049'));
+
+  API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  const ids = (await API.transactions({})).transactions.map(t => t.id);
+  out.goneAfterReload = ['T1048', 'T1049', n2.id].filter(id => ids.includes(id));
+  out.exp1 = (await API.summary({ scope: 'me', groupId: 'all' })).expense;
+  out.exp0 = exp0;
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+def test_修改與多筆刪除_只有本人_結算過的不行_刪除是全有全無():
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_TXEDIT_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    out = json.loads(res.stdout.decode("utf-8"))
+
+    assert out["edit"].get("amount") == 700 and out["edit"]["note"] == "早餐 加蛋" and out["edit"]["updatedAt"]
+    assert out["editKindOnly"]["kind"] == "income" and out["editKindOnly"]["cat"] == "I04", \
+        "只改收支方向時，分類要換到那一邊，不能留一個「支出分類的收入」"
+    assert out["others"]["status"] == 403, "監管是唯讀的，家長不能改子女的紀錄"
+    for k in ("unknown", "empty", "zero", "badDate", "catMismatch"):
+        assert out[k]["status"] == 400, k + " 應該回 400"
+    assert "source" in out["unknown"]["error"], "不認得的欄位要講出是哪一個，不要默默忽略"
+    assert out["notMine"]["status"] == 403
+    assert out["moved"]["group"] == "G2"
+    assert out["editNew"]["amount"] == 55
+
+    assert out["afterReload"]["amount"] == 700 and out["afterReload"]["date"] == "2026-09-03", \
+        "示範紀錄改完重新整理就變回去了"
+    assert out["kindAfterReload"]["kind"] == "income"
+    assert out["newAfterReload"]["amount"] == 55
+
+    assert out["editSettled"]["status"] == 409 and out["deleteSettled"]["status"] == 409, \
+        "結算過的帳本裡的紀錄不能改、不能刪"
+    assert out["moveIntoSettled"]["status"] == 409, "也不能把紀錄搬進結算過的帳本"
+
+    assert out["mixedOthers"]["status"] == 403 and out["mixedSettled"]["status"] == 409 \
+        and out["mixedMissing"]["status"] == 404
+    assert out["emptyIds"]["status"] == 400, "沒帶 ids 絕對不能當成「全部」"
+    assert out["tooMany"]["status"] == 400
+    assert out["untouched"], "其中一筆不能刪的時候，其他筆也要一筆都不動"
+    assert len(out["bulk"]["deleted"]) == 2, "重複的 id 只算一次"
+    assert out["single"]["deleted"] == "T1049"
+    assert out["goneAfterReload"] == [], "刪掉的示範紀錄重新整理又回來了：" + "、".join(out["goneAfterReload"])
+    # T1045 640→700(+60)、T1046 980 支出→收入(−980)、T1047 搬帳本不影響、N1 +55、
+    # T1048 1200 刪、N2 70 新增又刪、T1049 800 刪
+    assert out["exp1"] == out["exp0"] + 60 - 980 + 55 - 1200 - 800, "統計要跟著改和刪變動"
+
+
+def test_修改與多筆刪除_三層接口與文件都有():
+    api = read("frontend/js/api.js")
+    for fn in ("updateTransaction:", "deleteTransactions:"):
+        assert api.count(fn) >= 3, fn + " 要在 mock、http、facade 三層都有"
+    http = api[api.index("deleteTransactions: function (ids)  {"):][:200]
+    assert "method: 'DELETE'" in http and "ids:" in http, "多筆刪除走 DELETE /api/transactions?ids=，不是一筆一筆打"
+    assert "'txPatch', 'txGone'" in api, "示範紀錄的修改與刪除要存起來"
+
+    from app.ownership import all_routes
+    routes = {"%s %s" % r for r in all_routes()}
+    assert "DELETE /api/transactions" in routes and "PATCH /api/transactions/{tx_id}" in routes
+
+    app = read("frontend/js/app.js")
+    row = re.search(r"function txRow\(t, hit\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "data-edit" in row and "data-del" in row and "txCan(t)" in row, "修改、刪除只畫在自己的、沒結算的紀錄上"
+    table = re.search(r"function txTable\(rows, hit, empty\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert 'class="txr__u"' in table and 'class="txr__s"' in table
+    css = read("frontend/css/app.css")
+    assert "thead th:nth-child(4)" not in css, "勾選模式多一欄，用 nth-child 藏表頭會錯位"
+    h = app.index("t.closest('[data-pick-del]')")
+    assert "level: 'password'" in app[h:h + 800] and "deleteTransactions(" in app[h:h + 1200], \
+        "多筆刪除要輸入密碼，而且一次送出"
+    home = re.search(r"function todayCard\(rows, fam\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "data-edit" not in home, "總覽的今天紀錄只看不改"
+
+    contract = read("docs/02-前後端串接契約.md")
+    assert "### `PATCH /api/transactions/{id}`" in contract and "### `DELETE /api/transactions?ids=" in contract
+    assert "clean_ids" in contract and "require_editable" in contract
+    api_html = read("frontend/docs/api.html")
+    assert "{ n: 73, o: 'm2', m: 'DELETE', p: '/api/transactions'" in api_html
+    guide = read("frontend/docs/guide.html")
+    assert "選取多筆" in guide and "修改" in guide

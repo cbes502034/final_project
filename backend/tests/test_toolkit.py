@@ -786,6 +786,39 @@ def test_只有建立者能移除結算過的帳本():
         ledger.require_removable("U1", "U1", "2026-09-14", "2026-09-15")
 
 
+def test_改紀錄只收看得懂的欄位():
+    from decimal import Decimal
+
+    got = ledger.clean_patch({"date": "2026-09-14", "amount": 250, "kind": "income",
+                              "cat": "I01", "merchant": "  全家   便利商店 ", "note": "", "groupId": "G2"})
+    assert got == {"date": "2026-09-14", "amount": Decimal("250"), "kind": "income", "cat": "I01",
+                   "merchant": "全家 便利商店", "note": "", "groupId": "G2"}
+    for bad in ({}, None, {"source": "manual"}, {"user": "U2"}, {"amount": 0}, {"amount": -5},
+                {"amount": "abc"}, {"date": "2026-02-30"}, {"date": "9/14"}, {"kind": "transfer"},
+                {"cat": ""}, {"groupId": None}, {"note": "字" * 101}):
+        with pytest.raises(ValueError):
+            ledger.clean_patch(bad)
+
+
+def test_改刪紀錄_只有本人而且帳本沒結算():
+    ledger.require_editable("U1", "U1", None)
+    with pytest.raises(scope.Forbidden):
+        ledger.require_editable("U1", "U4", None)            # 監管是唯讀的
+    with pytest.raises(ValueError):
+        ledger.require_editable("U1", "U1", "2026-09-14")
+
+
+def test_一次刪多筆的_id_清單():
+    assert ledger.clean_ids("T1, T2,,T1") == ["T1", "T2"]
+    assert ledger.clean_ids(["N1", "N1", " N2 "]) == ["N1", "N2"]
+    for bad in ("", " , ", None, []):
+        with pytest.raises(ValueError):
+            ledger.clean_ids(bad)                              # 空的絕對不能當成「全部」
+    ledger.clean_ids(",".join("T%d" % i for i in range(ledger.MAX_BATCH)))
+    with pytest.raises(ValueError):
+        ledger.clean_ids(",".join("T%d" % i for i in range(ledger.MAX_BATCH + 1)))
+
+
 def test_沒有家長的家不能加入():
     family.require_has_parent(2)
     with pytest.raises(ValueError):

@@ -176,7 +176,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **68 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **69 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -272,8 +272,9 @@ final_project/
 |---|---|---|---|---|---|
 | 15 | GET | `/api/transactions` | 成員2 | 登入 | 明細。可帶 `userId` / `from` / `to` / `categoryId` / `kind` / `q` / `page` |
 | 16 | POST | `/api/transactions` | 成員2 | 登入 | 手動新增。**單筆手動模式走這支**，不經過模型，寫入的 `source` 記成 `manual` |
-| 17 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改 |
-| 18 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除 |
+| 17 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改。只送要改的欄位；結算過的帳本裡的不能改（409） |
+| 18 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除一筆。結算過的帳本裡的不能刪（409） |
+| 73 | DELETE | `/api/transactions` | 成員2 | 本人 | 一次刪多筆。`?ids=T1,T2`，最多 100 筆；**全部成功或全部不動** |
 | 23 | GET | `/api/categories` | 成員2 | 登入 | 分類體系（系統預設 + 家庭自訂） |
 | 24 | POST | `/api/categories` | 成員2 | 家長 | 新增家庭自訂分類 |
 
@@ -438,7 +439,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 | 成員 | 領域 | 分支 | 路由 | 資料表 | 畫面 | 該模組的 LLM |
 |---|---|---|---|---|---|---|
 | **成員1** | **認證** | `m1-auth` | 17 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
-| **成員2** | **記帳** | `m2-ledger` | 18 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
+| **成員2** | **記帳** | `m2-ledger` | 19 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 總覽（我／全家）、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
 | **成員4** | **家庭** | `m4-access` | 20 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
 
@@ -451,7 +452,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 ### 為什麼路由數不是 10 / 10 / 10 / 5 這種平均切法
 
-因為**路由數不是工作量**，但它也不能差太多。這一版是 17 / 18 / 13 / 20，
+因為**路由數不是工作量**，但它也不能差太多。這一版是 17 / 19 / 13 / 20，
 差距控制在合理範圍，同時讓每個領域維持概念上的完整。
 
 成員3 的路由最少，是刻意的：他那一條的重量不在路由數，而在**整個系統只有他算錢**，
@@ -502,13 +503,14 @@ DELETE /api/admin/users/{user_id}/suspend
 屬於他的：明細的增刪改查、段落解析、單句解析、確認後寫入、nlp_parses 的寫入。
 不屬於他的：分類體系的定義與 /api/categories（那是成員3 —— 分類由成員3 定義，成員2 只是把清單寫進 prompt）；統計加總（那是成員3，前端和這裡都不做任何加總）。
 
-**路由（18 支）**
+**路由（19 支）**
 
 ```
 GET    /api/transactions
 POST   /api/transactions
 PATCH  /api/transactions/{tx_id}
 DELETE /api/transactions/{tx_id}
+DELETE /api/transactions
 POST   /api/nlp/parse
 POST   /api/nlp/parse-batch
 POST   /api/nlp/confirm

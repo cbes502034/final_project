@@ -99,7 +99,7 @@ window.DATA = {
       kind: 'standing', created: '2026-03-01', note: '為了出國先存起來的錢' },
     { id: 'G3', name: '宇涵的零用', color: 'book-teal', owner: 'U3',
       kind: 'standing', created: '2026-02-11', note: '打工收入與自己的開銷' },
-    /* 到期日已經過了（示範資料的今天是 2026-09-10），畫面上會出現結算提示 */
+    /* 到期日已經過了（種子寫的今天是 2026-09-10，載入時對齊真實日期，見檔案最後），畫面上會出現結算提示 */
     { id: 'G4', name: '沖繩旅遊', color: 'book-moss', owner: 'U1',
       kind: 'temp', endsOn: '2026-09-08', settledAt: null,
       created: '2026-08-20', note: '五天四夜，回來就結算' }
@@ -798,3 +798,97 @@ window.DATA = {
     { action: '加入或干預任何家庭', master: 'N' }
   ]
 };
+
+
+/* ============================================================
+   示範資料對齊真實日期
+   ------------------------------------------------------------
+   上面的種子資料是以 2026-09-10 當「今天」寫的。載入時整份搬到真正的今天，
+   不然「今天的紀錄」「這個月」「到期了沒」全部會跟日曆對不上。
+
+     · 月份（每月統計、帳本建立日、加入日…）   整月平移
+     · 本月的明細（原本 1～10 號）             壓進「1 號到今天」，10 號那幾筆就是今天記的
+     · 「今天」「昨天」這種相對日期（語句示範）  照天數平移
+
+   ⚠️ 只搬示範資料。使用者自己記的存在 localStorage，本來就是真的日期，不動。
+   ⚠️ 本月的總額不變：只移日子、不跨月，統計頁跟成員表的數字才對得起來。
+   ⚠️ 測試要固定日期：載入前設 window.__FAMBUDGET_TODAY__ = 'YYYY-MM-DD'。
+   ============================================================ */
+(function (D) {
+  var ANCHOR = { y: 2026, m: 9, d: 10 };
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function ymd(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+  function daysIn(y, m) { return new Date(y, m, 0).getDate(); }
+
+  /* 今天（本機時區）。app.js、api.js 都用這一支，不要各自 new Date() */
+  window.fbToday = function () {
+    var o = window.__FAMBUDGET_TODAY__;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(o || '')) return o;
+    var n = new Date();
+    return ymd(n.getFullYear(), n.getMonth() + 1, n.getDate());
+  };
+
+  var today = window.fbToday();
+  var Y = +today.slice(0, 4), M = +today.slice(5, 7), R = +today.slice(8, 10);
+  var K = (Y * 12 + M) - (ANCHOR.y * 12 + ANCHOR.m);          // 平移幾個月
+  var seedMonth = ymd(ANCHOR.y, ANCHOR.m, 1).slice(0, 7);
+
+  function shiftMonth(ym) {
+    var t = (+ym.slice(0, 4)) * 12 + (+ym.slice(5, 7) - 1) + K;
+    return Math.floor(t / 12) + '-' + pad(t % 12 + 1);
+  }
+  /* 本月的日子壓進 1 號～今天：10 號 → 今天，其餘依序往前 */
+  function mapDay(d) {
+    return R >= ANCHOR.d ? d + (R - ANCHOR.d) : Math.max(1, Math.ceil(d * R / ANCHOR.d));
+  }
+  function shiftDate(s) {
+    if (!/^\d{4}-\d{2}-\d{2}/.test(s || '')) return s;
+    var rest = s.slice(10), ym = s.slice(0, 7), d = +s.slice(8, 10);
+    if (ym === seedMonth) return ymd(Y, M, mapDay(d)) + rest;
+    var nm = shiftMonth(ym);
+    return nm + '-' + pad(Math.min(d, daysIn(+nm.slice(0, 4), +nm.slice(5, 7)))) + rest;
+  }
+  /* 相對日期：「昨天」就是今天減一天 */
+  function shiftDays(s) {
+    var a = new Date(ANCHOR.y, ANCHOR.m - 1, ANCHOR.d), t = new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+    var n = new Date(Y, M - 1, R + Math.round((t - a) / 86400000));
+    return ymd(n.getFullYear(), n.getMonth() + 1, n.getDate());
+  }
+  function shiftText(s) {
+    return String(s)
+      .replace(/\b\d{4}-\d{2}\b(?!-)/g, shiftMonth)
+      .replace(/(\d{1,2}) 月/g, function (_, m) { return ((+m - 1 + K) % 12 + 12) % 12 + 1 + ' 月'; });
+  }
+
+  var now = new Date();
+  D.meta.period = ymd(Y, M, 1).slice(0, 7);
+  D.meta.updated = today + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+  if (K === 0 && R === ANCHOR.d) return;                      // 剛好就是種子的那一天
+
+  D.transactions.forEach(function (t) { t.date = shiftDate(t.date); });
+  D.groups.forEach(function (g) {
+    g.created = shiftDate(g.created);
+    if (g.endsOn) {
+      g.endsOn = shiftDate(g.endsOn);
+      /* 沖繩那本要保持「已經過期、等人結算」，不然示範不到結算提示 */
+      if (g.endsOn >= today) g.endsOn = shiftDays(ymd(ANCHOR.y, ANCHOR.m, ANCHOR.d - 1));
+    }
+  });
+  D.members.forEach(function (m) {
+    m.joined = shiftDate(m.joined);
+    (m.monthly || []).forEach(function (x) { x.m = shiftMonth(x.m); });
+  });
+  D.families.forEach(function (f) { f.createdAt = shiftDate(f.createdAt); });
+  D.guardianships.forEach(function (g) { g.since = shiftDate(g.since); });
+  D.auditLogs.forEach(function (a) { a.at = shiftDate(a.at); });
+  D.monthly.forEach(function (x) { x.m = shiftMonth(x.m); });
+  D.yearly.forEach(function (x) { x.y = String(+x.y + Math.floor((ANCHOR.m - 1 + K) / 12)); });
+  D.advices.forEach(function (a) {
+    a.period = shiftMonth(a.period);
+    a.title = shiftText(a.title); a.body = shiftText(a.body);
+    a.basis = a.basis.map(shiftText); a.suggest = a.suggest.map(shiftText);
+  });
+  D.nlpDemo.forEach(function (x) { x.out.date = shiftDays(x.out.date); });
+  D.paragraphDemo.items.forEach(function (x) { x.date = shiftDays(x.date); });
+})(window.DATA);

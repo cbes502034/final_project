@@ -46,8 +46,9 @@
    記帳
    GET    /api/transactions           明細（可帶 user / from / to / cat / kind / q）
    POST   /api/transactions           新增（手動記帳走這支，不經過模型）
-   PATCH  /api/transactions/{id}      修改
-   DELETE /api/transactions/{id}      刪除
+   PATCH  /api/transactions/{id}      修改（只送要改的欄位；結算過的帳本裡的不能改）
+   DELETE /api/transactions/{id}      刪除一筆
+   DELETE /api/transactions?ids=a,b   一次刪多筆（全部成功或全部不動）
    POST   /api/nlp/parse              ★ 單句記帳：一句話 → 一筆（不寫入）
    POST   /api/nlp/parse-batch        ★ 段落記帳：一段話 → 切分成 N 筆（不寫入）
    POST   /api/nlp/confirm            單筆確認後寫入，並記錄修正供評測
@@ -149,13 +150,14 @@
         /* ⚠️ 新增一種要存的狀態，這裡跟 save() 兩邊都要加。
            suspended／audit 漏過一次：停權在同一頁看起來有效，
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
-        ['newGroups', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed',
+        ['newGroups', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed', 'txPatch', 'txGone',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
          'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
         });
       }
     } catch (e) {}
+    applyTxEdits(base);
     applyGoals(base.goals);
     applyUsers(base.newUsers);
     applyPatch(base.patch);
@@ -180,6 +182,8 @@
         archived: state.archived || [],
         settled: state.settled || [],
         removed: state.removed || [],
+        txPatch: state.txPatch || {},
+        txGone: state.txGone || [],
         goalPatch: state.goalPatch || [],
         allowancePatch: state.allowancePatch || [],
         newAlerts: state.newAlerts || [],
@@ -194,6 +198,25 @@
         endedGuardians: state.endedGuardians || []
       }));
     } catch (e) {}
+  }
+
+  /* 示範紀錄（T 開頭）的修改與刪除蓋回去。
+     ⚠️ save() 只存新記的（N 開頭）。以前刪掉一筆示範紀錄，重新整理它就回來了——
+     看起來刪成功，其實沒有。改和刪都要各自記下來。 */
+  function applyTxEdits(st) {
+    var gone = st.txGone || [], patch = st.txPatch || {};
+    st.transactions = st.transactions
+      .filter(function (t) { return gone.indexOf(t.id) < 0; })
+      .map(function (t) { return patch[t.id] ? Object.assign(t, patch[t.id]) : t; });
+  }
+  function dropTx(st, ids) {
+    st.transactions = st.transactions.filter(function (x) { return ids.indexOf(x.id) < 0; });
+    ids.forEach(function (id) {
+      if (String(id).charAt(0) === 'N') return;
+      st.txGone = st.txGone || [];
+      if (st.txGone.indexOf(id) < 0) st.txGone.push(id);
+      if (st.txPatch) delete st.txPatch[id];
+    });
   }
 
   /* 註冊進來的人補回 DATA.members，不然重新整理就不見了 */
@@ -217,17 +240,16 @@
     return st.patch[id];
   }
 
-  /* 示範資料的「今天」。真後端用伺服器時間，這裡跟著示範期間走，
-     不然示範資料會因為你哪一天打開而表現不同。 */
   /* 同一天之內的先後：新記的 id 帶毫秒時間，種子資料是流水號 */
   function txOrder(t) {
     var n = Number(String(t.id).replace(/\D/g, '')) || 0;
     return n;
   }
 
+  /* 今天：真實日期（本機時區）。示範資料在 data.js 載入時已經對齊到今天。
+     ⚠️ 不要用 toISOString()——那是 UTC，台灣早上 8 點前會變成昨天。 */
   function todayStr() {
-    return (global.DATA.meta.updated || '').slice(0, 10) ||
-      new Date().toISOString().slice(0, 10);
+    return global.fbToday();
   }
 
   function notifyOf(gid, uid) {
@@ -450,6 +472,18 @@
       })
       .filter(function (g) { return (s.removed || []).indexOf(g) < 0; })      // 移除的帳本誰都不再「在裡面」
       .filter(function (g) { return withArchived || (s.archived || []).indexOf(g) < 0; });
+  }
+
+  /* PATCH 可以改的欄位、一次最多刪幾筆。跟 toolkit/ledger.py 的 EDITABLE／MAX_BATCH 一樣 */
+  var TX_EDITABLE = ['date', 'amount', 'kind', 'cat', 'merchant', 'note', 'groupId'];
+  var MAX_BATCH = 100;
+
+  /* 這本帳裡的紀錄還能不能改、能不能刪。結算過的不行；
+     移除的帳本一定是結算過的（只有結算過的能移除），groupOf 找不到它，所以另外看 removed。 */
+  function ledgerLocked(gid) {
+    var g = groupOf(gid);
+    if (g) return !!g.settledAt;
+    return ((load().removed) || []).indexOf(gid) >= 0;
   }
 
   function groupOf(id) {
@@ -687,7 +721,7 @@
         var u = {
           id: 'U' + n, name: name, email: mail, role: null, familyId: null,
           avatar: name.slice(-1), age: null,
-          joined: new Date().toISOString().slice(0, 10),
+          joined: todayStr(),
           income: 0, expense: 0, budget: 0,
           savingsGoal: Number(p.savingsGoal) || 0
         };
@@ -1452,7 +1486,7 @@
         var amt = m ? Number(m[1]) : 0;
         return {
           raw: text, matched: false,
-          out: { date: D.meta.period + '-10', amount: amt, kind: 'expense',
+          out: { date: todayStr(), amount: amt, kind: 'expense',
                  cat: 'C08', merchant: '', conf: amt ? 0.55 : 0.2, catConf: 0.3 },
           note: 'mock 模式只做示意解析。真後端由模型負責，並會回傳每個欄位的信心度。'
         };
@@ -1476,7 +1510,7 @@
           var income = /賺|收入|薪|給我|入帳/.test(p);
           return {
             seq: i + 1, span: p,
-            date: D.meta.period + '-10',
+            date: todayStr(),
             amount: amt,
             kind: income ? 'income' : 'expense',
             cat: income ? 'I04' : 'C08',
@@ -1553,10 +1587,110 @@
            前端已經不畫刪除鈕了，這裡再擋一次：
            按鈕藏起來不是權限控制，任何人都能自己呼叫這支。
            真後端必須做同樣的檢查（403），不可以只靠前端。 */
-        if (t.user !== s.me) throw new Error('這是別人的紀錄，你只能檢視');
-        s.transactions = s.transactions.filter(function (x) { return x.id !== id; });
+        if (t.user !== s.me) throw oops('這是別人的紀錄，你只能檢視', 403);
+        if (ledgerLocked(t.group)) throw oops('這本帳已經結算，裡面的紀錄不能再改或刪除', 409);
+        dropTx(s, [id]);
         save();
         return { deleted: id };
+      });
+    },
+
+    /* 一次刪多筆：DELETE /api/transactions?ids=T1,T2
+       ⚠️ 全部成功或全部不動。先把每一筆都檢查完，全部過了才刪——
+       刪到第三筆才發現第四筆是別人的，前三筆已經不見了，使用者根本不知道哪些被刪。
+       ⚠️ 空的清單一定要擋。沒帶 ids 被當成「不篩選」就是整本刪光。
+       真後端用 toolkit.ledger.clean_ids／require_editable。 */
+    deleteTransactions: function (ids) {
+      var s = load();
+      return sleep(220).then(function () {
+        var list = [];
+        (Array.isArray(ids) ? ids : String(ids || '').split(',')).forEach(function (x) {
+          var k = String(x).trim();
+          if (k && list.indexOf(k) < 0) list.push(k);
+        });
+        if (!list.length) throw oops('沒有指定要刪哪幾筆', 400);
+        if (list.length > MAX_BATCH) throw oops('一次最多刪 ' + MAX_BATCH + ' 筆', 400);
+        list.forEach(function (id) {
+          var t = s.transactions.filter(function (x) { return x.id === id; })[0];
+          if (!t) throw oops('找不到這筆紀錄：' + id, 404);
+          if (t.user !== s.me) throw oops('裡面有別人的紀錄，你只能檢視。這次一筆都沒有刪', 403);
+          if (ledgerLocked(t.group)) throw oops('裡面有結算過的帳本的紀錄，不能刪。這次一筆都沒有刪', 409);
+        });
+        dropTx(s, list);
+        save();
+        return { deleted: list };
+      });
+    },
+
+    /* 修改一筆：PATCH /api/transactions/{id}，只送要改的欄位。
+       ⚠️ 不認得的欄位直接丟錯（source、user 都不能改）。默默忽略的話，
+       前端以為改了，畫面上卻沒變，是最難抓的錯。
+       真後端用 toolkit.ledger.clean_patch／require_editable；
+       改的是模型解析的那筆，要把新值寫進 nlp_parses.user_corrected。 */
+    updateTransaction: function (id, p) {
+      var s = load(), D = global.DATA;
+      return sleep(240).then(function () {
+        var t = s.transactions.filter(function (x) { return x.id === id; })[0];
+        if (!t) throw oops('找不到這筆紀錄', 404);
+        if (t.user !== s.me) throw oops('這是別人的紀錄，你只能檢視', 403);
+        if (ledgerLocked(t.group)) throw oops('這本帳已經結算，裡面的紀錄不能再改或刪除', 409);
+
+        p = p || {};
+        var keys = Object.keys(p);
+        if (!keys.length) throw oops('沒有要改的欄位', 400);
+        var unknown = keys.filter(function (k) { return TX_EDITABLE.indexOf(k) < 0; });
+        if (unknown.length) throw oops('不認得的欄位：' + unknown.join('、'), 400);
+
+        var next = {};
+        if ('amount' in p) {
+          var amt = Number(p.amount);
+          if (!(amt > 0) || !isFinite(amt)) throw oops('金額要是大於 0 的數字', 400);
+          next.amount = amt;
+        }
+        if ('date' in p) {
+          var d = String(p.date || '');
+          var dt = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+          var ok = /^\d{4}-\d{2}-\d{2}$/.test(d) && dt.getMonth() === +d.slice(5, 7) - 1 && dt.getDate() === +d.slice(8, 10);
+          if (!ok) throw oops('日期格式要是 YYYY-MM-DD', 400);
+          next.date = d;
+        }
+        if ('kind' in p) {
+          if (p.kind !== 'expense' && p.kind !== 'income') throw oops('收支只能是支出或收入', 400);
+          next.kind = p.kind;
+        }
+        if ('cat' in p) next.cat = p.cat;
+        ['merchant', 'note'].forEach(function (k) {
+          if (!(k in p)) return;
+          var v = String(p[k] || '').replace(/\s+/g, ' ').trim();
+          if (v.length > 100) throw oops('店家和備註最多 100 個字', 400);
+          next[k] = v;
+        });
+        /* 分類要跟收支方向對得上：支出不能選「薪資」 */
+        var kind = next.kind || t.kind, cat = next.cat || t.cat;
+        var c = D.categories.filter(function (x) { return x.id === cat; })[0];
+        if (!c) throw oops('沒有這個分類', 400);
+        if (c.kind !== kind) {
+          if ('cat' in p) throw oops('「' + c.name + '」是' + (c.kind === 'income' ? '收入' : '支出') + '的分類，跟收支方向對不上', 400);
+          /* 只改了收支方向：分類換成那一邊的「其他」，不要留一個對不上的 */
+          next.cat = kind === 'income' ? 'I04' : 'C08';
+        }
+        if ('groupId' in p && !p.groupId) throw oops('要選一本帳本', 400);
+        if ('groupId' in p && p.groupId !== t.group) {
+          next.group = groupFor(s.me, p.groupId);      // 看不到的帳本、結算過的帳本在這裡擋
+          if (next.group !== p.groupId) throw oops('你沒有加入這本帳', 403);
+        }
+
+        Object.assign(t, next, { updatedAt: localStamp(new Date()) });
+        if (String(t.id).charAt(0) !== 'N') {
+          /* 種子紀錄的修改要另外存，重新整理之後才不會變回去（新記的整筆存在 extra 裡） */
+          s.txPatch = s.txPatch || {};
+          s.txPatch[t.id] = Object.assign(s.txPatch[t.id] || {}, next, { updatedAt: t.updatedAt });
+        }
+        save();
+        var cc = D.categories.filter(function (x) { return x.id === t.cat; })[0] || {};
+        return Object.assign(clone(t), {
+          userName: (memberOf(t.user) || {}).name || '', catName: cc.name || '', catColor: cc.color || ''
+        });
       });
     },
 
@@ -1866,7 +2000,7 @@
         var name = String(p.name || '').replace(/\s+/g, ' ').trim().slice(0, 20);
         if (!name) throw oops('幫你的家庭取個名字，例如「林家」');
         var f = { id: 'F' + (allFamilies().length + 1) + '-' + Date.now().toString(36),
-                  name: name, createdBy: s.me, createdAt: new Date().toISOString().slice(0, 10) };
+                  name: name, createdBy: s.me, createdAt: todayStr() };
         s.newFamilies = (s.newFamilies || []).concat([f]);
         setMembership(s, s.me, f.id, 'parent');
         pushAudit(s, 'create_family', null, '建立「' + name + '」');
@@ -2240,6 +2374,8 @@
     nlpConfirmBatch:   function (i)     { return req('/api/nlp/confirm-batch', { method: 'POST', body: { items: i } }); },
     createTransaction: function (p)     { return req('/api/transactions', { method: 'POST', body: p }); },
     deleteTransaction: function (id)    { return req('/api/transactions/' + encodeURIComponent(id), { method: 'DELETE' }); },
+    deleteTransactions: function (ids)  { return req('/api/transactions' + qs({ ids: ids.join(',') }), { method: 'DELETE' }); },
+    updateTransaction: function (id, p) { return req('/api/transactions/' + encodeURIComponent(id), { method: 'PATCH', body: p }); },
     notifications:     function (f)     { return req('/api/notifications' + qs(f)); },
     readNotification:  function (i)     { return req('/api/notifications/' + encodeURIComponent(i), { method: 'PATCH', body: { read: true } }); },
     readNotifications: function (u)     { return req('/api/notifications', { method: 'PATCH', body: { readUntil: u } }); },
@@ -2305,6 +2441,8 @@
     nlpConfirmBatch:   function (i)    { return impl.nlpConfirmBatch(i); },
     createTransaction: function (p)    { return impl.createTransaction(p); },
     deleteTransaction: function (i)    { return impl.deleteTransaction(i); },
+    deleteTransactions: function (ids) { return impl.deleteTransactions(ids); },
+    updateTransaction: function (i, p) { return impl.updateTransaction(i, p); },
     notifications:     function (f)    { return impl.notifications(f); },
     readNotification:  function (i)    { return impl.readNotification(i); },
     readNotifications: function (u)    { return impl.readNotifications(u); },

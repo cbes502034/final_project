@@ -300,17 +300,11 @@
     return h < 11 ? '早安' : (h < 17 ? '午安' : '晚上好');
   }
 
-  /* 「今天」是哪一天。
-     ⚠️ mock 的示範資料停在某一天（DATA.meta.updated），如果拿電腦的日期，
-     總覽的「今天的紀錄」永遠是空的、問候語的日期也跟資料對不上。
-     接上真後端之後，今天就是真的今天。 */
+  /* 「今天」是哪一天：真實日期（本機時區），mock 跟真後端都一樣。
+     示範資料在 data.js 載入時已經對齊到今天，所以「今天的紀錄」不會是空的。
+     ⚠️ 不要自己 new Date().toISOString()——那是 UTC，早上 8 點前會變成昨天。 */
   function todayKey() {
-    if (API.mode !== 'http') {
-      var k = String((global.DATA.meta && global.DATA.meta.updated) || '').slice(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) return k;
-    }
-    var d = new Date();
-    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    return global.fbToday();
   }
 
   function todayText() {
@@ -659,12 +653,39 @@
   /* 明細是表格。
      帳目本來就是一欄一欄對齊的東西——日期對日期、金額對金額。
      卡片式的排版每一筆的資訊位置都不一樣，掃過去很累。 */
+  /* 畫過的每一筆記在這裡，修改表單用 id 找回整筆（明細頁、成員頁都會畫） */
+  var TXSEEN = {};
+  /* 帳本清單（含封存），判斷一筆紀錄的帳本結算了沒。loadTx 會更新 */
+  var TXGROUPS = [];
+  /* 多選刪除。on = 勾選模式；ids = 勾了哪幾筆 */
+  var PICK = { on: false, ids: [] };
+
+  /* 這筆能不能改、能不能刪：自己的，而且帳本沒結算。
+     ⚠️ 只是決定要不要畫按鈕。真正的檢查在 API（403／409），按鈕藏起來不是權限控制。 */
+  function txLocked(t) {
+    var g = TXGROUPS.filter(function (x) { return x.id === t.group; })[0];
+    return !!(g && g.settledAt);
+  }
+  function txCan(t) { return isMine(t) && !txLocked(t); }
+
   function txRow(t, hit) {
-    return '<tr class="txr' + (hit && hit === t.id ? ' is-hit' : '') + '">' +
-      '<td class="txr__d">' + esc(t.date) + '</td>' +
+    TXSEEN[t.id] = t;
+    var can = txCan(t), picked = PICK.on && PICK.ids.indexOf(t.id) >= 0;
+    return '<tr class="txr' + (hit && hit === t.id ? ' is-hit' : '') + (picked ? ' is-picked' : '') + '"' +
+        (PICK.on && can ? ' data-pickrow="' + esc(t.id) + '"' : '') + '>' +
+      (PICK.on
+        ? '<td class="txr__ck">' + (can
+            ? '<input type="checkbox" data-pick="' + esc(t.id) + '"' + (picked ? ' checked' : '') +
+                ' aria-label="選取 ' + esc(t.date + ' ' + (t.merchant || t.catName)) + '">'
+            : '') + '</td>'
+        : '') +
+      /* 手機上年份和分類欄收起來（分類改寫在項目底下），修改、刪除才不會被擠到畫面外 */
+      '<td class="txr__d"><span class="txr__y">' + esc(String(t.date).slice(0, 5)) + '</span>' +
+        esc(String(t.date).slice(5)) + '</td>' +
       '<td class="txr__c"><span style="color:' + tint(t.catColor) + '">' +
         esc(t.catName) + '</span></td>' +
-      '<td class="txr__t">' + esc(t.merchant || t.catName) +
+      '<td class="txr__t"><span class="txr__cm" style="color:' + tint(t.catColor) + '">' + esc(t.catName) + '</span>' +
+        esc(t.merchant || t.catName) +
         (t.note ? ' <em>' + esc(t.note) + '</em>' : '') +
         (t.raw ? '<br><span class="txr__raw">「' + esc(t.raw) + '」</span>' : '') +
       '</td>' +
@@ -673,16 +694,22 @@
       '<td class="txr__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
         (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</td>' +
       '<td class="txr__x">' +
-        (isMine(t) ? '<button class="del" data-del="' + esc(t.id) + '">刪除</button>' : '') +
+        /* 勾選模式時不放單筆按鈕：一次只做一件事，不會勾到一半按到別的 */
+        (PICK.on ? '' : can
+          ? '<button class="txr__ed" data-edit="' + esc(t.id) + '">修改</button>' +
+            '<button class="del" data-del="' + esc(t.id) + '">刪除</button>'
+          : (isMine(t) ? '<span class="txr__lock" title="這本帳已經結算，紀錄不能改也不能刪">已結算</span>' : '')) +
       '</td></tr>';
   }
 
-  /* 表頭 ＋ 表身。空的時候不要畫一個只有表頭的空表格。 */
+  /* 表頭 ＋ 表身。空的時候不要畫一個只有表頭的空表格。
+     ⚠️ 表頭要隱藏的欄用 class 指，不要用 nth-child——勾選模式多一欄，第幾欄就全部錯位。 */
   function txTable(rows, hit, empty) {
     if (!rows.length) return empty;
     return '<div class="txw card card--flush"><table class="txt">' +
       '<thead><tr>' +
-        '<th>日期</th><th>分類</th><th>項目</th><th>記錄者</th><th>來源</th>' +
+        (PICK.on ? '<th class="txr__ck"><input type="checkbox" id="pickAll" aria-label="全選可以刪的紀錄"></th>' : '') +
+        '<th>日期</th><th class="txr__c">分類</th><th>項目</th><th class="txr__u">記錄者</th><th class="txr__s">來源</th>' +
         '<th class="rt">金額</th><th></th>' +
       '</tr></thead><tbody>' +
       rows.map(function (t) { return txRow(t, hit); }).join('') +
@@ -706,7 +733,9 @@
      ============================================================ */
   var FOLD = {};                       // id → 展開中嗎
 
-  function foldHead(id, title, label, kicker, help, tools) {
+  /* extra：放在「記一筆」這類主要按鈕左邊的次要按鈕（例如收支明細的「選取多筆」）。
+     跟 tools 分開，是因為手機上 tools 會整行掉到下一列，extra 要留在標題這一列。 */
+  function foldHead(id, title, label, kicker, help, tools, extra) {
     var on = !!FOLD[id];
     /* ⚠️ title 一定要 esc()，所以問號不能混在 title 裡傳進來——
        那樣傳會變成畫面上出現一串 &lt;button&gt;。要掛說明就用 help 參數。 */
@@ -714,6 +743,7 @@
       (help ? helpBtn(help) : '') + '</h2>' +
       (kicker ? '<span class="sec__n">' + esc(kicker) + '</span>' : '') +
       (tools ? '<div class="sec__tools">' + tools + '</div>' : '') +
+      (extra ? '<span class="sec__x">' + extra + '</span>' : '') +
       '<button class="fold__b' + (on ? ' on' : '') + '" data-fold="' + esc(id) + '" ' +
         'data-label="' + esc(label) + '" ' +
         'aria-expanded="' + (on ? 'true' : 'false') + '">' +
@@ -784,7 +814,7 @@
     var h = '<div class="page">';
 
     /* 篩選放在標題那一列，跟「記一筆」並排——不要自己佔一整條 */
-    h += foldHead('entry', '所有紀錄', '記一筆', '', null, filterBar());
+    h += foldHead('entry', '所有紀錄', '記一筆', '', null, filterBar(), pickToggle());
     h += '<div id="txList">' + skeleton(6) + '</div></div>';
     $view.innerHTML = h;
 
@@ -1045,13 +1075,175 @@
       '</div>';
   }
 
+  function pickToggle() {
+    return '<button class="btn btn--sm pk__t" id="pickToggle" aria-pressed="' + PICK.on + '">' +
+      (PICK.on ? '完成' : '選取多筆') + '</button>';
+  }
+
+  var TXROWS = [];
   function loadTx() {
     var box = document.getElementById('txList');
     if (!box) return;
-    API.transactions(Object.assign({}, F, { groupId: GROUP })).then(function (d) {
-      box.innerHTML = txTable(d.transactions, null,
-        '<div class="card">' + emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。') + '</div>');
+    Promise.all([
+      API.transactions(Object.assign({}, F, { groupId: GROUP })),
+      API.groups({ includeArchived: true }).catch(function () { return { groups: [] }; })
+    ]).then(function (r) {
+      TXROWS = r[0].transactions;
+      TXGROUPS = r[1].groups || [];
+      renderTx();
     }).catch(function (e) { box.innerHTML = errState(e); });
+  }
+
+  /* 只重畫，不重新問資料（切換勾選模式、全選的時候） */
+  function renderTx() {
+    var box = document.getElementById('txList');
+    if (!box) return;
+    // 勾過的只留還在清單上、而且還能刪的（篩選換了、別的分頁刪掉了）
+    PICK.ids = PICK.ids.filter(function (id) {
+      return TXROWS.some(function (t) { return t.id === id && txCan(t); });
+    });
+    box.innerHTML = (PICK.on ? '<div class="pkb" id="pickBar" role="region" aria-label="多筆刪除"></div>' : '') +
+      txTable(TXROWS, null,
+        '<div class="card">' + emptyState('沒有符合的紀錄', '換個篩選條件，或記一筆新的。') + '</div>');
+    var tg = document.getElementById('pickToggle');
+    if (tg) { tg.textContent = PICK.on ? '完成' : '選取多筆'; tg.setAttribute('aria-pressed', String(PICK.on)); }
+    paintPick();
+  }
+
+  /* 勾選列：已選幾筆、全選、刪除。勾一格只改這一條跟表頭，不重畫整張表 */
+  function paintPick() {
+    var bar = document.getElementById('pickBar');
+    if (!bar) return;
+    var can = TXROWS.filter(txCan).length, n = PICK.ids.length;
+    bar.innerHTML = can
+      ? '<span class="pkb__n">已選 <b>' + n + '</b> 筆</span>' +
+        '<button class="btn btn--sm" data-pick-all>' + (n === can ? '清除勾選' : '全選 ' + can + ' 筆') + '</button>' +
+        '<span class="pkb__sp"></span>' +
+        '<button class="btn btn--sm" data-pick-off>取消</button>' +
+        '<button class="btn btn--sm btn--danger" data-pick-del' + (n ? '' : ' disabled') + '>' +
+          (n ? '刪除 ' + n + ' 筆' : '刪除') + '</button>'
+      : '<span class="pkb__n">這裡沒有你可以刪的紀錄——別人的紀錄、結算過的帳本都不能刪</span>' +
+        '<span class="pkb__sp"></span><button class="btn btn--sm" data-pick-off>取消</button>';
+    var all = document.getElementById('pickAll');
+    if (all) {
+      all.checked = can > 0 && n === can;
+      all.indeterminate = n > 0 && n < can;
+      all.disabled = !can;
+    }
+  }
+
+  function setPick(id, on) {
+    var i = PICK.ids.indexOf(id);
+    if (on && i < 0) PICK.ids.push(id);
+    if (!on && i >= 0) PICK.ids.splice(i, 1);
+    var row = document.querySelector('[data-pickrow="' + id + '"]');
+    if (row) row.classList.toggle('is-picked', on);
+    paintPick();
+  }
+
+  /* 改完、刪完之後重畫：明細頁只重問清單，其他頁（成員的明細）整頁重畫 */
+  function refreshTx() {
+    if (document.getElementById('txList')) loadTx(); else paint();
+  }
+
+  /* ============================================================
+     修改一筆
+
+     只送改過的欄位（PATCH）。來源不能改：那是「怎麼記進來的」，不是資料本身。
+     改的是模型解析的那筆，後端會把新值記成模型的錯誤標註，所以表單上講一聲。
+     ============================================================ */
+  var txEdOn = false, txEdRow = null;
+
+  function txEdCats(kind, cur) {
+    return global.DATA.categories.filter(function (c) { return c.kind === kind; }).map(function (c) {
+      return '<option value="' + esc(c.id) + '"' + (c.id === cur ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+    }).join('');
+  }
+
+  function openTxEdit(id) {
+    var t = TXSEEN[id];
+    if (!t || txEdOn) return;
+    txEdOn = true; txEdRow = t;
+    /* 可以換去的帳本：沒結算、沒封存的；原本那本一定要在選項裡 */
+    var gs = TXGROUPS.filter(function (g) { return g.id === t.group || (!g.settledAt && !g.archived); });
+    var fld = function (label, input, wide) {
+      return '<div class="prs__f' + (wide ? ' txe__w' : '') + '"><label>' + label + '</label>' + input + '</div>';
+    };
+    var w = el('<div class="hp txe" id="txEd">' +
+      '<div class="hp__c" role="dialog" aria-modal="true" aria-labelledby="txEdT">' +
+        '<div class="hp__h"><h3 id="txEdT">修改這筆紀錄</h3>' +
+          '<button class="hp__x" id="txEdX" aria-label="取消">✕</button></div>' +
+        '<div class="hp__b">' +
+          (t.source === 'nlp' && t.raw
+            ? '<p class="txe__raw">原本的句子「' + esc(t.raw) + '」<span>改過的欄位會記下來，拿去檢查模型哪裡解析錯了。</span></p>'
+            : '') +
+          '<div class="prs__g txe__g">' +
+            fld('日期', '<input type="date" id="txeDate" value="' + esc(t.date) + '">') +
+            fld('金額', '<input type="number" id="txeAmt" min="1" inputmode="numeric" value="' + esc(t.amount) + '">') +
+            fld('收支', '<select id="txeKind">' +
+              '<option value="expense"' + (t.kind === 'expense' ? ' selected' : '') + '>支出</option>' +
+              '<option value="income"' + (t.kind === 'income' ? ' selected' : '') + '>收入</option></select>') +
+            fld('分類', '<select id="txeCat">' + txEdCats(t.kind, t.cat) + '</select>') +
+            (gs.length > 1
+              ? fld('帳本', '<select id="txeGroup">' + gs.map(function (g) {
+                  return '<option value="' + esc(g.id) + '"' + (g.id === t.group ? ' selected' : '') + '>' + esc(g.name) + '</option>';
+                }).join('') + '</select>', true)
+              : '') +
+            fld('店家', '<input type="text" id="txeMer" maxlength="100" value="' + esc(t.merchant || '') + '">', true) +
+            fld('備註', '<input type="text" id="txeNote" maxlength="100" value="' + esc(t.note || '') + '">', true) +
+          '</div>' +
+          '<p class="dg__err" id="txEdErr" hidden></p>' +
+        '</div>' +
+        '<div class="hp__d">' +
+          '<button class="btn" id="txEdNo">取消</button>' +
+          '<button class="btn btn--go" id="txEdOk">儲存修改</button>' +
+        '</div>' +
+      '</div></div>');
+    document.body.appendChild(w);
+    document.body.classList.add('hp-on');
+    requestAnimationFrame(function () { w.classList.add('on'); });
+    document.getElementById('txeAmt').focus();
+  }
+
+  function closeTxEdit() {
+    var w = document.getElementById('txEd');
+    txEdOn = false; txEdRow = null;
+    if (!w) return;
+    w.classList.remove('on');
+    document.body.classList.remove('hp-on');
+    setTimeout(function () { w.remove(); }, 200);
+  }
+
+  function saveTxEdit() {
+    var t = txEdRow;
+    if (!t) return;
+    var val = function (id) { var x = document.getElementById(id); return x ? x.value : null; };
+    var err = document.getElementById('txEdErr');
+    var next = {
+      date: val('txeDate'), amount: Number(val('txeAmt')), kind: val('txeKind'), cat: val('txeCat'),
+      merchant: (val('txeMer') || '').trim(), note: (val('txeNote') || '').trim()
+    };
+    if (val('txeGroup') !== null) next.groupId = val('txeGroup');
+    if (!next.date) { err.textContent = '請選日期'; err.hidden = false; return; }
+    if (!(next.amount > 0)) { err.textContent = '金額要大於 0'; err.hidden = false; return; }
+
+    var now = { date: t.date, amount: Number(t.amount), kind: t.kind, cat: t.cat,
+                merchant: t.merchant || '', note: t.note || '', groupId: t.group };
+    var diff = {};
+    Object.keys(next).forEach(function (k) { if (next[k] !== now[k]) diff[k] = next[k]; });
+    if (!Object.keys(diff).length) { closeTxEdit(); toast('沒有改到任何欄位'); return; }
+
+    var btn = document.getElementById('txEdOk');
+    btn.disabled = true; btn.textContent = '儲存中…';
+    API.updateTransaction(t.id, diff).then(function () {
+      closeTxEdit();
+      toast('已修改', 'ok');
+      refreshTx();
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = '儲存修改';
+      err.textContent = e.message || '沒有存成功，再試一次';
+      err.hidden = false;
+    });
   }
 
   /* ============================================================
@@ -2839,6 +3031,8 @@
       });
 
       function render() {
+        /* 勾選模式只屬於收支明細。離開就收掉，不然成員頁的明細也會長出勾選框 */
+        if (page !== 'entry') { PICK.on = false; PICK.ids = []; }
         (ROUTES[page] || vHome)(parts[1], parts[2]);
         /* 總覽就是儀表板；其他頁面左上角出現「總覽」可以回去 */
         var hb = document.getElementById('homeBtn');
@@ -2870,6 +3064,14 @@
       else if (t.closest('#tourPrev')) tourGo(-1);
       else if (t.closest('#tourSkip')) tourEnd();
       e.preventDefault(); e.stopPropagation();
+      return;
+    }
+
+    /* 修改表單開著：欄位照常點，按鈕自己處理，表單外面點一下就關 */
+    if (txEdOn) {
+      if (t.closest('#txEdOk')) saveTxEdit();
+      else if (t.closest('#txEdX') || t.closest('#txEdNo') || !t.closest('.hp__c')) closeTxEdit();
+      if (!t.closest('.hp__c')) { e.preventDefault(); e.stopPropagation(); }
       return;
     }
 
@@ -3487,8 +3689,54 @@
         level: 'password',
         onOk: function () {
           API.deleteTransaction(did).then(function () {
-            loadTx(); toast('已刪除', 'ok');
+            refreshTx(); toast('已刪除', 'ok');
           }).catch(function (err) { toast('刪除失敗：' + err.message, 'err'); });
+        }
+      });
+      return;
+    }
+
+    var ed = t.closest('[data-edit]');
+    if (ed) { openTxEdit(ed.dataset.edit); return; }
+
+    /* ---- 多筆刪除 ---- */
+    if (t.closest('#pickToggle')) {
+      PICK.on = !PICK.on; PICK.ids = [];
+      renderTx();
+      return;
+    }
+    if (t.closest('[data-pick-off]')) { PICK.on = false; PICK.ids = []; renderTx(); return; }
+    if (t.closest('[data-pick-all]') || t.closest('#pickAll')) {
+      var can = TXROWS.filter(txCan);
+      PICK.ids = PICK.ids.length === can.length ? [] : can.map(function (x) { return x.id; });
+      renderTx();
+      return;
+    }
+    var prow = t.closest('[data-pickrow]');
+    if (prow) {
+      var box = prow.querySelector('[data-pick]');
+      if (t !== box) box.checked = !box.checked;       // 點整列也算勾，手機上框很小
+      setPick(prow.dataset.pickrow, box.checked);
+      return;
+    }
+    if (t.closest('[data-pick-del]')) {
+      var ids = PICK.ids.slice();
+      if (!ids.length) return;
+      danger({
+        title: '刪除 ' + ids.length + ' 筆紀錄',
+        detail: '勾選的 <b>' + ids.length + ' 筆</b>會一起刪掉，<b>救不回來</b>。輸入密碼確認這是你本人。',
+        level: 'password',
+        ok: '刪除 ' + ids.length + ' 筆',
+        onOk: function () {
+          API.deleteTransactions(ids).then(function (r) {
+            PICK.on = false; PICK.ids = [];
+            loadTx();
+            toast('已刪除 ' + r.deleted.length + ' 筆', 'ok');
+          }).catch(function (err) {
+            /* 全部成功或全部不動：失敗的時候一筆都沒刪，勾選留著讓他調整 */
+            toast('刪除失敗：' + err.message, 'err');
+            loadTx();
+          });
         }
       });
       return;
@@ -3717,6 +3965,12 @@
   });
 
   document.addEventListener('change', function (e) {
+    /* 修改表單：收支換了，分類換成那一邊的選項（支出不能選「薪資」） */
+    if (e.target.id === 'txeKind') {
+      var cs = document.getElementById('txeCat');
+      if (cs) cs.innerHTML = txEdCats(e.target.value, txEdRow && txEdRow.kind === e.target.value ? txEdRow.cat : '');
+      return;
+    }
     var al = e.target.closest ? e.target.closest('[data-allow]') : null;
     if (al) {
       var av = Number(al.value);
@@ -3799,6 +4053,8 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && helpOpen) closeHelp();
     if (e.key === 'Escape' && dangerOn) dangerClose();
+    if (e.key === 'Escape' && txEdOn) closeTxEdit();
+    if (e.key === 'Enter' && txEdOn && e.target.tagName === 'INPUT') { e.preventDefault(); saveTxEdit(); }
     if (e.key === 'Escape' && tourAt >= 0) tourEnd();
     if (e.key === 'ArrowRight' && tourAt >= 0) tourGo(1);
     if (e.key === 'ArrowLeft' && tourAt >= 0) tourGo(-1);
