@@ -2278,7 +2278,8 @@ def test_品牌是上下兩行的藝術字():
 
     tokens = read("frontend/css/tokens.css")
     en = re.search(r"\.brand__en \{([^}]*)\}", tokens).group(1)
-    assert "font-size: .856em" in en, "英文要比中文小，而且縮到跟中文一樣寬（量出來的比例 0.856）"
+    assert "font-size: .5em" in en, "中文要是英文的兩倍大"
+    assert "letter-spacing: .41em" in en, "英文縮小之後用字距撐到跟中文一樣寬（量出來的 0.41em）"
     for bad in ("border", "background", "border-radius", "padding"):
         assert bad + ":" not in en, "英文不要框：.brand__en 不該有 " + bad
 

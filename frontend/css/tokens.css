@@ -253,21 +253,26 @@ code, pre, kbd, samp { font-family: var(--code); }
 /* ============================================================
    品牌：上面毛筆字「家庭記帳」，下面筆刷草寫 FamBudget
    ------------------------------------------------------------
-   兩行一樣寬、英文比較小、沒有框。系統、使用說明、專題文件共用這一份。
-   ⚠️ 比例是量出來的（兩種字「墨」的實際寬度）：
-        家庭記帳 在 Yuji Boku 裡寬 3.92em，FamBudget 在 Kaushan Script 裡寬 4.58em
-        → 英文 = 中文 × 0.856，左邊再往回收一點點，兩行的筆畫才會左右對齊。
-   換字體的話這兩個數字要重新量。
+   中文是英文的兩倍大，兩行一樣寬，沒有框。系統、使用說明、專題文件共用這一份。
+   ⚠️ 數字是量出來的（兩種字「墨」的實際寬度，單位是各自的 em）：
+        家庭記帳 在 Yuji Boku 裡：墨寬 3.92em，左邊留白 0.07em
+        FamBudget 在 Kaushan Script 裡：墨寬 4.58em，左邊留白 0.11em
+     ⚠️ 加了字距之後瀏覽器會關掉連字，英文的墨寬實測變成 4.78em。
+     英文縮成 1/2 之後是 4.78 ÷ 2 ＝ 2.39em（中文的 em），差 1.55em，
+     平均分給 8 個字母間距 → 每個間距約 0.2em（中文）＝ 0.41em（英文自己的 em，實測校正過）。
+     最後一個字母後面也會多一格間距，用 margin-right 收回去；左邊往右推一點點對齊筆畫。
+     （使用者先要三倍，字母被撐得太開，改成兩倍。）
+   換字體的話這幾個數字要重新量。
    ============================================================ */
 .brand {
-  display: inline-flex; flex-direction: column; align-items: flex-start; width: max-content;
+  display: inline-flex; flex-direction: column; align-items: flex-start !important; gap: 0 !important; width: max-content;
   font-size: 22px; line-height: 1; color: var(--ink); text-decoration: none;
 }
 .brand:hover { color: var(--ink); text-decoration: none; }
 .brand__zh { display: block; font-family: var(--brand-zh); font-size: 1em; font-weight: 400; line-height: 1; letter-spacing: 0; white-space: nowrap; }
 .brand__en {
-  display: block; margin: .06em 0 0 -.03em;
-  font-family: var(--brand-en); font-size: .856em; font-weight: 400; line-height: 1.02; letter-spacing: 0; white-space: nowrap;
+  display: block; margin: -.06em -.41em 0 .03em;   /* 上下貼近：英文大寫的頂端剛好碰到中文筆畫的底 */
+  font-family: var(--brand-en); font-size: .5em; font-weight: 400; line-height: 1.05; letter-spacing: .41em; white-space: nowrap;
   color: var(--accent);
 }
 

@@ -64,7 +64,7 @@ b, strong { color: var(--ink); font-weight: 700; }
 /* ============================================================
    品牌：tokens.css 的 .brand（毛筆字 ＋ 筆刷草寫，兩行一樣寬）
    ============================================================ */
-.rail__home.brand, .docbar__brand.brand { font-size: 20px; }
+.rail__home.brand, .docbar__brand.brand { font-size: 28px; }
 .rail__doc { padding-left: 14px; border-left: 1px solid var(--line-2); }
 
 /* ============================================================
@@ -545,7 +545,7 @@ pre.code .tk-k { color: var(--ink); font-weight: 600; }
   .rail__brand { min-height: 56px; gap: 8px; }
   .rail__t { font-size: 15px; }
   .rail__s { display: none; }
-  .rail__home.brand, .docbar__brand.brand { font-size: 18px; }
+  .rail__home.brand, .docbar__brand.brand { font-size: 24px; }
   .rail__doc { padding-left: 10px; }
   .nav a.nav__back { top: 10px; padding: 0 10px 0 4px; }
   .hero { padding-top: 24px; }

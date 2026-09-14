@@ -3597,8 +3597,8 @@ body.is-admin .acctm__h { pointer-events: none; }
 /* ============================================================
    品牌在各處的大小（元件本身在 tokens.css 的 .brand）
    ============================================================ */
-.appbar__brand.brand { font-size: 20px; }
-.gate__b .brand { font-size: 26px; }
+.appbar__brand.brand { font-size: 28px; }
+.gate__b .brand { font-size: 32px; }
 @media (max-width: 560px) {
-  .appbar__brand.brand { font-size: 18px; }
+  .appbar__brand.brand { font-size: 24px; }
 }
