@@ -535,8 +535,12 @@
       '<a class="sec__link" href="#/entry">看全部 ›</a></div>';
 
     if (!rows.length) {
+      /* ⚠️ 選了某一本帳的時候，「今天還沒有記帳」會讓人以為真的沒記——其實是被帳本篩掉了 */
+      var one = GROUP !== 'all';
       return h + '<div class="card tdy tdy--empty">' +
-        emptyState('今天還沒有記帳', fam ? '家人今天記的帳會出現在這裡。' : '花了什麼，說一句話就記好了。') +
+        (one
+          ? emptyState('這本帳今天還沒有紀錄', '右上角切回「全部帳本」，就看得到今天所有的紀錄。')
+          : emptyState('今天還沒有記帳', fam ? '家人今天記的帳會出現在這裡。' : '花了什麼，說一句話就記好了。')) +
         (fam ? '' : '<div class="tdy__go"><button class="btn btn--go btn--sm" data-quick="entry">記一筆</button></div>') +
       '</div>';
     }
