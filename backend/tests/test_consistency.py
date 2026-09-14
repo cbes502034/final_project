@@ -227,6 +227,28 @@ def test_前端有登入畫面而且不再說自己沒有():
         assert stale not in contract, "契約還寫著「%s」，但已經做好了" % stale
 
 
+def test_手冊上的路由總數也要對():
+    """手冊開頭的標籤、API 目錄那段各寫了一次總數。
+
+    ⚠️ 加了四支平台管理的路由之後，這兩處停在 59——分項的數字都對，只有總數沒人改。
+    """
+    from app.ownership import all_routes
+
+    n = len(list(all_routes()))
+    handbook = read("frontend/docs/index.html")
+    found = re.findall(r"(\d+) 支路由", handbook)
+    assert found, "手冊裡找不到「N 支路由」"
+    stale = sorted({x for x in found if int(x) != n})
+    assert not stale, "手冊寫的路由總數 %s，ownership.py 是 %d 支" % ("、".join(stale), n)
+
+    # API 瀏覽頁的開場與頁尾也各寫了一次
+    api = read("frontend/docs/api.html")
+    m1 = re.search(r"我們寫的 <b>(\d+) 支</b>", api)
+    m2 = re.search(r"(\d+) ROUTES · 4 MODULES", api)
+    assert m1 and m2, "API 瀏覽頁找不到路由總數"
+    assert int(m1.group(1)) == n and int(m2.group(1)) == n,         "API 瀏覽頁寫 %s／%s 支，ownership.py 是 %d 支" % (m1.group(1), m2.group(1), n)
+
+
 def test_心智圖的路由數也要對():
     """手冊底部的心智圖用另一種寫法標路由數（api: '8 支'），
     上面那條測試的正規表達式抓不到它——所以它真的飄掉過。

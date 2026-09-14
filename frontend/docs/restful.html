@@ -8,10 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=8">
+<link rel="stylesheet" href="docs.css?v=12">
 <style>
 /* ---- RESTful 說明書：用紫色，跟 FastAPI 的綠、手冊的藍分開 ---- */
-.rs .sec__n { color: var(--accent-2); }
+.rs .sec__n { background: var(--accent-2); color: #fff; }
 .rs h3.sub { border-left-color: var(--accent-2); }
 .rs .hero__eyebrow { color: var(--accent-2); }
 .rs .note { border-left-color: var(--accent-2); }
@@ -21,18 +21,18 @@
 pre.code2 {
   margin: 14px 0 0; padding: 15px 17px; overflow-x: auto;
   border-radius: var(--r-sm); border: 1px solid var(--line);
-  background: rgba(0,0,0,.34);
+  background: var(--code-bg);
   font-family: var(--mono); font-size: 12.5px; line-height: 1.9; color: var(--ink-soft);
 }
 pre.code2 b.ok { color: var(--up); font-weight: 500; }
 pre.code2 b.no { color: var(--down); font-weight: 500; }
-pre.code2 i  { color: var(--ink-dim); font-style: normal; }
+pre.code2 i  { color: var(--ink-faint); font-style: normal; }
 pre.code2 u  { color: var(--accent-hi); text-decoration: none; }
 
 .codelabel {
   display: flex; align-items: center; gap: 8px; margin-top: 20px;
   font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
-  color: var(--ink-dim); text-transform: uppercase;
+  color: var(--ink-faint); text-transform: uppercase;
 }
 .codelabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
@@ -65,7 +65,7 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <div class="rail__mark" style="background:linear-gradient(135deg,#8B7CF0,#6C9FFB)">R</div>
+      <div class="rail__mark" style="background:linear-gradient(135deg,#6A5B9E,#3C5FA0)">R</div>
       <div>
         <div class="rail__t">RESTful 說明書</div>
         <div class="rail__s">API 設計</div>
@@ -163,32 +163,32 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
       </p>
 
       <div class="lib">
-        <div class="lib__c" style="--k:#6EE7B7">
+        <div class="lib__c" style="--k:#2C7A56">
           <div class="lib__v">GET</div>
           <div class="lib__p">/books</div>
           <div class="lib__d">給我書單</div>
         </div>
-        <div class="lib__c" style="--k:#6EE7B7">
+        <div class="lib__c" style="--k:#2C7A56">
           <div class="lib__v">GET</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">給我第 5 本書</div>
         </div>
-        <div class="lib__c" style="--k:#6C9FFB">
+        <div class="lib__c" style="--k:#3C5FA0">
           <div class="lib__v">POST</div>
           <div class="lib__p">/books</div>
           <div class="lib__d">進一本新書</div>
         </div>
-        <div class="lib__c" style="--k:#FBBF6E">
+        <div class="lib__c" style="--k:#8C5409">
           <div class="lib__v">PATCH</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">改第 5 本的書名</div>
         </div>
-        <div class="lib__c" style="--k:#8B7CF0">
+        <div class="lib__c" style="--k:#6A5B9E">
           <div class="lib__v">PUT</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">把第 5 本整本換掉</div>
         </div>
-        <div class="lib__c" style="--k:#FB8A8F">
+        <div class="lib__c" style="--k:#A83A31">
           <div class="lib__v">DELETE</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">報廢第 5 本</div>

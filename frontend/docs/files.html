@@ -8,13 +8,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=8">
+<link rel="stylesheet" href="docs.css?v=12">
 <style>
 /* ---- 檔案系統說明書：用青色，跟 FastAPI 綠、RESTful 紫、手冊藍分開 ---- */
-.fs .sec__n { color: #5FB8D9; }
-.fs h3.sub { border-left-color: #5FB8D9; }
-.fs .hero__eyebrow { color: #5FB8D9; }
-.fs .note { border-left-color: #5FB8D9; }
+.fs .sec__n { background: #1F6E82; color: #fff; }
+.fs h3.sub { border-left-color: #1F6E82; }
+.fs .hero__eyebrow { color: #1F6E82; }
+.fs .note { border-left-color: #1F6E82; }
 .fs .note--warn { border-left-color: var(--warn); }
 .fs .note--crit { border-left-color: var(--down); }
 
@@ -22,19 +22,19 @@
 pre.tree {
   margin: 14px 0 0; padding: 16px 18px; overflow-x: auto;
   border-radius: var(--r-sm); border: 1px solid var(--line);
-  background: rgba(0,0,0,.34);
+  background: var(--code-bg);
   font-family: var(--mono); font-size: 12.5px; line-height: 1.95; color: var(--ink-soft);
 }
 pre.tree b   { color: var(--ink); font-weight: 500; }
-pre.tree i   { color: var(--ink-dim); font-style: normal; }
-pre.tree u   { color: #5FB8D9; text-decoration: none; }
+pre.tree i   { color: var(--ink-faint); font-style: normal; }
+pre.tree u   { color: #1F6E82; text-decoration: none; }
 pre.tree s   { color: var(--warn); text-decoration: none; }
 pre.tree em  { color: var(--up); font-style: normal; }
 
 .codelabel {
   display: flex; align-items: center; gap: 8px; margin-top: 20px;
   font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
-  color: var(--ink-dim); text-transform: uppercase;
+  color: var(--ink-faint); text-transform: uppercase;
 }
 .codelabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
@@ -56,13 +56,13 @@ pre.tree em  { color: var(--up); font-style: normal; }
 .fl__n {
   flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; z-index: 1;
   display: grid; place-items: center; font-family: var(--mono); font-size: 12px;
-  background: var(--card-3); border: 1px solid var(--line-2); color: #5FB8D9;
+  background: var(--card-3); border: 1px solid var(--line-2); color: #1F6E82;
 }
 .fl__b { flex: 1 1 auto; min-width: 0; padding-top: 3px; }
 .fl__t { font-family: var(--mono); font-size: 13px; color: var(--ink); }
 .fl__d { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
 
-td .fname { font-family: var(--mono); font-size: 12px; color: #5FB8D9; }
+td .fname { font-family: var(--mono); font-size: 12px; color: #1F6E82; }
 </style>
 </head>
 <body class="fs">
@@ -70,7 +70,7 @@ td .fname { font-family: var(--mono); font-size: 12px; color: #5FB8D9; }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <div class="rail__mark" style="background:linear-gradient(135deg,#5FB8D9,#6C9FFB)">檔</div>
+      <div class="rail__mark" style="background:linear-gradient(135deg,#1F6E82,#3C5FA0)">檔</div>
       <div>
         <div class="rail__t">檔案系統說明書</div>
         <div class="rail__s">專案結構</div>
@@ -137,7 +137,7 @@ PostgreSQL
       <div class="tw">
         <table>
           <tbody>
-            <tr><td class="tight"><b style="color:#5FB8D9">藍字 ★</b></td>
+            <tr><td class="tight"><b style="color:#1F6E82">藍字 ★</b></td>
                 <td>關鍵檔案，動工前先看過</td></tr>
             <tr><td class="tight"><b style="color:var(--up)">綠字</b></td>
                 <td><b>已經寫好、完整可用</b>，直接 import，不要改</td></tr>
@@ -154,7 +154,7 @@ PostgreSQL
         而且 <b>git 的歷史刪不掉</b>：下一個 commit 刪掉它，舊版本還在歷史裡。<br>
         真的不小心 commit 了，<b>唯一的補救是立刻換一組新密鑰</b>。<br>
         要告訴別人需要哪些變數，用 <code>.env.example</code>——只有名稱沒有值。<br>
-        <span style="color:var(--ink-dim)">同樣不進版控：<code>__pycache__/</code>、
+        <span style="color:var(--ink-faint)">同樣不進版控：<code>__pycache__/</code>、
         <code>.venv/</code>、<code>.pytest_cache/</code>、<code>*.db</code>、<code>.DS_Store</code></span></p>
       </div>
     </section>

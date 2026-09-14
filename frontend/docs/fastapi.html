@@ -8,13 +8,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=8">
+<link rel="stylesheet" href="docs.css?v=12">
 <style>
 /* ---- FastAPI 說明書：用綠色當主色，跟手冊的藍、模型頁的琥珀分開 ---- */
-.fa .sec__n { color: var(--up); }
+.fa .sec__n { background: var(--up); color: #fff; }
 .fa h3.sub { border-left-color: var(--up); }
 .fa .hero__eyebrow { color: var(--up); }
-.fa .nav a i { color: var(--ink-dim); }
+.fa .nav a i { color: rgba(230, 240, 236, .7); }
 .fa .note { border-left-color: var(--up); }
 .fa .note--warn { border-left-color: var(--warn); }
 .fa .note--crit { border-left-color: var(--down); }
@@ -23,23 +23,23 @@
 pre.py {
   margin: 14px 0 0; padding: 15px 17px; overflow-x: auto;
   border-radius: var(--r-sm); border: 1px solid var(--line);
-  background: rgba(0,0,0,.34);
+  background: var(--code-bg);
   font-family: var(--mono); font-size: 12.5px; line-height: 1.85; color: var(--ink-soft);
   tab-size: 4;
 }
-pre.py .tk-kw { color: #C792EA; }         /* 關鍵字 */
-pre.py .tk-st { color: #9BC0FF; }         /* 字串 */
-pre.py .tk-cm { color: #5A6273; font-style: italic; }  /* 註解 */
-pre.py .tk-dc { color: #6EE7B7; }         /* 裝飾器 */
-pre.py .tk-fn { color: #FBBF6E; }         /* 函式名 */
-pre.py .tk-nm { color: #5FB8D9; }         /* 數字 */
+pre.py .tk-kw { color: #7A3E9D; }         /* 關鍵字 */
+pre.py .tk-st { color: #2F5E9E; }         /* 字串 */
+pre.py .tk-cm { color: #686D75; font-style: italic; }  /* 註解 */
+pre.py .tk-dc { color: #2C7A56; }         /* 裝飾器 */
+pre.py .tk-fn { color: #8C5409; }         /* 函式名 */
+pre.py .tk-nm { color: #1F6E82; }         /* 數字 */
 pre.py b.hi { color: var(--ink); font-weight: 500; background: rgba(110,231,183,.14);
               padding: 0 3px; border-radius: 3px; }
 
 .codelabel {
   display: flex; align-items: center; gap: 8px; margin-top: 20px;
   font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
-  color: var(--ink-dim); text-transform: uppercase;
+  color: var(--ink-faint); text-transform: uppercase;
 }
 .codelabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
@@ -65,7 +65,7 @@ pre.py b.hi { color: var(--ink); font-weight: 500; background: rgba(110,231,183,
 .fl__t { font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
 .fl__d { font-size: 13px; color: var(--ink-soft); }
 .fl__d code { color: var(--accent-hi); }
-.fl__ar { flex: 0 0 30px; text-align: center; color: var(--line-3); font-size: 15px; line-height: 1.2; }
+.fl__ar { flex: 0 0 30px; text-align: center; color: var(--ink-faint); font-size: 15px; line-height: 1.2; }
 
 /* 檔案對照表裡的檔名 */
 td .fname { font-family: var(--mono); font-size: 12px; color: var(--up); }
@@ -76,7 +76,7 @@ td .fname { font-family: var(--mono); font-size: 12px; color: var(--up); }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <div class="rail__mark" style="background:linear-gradient(135deg,#6EE7B7,#5FB8D9)">F</div>
+      <div class="rail__mark" style="background:linear-gradient(135deg,#2C7A56,#1F6E82)">F</div>
       <div>
         <div class="rail__t">FastAPI 說明書</div>
         <div class="rail__s">從零開始</div>
