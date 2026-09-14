@@ -671,6 +671,18 @@ def test_env_example_列出每一個設定_分成共用與四個成員_機密一
         assert keys[secret].strip() == "", "%s 在 .env.example 裡不可以有值" % secret
 
 
+def test_存款門檻前後端一致():
+    """前端補 savings.level 用 data.js 的 savingsRule，後端用設定的門檻——兩邊不一樣，同一個人在總覽跟建議會看到不同的燈號。"""
+    from app.toolkit.config import Settings
+
+    out = subprocess.run(["node", "-e", "global.window={};require(process.argv[1]);"
+                          "process.stdout.write(JSON.stringify(window.DATA.savingsRule))",
+                          os.path.join(REPO, "frontend", "js", "data.js")], capture_output=True, check=True)
+    rule = json.loads(out.stdout.decode("utf-8"))
+    assert rule["warnAt"] == Settings.model_fields["savings_warn_ratio"].default
+    assert rule["overAt"] == Settings.model_fields["savings_over_ratio"].default
+
+
 def test_設定檔的每一段都標了是誰的():
     src = io.open(os.path.join(BACKEND, "app", "toolkit", "config.py"), encoding="utf-8").read()
     for section in ("共用", "成員1", "成員2", "成員3", "成員4"):

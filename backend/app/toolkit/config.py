@@ -9,7 +9,7 @@
 ===========================================================================
     cd backend
     python -m app.cli init-env      # 從 .env.example 複製出 .env，順便產生一組 JWT_SECRET
-    python -m app.cli check-config  # 看哪些還沒填、哪些功能因此會退回假資料
+    python -m app.cli check-config  # 看哪些還沒填、沒填的功能會怎樣（例如解析改用規則頂著）
 
 值寫在 `backend/.env`（已經在 .gitignore，不會被 commit）。
 Render 上沒有 .env，是在後台的 Environment 頁面填，名字跟這裡一模一樣（大寫）。
@@ -119,7 +119,7 @@ class Settings(BaseSettings):
         default="",
         description=(
             "我們自己微調的 Qwen2.5-1.5B 模型服務網址（GGUF + llama.cpp，跑在 Hugging Face Space）。\n"
-            "留空時 services/llm/client.py 回 None，解析改用規則、前端也會自己頂著，前後端照樣串得起來。"
+            "留空時 services/llm/client.py 回 None：解析與建議的路由回 503，前端用規則頂著，前後端照樣串得起來。"
         ),
     )
     model_api_key: str = Field(

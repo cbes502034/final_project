@@ -61,6 +61,10 @@ def test_解析_建議_登入裝置在後端還沒做的時候由前端頂著(ru
     assert run["sessionsFallback"] == {"fallback": True, "count": 1}
 
 
+def test_模型服務叫不動_503_也由前端頂著(run):
+    assert run["modelDown"]["fallback"] is True and run["modelDown"]["amount"] == 120, run["modelDown"]
+
+
 def test_沒有備援的_501_講出是哪一支_哪條路由_誰負責_而且不重複(run):
     e = run["notReady"]
     owner = owner_of("POST", "/api/categories").label

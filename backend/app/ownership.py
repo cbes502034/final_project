@@ -349,7 +349,7 @@ SCHEDULE: list[dict[str, str]] = [
     {
         "week": "第 1 週",
         "theme": "地基與標註同時開始",
-        "backend": "core/ 能動、每個人的前幾支路由打得通",
+        "backend": "地基已經做好（toolkit、guards、models）：每個人拿掉前幾支的 @stub、打得通",
         "model": "標註 150 筆（不用寫程式，每人每天 1 小時）",
         "gate": "",
     },

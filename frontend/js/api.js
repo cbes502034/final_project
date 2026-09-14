@@ -3046,7 +3046,7 @@
        名稱對照  transactions／budgets／notifications 的 catName、catColor、userName
                 guardianships 的 guardianName／wardName、advices 的 userName
                 （用 GET /api/categories 與 GET /api/family 的清單對）
-       備援      後端這幾支還沒做（501／404／405）或連不上時，前端先頂著：
+       備援      後端這幾支還沒做（501／404／405）、模型服務叫不動（503）或連不上時，前端先頂著：
                 nlpParse／nlpParseBatch → 前端規則解析（寫入還是走後端）
                 generateAdvices          → 用 summary＋budgets 在前端寫成句子（不會存）
                 sessions                 → 只列這一台
@@ -3192,9 +3192,9 @@
     var out;
     try { out = fn.apply(impl, args); } catch (e) { return Promise.reject(tag(e, name)); }
     return Promise.resolve(out).catch(function (e) {
-      /* 後端還沒做（501／404／405）或連不上：有備援的就先頂著 */
+      /* 後端還沒做（501／404／405）、模型服務叫不動（503）或連不上：有備援的就先頂著 */
       var st = e && e.status;
-      var notReady = st === 501 || st === 405 || (st === 404 && /^Not Found$/i.test(e.message)) ||
+      var notReady = st === 501 || st === 503 || st === 405 || (st === 404 && /^Not Found$/i.test(e.message)) ||
         (!st && e && (e.name === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(e.message)));
       if (notReady && FALLBACK[name]) return FALLBACK[name](args);
       throw e;

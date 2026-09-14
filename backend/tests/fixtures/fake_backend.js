@@ -33,6 +33,7 @@ const ROUTES = [
   ['GET', '/api/transactions', () => res(200, { transactions: [{ id: '7', user: '2', cat: 'C01', amount: 120, kind: 'expense', date: '2026-09-14' }], total: 1 })],
   ['GET', '/api/budgets', () => res(200, { budgets: [{ user: '1', cat: 'C01', limit: 40000, used: 42000, period: 'month' }] })],
   ['POST', '/api/nlp/parse-batch', () => res(501, { detail: notReady })],
+  ['POST', '/api/nlp/parse', () => res(503, { detail: '模型服務還沒接上，先用前端的規則解析' })],
   ['POST', '/api/advices/generate', () => res(501, { detail: notReady })],
   ['GET', '/api/auth/sessions', () => res(404, { detail: 'Not Found' })],
   ['GET', '/api/alerts', () => res(200, { wrong: [] })],
@@ -63,6 +64,8 @@ const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e
   out.budget = { pct: bd.budgets[0].pct, over: bd.budgets[0].over, catName: bd.budgets[0].catName };
   const para = await A.nlpParseBatch('早餐55，加油一千二');
   out.nlpFallback = { fallback: para.fallback, amounts: para.items.map(i => i.amount) };
+  const one = await settle(A.nlpParse('午餐120'));
+  out.modelDown = { fallback: one.fallback, amount: one.out && one.out.amount, error: one.error };
   const adv = await settle(A.generateAdvices({ scope: 'me' }));
   out.adviceFallback = { fallback: adv.fallback, count: (adv.advices || []).length, error: adv.error };
   const ss = await A.sessions();
