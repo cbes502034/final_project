@@ -22,7 +22,7 @@ import pytest  # noqa: E402
 
 from app.toolkit import (  # noqa: E402
     alerts, scope, roles, notify, profile, images, money, passwords, family,
-    period, tokens,
+    period, tokens, theme,
 )
 
 
@@ -752,3 +752,15 @@ def test_唯一的家長不能丟下其他成員():
     family.require_can_leave("parent", 0, 0)
     with pytest.raises(ValueError):
         family.require_can_leave("parent", 0, 2)
+
+
+# ===========================================================================
+# theme —— 介面主題
+# ===========================================================================
+
+def test_主題只收清單裡的_id():
+    assert theme.clean_theme("sky") == "sky"
+    assert theme.DEFAULT in theme.THEMES
+    for bad in ("Sky", " sky", "", None, 3, "dark", "<script>"):
+        with pytest.raises(ValueError):
+            theme.clean_theme(bad)

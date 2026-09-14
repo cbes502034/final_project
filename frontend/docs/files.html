@@ -167,8 +167,9 @@ PostgreSQL
 ├── <b>frontend/</b>                <i>前端：純靜態，沒有建置步驟</i>
 │   ├── index.html            <i>系統本體，單頁 + hash 路由</i>
 │   ├── css/
-│   │   ├── tokens.css        <i>設計權杖：顏色、字體、圓角</i>
-│   │   └── app.css           <i>元件樣式</i>
+│   │   ├── tokens.css        <i>設計權杖：顏色、字體、圓角（預設的米白）</i>
+│   │   ├── app.css           <i>元件樣式，只准用變數</i>
+│   │   └── themes.css        <i>另外七套主題，每套一組變數</i>
 │   ├── js/
 │   │   ├── <u>api.js</u>        ★    <i>唯一的資料入口（mock / http 兩套同簽名）</i>
 │   │   ├── app.js            <i>畫面繪製與互動</i>
@@ -261,6 +262,7 @@ PostgreSQL
             <tr><td><span class="fname">family.py</span></td><td>家庭綁定：邀請碼、用帳號邀請</td><td><code>new_code</code>、<code>hash_code</code>、<code>lookup_status</code>、<code>require_joinable</code></td></tr>
             <tr><td><span class="fname">profile.py</span></td><td>把理財習慣安全地組成 prompt 背景（隔離注入）</td><td><code>to_prompt_block</code>、<code>clean_note</code></td></tr>
             <tr><td><span class="fname">notify.py</span></td><td>通知發給誰，同一筆對同一個人只發一則</td><td><code>recipients_for</code></td></tr>
+            <tr><td><span class="fname">theme.py</span></td><td>介面主題：只收清單裡的 id</td><td><code>THEMES</code>、<code>clean_theme</code></td></tr>
             <tr><td><span class="fname">roles.py</span></td><td>角色能做哪些治理動作（不管可見範圍）；平台管理員的停權規則</td><td><code>can_govern</code>、<code>require_govern</code>、<code>can_set_goal_for</code>、<code>require_platform</code>、<code>clean_suspend_reason</code>、<code>require_active</code></td></tr>
           </tbody>
         </table>

@@ -1098,7 +1098,7 @@ def test_總覽統計建議各自回答一個問題_不重複():
 def test_全家模式只整理資訊不能編輯():
     """家庭是整理資訊，沒有「記一筆」，也沒有任何輸入框。
 
-    「記一筆」出現在三個地方：儀表板的第一顆按鈕、電腦版頂列、手機右下角的圓鈕。
+    「記一筆」出現在三個地方：常用功能的第一顆、電腦版頂列、手機底部分頁中間那顆。
     全家模式三個都要收起來——記帳永遠是記自己的。
     """
     app = read("frontend/js/app.js")
@@ -1113,7 +1113,7 @@ def test_全家模式只整理資訊不能編輯():
     assert "classList.toggle('in-family'" in head, "切到全家時 body 要標記 in-family"
     css = read("frontend/css/app.css")
     assert "body.in-family .appbar__add" in css, "全家模式頂列的「記一筆」沒有收起來"
-    assert "body.in-family .fab" in css, "全家模式手機右下角的「記一筆」沒有收起來"
+    assert "body.in-family .tabbar__add" in css, "全家模式手機底部分頁的「記一筆」沒有收起來"
 
 
 def test_子女只有我的模式():
@@ -1939,3 +1939,217 @@ def test_點了才長出來的東西_打開和收起都有動畫():
 
     assert "prefers-reduced-motion" in app and "prefers-reduced-motion" in docs, \
         "使用者關掉動態效果時要尊重"
+
+
+# ===========================================================================
+# 換膚：主題就是一組變數
+# ===========================================================================
+
+def _css_blocks(css, selector_re):
+    """把 `選擇器 { --a: #xxx; ... }` 裡的色碼變數讀成 dict。"""
+    out = {}
+    for m in re.finditer(selector_re + r"\s*\{(.*?)\n\}", css, re.S):
+        body = m.group(m.lastindex)
+        key = m.group(1) if m.lastindex > 1 else ":root"
+        out[key] = dict(re.findall(r"--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})\s*;", body))
+    return out
+
+
+def _contrast(a, b):
+    def lum(h):
+        h = h.lstrip("#")
+        rgb = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+        lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+        return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+    la, lb = lum(a), lum(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+
+def _themes():
+    css = read("frontend/css/themes.css")
+    return _css_blocks(css, r'\n\[data-theme="([a-z]+)"\]')
+
+
+def test_主題清單三邊一致():
+    """data.js 的清單、themes.css 的區塊、後端的驗證清單，三邊要一模一樣。
+
+    少一邊會發生什麼：
+      · data.js 有、CSS 沒有  → 選了之後畫面沒變，使用者以為壞了
+      · 前端有、後端沒有      → 按下去先換了，存檔被 422 打回來又換回去
+      · 後端有、前端沒有      → 資料庫裡的值前端不認得，登入後退回米白
+    """
+    import importlib
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(REPO, "backend"))
+    theme = importlib.import_module("app.toolkit.theme")
+
+    data = read("frontend/js/data.js")
+    block = data[data.index("  themes: ["):data.index("  ],", data.index("  themes: ["))]
+    in_data = re.findall(r"id: '([a-z]+)'", block)
+    in_css = list(_themes().keys())
+
+    assert in_data == list(theme.THEMES), "data.js 與 toolkit/theme.py 的主題清單不一致"
+    assert in_css == in_data, "themes.css 的 [data-theme] 區塊跟 data.js 對不上：%s / %s" % (in_css, in_data)
+    assert theme.DEFAULT == in_data[0] == "paper"
+    for tid in ("literary", "cute"):
+        assert re.search(r"id: '%s'.*font: '" % tid, block), "%s 用了另外的字體，要寫在 font 讓前端去載" % tid
+
+
+def test_預設主題寫兩次要一樣():
+    """米白寫在 tokens.css 的 :root，themes.css 又寫一次給預覽用。兩邊一改漏一邊，預覽就跟實際不一樣。"""
+    root = _css_blocks(read("frontend/css/tokens.css"), r"\n:root")
+    merged = {}
+    for d in root.values():
+        merged.update(d)
+    paper = _themes()["paper"]
+    diff = {k: (merged[k], v) for k, v in paper.items() if k in merged and merged[k].upper() != v.upper()}
+    assert not diff, "tokens.css 與 themes.css 的米白不一樣：%s" % diff
+
+
+RULES = [
+    ("ink", "card", 7), ("ink", "paper", 7), ("ink-soft", "card", 4.5), ("ink-soft", "card-2", 4.5),
+    ("ink-faint", "card", 4.5), ("ink-faint", "paper", 4.5), ("ink-faint", "card-2", 4.5), ("ink-dim", "card", 3),
+    ("accent", "card", 4.5), ("accent", "paper", 4.5), ("on-accent", "accent", 4.5), ("accent-hi", "accent-wash", 4.5),
+    ("up", "card", 4.5), ("down", "card", 4.5), ("warn-ink", "card", 4.5), ("warn", "card", 3), ("info", "card", 4.5),
+    ("up", "up-wash", 4.5), ("down", "down-wash", 4.5), ("warn-ink", "warn-wash", 4.5),
+    ("stack-ink", "stack-1", 4.5), ("stack-ink", "stack-2", 4.5), ("ink", "stack-3", 7), ("ink-faint", "stack-3", 4.5),
+    ("ink", "band", 7), ("ink-faint", "band", 4.5), ("badge-ink", "badge", 3.5),
+]
+
+
+def test_每一套主題的字都看得清楚():
+    """換膚最容易出事的地方是對比：少女、可愛這種淺色系，字最容易消失在底色裡。
+
+    門檻照 WCAG：主要文字 7:1、次要與小字 4.5:1、圖示與分類色點 3:1。
+    ⚠️ 加新主題或調色之前先跑這支。
+    """
+    bad = []
+    for tid, t in _themes().items():
+        t = dict(t)
+        t.setdefault("badge-ink", "#FFFFFF")
+        for fg, bg, th in RULES:
+            assert fg in t and bg in t, "%s 少了 --%s 或 --%s" % (tid, fg, bg)
+            v = _contrast(t[fg], t[bg])
+            if v < th:
+                bad.append("%s：--%s 在 --%s 上 %.2f（要 %s）" % (tid, fg, bg, v, th))
+        for k, v in t.items():
+            if k.startswith(("cat-", "book-")) and _contrast(v, t["card"]) < 3:
+                bad.append("%s：--%s 在卡片上 %.2f（要 3）" % (tid, k, _contrast(v, t["card"])))
+    assert not bad, "\n".join(bad)
+
+
+def test_元件只准用變數_不寫死顏色與直角():
+    """換膚 = 換變數。元件裡只要寫死一個 #fff，那一塊在深色主題就會變成一塊白板。
+
+    直角也一樣：以前全部寫 border-radius: 0，換成圓潤的主題時那些地方還是方的。
+    """
+    css = re.sub(r"/\*.*?\*/", "", read("frontend/css/app.css"), flags=re.S)
+    hexes = [h for h in re.findall(r"#[0-9A-Fa-f]{3,8}\b", css) if h.lower() != "#000"]
+    assert not hexes, "app.css 還有寫死的顏色：%s" % sorted(set(hexes))
+    assert "rgba(" not in css and "rgb(" not in css, "app.css 還有寫死的 rgba()"
+    zero = re.findall(r"([^{}]*)\{[^}]*border-radius:\s*0\s*[;}]", css)
+    allowed = {".seg__b"}
+    stray = [z.strip() for z in zero if z.strip() not in allowed]
+    assert not stray, "這些還是寫死的直角：%s" % stray
+    px = re.findall(r"border-radius:\s*\d+px", css)
+    assert not px, "圓角要用 var(--r-*)：%s" % px
+
+
+def test_會引用別的變數的變數_每個主題都要重算():
+    """自訂屬性往下繼承的是算好的值。主題預覽自己掛 data-theme，
+    陰影、底紋如果只在 :root 算一次，預覽裡就還是米白的陰影。"""
+    tokens = read("frontend/css/tokens.css")
+    assert ":root, [data-theme] {" in tokens
+    block = tokens[tokens.index(":root, [data-theme] {"):]
+    block = block[:block.index("\n}")]
+    for v in ("--shadow-card", "--bg-art", "--band-bg", "--scrim"):
+        assert v + ":" in block, v + " 要放在 :root, [data-theme] 裡"
+
+
+def test_主題設定_按下去就換_存不起來就換回去():
+    app = read("frontend/js/app.js")
+    cards = re.search(r"function themeCards\(cur\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert 'data-theme="\' + esc(t.id)' in cards, "預覽要自己掛 data-theme，才看得到那一套真正的樣子"
+    choose = re.search(r"function chooseTheme\(id\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert choose.index("applyTheme(id)") < choose.index("API.updateProfile({ theme: id })"), "要先換再存，不要讓人等"
+    assert "applyTheme(prev)" in choose, "存失敗要換回原本的主題"
+    who = re.search(r"function paintWho\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "applyTheme(m.user.theme)" in who, "登入之後要以帳號存的主題為準"
+
+    html = read("frontend/index.html")
+    head = html[:html.index("</head>")]
+    assert head.index("fambudget.theme") < head.index("css/tokens.css"), "主題要在 CSS 載入前掛上，不然重新整理會閃一下"
+    assert head.index("css/app.css") < head.index("css/themes.css"), "themes.css 要最後載，才蓋得過元件的結構規則"
+
+
+_THEME_DRIVER = r"""
+const [dataJs, apiJs] = process.argv.slice(2);
+const store = new Map();
+global.localStorage = { getItem: k => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
+global.document = { querySelector: () => null };
+global.setTimeout = fn => setImmediate(fn);
+function boot() {
+  delete require.cache[require.resolve(dataJs)];
+  delete require.cache[require.resolve(apiJs)];
+  global.window = {};
+  require(dataJs); require(apiJs);
+  return window.API;
+}
+async function fails(p) { try { await p; return null; } catch (e) { return { msg: e.message, status: e.status || null }; } }
+(async () => {
+  const out = {}, PW = 'password123';
+  let API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.before = (await API.me()).user.theme;
+  out.saved = (await API.updateProfile({ theme: 'sky' })).theme;
+  out.me = (await API.me()).user.theme;
+  out.bad = await fails(API.updateProfile({ theme: 'dark' }));
+  out.stillSky = (await API.me()).user.theme;
+  await API.login({ email: 'shufen@lin.tw', password: PW });
+  out.spouse = (await API.me()).user.theme;
+  API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.afterReload = (await API.me()).user.theme;
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+def test_主題存在帳號上_各選各的():
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_THEME_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    out = json.loads(res.stdout.decode("utf-8"))
+    assert out["before"] == "paper", "沒選過主題的人，契約說 theme 一定有值（paper）"
+    assert out["saved"] == out["me"] == "sky"
+    assert out["bad"] and out["bad"]["status"] == 422, "清單外的主題要回 422"
+    assert out["stillSky"] == "sky", "被擋掉的請求不可以改到原本的主題"
+    assert out["spouse"] == "paper", "主題是個人的，家人不會跟著換"
+    assert out["afterReload"] == "sky", "重新整理之後主題不見了"
+
+
+def test_總覽照銀行_App_疊卡_常用功能_底部分頁():
+    """參考富邦新版：數字卡疊在一起、常用功能收在一張卡裡、手機底部分頁中間是記一筆。"""
+    app = read("frontend/js/app.js")
+    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    for part in ("wal__strip--1", "wal__strip--2", "wal__card", 'class="qk"', 'class="dgrid"'):
+        assert part in home, "總覽少了 " + part
+    assert "hero" not in home, "舊的大數字卡還在"
+
+    html = read("frontend/index.html")
+    bar = html[html.index('<nav class="tabbar"'):html.index("</nav>", html.index('<nav class="tabbar"'))]
+    for tab in ('data-tab=""', 'data-tab="entry"', 'data-tab="stats"', 'data-tab="advice"', 'data-quick="entry"'):
+        assert tab in bar, "底部分頁少了 " + tab
+    css = read("frontend/css/app.css")
+    assert "body.is-admin .tabbar" in css and "body.is-out .tabbar" in css, "平台管理員與還沒登入不該有底部分頁"

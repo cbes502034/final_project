@@ -30,8 +30,8 @@
      不用純黑。純黑配米白會太刺，#1B1D21 讀起來柔和但一樣清楚。 */
   --ink:         #1B1D21;
   --ink-soft:    #4E535A;
-  --ink-faint:   #7B8189;
-  --ink-dim:     #9DA2A9;
+  --ink-faint:   #666B73;          /* ⚠️ 小字要過 4.5:1。原本 #7B8189 只有 3.9 */
+  --ink-dim:     #858A91;          /* 幣別這類裝飾字，門檻 3:1 */
 
   /* -- 主色：深玉綠 ------------------------------------------
      錢的顏色。飽和度壓低，跟米白配起來像印刷油墨而不是螢光。 */
@@ -45,6 +45,7 @@
      只用在需要「暖」的地方（歡迎、提示、空狀態），不搶主色。 */
   --accent-2:      #C4693C;
   --accent-2-wash: #FBEDE4;
+  --on-accent:     #FFFFFF;        /* 主色按鈕上的字。深色主題主色是螢光綠，字就要反過來用深色 */
 
   /* -- 語意色 -- */
   --up:          #2C7A56;          /* 收入、達標 */
@@ -53,27 +54,50 @@
   --info:        #3C5FA0;          /* 參考資訊 */
 
   --up-wash:     #E7F2EC;
-  --down-wash:   #FAEAE8;
+  --down-wash:   #FCEEEC;
   --warn-wash:   #FBF0DE;
   --info-wash:   #EAEFF8;
+  --warn-ink:    #8C5409;          /* 提醒色拿來當「字」的時候用這個，warn 本身只夠當圖示 */
 
-  /* -- 圓角：沒有圓角 ----------------------------------------
-     圓角（尤其是膠囊形和大圓角卡片）是這幾年 AI 產品的長相。
-     帳冊不是那樣的東西——它是直線、格線、對齊的欄位。
-     全部收成直角之後，畫面立刻像一份可以拿去報帳的文件，
-     而且細線分區的效果會更乾淨。 */
-  --r-card:      0;
-  --r-input:     0;
-  --r-sm:        0;
-  --r-xs:        0;
-  --r-pill:      0;      /* 連進度條也是平的 */
-  --r-dot:       999px;  /* 只有真正是圓的東西用這個 */
+  /* -- 疊在一起的數字卡 ----------------------------------------
+     像皮夾裡的卡片：後面兩張露出一截（收入、支出），最前面那張是還可以花。
+     stack-1、stack-2 上面是白字，stack-3 上面是一般的深色字。 */
+  --stack-1:     #123F36;
+  --stack-2:     #1B6B5A;
+  --stack-3:     #FFFFFF;
+  --stack-ink:   #FFFFFF;
+
+  --band:        #E3EEE8;          /* 頁面最上面那一條淡色帶，往下淡出 */
+  --badge:       #D6453A;          /* 未讀數字的紅底 */
+  --badge-ink:   #FFFFFF;
+  --knob:        #FFFFFF;          /* 開關上的圓鈕 */
+  --shade:       #3C3223;          /* 陰影的顏色。米白底上用純黑會發灰 */
+  --shade-deep:  #1C1812;          /* 遮罩 */
+
+  /* -- 圓角：交給主題決定 ------------------------------------
+     ⚠️ 2026-09-14 改。以前這裡全部是 0（帳冊的直線感），
+     使用者看了一陣子覺得「全部方方正正有點怪」，拿富邦、元大的 App 當參考——
+     大圓角的卡片、圓形的功能圖示、膠囊形的按鈕。
+
+     現在圓角是主題的一部分：預設是圓潤的，「資訊科技」「藝術」兩套再收回直角。
+     元件只寫 var(--r-*)，不寫數字。 */
+  --r-card:      20px;   /* 區塊、卡片 */
+  --r-panel:     16px;   /* 浮起來的面板 */
+  --r-input:     12px;   /* 按鈕、輸入框 */
+  --r-sm:        10px;   /* 小方塊：圖示底、品牌方塊 */
+  --r-xs:        6px;    /* 程式碼、極小的東西 */
+  --r-icon:      999px;  /* 常用功能的圖示底：圓的 */
+  --r-pill:      999px;  /* 膠囊、徽章、開關 */
+  --r-bar:       999px;  /* 進度條 */
+  --r-ava:       999px;  /* 頭像 */
+  --r-dot:       999px;  /* 分類與帳本的小色點 */
 
   /* -- 字體 --------------------------------------------------
      數字用等寬，因為帳目要對得齊。 */
   --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC",
           "Microsoft JhengHei", sans-serif;
   --serif: "Noto Serif TC", "Songti TC", PMingLiU, Georgia, serif;
+  --display: var(--serif);   /* 問候語、大數字、區塊標題。主題可以換成手寫或粉圓 */
   --mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, "Cascadia Mono",
           Consolas, monospace;
 
@@ -109,9 +133,6 @@
   --gap: 18px;           /* 區塊之間 */
   --ctl: 36px;           /* 一般控制項的高度（篩選、小按鈕） */
 
-  --shadow-block: 0 1px 2px rgba(60, 50, 35, .05),
-                  0 6px 18px rgba(60, 50, 35, .05);
-
   /* -- 動態曲線 ----------------------------------------------
      ease  一般轉場
      out   收尾慢，適合「浮起來」
@@ -120,30 +141,43 @@
   --out:  cubic-bezier(.16, 1, .3, 1);
   --back: cubic-bezier(.34, 1.56, .64, 1);
 
-  /* -- 陰影：暖色調的，不是純黑 ------------------------------
-     米白底上用純黑陰影會發灰，帶一點暖色才像紙。 */
-  --shadow-flat: 0 1px 2px rgba(60, 50, 35, .05);
-  --shadow-card: 0 1px 2px rgba(60, 50, 35, .05),
-                 0 8px 24px rgba(60, 50, 35, .055);
-  --shadow-lift: 0 2px 4px rgba(60, 50, 35, .06),
-                 0 14px 34px rgba(60, 50, 35, .10);
-  --shadow-pop:  0 8px 20px rgba(60, 50, 35, .10),
-                 0 28px 64px rgba(60, 50, 35, .16);
-  --shadow-in:   inset 0 1px 2px rgba(60, 50, 35, .06);
 }
 
 * { box-sizing: border-box; }
 
-html {
-  background-color: var(--paper);
-  /* 紙的感覺：兩團極淡的暖光，加上幾乎看不見的方格。
-     方格是「帳簿」的暗示，淡到不會干擾閱讀。 */
-  background-image:
+/* ⚠️ 會引用其他變數的變數，要在每一個 [data-theme] 上重新宣告一次。
+
+   自訂屬性往下繼承的是「已經代換好的值」。主題設定頁的小預覽自己掛著
+   data-theme="tech"，如果 --shadow-card 只在 :root 算過一次，
+   預覽裡拿到的就是米白主題的陰影色，不會跟著那一套主題變。 */
+:root, [data-theme] {
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in:    inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim:        color-mix(in srgb, var(--shade-deep) 38%, transparent);
+
+  /* 頁面底紋：兩團極淡的暖光，加上幾乎看不見的方格（帳簿的暗示） */
+  --bg-art:
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px),
-    radial-gradient(900px 600px at 12% -6%, rgba(196, 105, 60, .05), transparent 62%),
-    radial-gradient(760px 520px at 92% 4%, rgba(27, 107, 90, .05), transparent 60%);
-  background-size: 88px 88px, 88px 88px, auto, auto;
+    radial-gradient(900px 600px at 12% -6%, color-mix(in srgb, var(--accent-2) 5%, transparent), transparent 62%),
+    radial-gradient(760px 520px at 92% 4%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 60%);
+  --bg-size: 88px 88px, 88px 88px, auto, auto;
+  /* 最上面那條色帶：從 --band 往下淡出 */
+  --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 55%, transparent) 55%, transparent 100%);
+}
+
+html {
+  background-color: var(--paper);
+  background-image: var(--bg-art);
+  background-size: var(--bg-size);
   background-attachment: fixed;
   scroll-behavior: smooth;
 

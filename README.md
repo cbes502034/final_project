@@ -22,7 +22,7 @@
 final_project/
 ├── frontend/              前端：純靜態，無框架、無建置步驟
 │   ├── index.html           系統本體（單頁 + hash 路由）
-│   ├── css/                 tokens.css 設計權杖 · app.css 元件
+│   ├── css/                 tokens.css 設計權杖 · app.css 元件 · themes.css 八套主題
 │   ├── js/
 │   │   ├── api.js     ★     唯一的資料入口，mock / http 兩個轉接器
 │   │   ├── app.js           畫面繪製與互動

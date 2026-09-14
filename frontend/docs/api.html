@@ -197,9 +197,9 @@
       note: '<b>順序不能顛倒，模型不做任何算術。</b>財務數字算錯會讓使用者做出錯誤決定，而模型本來就不擅長算術。' },
 
     { n: 12, o: 'm1', m: 'PATCH', p: '/api/auth/me', a: '登入',
-      d: '修改個人資料：顯示名稱、出生年',
-      body: '{\n  "displayName": "林建國",\n  "birthYear": 1974\n}',
-      note: '只能改自己的資料。email 不給改——那是登入帳號，要改的話等於換帳號，要另外設計驗證流程。' },
+      d: '修改個人資料：顯示名稱、出生年、介面主題',
+      body: '{\n  "displayName": "林建國",\n  "birthYear": 1974,\n  "theme": "sky"\n}',
+      note: '只能改自己的資料，只送要改的欄位。email 不給改——那是登入帳號，要改的話等於換帳號，要另外設計驗證流程。<br><code>theme</code> 只收 <code>paper</code>／<code>sky</code>／<code>tech</code>／<code>literary</code>／<code>pop</code>／<code>girly</code>／<code>cute</code>／<code>art</code>，其他回 422（<code>toolkit.theme.clean_theme()</code>）。<b>換膚不增加後端負擔</b>：只多存一個字串，畫面全在瀏覽器裡換。' },
     { n: 13, o: 'm1', m: 'PUT', p: '/api/auth/me/avatar', a: '登入',
       d: '上傳大頭貼。前端已縮到 256×256',
       body: '{\n  "image": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."\n}',

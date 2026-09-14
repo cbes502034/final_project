@@ -533,6 +533,21 @@ window.DATA = {
     { task: '一次輸入完全正確率', metric: '全欄位皆對', base: 0.42, ft: 0.79, target: 0.75 }
   ],
 
+  /* ---------- 介面主題 ----------
+     ⚠️ 這份清單是正本。themes.css 每一套都要有一個 [data-theme="id"]，
+     後端 toolkit/theme.py 的 THEMES 要一模一樣——有測試對齊。
+     font 是要另外從 Google Fonts 載的字（只有選到那一套才載）。 */
+  themes: [
+    { id: 'paper',    name: '米白格子', note: '預設。像一本攤開的帳簿',       band: '#E3EEE8' },
+    { id: 'sky',      name: '晴空藍',   note: '銀行 App 的清爽藍',            band: '#D8E7F8' },
+    { id: 'tech',     name: '資訊科技', note: '深色、螢光綠、直角',           band: '#0D2229' },
+    { id: 'literary', name: '文青',     note: '亞麻紙、楷體、橄欖綠',         band: '#E8DFCC', font: 'LXGW+WenKai+TC:wght@400;700' },
+    { id: 'pop',      name: '流行',     note: '粗框、撞色、硬陰影',           band: '#FFD84D' },
+    { id: 'girly',    name: '少女',     note: '粉色、圓潤、柔光',             band: '#FADFEA' },
+    { id: 'cute',     name: '可愛',     note: '奶油黃、粉圓體、圓滾滾',       band: '#FFE8A6', font: 'Huninn' },
+    { id: 'art',      name: '藝術',     note: '克萊因藍、朱紅、幾何色塊',     band: '#E9E2D2' }
+  ],
+
   /* ---------- 資料庫架構 ---------- */
   schema: [
     { t: 'users', label: '使用者帳號', note: '登入身分，與家庭角色分開',
@@ -540,6 +555,7 @@ window.DATA = {
              ['password_hash', 'TEXT', 'bcrypt / argon2，絕不存明碼'],
              ['display_name', 'TEXT', ''],
              ['birth_year', 'INT', '個人資料。⚠️ 不參與任何權限判斷'],
+             ['theme', 'TEXT', "介面主題，預設 'paper'。只影響外觀，存在帳號上換裝置也一樣"],
              ['is_platform_admin', 'BOOLEAN', '平台管理員。與家庭角色無關，且看不到任何財務資料'],
              ['suspended_at', 'TIMESTAMPTZ', 'NULL = 正常。⚠️ 停權只擋登入與寫入，不刪任何資料'],
              ['suspended_reason', 'TEXT', '停權理由。沒有理由的停權就是任意封鎖'],

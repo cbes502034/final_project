@@ -1,0 +1,758 @@
+/* ============================================================
+   themes.css — 主題
+
+   每一套主題就是一組變數。元件只寫 var(--*)，所以換膚 =
+   在 <html> 上換 data-theme，其他什麼都不用動。
+
+   預設的「米白格子」寫在 tokens.css 的 :root；這裡是八套（米白再寫一次給預覽用）。
+   選擇器用 [data-theme="…"] 而不是 html[data-theme="…"]——
+   主題設定頁的小預覽自己也掛著 data-theme，要能在那一小塊裡套上整套顏色。
+   只有「結構上的差異」（粗框、發光、裝飾色塊）才寫成 html[data-theme="…"]，
+   那些不需要出現在預覽裡。
+
+   ⚠️ 色票都量過對比才寫進來（見 test_每一套主題的字都看得清楚）：
+     主要文字 7:1、次要與小字 4.5:1、分類色點與圖示 3:1。
+   加新主題之前，先把它加進那支測試。
+
+   主題清單的正本在 frontend/js/data.js 的 themes；
+   後端驗證用的清單在 backend/app/toolkit/theme.py，兩邊有測試對齊。
+   ============================================================ */
+
+
+/* ------------------------------------------------------------
+   米白格子（預設）——跟 tokens.css 的 :root 一樣。寫在這裡是給主題預覽用的：在別的主題底下，預覽要能變回米白。
+   ------------------------------------------------------------ */
+[data-theme="paper"] {
+  --paper: #F4F1EA;
+  --paper-2: #EFEBE2;
+  --card: #FFFFFF;
+  --card-2: #FCFAF6;
+  --card-3: #F7F4EE;
+  --sunk: #F1EEE6;
+  --line: #E7E2D8;
+  --line-2: #DAD3C6;
+  --line-3: #C3BAA9;
+  --ink: #1B1D21;
+  --ink-soft: #4E535A;
+  --ink-faint: #666B73;
+  --ink-dim: #858A91;
+  --accent: #1B6B5A;
+  --accent-hi: #14564A;
+  --accent-soft: #4E9585;
+  --accent-wash: #E6F0EC;
+  --accent-line: #BFD9D1;
+  --accent-2: #C4693C;
+  --accent-2-wash: #FBEDE4;
+  --on-accent: #FFFFFF;
+  --up: #2C7A56;
+  --down: #BE4239;
+  --warn: #B0741A;
+  --warn-ink: #8C5409;
+  --info: #3C5FA0;
+  --up-wash: #E7F2EC;
+  --down-wash: #FCEEEC;
+  --warn-wash: #FBF0DE;
+  --info-wash: #EAEFF8;
+  --stack-1: #123F36;
+  --stack-2: #1B6B5A;
+  --stack-3: #FFFFFF;
+  --stack-ink: #FFFFFF;
+  --band: #E3EEE8;
+  --badge: #D6453A;
+  --knob: #FFFFFF;
+  --cat-food: #C4693C;
+  --cat-transit: #3C5FA0;
+  --cat-home: #6A5B9E;
+  --cat-daily: #2C7A56;
+  --cat-fun: #BE4239;
+  --cat-study: #B0741A;
+  --cat-health: #3E8DA8;
+  --cat-other: #8A8E95;
+  --cat-bonus: #1B6B5A;
+  --book-indigo: #27405E;
+  --book-violet: #4A3F6B;
+  --book-teal: #1F5E63;
+  --book-moss: #2F5D3A;
+  --book-umber: #7A4A2E;
+  --book-wine: #7A2F3C;
+  --r-card: 20px;
+  --r-panel: 16px;
+  --r-input: 12px;
+  --r-sm: 10px;
+  --r-xs: 6px;
+  --r-icon: 999px;
+  --r-pill: 999px;
+  --r-bar: 999px;
+  --r-ava: 999px;
+  --r-dot: 999px;
+  color-scheme: light;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --display: var(--serif);
+  --shade: #3C3223;
+  --shade-deep: #1C1812;
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+  --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 55%, transparent) 55%, transparent 100%);
+}
+
+/* ------------------------------------------------------------
+   晴空藍——照富邦新版的首頁：淡藍漸層底、深藍與亮藍的疊卡、白色圓角功能卡。
+   ------------------------------------------------------------ */
+[data-theme="sky"] {
+  --paper: #EAF1FA;
+  --paper-2: #E1EAF6;
+  --card: #FFFFFF;
+  --card-2: #F5F9FD;
+  --card-3: #EEF4FB;
+  --sunk: #EBF1F8;
+  --line: #DCE5F0;
+  --line-2: #C8D5E5;
+  --line-3: #A6B8CE;
+  --ink: #132238;
+  --ink-soft: #3C4C61;
+  --ink-faint: #56667B;
+  --ink-dim: #7A889B;
+  --accent: #1F5FBF;
+  --accent-hi: #174C9B;
+  --accent-soft: #5E8FD6;
+  --accent-wash: #E6EFFB;
+  --accent-line: #BBD1EF;
+  --accent-2: #D9822B;
+  --accent-2-wash: #FCEFE0;
+  --on-accent: #FFFFFF;
+  --up: #1E7A55;
+  --down: #C23B3B;
+  --warn: #B7791F;
+  --warn-ink: #875A14;
+  --info: #1F5FBF;
+  --up-wash: #E3F3EB;
+  --down-wash: #FDEEEE;
+  --warn-wash: #FCF1DD;
+  --info-wash: #E6EFFB;
+  --stack-1: #0F2C55;
+  --stack-2: #1F5FBF;
+  --stack-3: #DCE7F4;
+  --stack-ink: #FFFFFF;
+  --band: #D8E7F8;
+  --badge: #D93A3A;
+  --knob: #FFFFFF;
+  --cat-food: #D0612B;
+  --cat-transit: #1F5FBF;
+  --cat-home: #6A5BB5;
+  --cat-daily: #1E7A55;
+  --cat-fun: #C23B3B;
+  --cat-study: #B7791F;
+  --cat-health: #2A86A8;
+  --cat-other: #7A8594;
+  --cat-bonus: #0F8A8F;
+  --book-indigo: #1F3F7A;
+  --book-violet: #4B3F8F;
+  --book-teal: #146B78;
+  --book-moss: #2C6B45;
+  --book-umber: #8A5530;
+  --book-wine: #8A2F4A;
+  --r-card: 22px;
+  --r-panel: 18px;
+  --r-input: 12px;
+  --r-sm: 12px;
+  color-scheme: light;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --display: var(--serif);
+  --shade: #1B3A66;
+  --shade-deep: #0B1B33;
+  --bg-art:
+    radial-gradient(1000px 520px at 85% -10%, color-mix(in srgb, #FFFFFF 70%, transparent), transparent 60%),
+    linear-gradient(180deg, #DCE9F8 0%, var(--paper) 520px);
+  --bg-size: auto, auto;
+  --band-bg: linear-gradient(180deg, #C9DDF5 0%, color-mix(in srgb, #D8E7F8 60%, transparent) 60%, transparent 100%);
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+}
+
+/* ------------------------------------------------------------
+   資訊科技——深色底、螢光蒂芬妮綠、直角。數字用等寬字，滑過去會發光。
+   ------------------------------------------------------------ */
+[data-theme="tech"] {
+  --paper: #0A0F15;
+  --paper-2: #0E141C;
+  --card: #111923;
+  --card-2: #15202C;
+  --card-3: #192533;
+  --sunk: #0D141D;
+  --line: #223041;
+  --line-2: #2D3E53;
+  --line-3: #415872;
+  --ink: #E6EDF5;
+  --ink-soft: #B6C2D0;
+  --ink-faint: #8E9CAD;
+  --ink-dim: #6E7D8F;
+  --accent: #2EE6D6;
+  --accent-hi: #6AF5E8;
+  --accent-soft: #1FB5A8;
+  --accent-wash: #0E2A2D;
+  --accent-line: #1D5256;
+  --accent-2: #FF5CD6;
+  --accent-2-wash: #2B1230;
+  --on-accent: #03201D;
+  --up: #3DDC97;
+  --down: #FF6B6B;
+  --warn: #FFC24B;
+  --warn-ink: #FFC24B;
+  --info: #5AA9FF;
+  --up-wash: #0F2A20;
+  --down-wash: #2E1518;
+  --warn-wash: #2C2410;
+  --info-wash: #0F2036;
+  --stack-1: #062F35;
+  --stack-2: #0B4A50;
+  --stack-3: #15202C;
+  --stack-ink: #E6FFFB;
+  --band: #0D2229;
+  --badge: #E8365A;
+  --knob: #E6EDF5;
+  --cat-food: #FF9F5A;
+  --cat-transit: #5AA9FF;
+  --cat-home: #A98BFF;
+  --cat-daily: #3DDC97;
+  --cat-fun: #FF6B6B;
+  --cat-study: #FFC24B;
+  --cat-health: #4FD1E8;
+  --cat-other: #9AA7B6;
+  --cat-bonus: #2EE6D6;
+  --book-indigo: #7B98E0;
+  --book-violet: #A58EE6;
+  --book-teal: #45C2C8;
+  --book-moss: #6CC48A;
+  --book-umber: #D8A070;
+  --book-wine: #E57F93;
+  --r-card: 0;
+  --r-panel: 0;
+  --r-input: 0;
+  --r-sm: 0;
+  --r-xs: 0;
+  --r-icon: 0;
+  --r-pill: 0;
+  --r-bar: 0;
+  --r-ava: 0;
+  --r-dot: 0;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  color-scheme: dark;
+  --shade: #000000;
+  --shade-deep: #000000;
+  --display: var(--sans);
+  --bg-art:
+    linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px),
+    radial-gradient(900px 500px at 90% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    radial-gradient(700px 500px at 0% 30%, color-mix(in srgb, var(--accent-2) 7%, transparent), transparent 60%);
+  --bg-size: 40px 40px, 40px 40px, auto, auto;
+  --band-bg: linear-gradient(180deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent);
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+}
+html[data-theme="tech"] #view .wal__v,
+html[data-theme="tech"] #view .wal__strip b,
+html[data-theme="tech"] #view .wal__f b,
+html[data-theme="tech"] #view .bcard__v { font-family: var(--mono); letter-spacing: -.02em; }
+html[data-theme="tech"] #view .wal__card,
+html[data-theme="tech"] #view .qk,
+html[data-theme="tech"] #view .card,
+html[data-theme="tech"] #view .bcard { border-color: var(--line-2); }
+html[data-theme="tech"] #view .wal__card { border-top: 2px solid var(--accent); }
+/* 滑過去：螢光綠的光 */
+html[data-theme="tech"] #view .dtile:hover .dtile__ic,
+html[data-theme="tech"] .btn:hover,
+html[data-theme="tech"] #view .wal__go:hover,
+html[data-theme="tech"] #view .thm__i:hover,
+html[data-theme="tech"] .appbar__add:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+html[data-theme="tech"] #view .sec__t { font-family: var(--mono); letter-spacing: .04em; }
+
+/* ------------------------------------------------------------
+   文青——亞麻紙的底、橫線筆記本、楷體標題、橄欖綠。
+   ------------------------------------------------------------ */
+[data-theme="literary"] {
+  --paper: #EEE7D9;
+  --paper-2: #E7DFCE;
+  --card: #FBF7EF;
+  --card-2: #F6F0E4;
+  --card-3: #F1EADC;
+  --sunk: #EDE5D5;
+  --line: #E0D6C3;
+  --line-2: #D1C4AB;
+  --line-3: #B5A485;
+  --ink: #2A241D;
+  --ink-soft: #54493C;
+  --ink-faint: #6B5F4F;
+  --ink-dim: #8A7D6A;
+  --accent: #56673A;
+  --accent-hi: #44522B;
+  --accent-soft: #8A9A6A;
+  --accent-wash: #E9EBDB;
+  --accent-line: #C8CEB0;
+  --accent-2: #A0522D;
+  --accent-2-wash: #F3E3D6;
+  --on-accent: #FBF7EF;
+  --up: #4E6B34;
+  --down: #A0412D;
+  --warn: #96691E;
+  --warn-ink: #7A5316;
+  --info: #4B5E7A;
+  --up-wash: #E6EBDB;
+  --down-wash: #F2E1DA;
+  --warn-wash: #F3E8D2;
+  --info-wash: #E3E7EC;
+  --stack-1: #3A3128;
+  --stack-2: #56673A;
+  --stack-3: #FBF7EF;
+  --stack-ink: #FBF7EF;
+  --band: #E8DFCC;
+  --badge: #A0412D;
+  --knob: #FBF7EF;
+  --cat-food: #A65A2E;
+  --cat-transit: #4B6A8A;
+  --cat-home: #75608E;
+  --cat-daily: #5A7A3C;
+  --cat-fun: #A84A3E;
+  --cat-study: #96691E;
+  --cat-health: #3F7F86;
+  --cat-other: #7C7468;
+  --cat-bonus: #56673A;
+  --book-indigo: #34465E;
+  --book-violet: #56476E;
+  --book-teal: #2F5F63;
+  --book-moss: #3D5F35;
+  --book-umber: #7A4A2E;
+  --book-wine: #7A3440;
+  --r-card: 8px;
+  --r-panel: 8px;
+  --r-input: 6px;
+  --r-sm: 6px;
+  --r-xs: 3px;
+  --r-pill: 999px;
+  --r-icon: 999px;
+  color-scheme: light;
+  --shade: #4A3B28;
+  --shade-deep: #2A2016;
+  --display: "LXGW WenKai TC", "Noto Serif TC", var(--serif);
+  --sans: "Noto Serif TC", "Songti TC", PMingLiU, serif;
+  --bg-art:
+    repeating-linear-gradient(180deg, transparent 0 31px, color-mix(in srgb, var(--line-3) 22%, transparent) 31px 32px),
+    radial-gradient(900px 600px at 10% -10%, color-mix(in srgb, var(--accent-2) 8%, transparent), transparent 60%);
+  --bg-size: auto, auto;
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+  --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 55%, transparent) 55%, transparent 100%);
+}
+html[data-theme="literary"] #view .sec__t { font-family: var(--display); font-weight: 700; letter-spacing: .12em; }
+html[data-theme="literary"] #view .sec__t::before { width: 2px; }
+html[data-theme="literary"] .phead__t { letter-spacing: .08em; }
+html[data-theme="literary"] #view .wal__card { border-style: solid; border-color: var(--line-2); }
+
+/* ------------------------------------------------------------
+   流行——奶油黃底、粗黑框、硬陰影、電光藍配桃紅。
+   ------------------------------------------------------------ */
+[data-theme="pop"] {
+  --paper: #FFF2D6;
+  --paper-2: #FFEABF;
+  --card: #FFFFFF;
+  --card-2: #FFF9EC;
+  --card-3: #FFF4DD;
+  --sunk: #FFF4DD;
+  --line: #EDE2CB;
+  --line-2: #DCCDB0;
+  --line-3: #161616;
+  --ink: #161616;
+  --ink-soft: #3A3A3A;
+  --ink-faint: #5A5A5A;
+  --ink-dim: #777777;
+  --accent: #3A2CF5;
+  --accent-hi: #2A1FCC;
+  --accent-soft: #7C73FF;
+  --accent-wash: #ECEAFF;
+  --accent-line: #C3BEFF;
+  --accent-2: #FF3E8A;
+  --accent-2-wash: #FFE3EF;
+  --on-accent: #FFFFFF;
+  --up: #067A53;
+  --down: #C81D33;
+  --warn: #C47400;
+  --warn-ink: #8F5500;
+  --info: #3A2CF5;
+  --up-wash: #E6F8EF;
+  --down-wash: #FFEDF0;
+  --warn-wash: #FFF0CC;
+  --info-wash: #ECEAFF;
+  --stack-1: #161616;
+  --stack-2: #3A2CF5;
+  --stack-3: #FFE14D;
+  --stack-ink: #FFFFFF;
+  --band: #FFD84D;
+  --badge: #E0206E;
+  --knob: #FFFFFF;
+  --cat-food: #E85A06;
+  --cat-transit: #2F6BFF;
+  --cat-home: #8A3FFC;
+  --cat-daily: #067A53;
+  --cat-fun: #C81D33;
+  --cat-study: #C47400;
+  --cat-health: #008EBD;
+  --cat-other: #6B6B6B;
+  --cat-bonus: #3A2CF5;
+  --book-indigo: #2F3C99;
+  --book-violet: #6A2FD6;
+  --book-teal: #007C80;
+  --book-moss: #2F7D32;
+  --book-umber: #9C4A1A;
+  --book-wine: #B0144B;
+  --r-card: 16px;
+  --r-panel: 14px;
+  --r-input: 12px;
+  --r-sm: 12px;
+  --r-icon: 14px;
+  color-scheme: light;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --shade: #161616;
+  --shade-deep: #161616;
+  --display: "Noto Sans TC", var(--sans);
+  --shadow-flat: 2px 2px 0 var(--ink);
+  --shadow-block: 3px 3px 0 var(--ink);
+  --shadow-card: 4px 4px 0 var(--ink);
+  --shadow-lift: 6px 6px 0 var(--ink);
+  --shadow-pop: 6px 6px 0 var(--ink);
+  --bg-art: radial-gradient(color-mix(in srgb, var(--ink) 12%, transparent) 1.4px, transparent 1.6px);
+  --bg-size: 22px 22px;
+  --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 45%, transparent) 60%, transparent 100%);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+}
+html[data-theme="pop"] #view .wal__card,
+html[data-theme="pop"] #view .wal__strip,
+html[data-theme="pop"] #view .qk,
+html[data-theme="pop"] #view .card,
+html[data-theme="pop"] #view .bcard,
+html[data-theme="pop"] #view .lgl,
+html[data-theme="pop"] #view .mt,
+html[data-theme="pop"] #view .thm__i,
+html[data-theme="pop"] .acctm__p,
+html[data-theme="pop"] .appbar .bell__panel { border: 2px solid var(--ink); }
+html[data-theme="pop"] #view .wal__strip { border-bottom: 0; }
+html[data-theme="pop"] #view .dtile__ic { border: 2px solid var(--ink); }
+html[data-theme="pop"] .phead__t,
+html[data-theme="pop"] #view .wal__v,
+html[data-theme="pop"] #view .sec__t { font-weight: 900; }
+html[data-theme="pop"] .btn--go, html[data-theme="pop"] .appbar__add { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+
+/* ------------------------------------------------------------
+   少女——粉色、圓潤、柔光，玫瑰色配薰衣草紫。
+   ------------------------------------------------------------ */
+[data-theme="girly"] {
+  --paper: #FCEFF4;
+  --paper-2: #F9E5ED;
+  --card: #FFFFFF;
+  --card-2: #FFF7FA;
+  --card-3: #FDF0F5;
+  --sunk: #FBEEF3;
+  --line: #F2DDE6;
+  --line-2: #E8C9D6;
+  --line-3: #D2A3B8;
+  --ink: #3A2531;
+  --ink-soft: #5E4553;
+  --ink-faint: #7A5C6C;
+  --ink-dim: #977988;
+  --accent: #C23B6E;
+  --accent-hi: #A02E5A;
+  --accent-soft: #E07AA0;
+  --accent-wash: #FCE4EE;
+  --accent-line: #F2B8CF;
+  --accent-2: #8E5BC7;
+  --accent-2-wash: #F1E7FB;
+  --on-accent: #FFFFFF;
+  --up: #257A5B;
+  --down: #CC3149;
+  --warn: #B3711A;
+  --warn-ink: #8C5812;
+  --info: #7A5BC7;
+  --up-wash: #E9F6F0;
+  --down-wash: #FEEDF0;
+  --warn-wash: #FDF0DC;
+  --info-wash: #F1E7FB;
+  --stack-1: #7E3767;
+  --stack-2: #C23B6E;
+  --stack-3: #FFFFFF;
+  --stack-ink: #FFFFFF;
+  --band: #FADFEA;
+  --badge: #E0457A;
+  --knob: #FFFFFF;
+  --cat-food: #D0622E;
+  --cat-transit: #5579D0;
+  --cat-home: #9A5BC7;
+  --cat-daily: #257A5B;
+  --cat-fun: #CC3149;
+  --cat-study: #B3711A;
+  --cat-health: #2A8AA3;
+  --cat-other: #8A7883;
+  --cat-bonus: #C23B6E;
+  --book-indigo: #4B4F9A;
+  --book-violet: #7A4FA8;
+  --book-teal: #2F7F88;
+  --book-moss: #4F7F4A;
+  --book-umber: #9A5A3A;
+  --book-wine: #A83A60;
+  --r-card: 24px;
+  --r-panel: 20px;
+  --r-input: 16px;
+  --r-sm: 14px;
+  color-scheme: light;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --display: var(--serif);
+  --shade: #9A2F5C;
+  --shade-deep: #3A1428;
+  --bg-art:
+    radial-gradient(color-mix(in srgb, var(--accent) 12%, transparent) 2px, transparent 2.5px),
+    radial-gradient(800px 500px at 90% -10%, color-mix(in srgb, var(--accent-2) 14%, transparent), transparent 60%);
+  --bg-size: 26px 26px, auto;
+  --band-bg: linear-gradient(180deg, #F6C9DC 0%, color-mix(in srgb, #EBD9F6 60%, transparent) 60%, transparent 100%);
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+}
+html[data-theme="girly"] #view .sec__t::before { background: linear-gradient(180deg, var(--accent), var(--accent-2)); }
+html[data-theme="girly"] #view .wal__card { background: linear-gradient(160deg, var(--card) 60%, var(--accent-wash)); }
+
+/* ------------------------------------------------------------
+   可愛——奶油黃底、圓點、粉圓體，圓滾滾的按鈕。
+   ------------------------------------------------------------ */
+[data-theme="cute"] {
+  --paper: #FFF8E1;
+  --paper-2: #FFF1C9;
+  --card: #FFFFFF;
+  --card-2: #FFFBEF;
+  --card-3: #FFF6DD;
+  --sunk: #FFF4D6;
+  --line: #F2E6C4;
+  --line-2: #E6D3A0;
+  --line-3: #CBB27A;
+  --ink: #3B2F22;
+  --ink-soft: #5E4E3B;
+  --ink-faint: #766450;
+  --ink-dim: #94836C;
+  --accent: #AD540F;
+  --accent-hi: #8E440B;
+  --accent-soft: #F0A060;
+  --accent-wash: #FFEBD6;
+  --accent-line: #F6C9A0;
+  --accent-2: #177562;
+  --accent-2-wash: #DDF3EC;
+  --on-accent: #FFFFFF;
+  --up: #177562;
+  --down: #BD3A31;
+  --warn: #BF7800;
+  --warn-ink: #8C5800;
+  --info: #3574B5;
+  --up-wash: #E8F7F2;
+  --down-wash: #FEEFEC;
+  --warn-wash: #FFF0C7;
+  --info-wash: #E3EEFA;
+  --stack-1: #AD540F;
+  --stack-2: #177562;
+  --stack-3: #FFFFFF;
+  --stack-ink: #FFFFFF;
+  --band: #FFE8A6;
+  --badge: #E5553F;
+  --knob: #FFFFFF;
+  --cat-food: #CF5F29;
+  --cat-transit: #3574B5;
+  --cat-home: #9660C4;
+  --cat-daily: #177562;
+  --cat-fun: #BD3A31;
+  --cat-study: #BF7800;
+  --cat-health: #268DAC;
+  --cat-other: #8A7E6B;
+  --cat-bonus: #AD540F;
+  --book-indigo: #4A5AA8;
+  --book-violet: #7B55B5;
+  --book-teal: #1F7F86;
+  --book-moss: #4A8A3C;
+  --book-umber: #A0602E;
+  --book-wine: #B04462;
+  --r-card: 28px;
+  --r-panel: 22px;
+  --r-input: 18px;
+  --r-sm: 16px;
+  color-scheme: light;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --shade: #8A6420;
+  --shade-deep: #3B2A10;
+  --display: "Huninn", var(--sans);
+  --bg-art: radial-gradient(color-mix(in srgb, #F2B84B 30%, transparent) 3px, transparent 3.5px);
+  --bg-size: 30px 30px;
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+  --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 55%, transparent) 55%, transparent 100%);
+}
+html[data-theme="cute"] #view .dtile:hover .dtile__ic { transform: translateY(-3px) rotate(-8deg) scale(1.06); }
+html[data-theme="cute"] #view .dtile__t,
+html[data-theme="cute"] #view .qk__t,
+html[data-theme="cute"] #view .sec__t,
+html[data-theme="cute"] .tabbar__i { font-family: var(--display); font-weight: 400; }
+html[data-theme="cute"] #view .qk { border: 2px dashed var(--line-2); }
+
+/* ------------------------------------------------------------
+   藝術——美術館的米白牆、克萊因藍、朱紅、幾何色塊，直角。
+   ------------------------------------------------------------ */
+[data-theme="art"] {
+  --paper: #F3EFE6;
+  --paper-2: #ECE6DA;
+  --card: #FFFFFF;
+  --card-2: #FAF8F3;
+  --card-3: #F5F2EA;
+  --sunk: #F2EEE5;
+  --line: #E2DCCF;
+  --line-2: #CFC6B4;
+  --line-3: #141414;
+  --ink: #141414;
+  --ink-soft: #3A3A3A;
+  --ink-faint: #5C5C5C;
+  --ink-dim: #7A7A7A;
+  --accent: #0033A8;
+  --accent-hi: #00267F;
+  --accent-soft: #4D6FCC;
+  --accent-wash: #E5EAF6;
+  --accent-line: #B3C2E6;
+  --accent-2: #E03C28;
+  --accent-2-wash: #FBE4E0;
+  --on-accent: #FFFFFF;
+  --up: #1F7A4D;
+  --down: #C42D1D;
+  --warn: #B38000;
+  --warn-ink: #7F5A00;
+  --info: #0033A8;
+  --up-wash: #E2F1E8;
+  --down-wash: #FCEDEA;
+  --warn-wash: #FBF0D0;
+  --info-wash: #E5EAF6;
+  --stack-1: #141414;
+  --stack-2: #0033A8;
+  --stack-3: #FFFFFF;
+  --stack-ink: #FFFFFF;
+  --band: #E9E2D2;
+  --badge: #E03C28;
+  --knob: #FFFFFF;
+  --cat-food: #E03C28;
+  --cat-transit: #0033A8;
+  --cat-home: #6B3FA0;
+  --cat-daily: #1F7A4D;
+  --cat-fun: #C2185B;
+  --cat-study: #B38000;
+  --cat-health: #00838F;
+  --cat-other: #6E6E6E;
+  --cat-bonus: #141414;
+  --book-indigo: #0033A8;
+  --book-violet: #5B2A86;
+  --book-teal: #00606B;
+  --book-moss: #2E6B2E;
+  --book-umber: #8A4B12;
+  --book-wine: #9C1B3A;
+  --r-card: 0;
+  --r-panel: 0;
+  --r-input: 0;
+  --r-sm: 0;
+  --r-xs: 0;
+  --r-icon: 0;
+  --r-pill: 0;
+  --r-bar: 0;
+  --r-ava: 0;
+  --r-dot: 0;
+  color-scheme: light;
+  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --shade: #141414;
+  --shade-deep: #141414;
+  --display: "Noto Serif TC", var(--serif);
+  --bg-art:
+    radial-gradient(circle at 92% 18%, color-mix(in srgb, #F2C23A 22%, transparent) 0 150px, transparent 151px),
+    linear-gradient(color-mix(in srgb, var(--accent-2) 8%, transparent), color-mix(in srgb, var(--accent-2) 8%, transparent));
+  --bg-size: auto, 180px 180px;
+  --band-bg: none;
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
+}
+html[data-theme="art"] { background-position: 0 0, 4% 78%; background-repeat: no-repeat; }
+html[data-theme="art"] .phead__t,
+html[data-theme="art"] #view .wal__v { font-weight: 900; letter-spacing: -.02em; }
+html[data-theme="art"] #view .sec__t::before { width: 10px; top: 6px; bottom: 6px; background: var(--accent-2); }
+html[data-theme="art"] #view .wal__card,
+html[data-theme="art"] #view .qk,
+html[data-theme="art"] #view .card,
+html[data-theme="art"] #view .bcard { border: 2px solid var(--ink); box-shadow: none; }
+/* 最前面那張卡的右上角：黃圓 ＋ 紅方塊 */
+html[data-theme="art"] #view .wal__card::after {
+  content: ''; position: absolute; top: -26px; right: -26px; width: 96px; height: 96px; pointer-events: none;
+  background:
+    linear-gradient(var(--accent-2), var(--accent-2)) no-repeat 0 100% / 34px 34px,
+    radial-gradient(circle, #F2C23A 0 36px, transparent 37px);
+}

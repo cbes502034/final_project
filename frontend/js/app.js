@@ -65,6 +65,44 @@
      頂列已經併進頁首，只剩一種做法；那個 class 留著的話，
      舊方案的規則（優先度比較高）會蓋掉新的工具列樣式。所以整段拿掉。 */
 
+  /* ============================================================
+     主題
+     ------------------------------------------------------------
+     換膚 = 在 <html> 上換 data-theme。顏色、圓角、字體都是變數，
+     元件本身什麼都不用改（見 css/themes.css）。
+
+     存兩個地方：
+       · 帳號上（PATCH /api/auth/me 的 theme）——換裝置登入也一樣
+       · 這台裝置（localStorage）——index.html 在 CSS 載入前先掛上，重新整理不會閃
+     ============================================================ */
+  var THEME_KEY = 'fambudget.theme';
+
+  function themeOf(id) {
+    return (global.DATA.themes || []).filter(function (t) { return t.id === id; })[0];
+  }
+  function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'paper';
+  }
+  function applyTheme(id) {
+    var t = themeOf(id) || themeOf('paper');
+    if (!t) return;
+    document.documentElement.setAttribute('data-theme', t.id);
+    if (t.font) loadFont(t.font);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta && t.band) meta.setAttribute('content', t.band);
+    try { localStorage.setItem(THEME_KEY, t.id); } catch (e) {}
+  }
+  /* 手寫體、粉圓體只有選到那一套才載，其他人不用多下載幾百 KB */
+  function loadFont(spec) {
+    var id = 'font-' + spec.replace(/[^A-Za-z]+/g, '-');
+    if (document.getElementById(id)) return;
+    var l = document.createElement('link');
+    l.id = id; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=' + spec + '&display=swap';
+    document.head.appendChild(l);
+  }
+  applyTheme(currentTheme());
+
   /* 展示用帳號。mock 模式的登入頁會列出來，免得評審還要猜 email。
      接上真後端（API.mode === 'http'）之後就不顯示了。 */
   var DEMO = [
@@ -340,7 +378,7 @@
   function tile(t) {
     var attr = t.quick ? ' data-quick="entry"' : t.nav !== undefined ? ' data-nav="' + t.nav + '"' : '';
     var tag = t.href ? 'a' : 'button';
-    return '<' + tag + ' class="dtile dtile--' + t.tone + '"' + attr + (t.href ? ' href="' + t.href + '"' : '') + '>' +
+    return '<' + tag + ' class="dtile' + (t.tone ? ' dtile--' + t.tone : '') + '"' + attr + (t.href ? ' href="' + t.href + '"' : '') + '>' +
       '<span class="dtile__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + TILE_IC[t.icon] + '</svg></span>' +
       '<span class="dtile__t">' + esc(t.label) + '</span>' +
@@ -370,47 +408,60 @@
         var used = Math.min(100, Math.round(sv.ratio * 100));
         var budgets = fam ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; });
         var warn = ads.filter(function (a) { return a.level === 'warn'; }).length;
+        var go = fam ? '#/stats' : '#/entry';
+        var chev = '<svg class="wal__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+          'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 
-        var h = '<div class="page"><div id="homeInv"></div>';
+        var h = '<div class="page"><div id="homeInv"></div><div class="dash">';
 
-        /* 1. 大數字卡 */
-        h += '<section class="hero hero--' + lv + '">' +
-          '<div class="hero__main">' +
-            '<div class="hero__k">' + (fam ? '全家' : '') + (lv === 'over' ? '這個月超出計畫' : '這個月還可以花') +
-              (lv === 'over' ? '' : '<span class="hero__pill">' + LEVEL_TW[lv] + '</span>') + '</div>' +
-            '<div class="hero__v">' + amt(lv === 'over' ? sv.shortfall : Math.max(0, sv.left)) + '</div>' +
-            '<div class="hero__bar" role="progressbar" aria-valuenow="' + used + '" aria-valuemin="0" aria-valuemax="100">' +
+        /* 1. 疊在一起的數字卡——像皮夾裡的卡片。
+              後面兩張露出一截：收入、支出；最前面那張是這個月還可以花。 */
+        h += '<section class="wal wal--' + lv + '" aria-label="這個月的錢">' +
+          '<a class="wal__strip wal__strip--1" href="' + go + '">' +
+            '<span>' + (fam ? '全家收入' : '本月收入') + '</span><b>' + amt(d.income) + '</b>' + chev + '</a>' +
+          '<a class="wal__strip wal__strip--2" href="' + go + '">' +
+            '<span>' + (fam ? '全家支出' : '本月支出') + '<small>' + d.count + ' 筆</small></span>' +
+            '<b>' + amt(d.expense) + '</b>' + chev + '</a>' +
+          '<div class="wal__card">' +
+            '<div class="wal__k">' + (lv === 'over' ? '這個月超出計畫' : '這個月還可以花') +
+              (lv === 'over' ? '' : '<span class="pill pill--' + lv + '">' + LEVEL_TW[lv] + '</span>') + '</div>' +
+            '<div class="wal__v">' + amt(lv === 'over' ? sv.shortfall : Math.max(0, sv.left)) + '</div>' +
+            '<div class="wal__bar" role="progressbar" aria-valuenow="' + used + '" aria-valuemin="0" aria-valuemax="100">' +
               '<i style="width:' + used + '%"></i></div>' +
-            '<div class="hero__meta"><span>已用 <b>' + used + '%</b></span>' +
+            '<div class="wal__meta"><span>已用 <b>' + used + '%</b></span>' +
               '<span>可花上限 <b>' + num(sv.allowance) + '</b></span>' +
               '<span>每月想存 <b>' + num(sv.goal) + '</b></span></div>' +
-          '</div>' +
-          '<div class="hero__stats">' +
-            '<div class="hero__s"><span>' + (fam ? '全家收入' : '收入') + '</span><b>' + amt(d.income) + '</b></div>' +
-            '<div class="hero__s"><span>' + (fam ? '全家支出' : '支出') + '</span><b>' + amt(d.expense) + '</b><small>' + d.count + ' 筆</small></div>' +
-            '<div class="hero__s"><span>結餘</span><b>' + amt(d.net) + '</b><small>存下 ' + pct(d.rate) + '</small></div>' +
+            '<div class="wal__foot">' +
+              '<div class="wal__f"><span>結餘</span><b>' + amt(d.net) + '</b></div>' +
+              '<div class="wal__f"><span>存下</span><b>' + pct(d.rate) + '</b></div>' +
+              '<a class="wal__go" href="#/stats" aria-label="看統計" title="看統計">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+                'stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>' +
+            '</div>' +
           '</div>' +
         '</section>';
 
-        /* 2. 功能按鈕：原本側欄的東西都在這裡 */
-        /* ⚠️ 全家模式只整理資訊，沒有「記一筆」——記帳永遠是記自己的 */
+        /* 2. 常用功能：原本側欄的東西都在這裡
+              ⚠️ 全家模式只整理資訊，沒有「記一筆」——記帳永遠是記自己的 */
         var tiles = [
           fam ? null : { quick: true, label: '記一筆', icon: 'add', tone: 'add' },
-          { nav: 'entry', label: '收支明細', icon: 'entry', tone: 'blue', badge: d.count ? d.count + ' 筆' : '' },
-          { nav: 'groups', label: '帳本', icon: 'groups', tone: 'teal', badge: gs.length ? gs.length + ' 本' : '' },
-          { nav: 'stats', label: '統計', icon: 'stats', tone: 'violet' },
-          { nav: 'advice', label: '財務建議', icon: 'advice', tone: 'amber', badge: warn ? warn + ' 則要注意' : '' },
-          { nav: 'members', label: fm.family ? '家庭成員' : '加入家庭', icon: 'members', tone: 'green',
+          { nav: 'entry', label: '收支明細', icon: 'entry', badge: d.count ? d.count + ' 筆' : '' },
+          { nav: 'groups', label: '帳本', icon: 'groups', badge: gs.length ? gs.length + ' 本' : '' },
+          { nav: 'stats', label: '統計', icon: 'stats' },
+          { nav: 'advice', label: '財務建議', icon: 'advice', tone: warn ? 'warn' : '', badge: warn ? warn + ' 則要注意' : '' },
+          { nav: 'members', label: fm.family ? '家庭成員' : '加入家庭', icon: 'members',
             badge: fm.family ? fm.members.length + ' 人' : '' },
-          { nav: 'profile', label: '個人資料', icon: 'profile', tone: 'rose' },
-          { href: 'docs/guide.html', label: '使用說明', icon: 'guide', tone: 'gray' }
+          { nav: 'profile', label: '個人資料', icon: 'profile' },
+          { href: 'docs/guide.html', label: '使用說明', icon: 'guide' }
         ];
-        h += '<nav class="dgrid' + (fam ? ' dgrid--7' : '') + '" aria-label="功能">' +
-          tiles.filter(Boolean).map(tile).join('') + '</nav>';
+        h += '<section class="qk"><div class="qk__h"><h2 class="qk__t">常用功能</h2></div>' +
+          '<nav class="dgrid" aria-label="功能">' + tiles.filter(Boolean).map(tile).join('') + '</nav></section>';
+        h += '</div>';
 
         /* 3. 預算：一個分類一張小卡 */
         h += '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
-          (budgets.length ? '<span class="sec__n">' + budgets.length + ' 項</span>' : '') + '</div>';
+          (budgets.length ? '<span class="sec__n">' + budgets.length + ' 項</span>' : '') +
+          '<a class="sec__link" href="#/stats">看統計 ›</a></div>';
         h += budgets.length
           ? '<div class="bgrid">' + budgets.map(function (x) {
               var p = Math.round(x.pct * 100);
@@ -1897,7 +1948,7 @@
     { sel: '.dtile--add', hash: '#/',
       t: '從這裡記帳',
       b: '打一段話就好，例如「早餐55 中午吃飯320」，系統會幫你拆成一筆一筆。' },
-    { sel: '.hero__main', hash: '#/',
+    { sel: '.wal__card', hash: '#/',
       t: '這個月還能花多少',
       b: '收入扣掉你想存的，剩下的就是能放心花的錢。' },
     { sel: '#gswBtn', hash: '#/',
@@ -2413,10 +2464,73 @@
           '<div class="card card--flush" id="alertBox">' + skeleton(2) + '</div>' +
           foldHead('fin', '理財習慣', '填寫') +
         '</section>' +
-      '</div></div>';
+      '</div>' +
+
+      /* 主題設定：左右滑著挑，按一下就套用 */
+      '<section class="thm">' +
+        '<div class="sec"><h2 class="sec__t">主題設定</h2>' +
+          '<span class="sec__n">' + (global.DATA.themes || []).length + ' 套</span>' +
+          '<div class="thm__nav">' +
+            '<button type="button" data-thm-go="-1" aria-label="往左看">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg></button>' +
+            '<button type="button" data-thm-go="1" aria-label="往右看">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="thm__row" id="thmRow">' + themeCards(u.theme || currentTheme()) + '</div>' +
+      '</section>' +
+      '</div>';
       $view.innerHTML = h;
+      var onCard = document.querySelector('.thm__i.on');
+      if (onCard && onCard.scrollIntoView) onCard.parentNode.scrollLeft = onCard.offsetLeft - 8;
       foldRestore();
       paintAlerts();
+    });
+  }
+
+  /* 每一張預覽自己掛著 data-theme，裡面的顏色、圓角、字就是那一套的——
+     不用另外準備截圖，主題改了預覽自動跟著變。 */
+  function themeCards(cur) {
+    return (global.DATA.themes || []).map(function (t) {
+      var on = t.id === cur;
+      return '<button type="button" class="thm__i' + (on ? ' on' : '') + '" data-theme-pick="' + esc(t.id) + '" ' +
+          'aria-pressed="' + on + '">' +
+        '<span class="thm__pv" data-theme="' + esc(t.id) + '" aria-hidden="true">' +
+          '<span class="thm__hi">午安</span>' +
+          '<span class="thm__s thm__s--1"></span><span class="thm__s thm__s--2"></span>' +
+          '<span class="thm__c">6,770<i></i></span>' +
+          '<span class="thm__q"><b></b><b></b><b></b><b></b></span>' +
+        '</span>' +
+        '<span class="thm__m"><span class="thm__n">' + esc(t.name) + '</span>' +
+          '<span class="thm__st">' + (on ? '使用中' : '套用') + '</span></span>' +
+        '<span class="thm__d">' + esc(t.note) + '</span>' +
+      '</button>';
+    }).join('');
+  }
+
+  function markTheme(id) {
+    Array.prototype.forEach.call(document.querySelectorAll('.thm__i'), function (b) {
+      var on = b.dataset.themePick === id;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var st = b.querySelector('.thm__st');
+      if (st) st.textContent = on ? '使用中' : '套用';
+    });
+  }
+
+  /* 按下去馬上換，同時存到帳號上；存失敗就換回去，畫面不會跟帳號對不上 */
+  function chooseTheme(id) {
+    var prev = currentTheme();
+    if (id === prev || !themeOf(id)) return;
+    applyTheme(id);
+    markTheme(id);
+    API.updateProfile({ theme: id }).then(function () {
+      if (ME && ME.user) ME.user.theme = id;
+      toast('換成「' + themeOf(id).name + '」了', 'ok');
+    }).catch(function (e) {
+      applyTheme(prev);
+      markTheme(prev);
+      toast((e && e.message) || '沒有存成功，等一下再試', 'err');
     });
   }
 
@@ -2565,6 +2679,7 @@
       document.body.classList.toggle('role-child', m.user.role !== 'parent');
       /* ⚠️ 平台管理員沒有財務頁可以看——那不是藏起來，是他真的沒有資料 */
       document.body.classList.toggle('is-admin', !!m.user.isPlatformAdmin);
+      if (m.user.theme && m.user.theme !== currentTheme()) applyTheme(m.user.theme);
     });
   }
 
@@ -2611,6 +2726,10 @@
         var hb = document.getElementById('homeBtn');
         if (hb) hb.hidden = page === '' || page === 'admin' || OPEN.indexOf(page) >= 0;
         document.body.classList.toggle('is-home', page === '');
+        var tab = page === 'member' ? 'members' : page;
+        Array.prototype.forEach.call(document.querySelectorAll('.tabbar__i[data-tab]'), function (b) {
+          b.classList.toggle('on', b.dataset.tab === tab);
+        });
         acctMenu(false);
       }
     });
@@ -2657,6 +2776,15 @@
 
     /* 右上角的帳號選單；點選單以外的地方就收起來 */
     if (t.closest('#acctBtn')) { acctMenu(); return; }
+
+    var tp = t.closest('[data-theme-pick]');
+    if (tp) { chooseTheme(tp.dataset.themePick); return; }
+    var tg = t.closest('[data-thm-go]');
+    if (tg) {
+      var row = document.getElementById('thmRow');
+      if (row) row.scrollBy({ left: Number(tg.dataset.thmGo) * 186, behavior: 'smooth' });
+      return;
+    }
     if (!t.closest('#acctm')) {
       var ap = document.getElementById('acctPanel');
       if (ap && !ap.hidden) acctMenu(false);

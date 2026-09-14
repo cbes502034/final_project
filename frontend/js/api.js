@@ -13,7 +13,7 @@
    POST   /api/auth/refresh           換新 token
    POST   /api/auth/logout            登出（撤銷 refresh token）
    POST   /api/auth/refresh           access token 過期時換新的
-   PATCH  /api/auth/me                改個人資料（displayName / birthYear）
+   PATCH  /api/auth/me                改個人資料（displayName / birthYear / theme）
    PUT    /api/auth/me/avatar         上傳大頭貼（body: { image: dataUri }）
    DELETE /api/auth/me/avatar         移除大頭貼
    GET    /api/auth/me/finance        我的理財習慣（拿去當建議的背景）
@@ -258,6 +258,12 @@
       actor: s.me, action: action, target: target,
       at: localStamp(new Date()), note: note
     }]);
+  }
+
+  /* 沒選過主題的人就是預設的米白。契約裡 user.theme 一定有值，前端不必自己補 */
+  function withTheme(u) {
+    if (u && !u.theme) u.theme = 'paper';
+    return u;
   }
 
   function memberOf(id) {
@@ -571,7 +577,7 @@
         var m = memberOf(s.me);
         var fam = familyOf(s.me);
         return {
-          user: clone(m),
+          user: withTheme(clone(m)),
           family: fam ? { id: fam.id, name: fam.name, period: global.DATA.meta.period } : null,
           visible: visibleUsers(s.me),
           queryable: queryableUsers(s.me),
@@ -701,9 +707,15 @@
           q.birthYear = y || null;
           q.age = y ? now - y : null;
         }
+        /* 主題只收清單裡有的 id。真後端用 toolkit.theme.clean_theme() 擋，回 422 */
+        if (p.theme !== undefined) {
+          var ids = (global.DATA.themes || []).map(function (t) { return t.id; });
+          if (ids.indexOf(p.theme) < 0) throw oops('沒有這個主題', 422);
+          q.theme = p.theme;
+        }
         applyPatch(s.patch);
         save();
-        return clone(memberOf(s.me));
+        return withTheme(clone(memberOf(s.me)));
       });
     },
 

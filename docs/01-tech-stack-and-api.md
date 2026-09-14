@@ -128,8 +128,9 @@ final_project/
 ├── site/                        前端（純靜態，可直接發布）
 │   ├── index.html
 │   ├── css/
-│   │   ├── tokens.css          設計權杖：星空底、藍紫色系、圓角
-│   │   └── app.css             元件與十一個畫面
+│   │   ├── tokens.css          設計權杖：顏色、圓角、字體（預設的米白）
+│   │   ├── app.css             元件與畫面，只准用變數
+│   │   └── themes.css          另外七套主題（晴空藍、資訊科技、文青、流行、少女、可愛、藝術）
 │   └── js/
 │       ├── stars.js            canvas 星空與流星
 │       ├── data.js             模擬資料（mock 模式用）

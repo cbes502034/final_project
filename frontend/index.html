@@ -19,8 +19,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/tokens.css?v=139">
-<link rel="stylesheet" href="css/app.css?v=139">
+<!-- 主題：在 CSS 載入之前就掛上，重新整理時不會先閃一下米白再變色。
+     登入之後以帳號存的為準（app.js 的 applyTheme），這裡只是記住這台裝置上次用的。 -->
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="css/tokens.css?v=140">
+<link rel="stylesheet" href="css/app.css?v=140">
+<link rel="stylesheet" href="css/themes.css?v=140">
 </head>
 <body>
 
@@ -40,7 +51,7 @@
       </a>
       <a class="appbar__home" id="homeBtn" href="#/" hidden><svg class="appbar__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg><span>總覽</span></a>
       <span class="appbar__sp"></span>
-      <!-- 電腦版：不在總覽時，右上角隨時能記一筆（手機用右下角的圓鈕） -->
+      <!-- 電腦版：不在總覽時，右上角隨時能記一筆（手機用底部分頁中間那顆） -->
       <button class="appbar__add" data-quick="entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>記一筆</span></button>
       <div class="bell__wrap">
         <button class="bell" id="bell" title="通知" aria-label="通知">
@@ -92,16 +103,22 @@
     <footer class="foot">家庭記帳　·　目前顯示的是示範資料</footer>
   </main>
 
-  <!-- 手機：隨時都能記一筆 -->
-  <button class="fab" data-quick="entry" aria-label="記一筆"><svg class="fab__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <!-- 手機：底部分頁。富邦、元大的 App 都是這樣——常用的四頁 ＋ 中間的記一筆 -->
+  <nav class="tabbar" aria-label="主要頁面">
+    <a class="tabbar__i" href="#/" data-tab=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/></svg><span>總覽</span></a>
+    <a class="tabbar__i" href="#/entry" data-tab="entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M9 13h6M9 16.5h4"/></svg><span>明細</span></a>
+    <button class="tabbar__i tabbar__add" data-quick="entry" aria-label="記一筆"><span class="tabbar__o"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span>記一筆</span></button>
+    <a class="tabbar__i" href="#/stats" data-tab="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>統計</span></a>
+    <a class="tabbar__i" href="#/advice" data-tab="advice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3z"/><path d="M9.5 20.5h5"/></svg><span>建議</span></a>
+  </nav>
 </div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=139"></script>
-<script src="js/data.js?v=139"></script>
-<script src="js/api.js?v=139"></script>
-<script src="js/notify.js?v=139"></script>
-<script src="js/app.js?v=139"></script>
+<script src="js/stars.js?v=140"></script>
+<script src="js/data.js?v=140"></script>
+<script src="js/api.js?v=140"></script>
+<script src="js/notify.js?v=140"></script>
+<script src="js/app.js?v=140"></script>
 </body>
 </html>
