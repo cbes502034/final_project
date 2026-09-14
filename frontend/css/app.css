@@ -23,13 +23,6 @@
    左側導覽
    ============================================================ */
 
-.brand__m {
-  width: 34px; height: 34px; flex: 0 0 34px; border-radius: var(--r-sm);
-  background: linear-gradient(140deg, var(--accent), var(--accent-2));
-  display: grid; place-items: center;
-  font-family: var(--serif); font-size: 15px; font-weight: 700; color: var(--card);
-  box-shadow: 0 6px 18px var(--accent-line);
-}
 .brand__n { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
 
 /* ============================================================
@@ -391,7 +384,7 @@
 .note--warn .note__k { color: var(--warn); }
 .note--crit .note__k { color: var(--down); }
 .note p { font-size: 13px; line-height: 1.95; color: var(--ink-soft); }
-.note code { font-family: var(--mono); font-size: 12px; background: var(--sunk); padding: 2px 7px; border-radius: var(--r-xs); color: var(--ink); }
+.note code { font-family: var(--code); font-size: 12px; background: var(--sunk); padding: 2px 7px; border-radius: var(--r-xs); color: var(--ink); }
 
 /* ============================================================
    資料表抽屜
@@ -772,14 +765,6 @@ body.is-out .main {
   padding: 34px 30px 28px;
 }
 .gate__b { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; }
-.gate__b .brand__m {
-  width: 26px; height: 26px; display: grid; place-items: center;
-  background: var(--accent); color: var(--card); border-radius: var(--r-sm);
-  font-family: var(--serif); font-weight: 700; font-size: 14px;
-}
-.gate__b .brand__n {
-  font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink);
-}
 .gate__t {
   font-family: var(--serif); font-size: 24px; font-weight: 600;
   color: var(--ink); margin: 0 0 6px;
@@ -1914,7 +1899,7 @@ input[type="password"], input[type="search"], select, textarea {
   color: var(--ink); line-height: 1.8; word-break: break-all;
   user-select: all; cursor: text;
 }
-.dg #dgCode { font-family: var(--mono); font-size: 12.5px; }
+.dg #dgCode { font-family: var(--code); font-size: 12.5px; }
 
 .dg__err { color: var(--down); font-size: 13px; margin-top: 4px; }
 .dg .hp__d { justify-content: flex-end; gap: 10px; }
@@ -2360,11 +2345,6 @@ body.dw-push #view { padding-top: 0; }
 
 /* ---------- 側欄 ---------- */
 
-.brand__m {
-  width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center;
-  background: var(--accent); color: var(--on-accent);
-  font-family: var(--display); font-size: 15px; font-weight: 700; box-shadow: none;
-}
 
 /* ---------- 帳戶卡：我是誰 ---------- */
 
@@ -3025,7 +3005,7 @@ body.is-out .foot { display: none; }
 }
 #view .fam0__f input:focus { outline: none; border-color: var(--accent); background: var(--card); }
 #view .fam0__f .btn { height: 44px; }
-#view .codein { font-family: var(--mono); font-size: 18px !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; text-align: center; }
+#view .codein { font-family: var(--code); font-size: 18px !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; text-align: center; }
 
 /* 收到的邀請 */
 #view .invc {
@@ -3083,7 +3063,7 @@ body.is-out .foot { display: none; }
   padding: 14px 16px; background: var(--warn-wash); border: 1px dashed color-mix(in srgb, var(--warn) 55%, transparent);
 }
 #view .code + .code { margin-top: 8px; }
-#view .code__v { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: .14em; color: var(--ink); }
+#view .code__v { font-family: var(--code); font-size: 26px; font-weight: 700; letter-spacing: .14em; color: var(--ink); }
 #view .code__m { grid-column: 1; font-size: 12.5px; color: var(--ink-faint); }
 #view .code .btn { grid-row: 1 / span 2; grid-column: 2; }
 
@@ -3165,8 +3145,6 @@ body.is-out .appbar { display: none; }
 }
 .appbar__brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
 .appbar__brand:hover { color: var(--ink); }
-.appbar__brand .brand__m { width: 34px; height: 34px; flex: 0 0 34px; font-size: 16px; }
-.appbar__n { font-family: var(--display); font-size: 17px; font-weight: 700; letter-spacing: .03em; }
 .appbar__home {
   display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 14px 0 8px; margin-left: 6px;
   font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: none;
@@ -3226,7 +3204,7 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 }
 .acctm__b:hover, .acctm__b.open { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 #who { display: inline-flex; align-items: center; gap: 8px; width: auto; }
-.acctm__b .ava { width: 32px; height: 32px; flex: 0 0 32px; font-size: 13px; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.acctm__b .ava { width: 32px; height: 32px; flex: 0 0 32px; font-size: 14.5px; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .acctm__n { font-size: 14px; font-weight: 600; white-space: nowrap; }
 .acctm__cv { width: 14px; height: 14px; opacity: .7; transition: transform .2s var(--ease); }
 .acctm__b.open .acctm__cv { transform: rotate(180deg); }
@@ -3489,7 +3467,7 @@ body.is-admin .acctm__h { pointer-events: none; }
   .toasts { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (max-width: 560px) {
-  .appbar__n, .acctm__n { display: none; }
+  .acctm__n { display: none; }
   #view .wal__strip { padding: 12px 18px 30px; }
   #view .wal__card { padding: 18px 18px 16px; }
   #view .wal__v { font-size: 34px; }
@@ -3616,30 +3594,11 @@ body.is-admin .acctm__h { pointer-events: none; }
   #view .tdy__l li:nth-child(odd) { border-right: 0; }
 }
 
-
 /* ============================================================
-   品牌：印著專案名稱的草寫徽章 ＋ 粉圓體「家庭記帳」
-   ------------------------------------------------------------
-   ⚠️ 2026-09-14 改。原本是一個方塊裡寫「帳」、旁邊襯線體的「家庭記帳」，
-   使用者覺得老土。現在徽章上是草寫的 FamBudget，中文名稱用圓滾滾的粉圓體。
-   品牌字體不跟主題換，顏色和圓角跟著主題。
+   品牌在各處的大小（元件本身在 tokens.css 的 .brand）
    ============================================================ */
-.brand__m,
-.appbar__brand .brand__m,
-.gate__b .brand__m {
-  width: auto; height: 34px; flex: 0 0 auto; padding: 0 14px 3px;
-  display: inline-grid; place-items: center; white-space: nowrap;
-  font-family: var(--font-script); font-size: 18px; font-weight: 400; line-height: 1; letter-spacing: .01em;
-  color: var(--on-accent); background: var(--accent); border-radius: var(--r-pill);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 26%, transparent);
-}
-.appbar__n,
-.gate__b .brand__n {
-  font-family: var(--font-cute); font-size: 18px; font-weight: 400; letter-spacing: .06em; color: var(--ink);
-}
-.gate__b { gap: 10px; }
-.gate__b .brand__m { height: 30px; padding: 0 12px 2px; font-size: 16px; }
-.gate__b .brand__n { font-size: 16px; }
+.appbar__brand.brand { font-size: 20px; }
+.gate__b .brand { font-size: 26px; }
 @media (max-width: 560px) {
-  .appbar__brand .brand__m { height: 32px; padding: 0 12px 3px; font-size: 16.5px; }
+  .appbar__brand.brand { font-size: 18px; }
 }

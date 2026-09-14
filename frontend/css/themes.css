@@ -5,6 +5,7 @@
    在 <html> 上換 data-theme，其他什麼都不用動。
 
    預設的「米白格子」寫在 tokens.css 的 :root；這裡是八套（米白再寫一次給預覽用）。
+   ⚠️ 主題不換字：全站同一套粉圓體（見 tokens.css 的 --sans）。
    選擇器用 [data-theme="…"] 而不是 html[data-theme="…"]——
    主題設定頁的小預覽自己也掛著 data-theme，要能在那一小塊裡套上整套顏色。
    只有「結構上的差異」（粗框、發光、裝飾色塊）才寫成 html[data-theme="…"]，
@@ -86,8 +87,6 @@
   --r-ava: 999px;
   --r-dot: 999px;
   color-scheme: light;
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
-  --display: var(--serif);
   --shade: #3C3223;
   --shade-deep: #1C1812;
   --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
@@ -165,8 +164,6 @@
   --r-input: 12px;
   --r-sm: 12px;
   color-scheme: light;
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
-  --display: var(--serif);
   --shade: #1B3A66;
   --shade-deep: #0B1B33;
   --bg-art:
@@ -188,7 +185,7 @@
 }
 
 /* ------------------------------------------------------------
-   資訊科技——深色底、螢光蒂芬妮綠、直角。數字用等寬字，滑過去會發光。
+   資訊科技——深色底、螢光蒂芬妮綠、直角，滑過去會發光。
    ------------------------------------------------------------ */
 [data-theme="tech"] {
   --paper: #0A0F15;
@@ -253,11 +250,9 @@
   --r-bar: 0;
   --r-ava: 0;
   --r-dot: 0;
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
   color-scheme: dark;
   --shade: #000000;
   --shade-deep: #000000;
-  --display: var(--sans);
   --bg-art:
     linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px),
@@ -277,10 +272,6 @@
   --shadow-in: inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
   --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
 }
-html[data-theme="tech"] #view .wal__v,
-html[data-theme="tech"] #view .wal__strip b,
-html[data-theme="tech"] #view .wal__f b,
-html[data-theme="tech"] #view .bcard__v { font-family: var(--mono); letter-spacing: -.02em; }
 html[data-theme="tech"] #view .wal__card,
 html[data-theme="tech"] #view .qk,
 html[data-theme="tech"] #view .card,
@@ -295,10 +286,10 @@ html[data-theme="tech"] .appbar__add:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
-html[data-theme="tech"] #view .sec__t { font-family: var(--mono); letter-spacing: .04em; }
+
 
 /* ------------------------------------------------------------
-   文青——亞麻紙的底、橫線筆記本、楷體標題、橄欖綠。
+   文青——亞麻紙的底、橫線筆記本、橄欖綠。
    ------------------------------------------------------------ */
 [data-theme="literary"] {
   --paper: #EEE7D9;
@@ -363,8 +354,6 @@ html[data-theme="tech"] #view .sec__t { font-family: var(--mono); letter-spacing
   color-scheme: light;
   --shade: #4A3B28;
   --shade-deep: #2A2016;
-  --display: "LXGW WenKai TC", "Noto Serif TC", var(--serif);
-  --sans: "Noto Serif TC", "Songti TC", PMingLiU, serif;
   --bg-art:
     repeating-linear-gradient(180deg, transparent 0 31px, color-mix(in srgb, var(--line-3) 22%, transparent) 31px 32px),
     radial-gradient(900px 600px at 10% -10%, color-mix(in srgb, var(--accent-2) 8%, transparent), transparent 60%);
@@ -382,7 +371,7 @@ html[data-theme="tech"] #view .sec__t { font-family: var(--mono); letter-spacing
   --scrim: color-mix(in srgb, var(--shade-deep) 38%, transparent);
   --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 55%, transparent) 55%, transparent 100%);
 }
-html[data-theme="literary"] #view .sec__t { font-family: var(--display); font-weight: 700; letter-spacing: .12em; }
+html[data-theme="literary"] #view .sec__t { letter-spacing: .12em; }
 html[data-theme="literary"] #view .sec__t::before { width: 2px; }
 html[data-theme="literary"] .phead__t { letter-spacing: .08em; }
 html[data-theme="literary"] #view .wal__card { border-style: solid; border-color: var(--line-2); }
@@ -449,10 +438,8 @@ html[data-theme="literary"] #view .wal__card { border-style: solid; border-color
   --r-sm: 12px;
   --r-icon: 14px;
   color-scheme: light;
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --shade: #161616;
   --shade-deep: #161616;
-  --display: "Noto Sans TC", var(--sans);
   --shadow-flat: 2px 2px 0 var(--ink);
   --shadow-block: 3px 3px 0 var(--ink);
   --shadow-card: 4px 4px 0 var(--ink);
@@ -542,8 +529,6 @@ html[data-theme="pop"] .btn--go, html[data-theme="pop"] .appbar__add { border: 2
   --r-input: 16px;
   --r-sm: 14px;
   color-scheme: light;
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
-  --display: var(--serif);
   --shade: #9A2F5C;
   --shade-deep: #3A1428;
   --bg-art:
@@ -567,7 +552,7 @@ html[data-theme="girly"] #view .sec__t::before { background: linear-gradient(180
 html[data-theme="girly"] #view .wal__card { background: linear-gradient(160deg, var(--card) 60%, var(--accent-wash)); }
 
 /* ------------------------------------------------------------
-   可愛——奶油黃底、圓點、粉圓體，圓滾滾的按鈕。
+   可愛——奶油黃底、圓點，圓滾滾的按鈕。
    ------------------------------------------------------------ */
 [data-theme="cute"] {
   --paper: #FFF8E1;
@@ -627,10 +612,8 @@ html[data-theme="girly"] #view .wal__card { background: linear-gradient(160deg, 
   --r-input: 18px;
   --r-sm: 16px;
   color-scheme: light;
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --shade: #8A6420;
   --shade-deep: #3B2A10;
-  --display: "Huninn", var(--sans);
   --bg-art: radial-gradient(color-mix(in srgb, #F2B84B 30%, transparent) 3px, transparent 3.5px);
   --bg-size: 30px 30px;
   --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
@@ -647,10 +630,6 @@ html[data-theme="girly"] #view .wal__card { background: linear-gradient(160deg, 
   --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 55%, transparent) 55%, transparent 100%);
 }
 html[data-theme="cute"] #view .dtile:hover .dtile__ic { transform: translateY(-3px) rotate(-8deg) scale(1.06); }
-html[data-theme="cute"] #view .dtile__t,
-html[data-theme="cute"] #view .qk__t,
-html[data-theme="cute"] #view .sec__t,
-html[data-theme="cute"] .tabbar__i { font-family: var(--display); font-weight: 400; }
 html[data-theme="cute"] #view .qk { border: 2px dashed var(--line-2); }
 
 /* ------------------------------------------------------------
@@ -720,10 +699,8 @@ html[data-theme="cute"] #view .qk { border: 2px dashed var(--line-2); }
   --r-ava: 0;
   --r-dot: 0;
   color-scheme: light;
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --shade: #141414;
   --shade-deep: #141414;
-  --display: "Noto Serif TC", var(--serif);
   --bg-art:
     radial-gradient(circle at 92% 18%, color-mix(in srgb, #F2C23A 22%, transparent) 0 150px, transparent 151px),
     linear-gradient(color-mix(in srgb, var(--accent-2) 8%, transparent), color-mix(in srgb, var(--accent-2) 8%, transparent));

@@ -94,15 +94,17 @@
 
   /* -- 字體 --------------------------------------------------
      數字用等寬，因為帳目要對得齊。 */
-  --sans: "Noto Sans TC", -apple-system, "Segoe UI", "PingFang TC",
-          "Microsoft JhengHei", sans-serif;
-  --serif: "Noto Serif TC", "Songti TC", PMingLiU, Georgia, serif;
-  --display: var(--serif);   /* 問候語、大數字、區塊標題。主題可以換成手寫或粉圓 */
-  /* 品牌字：草寫英文 ＋ 粉圓體。⚠️ 不跟主題換——換膚換的是顏色和形狀，名字要一眼認得 */
-  --font-script: "Pacifico", "Segoe Script", "Brush Script MT", cursive;
-  --font-cute: "Huninn", "jf-openhuninn-2.0", var(--sans);
-  --mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, "Cascadia Mono",
-          Consolas, monospace;
+  /* ⚠️ 2026-09-14：全站只用一套字。
+     以前標題是襯線體、內文黑體、數字等寬、主題還會各自換字（楷體、粉圓、等寬），
+     一頁裡混了四五種字。現在全部是粉圓體，主題只換顏色和形狀。
+     例外只有兩個：品牌那兩行（藝術字）、程式碼（要對齊，一定得等寬）。 */
+  --sans: "Huninn", "jf-openhuninn-2.0", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --serif: var(--sans);
+  --display: var(--sans);
+  --mono: var(--sans);                /* 介面上的數字、編號也同一套 */
+  --code: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --brand-zh: "Yuji Boku", "Kaisei Decol", serif;     /* 品牌：毛筆字的「家庭記帳」 */
+  --brand-en: "Kaushan Script", "Segoe Script", cursive;  /* 品牌：筆刷草寫的 FamBudget */
 
   /* -- 尺度 -- */
   --rail: 232px;
@@ -245,6 +247,29 @@ input, select, textarea { font: inherit; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hi); }
 table { border-collapse: collapse; }
+
+code, pre, kbd, samp { font-family: var(--code); }
+
+/* ============================================================
+   品牌：上面毛筆字「家庭記帳」，下面筆刷草寫 FamBudget
+   ------------------------------------------------------------
+   兩行一樣寬、英文比較小、沒有框。系統、使用說明、專題文件共用這一份。
+   ⚠️ 比例是量出來的（兩種字「墨」的實際寬度）：
+        家庭記帳 在 Yuji Boku 裡寬 3.92em，FamBudget 在 Kaushan Script 裡寬 4.58em
+        → 英文 = 中文 × 0.856，左邊再往回收一點點，兩行的筆畫才會左右對齊。
+   換字體的話這兩個數字要重新量。
+   ============================================================ */
+.brand {
+  display: inline-flex; flex-direction: column; align-items: flex-start; width: max-content;
+  font-size: 22px; line-height: 1; color: var(--ink); text-decoration: none;
+}
+.brand:hover { color: var(--ink); text-decoration: none; }
+.brand__zh { display: block; font-family: var(--brand-zh); font-size: 1em; font-weight: 400; line-height: 1; letter-spacing: 0; white-space: nowrap; }
+.brand__en {
+  display: block; margin: .06em 0 0 -.03em;
+  font-family: var(--brand-en); font-size: .856em; font-weight: 400; line-height: 1.02; letter-spacing: 0; white-space: nowrap;
+  color: var(--accent);
+}
 
 .num {
   font-family: var(--mono);

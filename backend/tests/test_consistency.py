@@ -1991,8 +1991,7 @@ def test_主題清單三邊一致():
     assert in_data == list(theme.THEMES), "data.js 與 toolkit/theme.py 的主題清單不一致"
     assert in_css == in_data, "themes.css 的 [data-theme] 區塊跟 data.js 對不上：%s / %s" % (in_css, in_data)
     assert theme.DEFAULT == in_data[0] == "paper"
-    for tid in ("literary", "cute"):
-        assert re.search(r"id: '%s'.*font: '" % tid, block), "%s 用了另外的字體，要寫在 font 讓前端去載" % tid
+    assert "font:" not in block, "主題只換顏色和形狀，不換字——全站同一套字"
 
 
 def test_預設主題寫兩次要一樣():
@@ -2258,16 +2257,57 @@ def test_明細的日期與分類篩選真的有篩():
 DOC_PAGES = ("index", "fastapi", "restful", "files", "api", "model", "guide")
 
 
-def test_品牌是印著專案名稱的草寫徽章():
-    """使用者覺得方塊裡寫「帳」很老土：換成草寫英文 FamBudget ＋ 粉圓體的「家庭記帳」。"""
+def test_品牌是上下兩行的藝術字():
+    """使用者要的品牌：上面「家庭記帳」、下面草寫英文，英文比較小、兩行一樣寬、沒有框。
+
+    ⚠️ 以前是方塊裡一個「帳」字（老土），後來是膠囊框裡的草寫英文（不要框）。
+    中文也要藝術字：Google Fonts 上的中文毛筆字多半只有簡體，沒有「記」「帳」，
+    所以用日文字型裡的毛筆字 Yuji Boku（這四個字都有）。
+    """
+    lockup = '<span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span>'
     html = read("frontend/index.html")
-    assert '<span class="brand__m" aria-hidden="true">FamBudget</span>' in html
-    assert "family=Pacifico" in html and "family=Huninn" in html, "品牌字體沒有載入"
-    tokens = read("frontend/css/tokens.css")
-    assert '--font-script: "Pacifico"' in tokens and '--font-cute: "Huninn"' in tokens
-    assert '>帳</span>' not in html and '>帳</div>' not in read("frontend/docs/index.html")
+    assert lockup in html, "系統頂列的品牌不是上下兩行"
+    assert "brand__m" not in html and ">帳</span>" not in html
+    assert "family=Yuji+Boku" in html and "family=Kaushan+Script" in html, "品牌字體沒有載入"
+    assert "text=%E5%AE%B6%E5%BA%AD%E8%A8%98%E5%B8%B3FamBudget" in html, "品牌字只需要這幾個字，用 text= 只載這幾個字"
+    assert lockup in read("frontend/js/app.js"), "登入頁的品牌沒有換"
     for pg in DOC_PAGES:
-        assert "FamBudget" in read("frontend/docs/%s.html" % pg), pg + " 的品牌還是舊的"
+        page = read("frontend/docs/%s.html" % pg)
+        assert lockup in page, pg + " 的品牌沒有換成上下兩行"
+        assert "rail__mark" not in page and "g-mark" not in page
+
+    tokens = read("frontend/css/tokens.css")
+    en = re.search(r"\.brand__en \{([^}]*)\}", tokens).group(1)
+    assert "font-size: .856em" in en, "英文要比中文小，而且縮到跟中文一樣寬（量出來的比例 0.856）"
+    for bad in ("border", "background", "border-radius", "padding"):
+        assert bad + ":" not in en, "英文不要框：.brand__en 不該有 " + bad
+
+
+def test_全站同一套字():
+    """以前一頁裡混了襯線標題、黑體內文、等寬數字，主題還會各自換字。
+
+    現在全站只有粉圓體；例外是品牌那兩行（藝術字）和程式碼（要對齊，一定等寬）。
+    字體名稱只准出現在 tokens.css，其他地方一律寫 var(--sans)／var(--code)。
+    """
+    tokens = read("frontend/css/tokens.css")
+    assert re.search(r'--sans: "Huninn"', tokens)
+    for alias in ("--serif", "--display", "--mono"):
+        assert "%s: var(--sans);" % alias in tokens, alias + " 要跟 --sans 同一套"
+    assert "code, pre, kbd, samp { font-family: var(--code); }" in tokens
+
+    themes = re.sub(r"/\*.*?\*/", "", read("frontend/css/themes.css"), flags=re.S)
+    assert "font-family" not in themes and not re.search(r"--(sans|serif|display|mono):", themes), "主題不換字"
+
+    named = re.compile(r'font-family:(?!\s*(?:var\(|inherit))[^;}]*')
+    for f in ("frontend/css/app.css", "frontend/docs/docs.css"):
+        css = re.sub(r"/\*.*?\*/", "", read(f), flags=re.S)
+        assert not named.findall(css), "%s 直接寫了字體名稱：%s" % (f, named.findall(css)[:3])
+    for pg in DOC_PAGES:
+        page = read("frontend/docs/%s.html" % pg)
+        assert not named.findall(page), "%s 直接寫了字體名稱" % pg
+        assert "Noto+Sans+TC" not in page and "Noto+Serif+TC" not in page, pg + " 還在載舊的字體"
+    assert "Noto+Sans+TC" not in read("frontend/index.html")
+    assert "function loadFont(" not in read("frontend/js/app.js"), "主題不換字，不需要另外載字"
 
 
 def test_文件跟系統同一套主題與樣子():
@@ -2278,7 +2318,6 @@ def test_文件跟系統同一套主題與樣子():
     """
     data = read("frontend/js/data.js")
     block = data[data.index("  themes: ["):data.index("  ],", data.index("  themes: ["))]
-    fonts = dict(re.findall(r"id: '([a-z]+)'[^\n]*font: '([^']+)'", block))
     css = read("frontend/docs/docs.css")
     assert not re.findall(r"#[0-9A-Fa-f]{3,8}\b|rgba?\(", re.sub(r"/\*.*?\*/", "", css, flags=re.S)), \
         "docs.css 還有寫死的顏色"
@@ -2287,8 +2326,6 @@ def test_文件跟系統同一套主題與樣子():
         head = page[:page.index("</head>")]
         assert "../css/tokens.css" in head and "../css/themes.css" in head, pg + " 沒有載系統的樣式"
         assert head.index("fambudget.theme") < head.index("../css/tokens.css"), pg + " 主題要在樣式載入前掛上"
-        m = re.search(r"var FONT = \{ literary: '([^']+)', cute: '([^']+)' \};", head)
-        assert m and m.group(1) == fonts["literary"] and m.group(2) == fonts["cute"], pg + " 的主題字體跟 data.js 對不上"
         body = re.sub(r"<!--.*?-->", "", page, flags=re.S)
         stray = re.findall(r"#[0-9A-Fa-f]{6}\b|rgba\(", body)
         assert not stray, "%s 還有寫死的顏色：%s" % (pg, sorted(set(stray))[:5])

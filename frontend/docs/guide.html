@@ -7,23 +7,19 @@
 <meta name="description" content="家庭記帳的使用說明：三分鐘上手、記帳、總覽、帳本、提醒、家人、個人資料與主題。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Pacifico&family=Huninn&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yuji+Boku&amp;family=Kaushan+Script&amp;text=%E5%AE%B6%E5%BA%AD%E8%A8%98%E5%B8%B3FamBudget&amp;display=swap">
 <!-- 跟系統同一套主題：在系統裡選了什麼，說明書就是什麼顏色 -->
 <script>
   (function () {
-    /* 另外要載字體的兩套，跟 js/data.js 的 themes[].font 一樣（有測試對齊） */
-    var FONT = { literary: 'LXGW+WenKai+TC:wght@400;700', cute: 'Huninn' };
     try {
       var t = localStorage.getItem('fambudget.theme');
-      if (t && /^[a-z]+$/.test(t)) {
-        document.documentElement.setAttribute('data-theme', t);
-        if (FONT[t]) document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + FONT[t] + '&display=swap">');
-      }
+      if (t && /^[a-z]+$/.test(t)) document.documentElement.setAttribute('data-theme', t);
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="../css/tokens.css?v=144">
-<link rel="stylesheet" href="../css/themes.css?v=144">
+<link rel="stylesheet" href="../css/tokens.css?v=145">
+<link rel="stylesheet" href="../css/themes.css?v=145">
 <style>
   /* ============================================================
      使用說明：跟系統同一套樣子
@@ -45,16 +41,7 @@
     border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
   }
   .g-bar__in { max-width: 1060px; margin: 0 auto; height: 60px; padding: 0 24px; display: flex; align-items: center; gap: 10px; }
-  .g-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
-  .g-brand:hover { color: var(--ink); }
-  /* 品牌：跟系統頂列一樣——印著專案名稱的草寫徽章 ＋ 粉圓體 */
-  .g-mark {
-    height: 34px; padding: 0 14px 3px; display: inline-grid; place-items: center; white-space: nowrap;
-    font-family: var(--font-script); font-size: 18px; font-weight: 400; line-height: 1;
-    color: var(--on-accent); background: var(--accent); border-radius: var(--r-pill);
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 26%, transparent);
-  }
-  .g-brand b { font-family: var(--font-cute); font-size: 18px; font-weight: 400; letter-spacing: .06em; }
+  .g-brand.brand { font-size: 20px; }
   .g-sep { padding-left: 10px; margin-left: 2px; border-left: 1px solid var(--line-2); font-size: 14px; color: var(--ink-faint); }
   .g-back {
     margin-left: auto; display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 14px 0 8px;
@@ -193,7 +180,8 @@
   }
   @media (max-width: 640px) {
     .g-bar__in, .g-wrap { padding-left: 16px; padding-right: 16px; }
-    .g-brand b, .g-sep { display: none; }
+    .g-sep { display: none; }
+    .g-brand.brand { font-size: 18px; }
     .g-hero { padding-top: 22px; }
     .g-hero h1 { font-size: 27px; }
     .g-toc .g-ic { width: 40px; height: 40px; }
@@ -227,7 +215,7 @@
 
 <header class="g-bar">
   <div class="g-bar__in">
-    <a class="g-brand" href="../index.html"><span class="g-mark" aria-hidden="true">FamBudget</span><b>家庭記帳</b></a>
+    <a class="brand g-brand" href="../index.html" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
     <span class="g-sep">使用說明</span>
     <a class="g-back" href="../index.html"><svg aria-hidden="true"><use href="#i-back"/></svg>回到系統</a>
   </div>

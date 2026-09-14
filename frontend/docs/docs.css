@@ -7,7 +7,7 @@
      · 沒有側欄：原本左邊那條導覽變成頂列 ＋ 一排可以左右滑的章節膠囊。
      · 重點先講：每頁開頭一張「這一頁的重點」，每一節的導言標上「重點」。
 
-   class 名稱沒有改，六頁文件共用這一份。這裡不准寫死任何顏色。
+   class 名稱沒有改，六頁文件共用這一份。這裡不准寫死任何顏色，也不准寫字體名稱（一律 var）。
    ============================================================ */
 
 /* ---------- 舊變數名稱：對到系統的變數 ---------- */
@@ -52,7 +52,7 @@ h1, h2, h3, h4 { margin: 0; color: var(--ink); text-wrap: balance; }
 p { margin: 0; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hi); text-decoration: underline; text-underline-offset: 3px; }
-code, .mono { font-family: var(--mono); font-size: .88em; letter-spacing: 0; }
+code, .mono { font-family: var(--code); font-size: .88em; letter-spacing: 0; }
 p code, li code, td code, .note code {
   padding: 1px 6px; color: var(--ink); background: var(--sunk);
   border: 1px solid var(--line); border-radius: var(--r-xs);
@@ -62,16 +62,10 @@ b, strong { color: var(--ink); font-weight: 700; }
 ::selection { background: var(--accent-wash); color: var(--accent-hi); }
 
 /* ============================================================
-   品牌：跟系統頂列一樣——印著專案名稱的草寫徽章
+   品牌：tokens.css 的 .brand（毛筆字 ＋ 筆刷草寫，兩行一樣寬）
    ============================================================ */
-.rail__mark {
-  height: 34px; padding: 0 14px 3px; display: inline-grid; place-items: center; white-space: nowrap;
-  font-family: var(--font-script); font-size: 18px; font-weight: 400; line-height: 1; letter-spacing: .01em;
-  color: var(--on-accent); background: var(--accent); border-radius: var(--r-pill);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 26%, transparent);
-}
-.rail__home { display: inline-flex; text-decoration: none; }
-.rail__home:hover { text-decoration: none; }
+.rail__home.brand, .docbar__brand.brand { font-size: 20px; }
+.rail__doc { padding-left: 14px; border-left: 1px solid var(--line-2); }
 
 /* ============================================================
    頂列：品牌 ＋ 回到系統，下面一排章節膠囊（左右滑）
@@ -89,7 +83,7 @@ b, strong { color: var(--ink); font-weight: 700; }
   width: 100%; height: auto; padding: 0 var(--doc-x); color: var(--ink);
 }
 .rail__brand { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0; border: 0; }
-.rail__t { font-family: var(--font-cute); font-size: 17px; font-weight: 400; line-height: 1.3; letter-spacing: .04em; color: var(--ink); }
+.rail__t { font-family: var(--sans); font-size: 16px; font-weight: 700; line-height: 1.3; letter-spacing: .04em; color: var(--ink); }
 .rail__s { font-size: 11px; letter-spacing: .1em; color: var(--ink-faint); }
 
 .nav {
@@ -250,7 +244,7 @@ tbody td b { color: var(--ink); }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: var(--card-2); }
 td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-faint); width: 40px; text-align: right; }
-td.rt { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; color: var(--ink); }
+td.rt { font-family: var(--code); font-size: 12.5px; white-space: nowrap; color: var(--ink); }
 td.tight { white-space: nowrap; }
 
 /* ---------- 標籤 ---------- */
@@ -345,7 +339,7 @@ td.tight { white-space: nowrap; }
 .acc__h::-webkit-details-marker { display: none; }
 .acc__h:hover { background: var(--card-2); }
 .acc[open] .acc__h { background: var(--card-2); border-bottom: 1px solid var(--line); }
-.acc__code { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent-hi); }
+.acc__code { font-family: var(--code); font-size: 13px; font-weight: 700; color: var(--accent-hi); }
 .acc__t { font-size: 14px; color: var(--ink); }
 .acc__n { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); }
 .acc__b { padding: 14px 18px 18px; }
@@ -377,7 +371,7 @@ figcaption b { color: var(--ink-soft); }
 /* ---------- 程式碼 ---------- */
 pre, pre.code, pre.py, pre.tree, pre.code2 {
   margin: 12px 0 0; padding: 14px 16px; overflow-x: auto;
-  font-family: var(--mono); font-size: 12.5px; line-height: 1.8; color: var(--code-ink); tab-size: 4;
+  font-family: var(--code); font-size: 12.5px; line-height: 1.8; color: var(--code-ink); tab-size: 4;
   background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r-input);
 }
 .codelabel {
@@ -513,7 +507,7 @@ pre, pre.code, pre.py, pre.tree, pre.code2 {
 .verb--PATCH { color: var(--warn-ink); background: var(--warn-wash); }
 .verb--DELETE { color: var(--down); background: var(--down-wash); }
 
-.route__p { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--ink); }
+.route__p { font-family: var(--code); font-size: 13px; font-weight: 600; color: var(--ink); }
 .route__p em { font-style: normal; color: var(--accent); }
 .route__d { flex: 1 1 180px; min-width: 0; font-size: 13px; color: var(--ink-faint); }
 .route__r { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
@@ -526,7 +520,7 @@ pre.code .tk-s { color: var(--info); }
 pre.code .tk-n { color: var(--up); }
 pre.code .tk-k { color: var(--ink); font-weight: 600; }
 .params { display: flex; flex-wrap: wrap; gap: 6px; }
-.param { padding: 2px 10px; font-family: var(--mono); font-size: 12px; color: var(--ink-soft); background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-pill); }
+.param { padding: 2px 10px; font-family: var(--code); font-size: 12px; color: var(--ink-soft); background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-pill); }
 .empty { padding: 40px 20px; text-align: center; font-size: 14px; color: var(--ink-faint); background: var(--card); border: 1px dashed var(--line-2); border-radius: var(--r-card); }
 
 /* ============================================================
@@ -551,7 +545,8 @@ pre.code .tk-k { color: var(--ink); font-weight: 600; }
   .rail__brand { min-height: 56px; gap: 8px; }
   .rail__t { font-size: 15px; }
   .rail__s { display: none; }
-  .rail__mark { height: 32px; padding: 0 12px 3px; font-size: 16px; }
+  .rail__home.brand, .docbar__brand.brand { font-size: 18px; }
+  .rail__doc { padding-left: 10px; }
   .nav a.nav__back { top: 10px; padding: 0 10px 0 4px; }
   .hero { padding-top: 24px; }
   .kp { padding: 16px 16px 6px; }

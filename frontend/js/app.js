@@ -87,19 +87,9 @@
     var t = themeOf(id) || themeOf('paper');
     if (!t) return;
     document.documentElement.setAttribute('data-theme', t.id);
-    if (t.font) loadFont(t.font);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta && t.band) meta.setAttribute('content', t.band);
     try { localStorage.setItem(THEME_KEY, t.id); } catch (e) {}
-  }
-  /* 手寫體、粉圓體只有選到那一套才載，其他人不用多下載幾百 KB */
-  function loadFont(spec) {
-    var id = 'font-' + spec.replace(/[^A-Za-z]+/g, '-');
-    if (document.getElementById(id)) return;
-    var l = document.createElement('link');
-    l.id = id; l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=' + spec + '&display=swap';
-    document.head.appendChild(l);
   }
   applyTheme(currentTheme());
 
@@ -2422,7 +2412,7 @@
     document.body.classList.add('is-out');
     $view.innerHTML =
       '<div class="gate"><div class="gate__c">' +
-        '<div class="gate__b"><span class="brand__m" aria-hidden="true">FamBudget</span><span class="brand__n">家庭記帳</span></div>' +
+        '<div class="gate__b"><span class="brand"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></span></div>' +
         '<h1 class="gate__t">' + title + '</h1>' +
         '<p class="gate__s">' + sub + '</p>' +
         inner +
