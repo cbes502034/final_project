@@ -1191,12 +1191,22 @@ def test_主頁不可以變成繞過登入的破口():
 
     如果把它加進 OPEN，沒登入的人就多一個能停留的地方；
     而真正危險的是有人順手把別的頁也加進去。這裡把 OPEN 釘死。
+
+    2026-09-14 加了兩頁，都是刻意的：
+      forgot  忘記密碼。本來就是給登不進去的人用的，頁面上沒有任何資料
+      reset   信裡的重設連結。登入與否都要能開（ANY），只認 token，不讀任何資料
     """
     app = read("frontend/js/app.js")
     mo = re.search(r"var OPEN = \[([^\]]*)\]", app)
     assert mo, "app.js 裡找不到 OPEN"
     opens = re.findall(r"'([^']+)'", mo.group(1))
-    assert opens == ["login", "register"],         "沒登入能看的頁被改了：%s" % opens
+    assert opens == ["login", "register", "forgot"],         "沒登入能看的頁被改了：%s" % opens
+    anys = re.findall(r"'([^']+)'", re.search(r"var ANY = \[([^\]]*)\]", app).group(1))
+    assert anys == ["reset"], "登入與否都能開的頁被改了：%s" % anys
+    for fn in ("vForgot", "vReset"):
+        body = re.search(r"function %s\([^)]*\) \{(.*?)\n  \}" % fn, app, re.S).group(1)
+        for leak in ("API.me(", "API.transactions(", "API.summary(", "API.members("):
+            assert leak not in body, "%s 是公開頁，不可以讀任何資料：%s" % (fn, leak)
 
     assert "landing:" not in app, "主頁不該是一個獨立路由"
 
@@ -1536,7 +1546,8 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
     routes = re.search(r"var ROUTES = \{(.*?)\};", app, re.S).group(1)
     pages = set(re.findall(r"(\w+): v\w+", routes))
     # 登入／註冊沒登入才看得到；member 是從家庭成員點進去的；admin 只有平台管理員（登入就直接導過去）
-    need = pages - {"login", "register", "member", "admin"}
+    # forgot 從登入頁點、reset 從信裡的連結點、setup 是註冊完路由閘帶過去的
+    need = pages - {"login", "register", "member", "admin", "forgot", "reset", "setup"}
     missing = need - tiles - in_menu
     assert not missing, "這些頁面拆掉側欄之後進不去了：%s" % sorted(missing)
     assert "quick: true" in home, "儀表板上要有「記一筆」"
@@ -1568,7 +1579,7 @@ def test_平台管理員與一般使用者的頁面互不相通():
     assert "admin && page !== 'admin'" in body, "路由閘沒有把管理員送去平台管理"
     assert "!admin && page === 'admin'" in body, "路由閘沒有擋一般使用者進平台管理"
 
-    mo2 = re.search(r"function afterLogin\(d\) \{(.*?)\n  \}", app, re.S)
+    mo2 = re.search(r"function afterLogin\(d(?:, fresh)?\) \{(.*?)\n  \}", app, re.S)
     assert mo2 and "ME = null" in mo2.group(1), "登入之後沒有清掉上一個人的身分"
     mo3 = re.search(r"API\.logout\(\)\.then\(function \(\) \{(.*?)\n      \}\);", app, re.S)
     assert mo3 and "ME = null" in mo3.group(1), "登出之後沒有清掉身分"
@@ -2695,3 +2706,161 @@ def test_修改與多筆刪除_三層接口與文件都有():
     assert "{ n: 73, o: 'm2', m: 'DELETE', p: '/api/transactions'" in api_html
     guide = read("frontend/docs/guide.html")
     assert "選取多筆" in guide and "修改" in guide
+
+
+# ===========================================================================
+# 註冊後的個人化設定、忘記密碼
+# ===========================================================================
+# 使用者要的：「註冊上的存款目標 改到註冊後的個人化設定流程」、忘記密碼接真的寄信服務。
+# 忘記密碼最容易「看起來對、其實是漏洞」：回應透露帳號在不在、連結能重複用、
+# 過期了還能用。所以真的跑一次，而不是只找字串。
+
+_RESET_DRIVER = _THEME_DRIVER.split("(async () => {")[0] + r"""
+const tryIt = p => p.then(r => r, e => ({ error: e.message, status: e.status || null }));
+(async () => {
+  const out = {}, PW = 'password123';
+  let API = boot();
+
+  // ---- 忘記密碼 ----
+  out.known = await API.requestPasswordReset('  JianGuo@lin.tw ');
+  out.unknown = await API.requestPasswordReset('nobody@nowhere.tw');
+  out.cooldown = await API.requestPasswordReset('jianguo@lin.tw');
+  out.badEmail = await tryIt(API.requestPasswordReset('not-an-email'));
+  const token = out.known.demoMail.link.split('/').pop();
+  out.tokenLen = token.length;
+
+  API = boot();                                                    // 重新整理：申請過的連結要還在
+  out.shortPw = await tryIt(API.confirmPasswordReset(token, '1234'));
+  out.wrongToken = await tryIt(API.confirmPasswordReset('x'.repeat(43), PW));
+  out.ok = await tryIt(API.confirmPasswordReset(token, PW));
+  out.loggedOutAfter = (await API.authState()).loggedIn;
+  out.reuse = await tryIt(API.confirmPasswordReset(token, PW));
+
+  // 過期：直接把存起來的到期時間改成過去
+  await API.login({ email: 'shufen@lin.tw', password: PW });
+  const t2 = (await API.requestPasswordReset('shufen@lin.tw')).demoMail.link.split('/').pop();
+  const raw = JSON.parse(localStorage.getItem('fambudget.state.v1'));
+  raw.resets.forEach(r => { if (r.token === t2) r.expiresAt = Date.now() - 1000; });
+  localStorage.setItem('fambudget.state.v1', JSON.stringify(raw));
+  API = boot();
+  out.expired = await tryIt(API.confirmPasswordReset(t2, PW));
+
+  // ---- 註冊：不收存款目標，註冊完還沒個人化設定 ----
+  out.regWithGoal = await tryIt(API.register({ name: '測試', email: 'new@x.tw', password: PW, savingsGoal: 5000 }));
+  out.reg = await tryIt(API.register({ name: '測試', email: 'new@x.tw', password: PW }));
+  out.meBefore = (await API.me()).user.onboardedAt;
+  out.badFlag = await tryIt(API.updateProfile({ onboarded: false }));
+  await API.setSavingsGoal((await API.me()).user.id, 6000);
+  await API.updateProfile({ onboarded: true });
+  API = boot();
+  const me = (await API.me()).user;
+  out.meAfter = me.onboardedAt; out.goalAfter = me.savingsGoal;
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.seed = (await API.me()).user.onboardedAt;
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+def test_忘記密碼_不透露帳號_連結一次性會過期_改完登出():
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_RESET_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    out = json.loads(res.stdout.decode("utf-8"))
+
+    from app.toolkit import password_reset as pr
+    for k in ("known", "unknown", "cooldown"):
+        assert out[k]["ok"] is True and out[k]["message"] == pr.GENERIC_MESSAGE, \
+            k + "：有沒有這個帳號、是不是冷卻中，回應都要一模一樣（跟 toolkit 同一句）"
+    assert out["known"]["demoMail"]["link"].startswith("#/reset/"), "示範模式要看得到信的內容"
+    assert "demoMail" not in out["unknown"] and "demoMail" not in out["cooldown"], "冷卻中不重寄"
+    assert out["badEmail"]["status"] == 400
+    assert out["tokenLen"] >= 40
+
+    assert out["shortPw"]["status"] == 422
+    assert out["wrongToken"]["status"] == 400
+    assert out["ok"].get("ok") is True and out["loggedOutAfter"] is False, "改完密碼要登出所有裝置"
+    assert out["reuse"]["status"] == 400, "重設連結只能用一次"
+    assert out["expired"]["status"] == 400, "過期的連結不能用"
+    assert out["reuse"]["error"] == out["expired"]["error"] == out["wrongToken"]["error"] == pr.INVALID_MESSAGE, \
+        "找不到、過期、用過要是同一句話，不讓人分辨"
+
+    assert out["regWithGoal"]["status"] == 400, "存款目標不在註冊時收"
+    assert out["reg"]["user"]["onboardedAt"] is None and out["meBefore"] is None, "新帳號要還沒走個人化設定"
+    assert out["badFlag"]["status"] == 422
+    assert out["meAfter"] and out["goalAfter"] == 6000, "個人化設定走完要記在帳號上，重新整理後還在"
+    assert out["seed"], "示範帳號是早就在用的人，不該被帶去個人化設定"
+
+
+def test_存款目標搬到註冊後的個人化設定():
+    app = read("frontend/js/app.js")
+    reg = re.search(r"function vRegister\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "rgGoal" not in reg and "存款" not in reg.replace("每月想存多少，建好帳號之後再一步一步設定", ""), \
+        "註冊表單還在問存款目標"
+    h = app.index("if (f.id === 'regF')")
+    assert "savingsGoal" not in app[h:h + 900], "註冊送出時還帶著存款目標"
+
+    paint = re.search(r"function paint\(\) \{(.*?)\n  \}\n", app, re.S).group(1)
+    assert "!admin && !m.user.onboardedAt && page !== 'setup'" in paint, "還沒個人化設定的人，登入後要先帶去設定"
+    setup = re.search(r"function vSetup\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    for part in ("suGoalF", "suFinF", "themeCards(", "data-su-next", 'data-su-done="skip"', 'data-su-done="finish"'):
+        assert part in setup, "個人化設定少了 " + part
+    done = re.search(r"function setupDone\(how\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "onboarded: true" in done and "ME = null" in done and "tourAsk" in done, \
+        "走完要標記在帳號上、清掉快取的身分，再問要不要導覽"
+    tour = re.search(r"function tourAsk\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "onboardedAt" in tour, "個人化設定還沒走完就跳導覽，兩個視窗會疊在一起"
+
+    api = read("frontend/js/api.js")
+    assert api.count("requestPasswordReset:") >= 3 and api.count("confirmPasswordReset:") >= 3
+    assert "'txPatch', 'txGone', 'resets'," in api and "resets: state.resets" in api, "重設連結要存起來，重新整理才點得開"
+
+    contract = read("docs/02-前後端串接契約.md")
+    assert "`API.register({ name, email, password })`" in contract
+    assert '{ "onboarded": true }' in contract and "user.onboardedAt" in contract
+    api_html = read("frontend/docs/api.html")
+    assert '"savingsGoal": 20000\\n}' not in api_html, "API 說明頁的註冊範例還帶著存款目標"
+    guide = read("frontend/docs/guide.html")
+    assert "建好帳號會先帶你設定" in guide
+
+
+def test_忘記密碼的頁面_設定與文件():
+    app = read("frontend/js/app.js")
+    login = re.search(r"function vLogin\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert 'href="#/forgot"' in login, "登入頁要有「忘記密碼？」"
+    reset = re.search(r"function vReset\(token\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "history.replaceState" in reset, "token 要從網址列拿掉，不要留在瀏覽紀錄"
+    result = re.search(r"function forgotResult\(r\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "r.message" in result, "畫面要照後端那一句話講，不要自己分成「寄出了／沒這個人」"
+
+    from app.ownership import all_routes
+    routes = {"%s %s" % r for r in all_routes()}
+    assert {"POST /api/auth/password-reset", "POST /api/auth/password-reset/confirm"} <= routes
+
+    render = read("render.yaml")
+    for key in ("BREVO_API_KEY", "MAIL_FROM"):
+        i = render.index("key: " + key + "\n")
+        assert "sync: false" in render[i:i + 60], key + " 是機密，要在 Render 後台填，不能寫進 repo"
+    env = read("backend/.env.example")
+    assert re.search(r"^BREVO_API_KEY=$", env, re.M), ".env.example 只能留空白範本"
+
+    contract = read("docs/02-前後端串接契約.md")
+    for part in ("### `POST /api/auth/password-reset`", "### `POST /api/auth/password-reset/confirm`",
+                 "GENERIC_MESSAGE", "Brevo", "25／465／587", "demoMail"):
+        assert part in contract, "契約少了 " + part
+    api_html = read("frontend/docs/api.html")
+    assert "{ n: 74, o: 'm1', m: 'POST', p: '/api/auth/password-reset'" in api_html
+    assert "{ n: 75, o: 'm1', m: 'POST', p: '/api/auth/password-reset/confirm'" in api_html
+    guide = read("frontend/docs/guide.html")
+    assert "忘記密碼怎麼辦" in guide

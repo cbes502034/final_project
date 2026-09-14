@@ -84,7 +84,11 @@ MEMBERS: list[Member] = [
         color="#6C9FFB",
         scope=(
             "負責「你是誰」。\n"
-            "屬於他的：註冊登入登出、密碼、JWT、工作階段、個人資料與大頭貼、介面主題。\n"
+            "屬於他的：註冊登入登出、密碼、忘記密碼、JWT、工作階段、個人資料與大頭貼、介面主題。\n"
+            "註冊只問名字、email、密碼；每月存款目標、理財習慣、主題在註冊後的個人化設定問，\n"
+            "  走完（或全部跳過）用 PATCH /api/auth/me 的 onboarded 設 users.onboarded_at。\n"
+            "忘記密碼：toolkit/password_reset.py 產一次性連結（只存雜湊、30 分鐘），toolkit/mailer.py 用 Brevo 寄出。\n"
+            "⚠️ 申請重設時，有沒有這個帳號都回同一句話——不然這支就是帳號列舉工具。\n"
             "地基（資料庫連線、設定、依賴注入、密碼雜湊、JWT 實作）"
             "已經在 toolkit/ 裡寫好了，直接用就好，不用再造一次。\n"
             "停權也在這裡：平台管理員（master）可以停掉違規帳號。\n"
@@ -107,6 +111,8 @@ MEMBERS: list[Member] = [
             ("POST", "/api/auth/logout-all"),
             ("GET", "/api/auth/me"),
             ("PATCH", "/api/auth/password"),
+            ("POST", "/api/auth/password-reset"),
+            ("POST", "/api/auth/password-reset/confirm"),
             ("GET", "/api/auth/me/finance"),
             ("PUT", "/api/auth/me/finance"),
             ("POST", "/api/auth/verify-password"),

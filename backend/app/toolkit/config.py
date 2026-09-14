@@ -103,6 +103,28 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---------- 寄信（忘記密碼） ----------
+    brevo_api_key: str = Field(
+        default="",
+        description=(
+            "Brevo 的 API 金鑰（Brevo 後台 → SMTP & API → API keys）。\n"
+            "**跟 JWT_SECRET 一樣不可以 commit**，Render 上在後台填。\n"
+            "⚠️ 不能改用 SMTP：Render 免費方案擋掉了 25／465／587 埠，見 toolkit/mailer.py。"
+        ),
+    )
+    mail_from: str = Field(
+        default="",
+        description="寄件信箱。一定要先在 Brevo 驗證過（Senders），不然信會被拒絕。",
+    )
+    mail_from_name: str = Field(default="家庭記帳", description="收件人看到的寄件人名稱。")
+    app_base_url: str = Field(
+        default="https://fambudget-web.onrender.com",
+        description=(
+            "前端的網址。重設密碼信裡的連結會長成 <這個網址>/#/reset/<token>。\n"
+            "本機開發改成 http://localhost:5174。"
+        ),
+    )
+
     @field_validator("jwt_secret")
     @classmethod
     def _secret_must_be_long_enough(cls, v: str) -> str:

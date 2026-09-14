@@ -2235,6 +2235,7 @@
        平台管理員的首頁上一個都沒有——框會圈在看不見的元素上。 */
     API.me().then(function (m) {
       if (m.user.isPlatformAdmin || tourDone() || document.getElementById('tourAsk')) return;
+      if (!m.user.onboardedAt || /^#\/setup/.test(location.hash)) return;   // 先把個人化設定走完
       tourAskShow();
     });
   }
@@ -2606,10 +2607,10 @@
     requestAnimationFrame(step);
   }
 
-  function authShell(title, sub, inner) {
+  function authShell(title, sub, inner, wide) {
     document.body.classList.add('is-out');
     $view.innerHTML =
-      '<div class="gate"><div class="gate__c">' +
+      '<div class="gate"><div class="gate__c' + (wide ? ' gate__c--wide' : '') + '">' +
         '<div class="gate__b"><span class="brand"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></span></div>' +
         '<h1 class="gate__t">' + title + '</h1>' +
         '<p class="gate__s">' + sub + '</p>' +
@@ -2628,6 +2629,7 @@
           '<input type="email" id="lgEmail" autocomplete="username" required></label>' +
         '<label class="fld"><span>密碼</span>' +
           '<input type="password" id="lgPw" autocomplete="current-password" required></label>' +
+        '<a class="gate__fp" href="#/forgot">忘記密碼？</a>' +
         '<button class="btn btn--go gate__go" type="submit">登入</button>' +
         '<p class="gate__alt">還沒有帳號？<a href="#/register" data-gate="register">建立一個</a></p>' +
       '</form>' +
@@ -2644,7 +2646,7 @@
   function vRegister() {
     gateStep = 'register';
     head('註冊', '');
-    authShell('建立帳號', '註冊之後可以自己記帳，也可以加入家庭一起看。',
+    authShell('建立帳號', '只要名字、email、密碼。每月想存多少，建好帳號之後再一步一步設定。',
       '<form class="gate__f" id="regF">' +
         '<label class="fld"><span>名字</span>' +
           '<input type="text" id="rgName" autocomplete="name" required></label>' +
@@ -2653,12 +2655,172 @@
         '<label class="fld"><span>密碼</span>' +
           '<input type="password" id="rgPw" autocomplete="new-password" required>' +
           '<em class="fld__h">至少 8 個字</em></label>' +
-        '<label class="fld"><span>每月存款目標</span>' +
-          '<input type="number" id="rgGoal" min="0" value="0">' +
-          '</label>' +
         '<button class="btn btn--go gate__go" type="submit">建立帳號</button>' +
         '<p class="gate__alt">已經有帳號了？<a href="#/login" data-gate="login">回去登入</a></p>' +
       '</form>');
+  }
+
+  /* ============================================================
+     註冊後的個人化設定
+
+     註冊頁只問名字、email、密碼。「每個月想存多少」需要想一下，
+     塞在註冊表單裡，大部分人會隨便填個 0 先過——那總覽的「還可以花」就沒有意義。
+     所以建好帳號之後，一步一步問：存錢目標 → 理財習慣 → 主題。
+
+     ⚠️ 每一步都能跳過，也能「全部先跳過」。這是**幫忙設定，不是關卡**。
+     ⚠️ 走完或全部跳過才標記 onboarded。沒標記的人登入之後會先回到這裡，
+        換一台裝置也一樣（標記存在帳號上：users.onboarded_at）。
+     ============================================================ */
+  var SETUP = { step: 0, note: '' };
+  var SETUP_STEPS = ['存錢目標', '理財習慣', '主題'];
+
+  function setupDots() {
+    return '<ol class="stp" aria-label="個人化設定，共 ' + SETUP_STEPS.length + ' 步">' +
+      SETUP_STEPS.map(function (t, i) {
+        var cls = i === SETUP.step ? ' on' : (i < SETUP.step ? ' done' : '');
+        return '<li class="stp__i' + cls + '"' + (i === SETUP.step ? ' aria-current="step"' : '') + '>' +
+          '<b>' + (i + 1) + '</b><span>' + t + '</span></li>';
+      }).join('') + '</ol>';
+  }
+
+  function vSetup() {
+    head('個人化設定', '');
+    API.me().then(function (m) {
+      var u = m.user;
+      ME = m;
+      var skipAll = '<p class="gate__alt"><button type="button" class="gate__lnk" data-su-done="skip">全部先跳過，直接開始用</button></p>';
+
+      if (SETUP.step === 0) {
+        authShell('每個月想存多少？',
+          '先決定要存的，剩下的才是這個月可以花的。之後隨時可以到「個人資料」改。',
+          setupDots() +
+          '<form class="gate__f" id="suGoalF">' +
+            '<label class="money money--lg"><i>NT$</i>' +
+              '<input type="number" id="suGoal" min="0" step="100" inputmode="numeric" ' +
+                'value="' + (u.savingsGoal ? esc(u.savingsGoal) : '') + '" placeholder="0" aria-label="每月想存多少"></label>' +
+            '<div class="su__chips" role="group" aria-label="常見的金額">' +
+              [3000, 5000, 10000, 20000].map(function (v) {
+                return '<button type="button" class="su__chip" data-su-goal="' + v + '">' + num(v) + '</button>';
+              }).join('') + '</div>' +
+            '<p class="su__f">收入 − 每月想存 ＝ 這個月可以花的</p>' +
+            '<button class="btn btn--go gate__go" type="submit">下一步</button>' +
+            '<button type="button" class="gate__lnk" data-su-next>還沒想好，先跳過這一步</button>' +
+          '</form>' + skipAll, true);
+        return;
+      }
+
+      if (SETUP.step === 1) {
+        authShell('你怎麼管錢？', '選你覺得像的就好。財務建議會參考這些，讓說法更貼近你。', setupDots() + skeleton(2), true);
+        API.financeProfile().then(function (d) {
+          var f = d.finance || {};
+          SETUP.note = f.note || '';
+          var has = function (key, id) { return (f[key] || []).indexOf(id) >= 0 ? ' checked' : ''; };
+          authShell('你怎麼管錢？', '選你覺得像的就好。財務建議會參考這些，讓說法更貼近你。',
+            setupDots() +
+            '<form class="gate__f" id="suFinF">' +
+              '<div class="finf__g"><span class="finf__k">理財風格</span><div class="finf__o">' +
+                d.styles.map(function (x) {
+                  return '<label class="pick"><input type="radio" name="suStyle" value="' + esc(x.id) + '"' +
+                    (f.style === x.id ? ' checked' : '') + '><b>' + esc(x.name) + '</b><i>' + esc(x.desc) + '</i></label>';
+                }).join('') + '</div></div>' +
+              '<div class="finf__g"><span class="finf__k">目前最在意的（可以複選）</span><div class="finf__o finf__o--row">' +
+                d.goals.map(function (x) {
+                  return '<label class="pick pick--sm"><input type="checkbox" name="suGoalPick" value="' + esc(x.id) + '"' +
+                    has('goals', x.id) + '><b>' + esc(x.name) + '</b></label>';
+                }).join('') + '</div></div>' +
+              '<div class="finf__g"><span class="finf__k">固定的財務安排（可以複選）</span><div class="finf__o finf__o--row">' +
+                d.habits.map(function (x) {
+                  return '<label class="pick pick--sm"><input type="checkbox" name="suHabit" value="' + esc(x.id) + '"' +
+                    has('habits', x.id) + '><b>' + esc(x.name) + '</b></label>';
+                }).join('') + '</div></div>' +
+              '<p class="su__f">只拿來讓建議更貼近你，<b>不會</b>拿來推薦投資、保險。</p>' +
+              '<div class="su__nav"><button type="button" class="btn" data-su-back>上一步</button>' +
+                '<button class="btn btn--go" type="submit">下一步</button></div>' +
+              '<button type="button" class="gate__lnk" data-su-next>先跳過這一步</button>' +
+            '</form>' + skipAll, true);
+        }).catch(function (e) { toast(e.message || '讀不到選項，先跳過這一步', 'err'); SETUP.step = 2; vSetup(); });
+        return;
+      }
+
+      authShell('挑一個喜歡的樣子', '按一下就換，整個系統馬上變成那個樣子。之後在右上角頭貼也能換。',
+        setupDots() +
+        '<div class="thm__row su__thm" id="thmRow">' + themeCards(u.theme || currentTheme()) + '</div>' +
+        '<div class="su__nav"><button type="button" class="btn" data-su-back>上一步</button>' +
+          '<button type="button" class="btn btn--go" data-su-done="finish">完成，開始記帳</button></div>', true);
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
+
+  /* 走完或全部跳過：標記在帳號上，回總覽，再問要不要導覽 */
+  function setupDone(how) {
+    API.updateProfile({ onboarded: true }).then(function () {
+      ME = null;
+      SETUP.step = 0;
+      location.hash = '#/';
+      toast(how === 'finish' ? '設定好了，來記第一筆吧' : '好，之後隨時可以到「個人資料」設定', 'ok');
+      setTimeout(tourAsk, 900);
+    }).catch(function (e) { toast(e.message || '沒有存成功，再試一次', 'err'); });
+  }
+
+  /* ============================================================
+     忘記密碼
+
+     ⚠️ 不管 email 有沒有註冊，畫面都說同一句話（後端也是），不然就是帳號列舉工具。
+     示範站沒有後端寄不出信，mock 會把「信的內容」一起回來，直接攤在畫面上。
+     ============================================================ */
+  function vForgot() {
+    gateStep = 'login';                    // 從這裡回登入，要看到登入表單，不是主頁
+    head('忘記密碼', '');
+    authShell('忘記密碼', '輸入註冊時用的 email，我們寄一封重設密碼的信給你。',
+      '<form class="gate__f" id="forgotF">' +
+        '<label class="fld"><span>Email</span>' +
+          '<input type="email" id="fgEmail" autocomplete="username" required></label>' +
+        '<button class="btn btn--go gate__go" type="submit">寄重設信給我</button>' +
+        '<p class="gate__alt">想起來了？<a href="#/login">回去登入</a></p>' +
+      '</form>' +
+      '<div id="forgotOut" aria-live="polite"></div>');
+  }
+
+  function forgotResult(r) {
+    var mail = r.demoMail;
+    return '<div class="fgt">' +
+      '<p class="fgt__t">' + esc(r.message) + '</p>' +
+      '<p class="fgt__h">沒收到的話，看一下垃圾信件匣；過一分鐘可以再申請一次。</p>' +
+      (mail
+        ? '<div class="fgt__mail">' +
+            '<div class="fgt__k">示範模式：真的系統會把這封信寄到信箱，這裡直接給你看</div>' +
+            '<dl class="fgt__dl"><dt>寄給</dt><dd>' + esc(mail.to) + '</dd><dt>主旨</dt><dd>' + esc(mail.subject) + '</dd></dl>' +
+            '<p>按下面的按鈕設定新密碼。這個連結 ' + esc(mail.minutes) + ' 分鐘內有效，而且只能用一次。</p>' +
+            '<a class="btn btn--go gate__go" href="' + esc(mail.link) + '">設定新密碼</a>' +
+          '</div>'
+        : (API.mode === 'http' ? '' :
+            '<p class="fgt__demo">示範模式：這個 email 沒有註冊，或一分鐘內已經寄過，所以這次沒有信。</p>')) +
+      '<p class="gate__alt"><a href="#/login">回去登入</a>　·　' +
+        '<button type="button" class="gate__lnk" data-fg-again>換一個 email</button></p>' +
+    '</div>';
+  }
+
+  /* 信裡的連結是 #/reset/<token>。進來之後把 token 收進記憶體、從網址列拿掉——
+     不然它會一直躺在瀏覽紀錄裡，旁邊的人也看得到。 */
+  var RESET_TOKEN = '';
+  function vReset(token) {
+    gateStep = 'login';
+    if (token) {
+      RESET_TOKEN = token;
+      try { history.replaceState(null, '', location.pathname + location.search + '#/reset'); } catch (e) {}
+    }
+    head('設定新密碼', '');
+    authShell('設定新密碼', '新密碼至少 8 個字。設定好之後，所有裝置上的登入都會登出。',
+      RESET_TOKEN
+        ? '<form class="gate__f" id="resetF">' +
+            '<label class="fld"><span>新密碼</span>' +
+              '<input type="password" id="rsPw" autocomplete="new-password" minlength="8" required></label>' +
+            '<label class="fld"><span>再輸入一次</span>' +
+              '<input type="password" id="rsPw2" autocomplete="new-password" minlength="8" required></label>' +
+            '<button class="btn btn--go gate__go" type="submit">設定新密碼</button>' +
+            '<p class="gate__alt">連結失效了？<a href="#/forgot">重新申請一封</a></p>' +
+          '</form>'
+        : '<div class="fgt"><p class="fgt__t">這個重設連結不完整，或已經用過了。</p>' +
+            '<p class="gate__alt"><a href="#/forgot">重新申請一封</a>　·　<a href="#/login">回去登入</a></p></div>');
   }
 
   function vProfile() {
@@ -2997,16 +3159,20 @@
   var ROUTES = { '': vHome, entry: vEntry, stats: vStats,
                  advice: vAdvice, members: vMembers,
                  login: vLogin, register: vRegister, profile: vProfile,
-                 member: vMember, groups: vGroups, admin: vAdmin };
+                 member: vMember, groups: vGroups, admin: vAdmin,
+                 setup: vSetup, forgot: vForgot, reset: vReset };
 
-  var OPEN = ['login', 'register'];      // 沒登入也能看的頁
+  var OPEN = ['login', 'register', 'forgot'];      // 沒登入也能看的頁（登入了就送回總覽）
+  /* 登入與否都能開：信裡的重設連結可能在「還登入著」的瀏覽器上點開，不能把人送走 */
+  var ANY = ['reset'];
 
   function paint() {
     // #/member/U3/T1051 → ['member', 'U3', 'T1051']
     var parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
     var page = parts[0];
     API.authState().then(function (a) {
-      /* 登入閘。沒登入只能待在 login／register，
+      if (ANY.indexOf(page) >= 0) { render(); return; }
+      /* 登入閘。沒登入只能待在 login／register／forgot，
          登入了就別再讓他看登入頁。 */
       if (!a.loggedIn && OPEN.indexOf(page) < 0) { location.hash = '#/login'; return; }
       if (a.loggedIn && OPEN.indexOf(page) >= 0) { location.hash = '#/'; return; }
@@ -3027,6 +3193,8 @@
         var admin = !!m.user.isPlatformAdmin;
         if (admin && page !== 'admin') { location.hash = '#/admin'; return; }
         if (!admin && page === 'admin') { location.hash = '#/'; return; }
+        /* 還沒走完註冊後的個人化設定：先帶去設定（每一步都能跳過，不是關卡） */
+        if (!admin && !m.user.onboardedAt && page !== 'setup') { location.hash = '#/setup'; return; }
         render();
       });
 
@@ -3254,6 +3422,19 @@
     }
 
     /* 登入 ↔ 註冊 也在原地換，不要為了切換表單重畫整頁 */
+    /* ---- 個人化設定 ---- */
+    var sg = t.closest('[data-su-goal]');
+    if (sg) {
+      var gi = document.getElementById('suGoal');
+      if (gi) { gi.value = sg.dataset.suGoal; gi.focus(); }
+      return;
+    }
+    if (t.closest('[data-su-next]')) { SETUP.step = Math.min(SETUP.step + 1, SETUP_STEPS.length - 1); vSetup(); return; }
+    if (t.closest('[data-su-back]')) { SETUP.step = Math.max(SETUP.step - 1, 0); vSetup(); return; }
+    var sdone = t.closest('[data-su-done]');
+    if (sdone) { sdone.disabled = true; setupDone(sdone.dataset.suDone); return; }
+    if (t.closest('[data-fg-again]')) { vForgot(); return; }
+
     var swap = t.closest('[data-gate]');
     if (swap) {
       e.preventDefault();
@@ -3767,14 +3948,14 @@
   }
 
   /* 登入成功之後要做的事都一樣：重畫身分、開通知、回總覽 */
-  function afterLogin(d) {
+  function afterLogin(d, fresh) {
     ME = null;                      // 同上：路由閘要重新問一次這個人是誰
     document.body.classList.remove('is-out');
     paintWho();
     if (global.Notify) { global.Notify.reset(); global.Notify.start(); }
     location.hash = '#/';
     paint();
-    toast('歡迎回來，' + (d && d.user ? d.user.name : ''), 'ok');
+    if (!fresh) toast('歡迎回來，' + (d && d.user ? d.user.name : ''), 'ok');
   }
 
   /* 建議的搜尋：邊打邊篩。 */
@@ -3808,14 +3989,80 @@
       API.register({
         name: document.getElementById('rgName').value,
         email: document.getElementById('rgEmail').value,
-        password: document.getElementById('rgPw').value,
-        savingsGoal: Number(document.getElementById('rgGoal').value) || 0
+        password: document.getElementById('rgPw').value
       }).then(function (d) {
-        afterLogin(d);
-        toast('帳號建好了', 'ok');
+        SETUP.step = 0;
+        afterLogin(d, true);               // 路由閘看到還沒個人化設定，會帶去 #/setup
+        toast('帳號建好了，花一分鐘設定一下', 'ok');
       }).catch(function (err) {
         busy(f, false);
         toast(err.message || '註冊失敗', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'forgotF') {
+      e.preventDefault();
+      busy(f, true, '寄送中…');
+      API.requestPasswordReset(document.getElementById('fgEmail').value).then(function (r) {
+        busy(f, false);
+        f.hidden = true;
+        var out = document.getElementById('forgotOut');
+        if (out) out.innerHTML = forgotResult(r);
+      }).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '寄不出去，稍後再試', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'resetF') {
+      e.preventDefault();
+      var pw = document.getElementById('rsPw').value, pw2 = document.getElementById('rsPw2').value;
+      if (pw.length < 8) { toast('新密碼至少 8 個字', 'err'); return; }
+      if (pw !== pw2) { toast('兩次輸入的密碼不一樣', 'err'); return; }
+      busy(f, true, '設定中…');
+      API.confirmPasswordReset(RESET_TOKEN, pw).then(function () {
+        /* 所有裝置都登出了，這一台也是：清掉身分和通知，回登入頁 */
+        RESET_TOKEN = '';
+        ME = null;
+        if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
+        document.body.classList.remove('is-admin', 'role-child');
+        gateStep = 'login';
+        location.hash = '#/login';
+        toast('密碼改好了，用新密碼登入', 'ok');
+      }).catch(function (err) {
+        busy(f, false);
+        if (err.status === 400) { RESET_TOKEN = ''; vReset(); }   // 失效的連結：改顯示「重新申請」
+        toast(err.message || '沒有設定成功', 'err');
+      });
+      return;
+    }
+
+    if (f.id === 'suGoalF') {
+      e.preventDefault();
+      var gv = Number(document.getElementById('suGoal').value || 0);
+      if (isNaN(gv) || gv < 0) { toast('存款目標要是 0 以上的數字', 'err'); return; }
+      busy(f, true, '儲存中…');
+      API.me().then(function (m) { return API.setSavingsGoal(m.user.id, gv); }).then(function () {
+        SETUP.step = 1;
+        vSetup();
+      }).catch(function (err) { busy(f, false); toast(err.message || '儲存失敗', 'err'); });
+      return;
+    }
+
+    if (f.id === 'suFinF') {
+      e.preventDefault();
+      var picked = function (name) {
+        return [].slice.call(f.querySelectorAll('[name="' + name + '"]:checked')).map(function (i) { return i.value; });
+      };
+      var fin = { style: picked('suStyle')[0] || null, goals: picked('suGoalPick'), habits: picked('suHabit'), note: SETUP.note };
+      var next = function () { SETUP.step = 2; vSetup(); };
+      if (!fin.style && !fin.goals.length && !fin.habits.length) { next(); return; }   // 什麼都沒選就當跳過
+      busy(f, true, '儲存中…');
+      API.setFinanceProfile(fin).then(next).catch(function (err) {
+        busy(f, false);
+        toast(err.message || '儲存失敗', 'err');
       });
       return;
     }

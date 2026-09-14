@@ -134,6 +134,8 @@ docker compose up
 |---|---|
 | `JWT_SECRET` | 簽 JWT 用的密鑰。拿到它的人可以偽造任何人的登入權杖 |
 | `MODEL_BASE_URL` | 我們自己微調的模型服務網址 |
+| `BREVO_API_KEY` | 忘記密碼的寄信服務金鑰（Brevo 後台 → SMTP & API → API keys） |
+| `MAIL_FROM` | 寄件信箱，要先在 Brevo 的 Senders 驗證過 |
 
 **這兩個絕對不可以寫進 repo。** 一旦 commit 進 git 歷史，
 就算之後刪掉也救不回來——必須重新產生一組。
@@ -162,6 +164,8 @@ docker compose up
    |---|---|
    | `JWT_SECRET` | 隨機長字串。產生方式：`python -c "import secrets;print(secrets.token_urlsafe(48))"` |
    | `MODEL_BASE_URL` | **先留空**。模型還沒訓練完，留空時後端會回傳形狀正確的假資料 |
+   | `BREVO_API_KEY` | Brevo 的 API 金鑰。⚠️ 不能改用 Gmail SMTP：Render 免費方案擋掉了 SMTP 埠 |
+   | `MAIL_FROM` | 在 Brevo 驗證過的寄件信箱。填好後本機先試寄：`python -m app.toolkit.mailer --to 你的信箱` |
 
 5. Apply，等三個資源都變成 Live
 
@@ -204,7 +208,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 獨佔檔案 | 共用元件（要最先完成） |
 |---|---|---|---|---|---|
-| **成員1** | **認證** | `m1-auth` | 17 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
+| **成員1** | **認證** | `m1-auth` | 19 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
 | **成員2** | **記帳** | `m2-ledger` | 19 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
 | **成員4** | **家庭** | `m4-access` | 20 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
@@ -226,7 +230,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 **LLM 工作**：共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證。成員2 和成員3 都會呼叫它，所以第 1 週要先做出來。
 
-**路由（17 支）**
+**路由（19 支）**
 
 ```
 POST   /api/auth/register
@@ -236,6 +240,8 @@ POST   /api/auth/logout
 POST   /api/auth/logout-all
 GET    /api/auth/me
 PATCH  /api/auth/password
+POST   /api/auth/password-reset
+POST   /api/auth/password-reset/confirm
 GET    /api/auth/me/finance
 PUT    /api/auth/me/finance
 POST   /api/auth/verify-password

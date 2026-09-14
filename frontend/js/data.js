@@ -560,9 +560,10 @@ window.DATA = {
              ['is_platform_admin', 'BOOLEAN', '平台管理員。與家庭角色無關，且看不到任何財務資料'],
              ['suspended_at', 'TIMESTAMPTZ', 'NULL = 正常。⚠️ 停權只擋登入與寫入，不刪任何資料'],
              ['suspended_reason', 'TEXT', '停權理由。沒有理由的停權就是任意封鎖'],
+             ['onboarded_at', 'TIMESTAMPTZ', 'NULL = 還沒走完註冊後的個人化設定（存款目標、理財習慣、主題），登入後先帶去設定'],
              ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', '']] },
 
-    { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊時就要填。改過的值保留歷史，不覆蓋',
+    { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊後的個人化設定第一步就填。改過的值保留歷史，不覆蓋',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
              ['group_id', 'BIGINT', 'FK → groups。NULL = 不分帳本的整體目標'],
              ['period_key', 'TEXT', "'2026-09'。NULL = 預設值，套用到所有未指定的月份"],
@@ -577,6 +578,13 @@ window.DATA = {
              ['user_agent', 'TEXT', ''], ['ip_hash', 'TEXT', ''],
              ['issued_at', 'TIMESTAMPTZ', ''], ['expires_at', 'TIMESTAMPTZ', ''],
              ['revoked_at', 'TIMESTAMPTZ', 'NULL = 仍有效']] },
+
+    { t: 'password_resets', label: '重設密碼連結', note: '忘記密碼寄出的一次性連結。30 分鐘失效、只能用一次',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
+             ['token_hash', 'TEXT', 'UNIQUE。只存雜湊，信裡的 token 原文不進資料庫'],
+             ['expires_at', 'TIMESTAMPTZ', '建立後 30 分鐘'],
+             ['used_at', 'TIMESTAMPTZ', 'NULL = 還沒用過。用過就作廢，並撤銷這個人所有的 sessions'],
+             ['created_at', 'TIMESTAMPTZ', '重寄冷卻用：同一個人 60 秒內不再寄']] },
 
     { t: 'families', label: '家庭', note: '一個家庭一列',
       cols: [['id', 'BIGSERIAL', 'PK'], ['name', 'TEXT', '例如「林家」'],
@@ -719,6 +727,7 @@ window.DATA = {
 
   relations: [
     ['sessions', 'users', 'N:1', ''],
+    ['password_resets', 'users', 'N:1', ''],
     ['allowances', 'users', 'N:1', '給錢的人與收錢的人'],
     ['notifications', 'users', 'N:1', '收件人'],
     ['notifications', 'transactions', 'N:1', '記帳類通知指到那一筆'],

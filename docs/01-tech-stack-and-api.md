@@ -36,13 +36,13 @@
 
 | 用 React 的好處 | 對本專案的實際影響 |
 |---|---|
-| 元件化、狀態管理 | 目前十一個畫面已經寫完，重寫是純成本 |
+| 元件化、狀態管理 | 目前十四個畫面已經寫完，重寫是純成本 |
 | 生態系豐富 | 我們沒有要用第三方 UI 套件 |
 | 履歷加分 | 冠文已有 React 經驗，其他三人沒有 |
 
 | 用原生的代價 | 實際狀況 |
 |---|---|
-| 沒有元件複用 | 十一個畫面規模還撐得住，函式化就夠 |
+| 沒有元件複用 | 十四個畫面規模還撐得住，函式化就夠 |
 | 手寫 DOM 操作 | 已經封裝在 `app.js` 的 render 函式裡 |
 | 沒有型別檢查 | 用 `js/api.js` 這一層集中管住資料形狀 |
 
@@ -61,7 +61,7 @@
 | **Pydantic** | v2 | 請求／回應驗證 | **強制結構化輸出的關鍵**，LLM 回傳也用它驗 |
 | **pydantic-settings** | 2.6+ | 環境變數管理 | 設定集中，不散落在各處 |
 | **SQLAlchemy** | 2.0 | ORM | 2.0 的型別標註對新手比較友善 |
-| **Alembic** | 1.14+ | 資料庫遷移 | 19 張表一定會改，沒有遷移工具會很痛苦 |
+| **Alembic** | 1.14+ | 資料庫遷移 | 20 張表一定會改，沒有遷移工具會很痛苦 |
 | **psycopg** | 3.2+ | PostgreSQL 驅動 | `[binary]` 版有預編譯輪檔，不用編譯 |
 | **PyJWT** | 2.10+ | JWT 簽發驗證 | 比 python-jose 維護更活躍 |
 | **passlib[bcrypt]** | 1.7+ | 密碼雜湊 | **絕不自己實作密碼雜湊** |
@@ -176,7 +176,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **69 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **71 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -186,18 +186,20 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 1 | POST | `/api/auth/register` | 成員1 | 公開 | 註冊。回傳 user + tokens |
+| 1 | POST | `/api/auth/register` | 成員1 | 公開 | 註冊。只問名字、email、密碼，回傳 user + tokens（存款目標在註冊後的個人化設定） |
 | 2 | POST | `/api/auth/login` | 成員1 | 公開 | 登入。回傳 access + refresh token |
 | 3 | POST | `/api/auth/refresh` | 成員1 | 公開 | 用 refresh token 換新的 access token |
 | 4 | POST | `/api/auth/logout` | 成員1 | 登入 | 撤銷目前的 refresh token |
 | 5 | POST | `/api/auth/logout-all` | 成員1 | 登入 | 撤銷所有裝置的 token |
 | 6 | GET | `/api/auth/me` | 成員1 | 登入 | 目前使用者、家庭角色、被誰監管 |
 | 7 | PATCH | `/api/auth/password` | 成員1 | 登入 | 修改密碼，同時讓其他 session 失效 |
+| 74 | POST | `/api/auth/password-reset` | 成員1 | 公開 | 忘記密碼：寄一次性的重設連結（Brevo）。**有沒有這個帳號都回同一句話** |
+| 75 | POST | `/api/auth/password-reset/confirm` | 成員1 | 公開 | 用信裡的 token 設新密碼。30 分鐘失效、只能用一次，成功後撤銷所有 sessions |
 | 8 | GET | `/api/auth/me/finance` | 成員1 | 本人 | 我的理財習慣（財務建議的背景） |
 | 9 | PUT | `/api/auth/me/finance` | 成員1 | 本人 | 改理財習慣。body: { style, goals[], habits[], note } |
 | 10 | POST | `/api/auth/verify-password` | 成員1 | 本人 | 重大操作前再確認一次 |
 | 11 | GET | `/api/auth/sessions` | 成員1 | 登入 | 列出有效的登入裝置 |
-| 12 | PATCH | `/api/auth/me` | 成員1 | 登入 | 修改個人資料：顯示名稱、出生年 |
+| 12 | PATCH | `/api/auth/me` | 成員1 | 登入 | 修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 `onboarded: true` |
 | 13 | PUT | `/api/auth/me/avatar` | 成員1 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
 | 14 | DELETE | `/api/auth/me/avatar` | 成員1 | 登入 | 移除大頭貼，改回顯示文字頭像 |
 | 62 | GET | `/api/admin/users` | 成員1 | 平台管理員 | 帳號清單（停權用）。⚠️ 刻意不回傳任何金額 |
@@ -346,7 +348,7 @@ final_project/
 | 35 | GET | `/api/budgets` | 成員3 | 登入 | 預算與使用率 |
 | 36 | PUT | `/api/budgets` | 成員3 | 本人 | 設定預算 |
 | 37 | GET | `/api/savings-goal` | 成員3 | 登入 | **每月存款目標與達成狀態** |
-| 38 | PUT | `/api/savings-goal` | 成員3 | 本人 | **設定每月存款目標**（註冊時也走這支）。⚠️ 只有本人能設，監管者不能代設 |
+| 38 | PUT | `/api/savings-goal` | 成員3 | 本人 | **設定每月存款目標**（註冊後的個人化設定也走這支）。⚠️ 只有本人能設，監管者不能代設 |
 | 39 | GET | `/api/savings-goals` | 成員3 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
 | 40 | GET | `/api/alerts` | 成員3 | 登入 | 我設定的階段性提醒門檻 |
 | 41 | POST | `/api/alerts` | 成員3 | 本人 | 新增一個門檻（百分比 1~200） |
@@ -364,7 +366,7 @@ final_project/
 > 100%         → 存不到目標，跳警告並算出短少多少
 ```
 
-註冊時就會請使用者填「每月想存多少」。目標改動**保留歷史不覆蓋**
+建好帳號之後的「個人化設定」第一步就會問「每月想存多少」（可以跳過，之後在個人資料改）。目標改動**保留歷史不覆蓋**
 （`savings_goals` 帶 `period_key`），否則回頭看會不知道當時的目標是多少。
 
 ## 4-6　財務建議 ★ `/api/advices`
@@ -438,7 +440,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 資料表 | 畫面 | 該模組的 LLM |
 |---|---|---|---|---|---|---|
-| **成員1** | **認證** | `m1-auth` | 17 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
+| **成員1** | **認證** | `m1-auth` | 19 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 19 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 總覽（我／全家）、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
 | **成員4** | **家庭** | `m4-access` | 20 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
@@ -452,7 +454,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 ### 為什麼路由數不是 10 / 10 / 10 / 5 這種平均切法
 
-因為**路由數不是工作量**，但它也不能差太多。這一版是 17 / 19 / 13 / 20，
+因為**路由數不是工作量**，但它也不能差太多。這一版是 19 / 19 / 13 / 20，
 差距控制在合理範圍，同時讓每個領域維持概念上的完整。
 
 成員3 的路由最少，是刻意的：他那一條的重量不在路由數，而在**整個系統只有他算錢**，
@@ -475,7 +477,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層，以及平台管理員的停權（停權擋的是登入，所以歸認證）。
 不屬於他的：家庭角色與監管關係（那是成員4）。users 表存的是登入身分，family_members 表才是家庭角色，兩者刻意分開。
 
-**路由（17 支）**
+**路由（19 支）**
 
 ```
 POST   /api/auth/register
@@ -485,6 +487,8 @@ POST   /api/auth/logout
 POST   /api/auth/logout-all
 GET    /api/auth/me
 PATCH  /api/auth/password
+POST   /api/auth/password-reset
+POST   /api/auth/password-reset/confirm
 GET    /api/auth/me/finance
 PUT    /api/auth/me/finance
 POST   /api/auth/verify-password

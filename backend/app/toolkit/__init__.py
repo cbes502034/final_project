@@ -30,6 +30,8 @@
     family      家庭綁定（邀請碼、找人）  new_code / hash_code / lookup_status
     theme       介面主題的 id 驗證      THEMES / clean_theme
     ledger      帳本結算、移除、改刪紀錄  require_open / require_editable / clean_ids
+    mailer      寄信（Brevo HTTP API）  send_mail；試寄：python -m app.toolkit.mailer --to 你的信箱
+    password_reset 忘記密碼的重設連結   new_token / hash_token / require_usable / mail_content
 
 ===========================================================================
 怎麼查一個工具怎麼用

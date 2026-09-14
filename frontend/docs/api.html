@@ -40,7 +40,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>69 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>71 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -95,7 +95,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">69 ROUTES · 4 MODULES</div>
+    <div class="mono">71 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -114,10 +114,10 @@
   /* 路由與回應形狀取自 frontend/js/api.js 的契約定義 */
   var ROUTES = [
     { n: 1, o: 'm1', m: 'POST', p: '/api/auth/register', a: '公開',
-      d: '註冊，同時建立每月存款目標',
-      body: '{\n  "email": "a@example.com",\n  "password": "………",\n  "displayName": "林建國",\n  "birthYear": 1974,\n  "savingsGoal": 20000\n}',
+      d: '註冊：名字、email、密碼',
+      body: '{\n  "email": "a@example.com",\n  "password": "………",\n  "displayName": "林建國"\n}',
       res: '{\n  "accessToken": "eyJhbGciOi…",\n  "refreshToken": "eyJhbGciOi…",\n  "expiresIn": 1800,\n  "user": { "id": 1, "displayName": "林建國", "role": "parent" }\n}',
-      note: '註冊流程會請使用者填「每月想存多少」，這個值直接寫進 <code>savings_goals</code>。' },
+      note: '<b>存款目標不在註冊時問。</b>建好帳號後，<code>user.onboardedAt</code> 是 null，前端帶去「個人化設定」：每月想存多少（<code>PUT /api/savings-goal</code>）→ 理財習慣 → 主題，走完或全部跳過送 <code>PATCH /api/auth/me</code> <code>{ "onboarded": true }</code>。<br>⚠️ 主體帶了 <code>savingsGoal</code> 回 <b>400</b>：舊前端塞進來的值被默默吃掉，使用者會以為設好了。' },
     { n: 2, o: 'm1', m: 'POST', p: '/api/auth/login', a: '公開',
       d: '登入，回傳 access + refresh token',
       body: '{\n  "email": "a@example.com",\n  "password": "………"\n}',
@@ -132,10 +132,21 @@
       d: '撤銷所有裝置的 token' },
     { n: 6, o: 'm1', m: 'GET', p: '/api/auth/me', a: '登入',
       d: '目前使用者、家庭角色、被誰監管',
-      res: '{\n  "user": { "id": 1, "displayName": "林建國", "role": "parent" },\n  "family": { "id": 1, "name": "林家" },\n  "guardedBy": []\n}' },
+      res: '{\n  "user": { "id": 1, "displayName": "林建國", "role": "parent",\n            "onboardedAt": "2026-01-05T09:00:00+08:00" },\n  "family": { "id": 1, "name": "林家" },\n  "guardedBy": []\n}',
+      note: '<code>onboardedAt</code> 是 <b>null</b> 的人還沒走完註冊後的個人化設定，前端登入後會先帶去設定（每一步都能跳過）。' },
     { n: 7, o: 'm1', m: 'PATCH', p: '/api/auth/password', a: '登入',
       d: '修改密碼，同時讓其他 session 失效',
       body: '{ "oldPassword": "………", "newPassword": "………" }' },
+    { n: 74, o: 'm1', m: 'POST', p: '/api/auth/password-reset', a: '公開',
+      d: '忘記密碼：寄一次性的重設連結',
+      body: '{ "email": "jianguo@lin.tw" }',
+      res: '{\n  "ok": true,\n  "message": "如果這個 email 有註冊，重設密碼的信已經寄出，30 分鐘內有效。"\n}',
+      note: '⚠️ <b>有沒有這個帳號都回一模一樣的回應</b>（同一句話、同一個狀態碼），不然這支就是帳號列舉工具。找不到人就什麼都不做。<br>找得到：<code>password_reset.new_token()</code>，資料庫只存 <code>hash_token()</code>，連結 <code>reset_link(APP_BASE_URL, token)</code> 長成 <code>…/#/reset/&lt;token&gt;</code>（放在 # 後面，不會送到伺服器、不會留在紀錄裡），用 <code>mailer.send_mail()</code> 寄出。<br>同一個人 60 秒內不重寄（<code>should_send</code>），但回應照舊。<br>⚠️ 寄信走 <b>Brevo 的 HTTP API</b>：Render 免費方案擋掉了 SMTP 的 25／465／587 埠。金鑰放 <code>BREVO_API_KEY</code>、寄件信箱放 <code>MAIL_FROM</code>，都在 Render 後台填。' },
+    { n: 75, o: 'm1', m: 'POST', p: '/api/auth/password-reset/confirm', a: '公開',
+      d: '用信裡的 token 設新密碼',
+      body: '{\n  "token": "1mO04jDjqJpRQT4V6_buPYtuq5EAZkNb8rJdCcnx_hY",\n  "password": "………"\n}',
+      res: '{ "ok": true }',
+      note: '<code>hash_token(token)</code> 找那一列 → <code>require_usable(expires_at, used_at)</code> → <code>passwords.hash_password()</code> 存新密碼 → 設 <code>used_at</code> → <b>撤銷這個人所有的 sessions</b>（連結可能是被別人拿去用的）。<br>⚠️ 找不到、過期、用過<b>回同一句話</b>（400），不讓人分辨是哪一種。密碼太弱回 422（<code>check_strength</code>）。' },
     { n: 11, o: 'm1', m: 'GET', p: '/api/auth/sessions', a: '登入',
       d: '列出有效的登入裝置' },
     { n: 46, o: 'm4', m: 'GET', p: '/api/family', a: '登入',
@@ -222,7 +233,7 @@
       d: '每月存款目標與達成狀態',
       res: '可支配上限 = 本月收入 − 每月存款目標\n使用率     = 支出 ÷ 可支配上限\n\n< 80%        達標中\n80% ~ 100%   接近上限\n> 100%       存不到目標，算出短少多少' },
     { n: 38, o: 'm3', m: 'PUT', p: '/api/savings-goal', a: '本人',
-      d: '設定每月存款目標（註冊時也走這支）',
+      d: '設定每月存款目標（註冊後的個人化設定也走這支）',
       body: '{ "userId": 3, "goal": 2000, "period": "2026-09" }',
       note: '目標改動<b>保留歷史不覆蓋</b>（<code>savings_goals</code> 帶 <code>period_key</code>），否則之後回頭看會不知道當時的目標是多少。' },
 
@@ -234,9 +245,9 @@
       note: '<b>順序不能顛倒，模型不做任何算術。</b>財務數字算錯會讓使用者做出錯誤決定，而模型本來就不擅長算術。' },
 
     { n: 12, o: 'm1', m: 'PATCH', p: '/api/auth/me', a: '登入',
-      d: '修改個人資料：顯示名稱、出生年、介面主題',
+      d: '修改個人資料：顯示名稱、出生年、介面主題、個人化設定走完',
       body: '{\n  "displayName": "林建國",\n  "birthYear": 1974,\n  "theme": "sky"\n}',
-      note: '只能改自己的資料，只送要改的欄位。email 不給改——那是登入帳號，要改的話等於換帳號，要另外設計驗證流程。<br><code>theme</code> 只收 <code>paper</code>／<code>sky</code>／<code>tech</code>／<code>literary</code>／<code>pop</code>／<code>girly</code>／<code>cute</code>／<code>art</code>，其他回 422（<code>toolkit.theme.clean_theme()</code>）。<b>換膚不增加後端負擔</b>：只多存一個字串，畫面全在瀏覽器裡換。' },
+      note: '<code>{ "onboarded": true }</code>：註冊後的個人化設定走完（或全部跳過）時送，設 <code>users.onboarded_at</code>。只收 true，其他值回 422。<br>只能改自己的資料，只送要改的欄位。email 不給改——那是登入帳號，要改的話等於換帳號，要另外設計驗證流程。<br><code>theme</code> 只收 <code>paper</code>／<code>sky</code>／<code>tech</code>／<code>literary</code>／<code>pop</code>／<code>girly</code>／<code>cute</code>／<code>art</code>，其他回 422（<code>toolkit.theme.clean_theme()</code>）。<b>換膚不增加後端負擔</b>：只多存一個字串，畫面全在瀏覽器裡換。' },
     { n: 13, o: 'm1', m: 'PUT', p: '/api/auth/me/avatar', a: '登入',
       d: '上傳大頭貼。前端已縮到 256×256',
       body: '{\n  "image": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."\n}',

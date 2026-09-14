@@ -8,12 +8,14 @@
    後端契約
 
    身分
-   POST   /api/auth/register          註冊
+   POST   /api/auth/register          註冊（名字、email、密碼。存款目標不在這裡，註冊完的個人化設定再設）
+   POST   /api/auth/password-reset    忘記密碼：寄重設信（有沒有這個帳號都回同一句）
+   POST   /api/auth/password-reset/confirm  用信裡的 token 設新密碼（一次性，並登出所有裝置）
    POST   /api/auth/login             登入 → { accessToken, refreshToken, user }
    POST   /api/auth/refresh           換新 token
    POST   /api/auth/logout            登出（撤銷 refresh token）
    POST   /api/auth/refresh           access token 過期時換新的
-   PATCH  /api/auth/me                改個人資料（displayName / birthYear / theme）
+   PATCH  /api/auth/me                改個人資料（displayName / birthYear / theme / onboarded）
    PUT    /api/auth/me/avatar         上傳大頭貼（body: { image: dataUri }）
    DELETE /api/auth/me/avatar         移除大頭貼
    GET    /api/auth/me/finance        我的理財習慣（拿去當建議的背景）
@@ -150,7 +152,7 @@
         /* ⚠️ 新增一種要存的狀態，這裡跟 save() 兩邊都要加。
            suspended／audit 漏過一次：停權在同一頁看起來有效，
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
-        ['newGroups', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed', 'txPatch', 'txGone',
+        ['newGroups', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed', 'txPatch', 'txGone', 'resets',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
          'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
@@ -158,8 +160,10 @@
       }
     } catch (e) {}
     applyTxEdits(base);
-    applyGoals(base.goals);
+    /* ⚠️ 先把註冊進來的人補回 DATA.members，再套存款目標。
+       順序反過來的話，新帳號在套目標的當下還不存在——個人化設定填的目標，重新整理就變回 0。 */
     applyUsers(base.newUsers);
+    applyGoals(base.goals);
     applyPatch(base.patch);
     applyMemberships(base.memberships);
     applyEndedGuardians(base.endedGuardians);
@@ -184,6 +188,7 @@
         removed: state.removed || [],
         txPatch: state.txPatch || {},
         txGone: state.txGone || [],
+        resets: state.resets || [],
         goalPatch: state.goalPatch || [],
         allowancePatch: state.allowancePatch || [],
         newAlerts: state.newAlerts || [],
@@ -293,6 +298,9 @@
   /* 沒選過主題的人就是預設的米白。契約裡 user.theme 一定有值，前端不必自己補 */
   function withTheme(u) {
     if (u && !u.theme) u.theme = 'paper';
+    /* 註冊後的個人化設定走完了沒。null = 還沒（登入後先帶去 #/setup）。
+       種子帳號都是早就在用的人，當成走完了；新註冊的明確是 null。 */
+    if (u && u.onboardedAt === undefined) u.onboardedAt = u.joined ? u.joined + ' 09:00' : null;
     return u;
   }
 
@@ -412,6 +420,23 @@
   }
 
   var INVITE_DAYS = 7;
+
+  /* 忘記密碼。跟 toolkit/password_reset.py 的 TOKEN_MINUTES／COOLDOWN_SECONDS／GENERIC_MESSAGE 一樣 */
+  var RESET_MINUTES = 30;
+  var RESET_COOLDOWN_SEC = 60;
+  var RESET_MESSAGE = '如果這個 email 有註冊，重設密碼的信已經寄出，30 分鐘內有效。';
+  var RESET_INVALID = '這個重設連結已經失效，請重新申請一次';
+
+  /* 43 個字元、網址安全。⚠️ 用 crypto，不要用 Math.random——那猜得出來 */
+  function randomToken() {
+    var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    var buf = new Uint8Array(43), out = '';
+    var c = global.crypto || (typeof crypto !== 'undefined' ? crypto : null);
+    if (c && c.getRandomValues) c.getRandomValues(buf);
+    else for (var i = 0; i < 43; i++) buf[i] = Math.floor(Math.random() * 256);
+    for (var j = 0; j < 43; j++) out += abc.charAt(buf[j] % 64);
+    return out;
+  }
   var CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';     // 拿掉 0/O、1/I/L
 
   /* ⚠️ mock 用 Math.random 就好；真後端要用 secrets（toolkit/family.py 的 new_code） */
@@ -696,7 +721,7 @@
           accessToken: 'mock.access.' + u.id,
           refreshToken: 'mock.refresh.' + u.id,
           expiresIn: 1800,
-          user: clone(u)
+          user: withTheme(clone(u))
         };
       });
     },
@@ -712,6 +737,9 @@
           return String(m.email || '').toLowerCase() === mail;
         })) throw new Error('這個 email 已經註冊過了');
         if (String(p.password || '').length < 8) throw new Error('密碼至少 8 個字');
+        /* ⚠️ 存款目標搬到註冊後的個人化設定（PUT /api/savings-goal）。
+           舊的前端還把它塞在註冊裡的話直接擋——默默吃掉，使用者會以為設好了。 */
+        if (p.savingsGoal !== undefined) throw oops('存款目標不在註冊時設定，註冊完的個人化設定會問', 400);
 
         var n = global.DATA.members.reduce(function (mx, m) {
           return Math.max(mx, Number(String(m.id).replace(/\D/g, '')) || 0);
@@ -723,7 +751,8 @@
           avatar: name.slice(-1), age: null,
           joined: todayStr(),
           income: 0, expense: 0, budget: 0,
-          savingsGoal: Number(p.savingsGoal) || 0
+          savingsGoal: 0,
+          onboardedAt: null           // 還沒走個人化設定
         };
         global.DATA.members.push(u);
         s.newUsers = (s.newUsers || []).concat([clone(u)]);
@@ -734,7 +763,7 @@
           accessToken: 'mock.access.' + u.id,
           refreshToken: 'mock.refresh.' + u.id,
           expiresIn: 1800,
-          user: clone(u)
+          user: withTheme(clone(u))
         };
       });
     },
@@ -774,6 +803,12 @@
           var ids = (global.DATA.themes || []).map(function (t) { return t.id; });
           if (ids.indexOf(p.theme) < 0) throw oops('沒有這個主題', 422);
           q.theme = p.theme;
+        }
+        /* 個人化設定走完（或按了全部跳過）。只能設成 true——
+           沒有「退回沒走過」這回事，存款目標之後到個人資料改就好。 */
+        if (p.onboarded !== undefined) {
+          if (p.onboarded !== true) throw oops('onboarded 只能是 true', 422);
+          if (!m.onboardedAt) q.onboardedAt = localStamp(new Date());
         }
         applyPatch(s.patch);
         save();
@@ -886,6 +921,51 @@
             return Object.assign({}, a, { actorName: who ? who.name : a.actor });
           })
         };
+      });
+    },
+
+    /* ---------------------------------------------------------
+       忘記密碼
+
+       ⚠️ 回應一律是 RESET_MESSAGE，有沒有這個帳號都一樣——不然這支就是帳號列舉工具。
+       ⚠️ demoMail 只有 mock 會回：示範站沒有後端、寄不出信，只好把信的內容攤在畫面上。
+          **真後端絕對不能回這個欄位**，那等於把重設連結交給任何輸入別人 email 的人。
+          （mock 只在帳號存在時才附，等於說出帳號在不在；那是示範的取捨，跟登入的錯誤訊息同一個道理。）
+       真後端：toolkit/password_reset.py 產 token、只存雜湊；toolkit/mailer.py 用 Brevo 寄出。
+       --------------------------------------------------------- */
+    requestPasswordReset: function (email) {
+      var s = load();
+      return sleep(420).then(function () {
+        var mail = String(email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw oops('email 格式看起來不對', 400);
+        var out = { ok: true, message: RESET_MESSAGE };
+        var u = global.DATA.members.filter(function (m) { return String(m.email || '').toLowerCase() === mail; })[0];
+        if (!u) return out;
+        var now = Date.now();
+        var last = (s.resets || []).filter(function (r) { return r.userId === u.id; })
+          .reduce(function (mx, r) { return Math.max(mx, r.createdAt); }, 0);
+        if (now - last < RESET_COOLDOWN_SEC * 1000) return out;          // 冷卻中：不寄，但回一樣的話
+        var token = randomToken();
+        s.resets = (s.resets || []).concat([{ userId: u.id, token: token, createdAt: now,
+          expiresAt: now + RESET_MINUTES * 60000, usedAt: null }]);
+        save();
+        out.demoMail = { to: u.email, subject: '重設你的家庭記帳密碼', link: '#/reset/' + token, minutes: RESET_MINUTES };
+        return out;
+      });
+    },
+
+    confirmPasswordReset: function (token, password) {
+      var s = load();
+      return sleep(360).then(function () {
+        var r = (s.resets || []).filter(function (x) { return x.token === String(token || ''); })[0];
+        // 找不到、過期、用過：同一句話，不讓人分辨是哪一種
+        if (!r || r.usedAt || Date.now() >= r.expiresAt) throw oops(RESET_INVALID, 400);
+        if (String(password || '').length < 8) throw oops('密碼至少 8 個字', 422);
+        r.usedAt = Date.now();
+        /* 改完密碼，所有裝置都要登出（連結可能是被別人拿去用的）。mock 只有這一個瀏覽器 */
+        s.auth = { loggedIn: false };
+        save();
+        return { ok: true };
       });
     },
 
@@ -2365,6 +2445,8 @@
     unsuspendUser:     function (u)     { return req('/api/admin/users/' + u + '/suspend', { method: 'DELETE' }); },
     audit:             function ()      { return req('/api/audit'); },
     verifyPassword:    function (pw)    { return req('/api/auth/verify-password', { method: 'POST', body: { password: pw } }); },
+    requestPasswordReset: function (e)  { return req('/api/auth/password-reset', { method: 'POST', body: { email: e } }); },
+    confirmPasswordReset: function (t, pw) { return req('/api/auth/password-reset/confirm', { method: 'POST', body: { token: t, password: pw } }); },
 
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
     transactions:      function (f)     { return req('/api/transactions' + qs(f)); },
@@ -2433,6 +2515,8 @@
     unsuspendUser:     function (u)    { return impl.unsuspendUser(u); },
     audit:             function ()     { return impl.audit(); },
     verifyPassword:    function (pw)   { return impl.verifyPassword(pw); },
+    requestPasswordReset: function (e) { return impl.requestPasswordReset(e); },
+    confirmPasswordReset: function (t, pw) { return impl.confirmPasswordReset(t, pw); },
     summary:           function (f)    { return impl.summary(f); },
     transactions:      function (f)    { return impl.transactions(f); },
     nlpParse:          function (t)    { return impl.nlpParse(t); },

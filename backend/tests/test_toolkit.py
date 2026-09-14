@@ -22,7 +22,7 @@ import pytest  # noqa: E402
 
 from app.toolkit import (  # noqa: E402
     alerts, scope, roles, notify, profile, images, money, passwords, family,
-    period, tokens, theme, ledger,
+    period, tokens, theme, ledger, mailer, password_reset,
 )
 
 
@@ -823,3 +823,127 @@ def test_沒有家長的家不能加入():
     family.require_has_parent(2)
     with pytest.raises(ValueError):
         family.require_has_parent(0)
+
+
+# ===========================================================================
+# password_reset —— 忘記密碼的重設連結
+# ===========================================================================
+
+def test_重設連結的_token_只存雜湊_而且格式不對就當成失效():
+    from datetime import datetime, timedelta, timezone
+
+    t1, t2 = password_reset.new_token(), password_reset.new_token()
+    assert t1 != t2 and len(t1) >= 40
+    assert password_reset.hash_token(t1) == password_reset.hash_token(t1) != t1
+    for bad in ("", None, "short", "有中文" * 20, "a b" * 20):
+        with pytest.raises(ValueError):
+            password_reset.hash_token(bad)
+
+    now = datetime(2026, 9, 14, 9, 0, tzinfo=timezone.utc)
+    exp = password_reset.expires_at(now)
+    assert exp - now == timedelta(minutes=password_reset.TOKEN_MINUTES)
+    password_reset.require_usable(exp, None, now + timedelta(minutes=29))
+    for args in ((exp, None, now + timedelta(minutes=30)),       # 剛好到期
+                 (exp, now, now),                                # 用過了
+                 (None, None, now)):                             # 找不到那一列
+        with pytest.raises(ValueError) as e:
+            password_reset.require_usable(*args)
+        assert str(e.value) == password_reset.INVALID_MESSAGE, "找不到、過期、用過要是同一句，不能讓人分辨"
+    # 資料庫裡拿出來的時間沒有時區，也要能比
+    password_reset.require_usable(exp.replace(tzinfo=None), None, now)
+
+
+def test_申請重設的回應不透露帳號在不在():
+    msg = password_reset.GENERIC_MESSAGE
+    assert "如果" in msg and "沒有" not in msg and "不存在" not in msg
+
+
+def test_重寄要冷卻_避免拿別人的信箱轟炸():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 9, 14, tzinfo=timezone.utc)
+    assert password_reset.should_send(None, now)
+    assert not password_reset.should_send(now - timedelta(seconds=59), now)
+    assert password_reset.should_send(now - timedelta(seconds=60), now)
+
+
+def test_重設連結放在井號後面_而且只接受_https():
+    tok = password_reset.new_token()
+    link = password_reset.reset_link("https://fambudget-web.onrender.com/", tok)
+    assert link == "https://fambudget-web.onrender.com/#/reset/" + tok, "token 要在 # 後面，才不會送到伺服器、留在紀錄裡"
+    assert password_reset.reset_link("http://localhost:5174", tok).startswith("http://localhost:5174/#/")
+    for bad in ("http://fambudget-web.onrender.com", "", "javascript:alert(1)"):
+        with pytest.raises(ValueError):
+            password_reset.reset_link(bad, tok)
+
+
+def test_重設信的名字要跳脫():
+    subject, text, html = password_reset.mail_content('<img src=x onerror=alert(1)>', "https://a.tw/#/reset/" + "a" * 43)
+    assert subject and "30 分鐘" in text and "https://a.tw/#/reset/" in text
+    assert "<img" not in html and "&lt;img" in html, "名字是使用者填的，放進信件 HTML 要跳脫"
+
+
+def test_email_比對用小寫():
+    assert password_reset.normalize_email(" Ming@Lin.TW ") == "ming@lin.tw"
+    with pytest.raises(ValueError):
+        password_reset.normalize_email("not-an-email")
+
+
+# ===========================================================================
+# mailer —— 寄信（Brevo HTTP API）
+# ===========================================================================
+
+def _brevo(status=201, body=None, seen=None):
+    import httpx
+
+    def handler(request):
+        if seen is not None:
+            seen.append(request)
+        return httpx.Response(status, json=body if body is not None else {"messageId": "<m1@brevo>"})
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_寄信打的是_Brevo_的_HTTP_API_不是_SMTP():
+    import json
+
+    seen = []
+    mid = mailer.send_mail("to@example.com", "主旨", "純文字", html="<p>HTML</p>", to_name="林建國",
+                           api_key="xkeysib-secret", sender="me@example.com", sender_name="家庭記帳",
+                           client=_brevo(seen=seen))
+    assert mid == "<m1@brevo>"
+    req = seen[0]
+    assert str(req.url) == "https://api.brevo.com/v3/smtp/email" and req.method == "POST"
+    assert req.headers["api-key"] == "xkeysib-secret"
+    body = json.loads(req.content)
+    assert body["sender"] == {"name": "家庭記帳", "email": "me@example.com"}
+    assert body["to"] == [{"email": "to@example.com", "name": "林建國"}]
+    assert body["textContent"] == "純文字" and body["htmlContent"] == "<p>HTML</p>"
+
+    src = open(mailer.__file__, encoding="utf-8").read()
+    assert "import smtplib" not in src, "Render 免費方案擋 SMTP 埠，部署上去會永遠逾時"
+
+
+def test_沒設金鑰或寄件人_要大聲失敗():
+    with pytest.raises(mailer.MailNotConfigured):
+        mailer.send_mail("to@example.com", "s", "t", api_key="", sender="me@example.com", sender_name="x", client=_brevo())
+    with pytest.raises(mailer.MailNotConfigured):
+        mailer.send_mail("to@example.com", "s", "t", api_key="k", sender="", sender_name="x", client=_brevo())
+    with pytest.raises(ValueError):
+        mailer.send_mail("not-email", "s", "t", api_key="k", sender="me@example.com", sender_name="x", client=_brevo())
+
+
+def test_寄信失敗的訊息不能帶出金鑰():
+    import httpx
+
+    key = "xkeysib-THIS-MUST-NOT-LEAK"
+    with pytest.raises(mailer.MailError) as e:
+        mailer.send_mail("to@example.com", "s", "t", api_key=key, sender="me@example.com", sender_name="x",
+                         client=_brevo(401, {"code": "unauthorized", "message": "Key not found: " + key}))
+    assert key not in str(e.value) and "401" in str(e.value)
+
+    def boom(request):
+        raise httpx.ConnectTimeout("timed out")
+    with pytest.raises(mailer.MailError):
+        mailer.send_mail("to@example.com", "s", "t", api_key=key, sender="me@example.com", sender_name="x",
+                         client=httpx.Client(transport=httpx.MockTransport(boom)))
