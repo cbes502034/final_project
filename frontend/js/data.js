@@ -87,7 +87,8 @@ window.DATA = {
      每一本帳可以各自設一個每月存款目標。 */
   /* kind：
        'standing'  常設。永遠在，沒有結束這回事。
-       'temp'      臨時。有結束日，到了就結算，結算後唯讀。
+       'temp'      臨時。有結束日；過了結束日不會自動結算，由建立者按「結算」，之後唯讀。
+                   結算過的可以封存（可復原）或移除（帳本不見、紀錄不刪）。
 
      ⚠️ 臨時帳本**不是另一種實體**，就是一本帳，只是多了生命週期。
      拆成兩張表的話，成員、紀錄、統計、目標全部要寫兩份。 */
@@ -684,7 +685,8 @@ window.DATA = {
              ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著'],
              ['kind', 'TEXT', "'standing' 常設 / 'temp' 臨時（有結束日、會結算）"],
              ['ends_on', 'DATE', '臨時帳本的結束日。常設為 NULL'],
-             ['settled_at', 'TIMESTAMPTZ', 'NULL = 還沒結算。結算後這本帳唯讀']] },
+             ['settled_at', 'TIMESTAMPTZ', 'NULL = 還沒結算。結算後這本帳唯讀'],
+             ['removed_at', 'TIMESTAMPTZ', 'NULL = 還在。只有結算過的才能移除；移除不能復原，紀錄一筆都不刪']] },
 
     { t: 'group_members', label: '帳本成員', note: '可見範圍的另一條路：我在這本帳裡就看得到這本帳',
       cols: [['group_id', 'BIGINT', 'PK, FK → groups'],

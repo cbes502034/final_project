@@ -29,6 +29,7 @@
     profile     理財習慣組成 prompt     to_prompt_block / clean_note
     family      家庭綁定（邀請碼、找人）  new_code / hash_code / lookup_status
     theme       介面主題的 id 驗證      THEMES / clean_theme
+    ledger      帳本結算、移除的規則    require_open / require_removable
 
 ===========================================================================
 怎麼查一個工具怎麼用

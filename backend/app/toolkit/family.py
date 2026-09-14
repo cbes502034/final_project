@@ -57,6 +57,7 @@ __all__ = [
     "require_joinable",
     "require_can_remove",
     "require_can_leave",
+    "require_has_parent",
 ]
 
 #: 邀請多久之後失效。
@@ -201,3 +202,19 @@ def require_can_leave(my_role: object, other_parents: int, other_members: int) -
     """
     if my_role == "parent" and other_parents == 0 and other_members > 0:
         raise ValueError("你是這個家唯一的家長。先邀請另一位家長，或把其他成員移出，才能退出")
+
+
+def require_has_parent(parent_count: int) -> None:
+    """用邀請碼加入、或接受邀請之前的檢查：家裡至少要有一位家長。
+
+    ⚠️ 家長離開時要一起作廢他產生、還沒用過的邀請碼。兩道一起擋，
+    才不會出現「只有子女、沒有家長」的家——那種家沒有人能邀請或管理。
+
+    >>> require_has_parent(1)
+    >>> require_has_parent(0)
+    Traceback (most recent call last):
+    ...
+    ValueError: 這個家目前沒有家長，暫時不能加入
+    """
+    if parent_count < 1:
+        raise ValueError("這個家目前沒有家長，暫時不能加入")

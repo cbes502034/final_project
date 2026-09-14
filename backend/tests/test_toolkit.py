@@ -22,7 +22,7 @@ import pytest  # noqa: E402
 
 from app.toolkit import (  # noqa: E402
     alerts, scope, roles, notify, profile, images, money, passwords, family,
-    period, tokens, theme,
+    period, tokens, theme, ledger,
 )
 
 
@@ -764,3 +764,29 @@ def test_主題只收清單裡的_id():
     for bad in ("Sky", " sky", "", None, 3, "dark", "<script>"):
         with pytest.raises(ValueError):
             theme.clean_theme(bad)
+
+
+# ===========================================================================
+# ledger —— 帳本結算與移除
+# ===========================================================================
+
+def test_結算過的帳本不能再記():
+    ledger.require_open(None)
+    with pytest.raises(ValueError):
+        ledger.require_open("2026-09-14")
+
+
+def test_只有建立者能移除結算過的帳本():
+    ledger.require_removable("U1", "U1", "2026-09-14", None)
+    with pytest.raises(scope.Forbidden):
+        ledger.require_removable("U2", "U1", "2026-09-14", None)
+    with pytest.raises(ValueError):
+        ledger.require_removable("U1", "U1", None, None)          # 還沒結算：請用封存
+    with pytest.raises(ValueError):
+        ledger.require_removable("U1", "U1", "2026-09-14", "2026-09-15")
+
+
+def test_沒有家長的家不能加入():
+    family.require_has_parent(2)
+    with pytest.raises(ValueError):
+        family.require_has_parent(0)

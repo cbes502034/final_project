@@ -71,7 +71,7 @@
    GET    /api/groups                 我加入的群組
    POST   /api/groups                 建立
    PATCH  /api/groups/{gid}           改名稱／圖示／顏色
-   DELETE /api/groups/{gid}           封存（不刪除）
+   DELETE /api/groups/{gid}           封存（不刪除）；?permanent=true 移除已結算的活動帳本（紀錄保留）
    POST   /api/groups/{gid}/members   把家人加進這本帳
    DELETE /api/groups/{gid}/members/{uid}  移出
 
@@ -149,7 +149,7 @@
         /* ⚠️ 新增一種要存的狀態，這裡跟 save() 兩邊都要加。
            suspended／audit 漏過一次：停權在同一頁看起來有效，
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
-        ['newGroups', 'groupPatch', 'joined', 'left', 'archived',
+        ['newGroups', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
          'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
@@ -178,6 +178,8 @@
         joined: state.joined || [],
         left: state.left || [],
         archived: state.archived || [],
+        settled: state.settled || [],
+        removed: state.removed || [],
         goalPatch: state.goalPatch || [],
         allowancePatch: state.allowancePatch || [],
         newAlerts: state.newAlerts || [],
@@ -329,7 +331,18 @@
     (s.invites || []).forEach(function (i) {
       if (i.inviter === uid && i.status === 'pending') i.status = 'cancelled';
     });
+    /* ⚠️ 他產生、還沒用過的邀請碼也要作廢。
+       沒作廢的話：家長產生子女邀請碼 → 大家陸續離開 → 有人拿舊碼加入，
+       變成一個只有子女、沒有家長的家，沒有人能邀請或管理。 */
+    (s.codes || []).forEach(function (c) {
+      if (c.createdBy === uid && c.status === 'pending') c.status = 'cancelled';
+    });
     return { ended: ended.length };
+  }
+
+  /* 家裡還有沒有家長。沒有的話誰都不能再加入——真後端用 toolkit.family.require_has_parent() */
+  function hasParent(familyId) {
+    return global.DATA.members.some(function (x) { return x.familyId === familyId && x.role === 'parent'; });
   }
 
   function allFamilies() {
@@ -435,6 +448,7 @@
       .filter(function (g) {
         return !(s.left || []).some(function (l) { return l.group === g && l.user === meId; });
       })
+      .filter(function (g) { return (s.removed || []).indexOf(g) < 0; })      // 移除的帳本誰都不再「在裡面」
       .filter(function (g) { return withArchived || (s.archived || []).indexOf(g) < 0; });
   }
 
@@ -457,6 +471,7 @@
           settledAt: done.length ? done[done.length - 1].at : (g.settledAt || null)
         });
       })
+      .filter(function (g) { return (s.removed || []).indexOf(g.id) < 0; })   // 移除的連「已封存」都不列
       .filter(function (g) { return withArchived || !g.archived; });
   }
 
@@ -522,11 +537,18 @@
   /* 新記的一筆要進哪一本帳。
      ⚠️ 沒有 group 的紀錄會被群組篩選擋掉，使用者記了卻找不到。
      所以每一條建立路徑都要走這裡，不要各自寫。 */
+  /* 新的一筆要記在哪本帳。
+     ⚠️ 結算過的帳本唯讀：指定了就擋（409），沒指定也不會落到它身上。
+     真後端用 toolkit.ledger.require_open()。 */
   function groupFor(meId, wanted) {
     var mine = visibleGroups(meId);
-    if (wanted && mine.indexOf(wanted) >= 0) return wanted;
-    if (!mine.length) throw new Error('你還沒有任何帳本，先到「帳本」開一本');
-    return mine[0];
+    var open = mine.filter(function (id) { var g = groupOf(id); return g && !g.settledAt; });
+    if (wanted && mine.indexOf(wanted) >= 0) {
+      if (open.indexOf(wanted) < 0) throw oops('這本帳已經結算，不能再記新的帳。請換一本帳本', 409);
+      return wanted;
+    }
+    if (!open.length) throw new Error('你還沒有可以記帳的帳本，先到「帳本」開一本');
+    return open[0];
   }
 
   /* 跟我同帳本的人。我看得到他們**在共用帳本裡**的紀錄，
@@ -1042,6 +1064,27 @@
         s.archived = (s.archived || []).concat([gid]);
         save();
         return { id: gid, archived: true };
+      });
+    },
+
+    /* 移除已結算的活動帳本。
+       ⚠️ 移除的是「帳本」，不是紀錄：裡面的每一筆還在記帳的人自己的收支明細和統計裡，
+          過去月份的數字不會變。但這本帳從清單、切換器、「已封存」都消失，不能復原；
+          原本只靠這本帳看得到別人紀錄的成員，之後就看不到了。
+       只有建立者、只有結算過的才能移除——還在用的帳本請用封存。
+       真後端用 toolkit.ledger.require_removable()。 */
+    removeGroup: function (gid) {
+      var s = load();
+      return sleep(260).then(function () {
+        var g = groupOf(gid);
+        if (!g) throw oops('找不到這本帳', 404);
+        if (g.owner !== s.me) throw oops('只有建立這本帳的人可以移除', 403);
+        if (!g.settledAt) throw oops('只有結算過的活動帳本可以移除；還在用的帳本請改用封存', 409);
+        s.removed = (s.removed || []).concat([gid]);
+        s.archived = (s.archived || []).filter(function (a) { return a !== gid; });
+        pushAudit(s, 'remove_group', gid, '移除已結算的「' + g.name + '」');
+        save();
+        return { id: gid, removed: true };
       });
     },
 
@@ -1865,6 +1908,7 @@
         if (row.status === 'used') throw oops('這組邀請碼已經用過了');
         if (row.status !== 'pending') throw oops('這組邀請碼已經失效，請家人重新產生一組');
         if (expired(row)) throw oops('這組邀請碼已經過期了，請家人重新產生一組');
+        if (!hasParent(row.familyId)) throw oops('這個家目前沒有家長，暫時不能加入。請家人重新建立家庭再邀請你', 409);
         row.status = 'used'; row.usedBy = s.me;
         setMembership(s, s.me, row.familyId, row.role);
         var fam = familyById(row.familyId);
@@ -1958,6 +2002,7 @@
         if (row.status !== 'pending') throw oops('這個邀請已經處理過了');
         if (expired(row)) throw oops('這個邀請已經過期了，請家人重新邀請一次');
         if (me.familyId) throw oops('你已經在一個家庭裡了', 409);
+        if (!hasParent(row.familyId)) throw oops('這個家目前沒有家長，暫時不能加入', 409);
         row.status = 'accepted'; row.respondedAt = new Date().toISOString();
         setMembership(s, s.me, row.familyId, row.role);
         var fam = familyById(row.familyId);
@@ -2204,6 +2249,7 @@
     setGroupNotify:    function (g, on) { return req('/api/groups/' + g + '/notify', { method: 'PATCH', body: { notify: !!on } }); },
     updateGroup:       function (g, p)  { return req('/api/groups/' + encodeURIComponent(g), { method: 'PATCH', body: p }); },
     archiveGroup:      function (g)     { return req('/api/groups/' + encodeURIComponent(g), { method: 'DELETE' }); },
+    removeGroup:       function (g)     { return req('/api/groups/' + encodeURIComponent(g) + '?permanent=true', { method: 'DELETE' }); },
     addGroupMember:    function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members', { method: 'POST', body: { userId: u } }); },
     removeGroupMember: function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members/' + encodeURIComponent(u), { method: 'DELETE' }); },
     allowances:        function ()      { return req('/api/allowances'); },
@@ -2268,6 +2314,7 @@
     setGroupNotify:    function (g, on){ return impl.setGroupNotify(g, on); },
     updateGroup:       function (g, p) { return impl.updateGroup(g, p); },
     archiveGroup:      function (g)    { return impl.archiveGroup(g); },
+    removeGroup:       function (g)    { return impl.removeGroup(g); },
     addGroupMember:    function (g, u) { return impl.addGroupMember(g, u); },
     removeGroupMember: function (g, u) { return impl.removeGroupMember(g, u); },
     allowances:        function ()     { return impl.allowances(); },

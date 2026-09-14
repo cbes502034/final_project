@@ -2346,3 +2346,109 @@ def test_專題文件每一頁先講重點():
             assert kp_at < page.index('class="sec'), pg + " 重點卡要放在第一節前面"
     css = read("frontend/docs/docs.css")
     assert "content: '重點'" in css, "每一節的導言要標出「重點」"
+
+
+# ===========================================================================
+# 帳本：結算後唯讀、封存或移除；家庭：沒有家長的家不能加入
+# ===========================================================================
+
+_LEDGER_DRIVER = _THEME_DRIVER.split("(async () => {")[0] + r"""
+const tryIt = p => p.then(r => r, e => ({ error: e.message, status: e.status || null }));
+(async () => {
+  const out = {}, PW = 'password123';
+  let API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  const sum0 = (await API.summary({ scope: 'me', groupId: 'all' })).expense;
+  const tx0 = (await API.transactions({ userId: 'U1' })).total;
+
+  out.removeUnsettled = await tryIt(API.removeGroup('G1'));
+  await API.settleGroup('G4');
+  API = boot();                                   // 重新整理之後結算還在
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.settledAfterReload = (await API.groups({})).groups.find(g => g.id === 'G4').settled;
+  out.addToSettled = await tryIt(API.createTransaction({ groupId: 'G4', date: '2026-09-10', amount: 9, kind: 'expense', cat: 'C01' }));
+  out.defaultNotSettled = (await API.createTransaction({ date: '2026-09-10', amount: 9, kind: 'expense', cat: 'C01' })).group;
+  await API.deleteTransaction && null;
+
+  await API.login({ email: 'shufen@lin.tw', password: PW });
+  out.removeByOther = await tryIt(API.removeGroup('G4'));
+
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  const sum1 = (await API.summary({ scope: 'me', groupId: 'all' })).expense;
+  out.removed = await tryIt(API.removeGroup('G4'));
+  out.listed = (await API.groups({ includeArchived: true })).groups.some(g => g.id === 'G4');
+  out.sumSame = (await API.summary({ scope: 'me', groupId: 'all' })).expense === sum1;
+  out.txSame = (await API.transactions({ userId: 'U1' })).total === tx0 + 1;
+  out.removeTwice = await tryIt(API.removeGroup('G4'));
+
+  // 家長離開：他產生的邀請碼作廢；沒有家長的家不能加入
+  const code = (await API.createInviteCode({ role: 'child' })).code;
+  await API.leaveFamily();                          // 還有陳淑芬這位家長，可以退
+  for (const e of ['yuhan@lin.tw', 'yuxuan@lin.tw', 'shufen@lin.tw']) {
+    await API.login({ email: e, password: PW }); await API.leaveFamily();
+  }
+  await API.login({ email: 'yuzhen@mail.tw', password: PW });
+  out.joinOldCode = await tryIt(API.joinFamily({ code }));
+  out.u5Family = (await API.me()).user.familyId;
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+def _run_ledger():
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("node"):
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_LEDGER_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    return json.loads(res.stdout.decode("utf-8"))
+
+
+def test_結算過的帳本唯讀_而且重新整理後還是結算過():
+    out = _run_ledger()
+    assert out["settledAfterReload"] is True, "結算沒有存下來，重新整理就變回沒結算"
+    assert out["addToSettled"]["status"] == 409, "結算過的帳本還記得進去"
+    assert out["defaultNotSettled"] != "G4", "沒指定帳本時，不可以落到已結算的帳本"
+
+
+def test_已結算的活動帳本可以移除_帳本不見但紀錄都在():
+    """使用者要的是：可以收起（封存），也可以移除——移除之後帳本不見，但裡面的帳還在總帳上。"""
+    out = _run_ledger()
+    assert out["removeUnsettled"]["status"] == 409, "還在用的帳本要用封存，不能移除"
+    assert out["removeByOther"]["status"] == 403, "只有建立者可以移除"
+    assert out["removed"].get("removed") is True
+    assert out["listed"] is False, "移除的帳本連「已封存」都不該出現"
+    assert out["sumSame"] and out["txSame"], "移除帳本不可以刪紀錄，統計數字也不能變"
+    assert out["removeTwice"]["status"] == 404
+
+
+def test_家長離開後舊邀請碼失效_沒有家長的家不能加入():
+    out = _run_ledger()
+    assert out["joinOldCode"].get("error"), "家長離開後，他產生的邀請碼還能用"
+    assert out["u5Family"] is None, "出現了沒有家長、只有子女的家"
+
+
+def test_帳本移除與移出的說明前後一致():
+    """程式、串接契約、API 說明、使用說明四處講的要一樣。"""
+    for f in ("docs/02-前後端串接契約.md", "frontend/docs/api.html", "frontend/docs/guide.html", "frontend/js/app.js"):
+        text = read(f)
+        assert "包含他自己記" not in text and "包含他自己記在那本" not in text, \
+            f + " 還寫著「移出帳本連自己記的也看不到」，跟可見範圍一定包含自己矛盾"
+    guide = read("frontend/docs/guide.html")
+    assert "<b>移除</b>" in guide and "不會自動結束" in guide
+    contract = read("docs/02-前後端串接契約.md")
+    assert "?permanent=true" in contract and "require_has_parent" in contract
+    api = read("frontend/js/api.js")
+    assert api.count("removeGroup:") >= 3, "removeGroup 要在 mock、http、facade 三層都有"
+    app = read("frontend/js/app.js")
+    h = app.index("t.closest('[data-gremove]')")
+    assert "level: 'full'" in app[h:h + 1200], "移除不能復原，要輸入確認碼才執行"

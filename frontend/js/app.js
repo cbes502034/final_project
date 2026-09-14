@@ -1587,6 +1587,8 @@
           '<span class="arch__n">' + esc(g.name) + '</span>' +
           '<span class="arch__c">' + g.count + ' 筆</span>' +
           (g.canEdit ? '<button class="btn btn--sm" data-grestore="' + esc(g.id) + '">復原</button>' : '') +
+          (g.canEdit && g.settled
+            ? '<button class="btn btn--sm btn--ghost" data-gremove="' + esc(g.id) + '|' + esc(g.name) + '">移除</button>' : '') +
         '</li>';
       }).join('') + '</ul></div>';
 
@@ -1707,9 +1709,13 @@
         '<span class="lg__sp"></span>' +
         (g.kind === 'temp' && !g.settled && g.canEdit
           ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">結算</button>' : '') +
-        (g.canEdit && !g.settled
+        (g.canEdit
           ? '<button class="gx" data-garch="' + esc(g.id) +
             '" title="收起這本帳。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
+        /* 結算過的活動帳本才能移除：帳本不見、紀錄留在各自的收支明細裡 */
+        (g.canEdit && g.settled
+          ? '<button class="gx gx--warn" data-gremove="' + esc(g.id) + '|' + esc(g.name) +
+            '" title="帳本移除、不能復原；裡面的紀錄會留在各自的收支明細">移除</button>' : '') +
       '</div>' +
     '</div>';
   }
@@ -2259,7 +2265,7 @@
     grant_guardianship: '建立監管關係', end_guardianship: '解除監管',
     change_role: '變更角色', create_family: '建立家庭', view_ward: '查看被監管者',
     invite_member: '邀請家人', join_family: '加入家庭',
-    remove_member: '移出家庭', leave_family: '退出家庭'
+    remove_member: '移出家庭', leave_family: '退出家庭', remove_group: '移除帳本'
   };
 
   /* ---------- 共用 ---------- */
@@ -2762,6 +2768,7 @@
               '" data-group="' + esc(g.id) + '">' +
               '<span class="gsw__d" style="background:' + tint(g.color) + '"></span>' +
               '<span class="gsw__m"><b>' + esc(g.name) + '</b><i>' +
+                (g.settled ? '已結算・不能再記　' : '') +
                 g.count + ' 筆' + (g.goal ? '　目標 ' + money(g.goal) : '') +
               '</i></span></button>';
           }).join('') +
@@ -3281,13 +3288,33 @@
       }).catch(function (err) { toast(err.message || '復原失敗', 'err'); });
       return;
     }
+    var grem = t.closest('[data-gremove]');
+    if (grem) {
+      var rm = grem.dataset.gremove.split('|');
+      danger({
+        title: '移除「' + rm[1] + '」',
+        detail: '這本帳會從帳本清單和切換器消失，<b>不能復原</b>。' +
+                '<br>裡面的紀錄<b>不會刪掉</b>：每一筆都還在記帳的人自己的收支明細裡，統計數字也不會變。' +
+                '<br>只是之後不能再單獨看這本帳；只靠這本帳看得到別人紀錄的家人，就看不到了。',
+        level: 'full',
+        ok: '確定移除',
+        onOk: function () {
+          API.removeGroup(rm[0]).then(function () {
+            if (GROUP === rm[0]) setGroup('all');
+            paintGroups(); vGroups();
+            toast('已移除「' + rm[1] + '」，紀錄都還在收支明細裡', 'ok');
+          }).catch(function (err) { toast(err.message || '移除失敗', 'err'); });
+        }
+      });
+      return;
+    }
     var gdel = t.closest('[data-gdel]');
     if (gdel) {
       var b = gdel.dataset.gdel.split('|');
       danger({
         title: '把這個人移出帳本',
-        detail: '他會失去這本帳<b>所有紀錄</b>的存取，' +
-                '<b>包含他自己記的那些</b>——紀錄是屬於帳本的。',
+        detail: '他之後<b>看不到別人記在這本帳的紀錄</b>，也不能再往這本帳記。' +
+                '<br>他自己記過的那些<b>不會刪掉</b>，還在他自己的收支明細裡。',
         level: 'full',
         ok: '確定移出',
         onOk: function () {

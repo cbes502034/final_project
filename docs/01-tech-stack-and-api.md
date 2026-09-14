@@ -257,7 +257,7 @@ final_project/
 | 25 | GET | `/api/groups` | 成員2 | 登入 | 我加入的群組（帳本） |
 | 26 | POST | `/api/groups` | 成員2 | 登入 | 建立一個群組，建立者自動加入 |
 | 27 | PATCH | `/api/groups/{gid}` | 成員2 | 建立者 | 改名稱、圖示、顏色 |
-| 28 | DELETE | `/api/groups/{gid}` | 成員2 | 建立者 | 封存這本帳 |
+| 28 | DELETE | `/api/groups/{gid}` | 成員2 | 建立者 | 封存這本帳；`?permanent=true` 移除已結算的活動帳本（紀錄保留） |
 | 29 | POST | `/api/groups/{gid}/members` | 成員2 | 建立者 | 把家人加進這本帳 |
 | 30 | DELETE | `/api/groups/{gid}/members/{user_id}` | 成員2 | 建立者 | 把某個人移出這本帳 |
 | 31 | POST | `/api/groups/{gid}/settle` | 成員2 | 本人（開帳本的人） | 結算活動帳本。之後唯讀，不能再往裡面記 |

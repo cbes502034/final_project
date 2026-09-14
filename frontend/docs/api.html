@@ -18,9 +18,9 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="../css/tokens.css?v=149">
-<link rel="stylesheet" href="../css/themes.css?v=149">
-<link rel="stylesheet" href="docs.css?v=18">
+<link rel="stylesheet" href="../css/tokens.css?v=150">
+<link rel="stylesheet" href="../css/themes.css?v=150">
+<link rel="stylesheet" href="docs.css?v=19">
 </head>
 <body>
 
@@ -150,7 +150,7 @@
       note: '⚠️ <b>身分由家長決定</b>，拿到碼的人不能自己選，否則任何人拿到碼都能以家長身分加入。碼<b>只能用一次</b>、七天過期，資料庫只存雜湊（toolkit/family.py）。同一個身分再產生一次，舊的那組就作廢。' },
     { n: 49, o: 'm4', m: 'POST', p: '/api/family/join', a: '登入',
       d: '用邀請碼加入家庭', body: '{ "code": "K7QM-3XWP" }',
-      note: '比對前先正規化：去掉空白與 -、轉大寫，所以 k7qm 3xwp 也能用。' },
+      note: '比對前先正規化：去掉空白與 -、轉大寫，所以 k7qm 3xwp 也能用。<br>⚠️ 家裡沒有家長時回 409（<code>toolkit.family.require_has_parent</code>）；家長離開時，他產生、還沒用過的邀請碼要一起作廢。' },
     { n: 50, o: 'm4', m: 'PATCH', p: '/api/family/members/{userId}', a: '家長',
       d: '修改成員角色', body: '{ "role": "parent" }' },
     { n: 51, o: 'm4', m: 'DELETE', p: '/api/family/members/{userId}', a: '家長／本人',
@@ -270,14 +270,14 @@
     { n: 27, o: 'm2', m: 'PATCH', p: '/api/groups/{gid}', a: '建立者',
       d: '改名稱、圖示、顏色' },
     { n: 28, o: 'm2', m: 'DELETE', p: '/api/groups/{gid}', a: '建立者',
-      d: '封存這本帳',
-      note: '⚠️ <b>設 <code>archived_at</code>，不要真的刪。</b>裡面的記帳紀錄還在，真刪了那些紀錄會變成孤兒。' },
+      d: '封存這本帳；?permanent=true 是移除已結算的活動帳本', q: ['permanent'],
+      note: '⚠️ <b>封存設 <code>archived_at</code>，不要真的刪。</b>裡面的記帳紀錄還在，可以復原。<br>帶 <code>permanent=true</code> 是<b>移除</b>：只限建立者、只限結算過的活動帳本（沒結算回 409）。設 <code>removed_at</code>、不能復原，但<b>紀錄一筆都不刪</b>——每一筆仍在記帳的人自己的收支明細與統計裡。' },
     { n: 29, o: 'm2', m: 'POST', p: '/api/groups/{gid}/members', a: '建立者',
       d: '把家人加進這本帳',
       note: '只能加同一個家庭裡的人。' },
     { n: 30, o: 'm2', m: 'DELETE', p: '/api/groups/{gid}/members/{user_id}', a: '建立者',
       d: '把某個人移出這本帳',
-      note: '⚠️ 移出之後他<b>看不到這本帳的任何紀錄</b>，包含他自己記的那些——紀錄屬於帳本，不屬於人。這一點要在介面上講清楚。' },
+      note: '⚠️ 移出之後他<b>看不到別人記在這本帳的紀錄</b>，也不能再往這本帳記；<b>他自己記過的仍在自己的收支明細裡</b>（可見範圍一定包含自己）。確認視窗要講清楚，免得他以為資料被刪了。' },
 
     { n: 10, o: 'm1', m: 'POST', p: '/api/auth/verify-password', a: '本人',
       d: '重大操作前再確認一次',
@@ -305,7 +305,7 @@
       note: '不刪資料，把 status 改成 declined 或 cancelled。' },
 
     { n: 31, o: 'm2', m: 'POST', p: '/api/groups/{gid}/settle', a: '本人（開帳本的人）',
-      d: '結算活動帳本。之後唯讀，不能再往裡面記',
+      d: '結算活動帳本。之後唯讀，往裡面記會回 409',
       note: '⚠️ <b>結算不搬動任何一筆紀錄。</b>紀錄本來就屬於這本帳，也本來就出現在每個成員的收支明細裡（可見範圍是聯集）。所以它<b>不會改變任何人的可見範圍</b>——監管者早就看得到監管對象在任何帳本的紀錄。' },
     { n: 32, o: 'm2', m: 'PATCH', p: '/api/groups/{gid}/notify', a: '帳本成員',
       d: '這本帳有動靜要不要通知我。body: { notify }',
@@ -448,6 +448,6 @@
   render();
 })();
 </script>
-<script src="docs.js?v=4"></script>
+<script src="docs.js?v=5"></script>
 </body>
 </html>

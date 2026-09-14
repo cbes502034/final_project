@@ -18,8 +18,8 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="../css/tokens.css?v=149">
-<link rel="stylesheet" href="../css/themes.css?v=149">
+<link rel="stylesheet" href="../css/tokens.css?v=150">
+<link rel="stylesheet" href="../css/themes.css?v=150">
 <style>
   /* ============================================================
      使用說明：跟系統同一套樣子
@@ -334,8 +334,9 @@
         <li><b>開一本</b><span>「常設帳本」右邊「＋ 開一本」；誰都可以開，開的人管這本</span></li>
         <li><b>切換</b><span>切過去之後，總覽和統計的數字都只算那一本</span></li>
         <li><b>各自的目標</b><span>點開那本帳就能填它自己的月目標，跟整體目標各算各的</span></li>
-        <li><b>活動帳本</b><span>旅行、婚禮這種一次性的；結束後<em>結算</em>，不能再記，紀錄都還在</span></li>
+        <li><b>活動帳本</b><span>旅行、婚禮這種一次性的；過了結束日<em>不會自動結束</em>，由開帳本的人按「結算」，之後不能再記</span></li>
         <li><b>封存</b><span>收起來不用，<em>不是刪除</em>；在「已封存」隨時叫回來</span></li>
+        <li><b>移除</b><span>只有結算過的活動帳本可以移除：帳本不見、<em>不能復原</em>，但裡面的紀錄都還在各自的收支明細和統計裡</span></li>
         <li><b>加人</b><span>加進來的人看得到這本帳的所有紀錄，其他本看不到；目前只能加家人</span></li>
       </ul>
     </div>
@@ -432,7 +433,11 @@
         </details>
         <details>
           <summary>結算之後紀錄去哪了？</summary>
-          <div class="a"><b>哪裡都沒去。</b>紀錄還在那本帳和你的明細裡，只是那本帳不能再記新的。</div>
+          <div class="a"><b>哪裡都沒去。</b>紀錄還在那本帳和你的明細裡，只是那本帳不能再記新的。結算完的帳本會收到帳本頁的「已結算」裡。</div>
+        </details>
+        <details>
+          <summary>結算完的活動帳本可以刪掉嗎？</summary>
+          <div class="a">可以選兩種：<b>封存</b>是收起來，之後還能叫回來；<b>移除</b>是帳本不見、不能復原。兩種都<b>不會刪紀錄</b>——每一筆還在記帳的人自己的收支明細裡，統計數字也不變。只有開這本帳的人能操作。</div>
         </details>
         <details>
           <summary>有人記帳，我會被通知嗎？</summary>
@@ -440,7 +445,7 @@
         </details>
         <details>
           <summary>把人移出帳本會怎樣？</summary>
-          <div class="a">他看不到那本帳的所有紀錄，<b>包含他自己記在那本的</b>——紀錄屬於帳本。</div>
+          <div class="a">他之後看不到<b>別人</b>記在那本帳的紀錄，也不能再往那本帳記。他<b>自己記過的不會不見</b>，還在他自己的收支明細裡。</div>
         </details>
         <details>
           <summary>財務建議的數字可靠嗎？</summary>
@@ -448,7 +453,7 @@
         </details>
         <details>
           <summary>我是唯一的家長，可以退出嗎？</summary>
-          <div class="a">要先邀請另一位家長，或讓其他人先離開，才能退出。</div>
+          <div class="a">要先邀請另一位家長，或讓其他人先離開，才能退出。家長退出時，他產生、還沒用過的邀請碼會一起失效；家裡沒有家長時，也不能再用邀請碼加入。</div>
         </details>
         <details>
           <summary>邀請碼過期或用過了？</summary>
@@ -473,6 +478,6 @@
 
 </main>
 
-<script src="docs.js?v=4"></script>
+<script src="docs.js?v=5"></script>
 </body>
 </html>
