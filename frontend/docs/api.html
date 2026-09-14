@@ -7,12 +7,29 @@
 <meta name="description" content="家庭記帳系統的 37 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Pacifico&family=Huninn&display=swap">
+<!-- 跟系統同一套主題：在系統裡選了什麼，文件就是什麼顏色 -->
+<script>
+  (function () {
+    /* 另外要載字體的兩套，跟 ../js/data.js 的 themes[].font 一樣（有測試對齊） */
+    var FONT = { literary: 'LXGW+WenKai+TC:wght@400;700', cute: 'Huninn' };
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+        if (FONT[t]) document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + FONT[t] + '&display=swap">');
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="../css/tokens.css?v=144">
+<link rel="stylesheet" href="../css/themes.css?v=144">
+<link rel="stylesheet" href="docs.css?v=13">
 </head>
 <body>
 
-<nav class="docbar" style="max-width:1100px">
+<nav class="docbar">
+  <a class="docbar__brand" href="../index.html" aria-label="回到系統"><span class="rail__mark">FamBudget</span></a>
   <a href="index.html">← 專題手冊</a>
   <a href="fastapi.html">FastAPI 說明書</a>
   <a href="restful.html">RESTful 說明書</a>
@@ -37,6 +54,19 @@
       <div class="mchip"><span>後端</span><b>FastAPI · 尚未部署</b></div>
     </div>
   </header>
+    <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
+    <section class="kp" aria-label="這一頁的重點">
+      <div class="kp__h"><span class="kp__ic" aria-hidden="true">★</span><span class="kp__t">這一頁的重點</span><span class="kp__s">只看這張卡，也能知道這份文件在講什麼</span></div>
+      <ul class="kp__l">
+      <li><b>怎麼看</b><span>依四個功能模組分組，點一列展開看參數、請求與回應</span></li>
+      <li><b>找得快</b><span>上面可以搜尋路徑或說明，也可以只看某一位成員的</span></li>
+      <li><b>方法</b><span>GET 讀、POST 新增、PUT 整份換、PATCH 改一部分、DELETE 刪除</span></li>
+      <li><b>★ 標記</b><span>跟模型直接相關的路由</span></li>
+      <li><b>權限</b><span>公開、登入、本人、家長、監管者、平台</span></li>
+      <li><b>錯誤</b><span>沒權限回 403 而不是空陣列，前端才分得出「沒資料」和「不能看」</span></li>
+      </ul>
+    </section>
+
 
   <div class="abar">
     <label class="asearch">
@@ -78,11 +108,11 @@
   'use strict';
 
   var OWNERS = [
-    { id: 'm1', name: '成員1', dom: '認證', branch: 'm1-auth', c: '#3C5FA0' },
-    { id: 'm2', name: '成員2', dom: '記帳', branch: 'm2-ledger', c: '#6A5B9E' },
-    { id: 'm3', name: '成員3', dom: '數字', branch: 'm3-analytics', c: '#1F6E82' },
-    { id: 'm4', name: '成員4', dom: '家庭', branch: 'm4-access', c: '#276D4D' },
-    { id: 'sys', name: '共用', dom: '系統', branch: '—', c: '#5E636B' }
+    { id: 'm1', name: '成員1', dom: '認證', branch: 'm1-auth', c: 'var(--m1)' },
+    { id: 'm2', name: '成員2', dom: '記帳', branch: 'm2-ledger', c: 'var(--m2)' },
+    { id: 'm3', name: '成員3', dom: '數字', branch: 'm3-analytics', c: 'var(--m3)' },
+    { id: 'm4', name: '成員4', dom: '家庭', branch: 'm4-access', c: 'var(--m4)' },
+    { id: 'sys', name: '共用', dom: '系統', branch: '—', c: 'var(--ink-soft)' }
   ];
 
   /* 路由與回應形狀取自 frontend/js/api.js 的契約定義 */
@@ -360,7 +390,7 @@
       '<span class="route__r">' +
       (r.llm ? '<span class="tag tag--llm">★ LLM</span>' : '') +
       '<span class="tag">' + esc(r.a) + '</span>' +
-      '<span class="tag" style="border-color:' + o.c + '55;color:' + o.c + '">' + o.name + '</span>' +
+      '<span class="tag" style="border-color:color-mix(in srgb, ' + o.c + ' 35%, transparent);color:' + o.c + '">' + o.name + '</span>' +
       '</span></summary><div class="route__b">';
 
     if (r.q && r.q.length) {
@@ -422,6 +452,6 @@
   render();
 })();
 </script>
-<script src="docs.js?v=3"></script>
+<script src="docs.js?v=4"></script>
 </body>
 </html>

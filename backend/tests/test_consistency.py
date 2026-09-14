@@ -2249,3 +2249,62 @@ def test_明細的日期與分類篩選真的有篩():
     assert out["noneN"] == 0
     assert out["catOk"], "categoryId 沒有篩"
     assert out["sorted"], "明細要新的在前"
+
+
+# ===========================================================================
+# 品牌與文件：跟系統同一套樣子
+# ===========================================================================
+
+DOC_PAGES = ("index", "fastapi", "restful", "files", "api", "model", "guide")
+
+
+def test_品牌是印著專案名稱的草寫徽章():
+    """使用者覺得方塊裡寫「帳」很老土：換成草寫英文 FamBudget ＋ 粉圓體的「家庭記帳」。"""
+    html = read("frontend/index.html")
+    assert '<span class="brand__m" aria-hidden="true">FamBudget</span>' in html
+    assert "family=Pacifico" in html and "family=Huninn" in html, "品牌字體沒有載入"
+    tokens = read("frontend/css/tokens.css")
+    assert '--font-script: "Pacifico"' in tokens and '--font-cute: "Huninn"' in tokens
+    assert '>帳</span>' not in html and '>帳</div>' not in read("frontend/docs/index.html")
+    for pg in DOC_PAGES:
+        assert "FamBudget" in read("frontend/docs/%s.html" % pg), pg + " 的品牌還是舊的"
+
+
+def test_文件跟系統同一套主題與樣子():
+    """文件跟產品長得不一樣，讀者從系統點過來會以為進了另一個網站。
+
+    現在每一頁都載系統的 tokens.css ＋ themes.css，在系統選的主題文件也跟著換；
+    所以文件裡不准寫死顏色——寫死的那一塊在深色主題就會變成一塊白板。
+    """
+    data = read("frontend/js/data.js")
+    block = data[data.index("  themes: ["):data.index("  ],", data.index("  themes: ["))]
+    fonts = dict(re.findall(r"id: '([a-z]+)'[^\n]*font: '([^']+)'", block))
+    css = read("frontend/docs/docs.css")
+    assert not re.findall(r"#[0-9A-Fa-f]{3,8}\b|rgba?\(", re.sub(r"/\*.*?\*/", "", css, flags=re.S)), \
+        "docs.css 還有寫死的顏色"
+    for pg in DOC_PAGES:
+        page = read("frontend/docs/%s.html" % pg)
+        head = page[:page.index("</head>")]
+        assert "../css/tokens.css" in head and "../css/themes.css" in head, pg + " 沒有載系統的樣式"
+        assert head.index("fambudget.theme") < head.index("../css/tokens.css"), pg + " 主題要在樣式載入前掛上"
+        m = re.search(r"var FONT = \{ literary: '([^']+)', cute: '([^']+)' \};", head)
+        assert m and m.group(1) == fonts["literary"] and m.group(2) == fonts["cute"], pg + " 的主題字體跟 data.js 對不上"
+        body = re.sub(r"<!--.*?-->", "", page, flags=re.S)
+        stray = re.findall(r"#[0-9A-Fa-f]{6}\b|rgba\(", body)
+        assert not stray, "%s 還有寫死的顏色：%s" % (pg, sorted(set(stray))[:5])
+
+
+def test_專題文件每一頁先講重點():
+    """文件很長，第一次讀的人要先知道這一頁在講什麼：開頭一張「這一頁的重點」。"""
+    for pg in ("index", "fastapi", "restful", "files", "api", "model"):
+        page = read("frontend/docs/%s.html" % pg)
+        m = re.search(r'<section class="kp".*?<ul class="kp__l">(.*?)</ul>', page, re.S)
+        assert m, pg + " 沒有重點卡"
+        items = re.findall(r"<li><b>[^<]+</b><span>[^<]+</span></li>", m.group(1))
+        assert 4 <= len(items) <= 7, "%s 的重點要 4～7 條，現在 %d 條" % (pg, len(items))
+        kp_at = page.index('class="kp"')
+        assert kp_at > page.index("</header>"), pg + " 重點卡要放在開場後面"
+        if 'class="sec' in page:
+            assert kp_at < page.index('class="sec'), pg + " 重點卡要放在第一節前面"
+    css = read("frontend/docs/docs.css")
+    assert "content: '重點'" in css, "每一節的導言要標出「重點」"

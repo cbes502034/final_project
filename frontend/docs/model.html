@@ -7,141 +7,51 @@
 <meta name="description" content="段落記帳模型的技術方案：模型選型、三段架構、工具設計、訓練管線與評測。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Pacifico&family=Huninn&display=swap">
+<!-- 跟系統同一套主題：在系統裡選了什麼，文件就是什麼顏色 -->
+<script>
+  (function () {
+    /* 另外要載字體的兩套，跟 ../js/data.js 的 themes[].font 一樣（有測試對齊） */
+    var FONT = { literary: 'LXGW+WenKai+TC:wght@400;700', cute: 'Huninn' };
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+        if (FONT[t]) document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + FONT[t] + '&display=swap">');
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="../css/tokens.css?v=144">
+<link rel="stylesheet" href="../css/themes.css?v=144">
+<link rel="stylesheet" href="docs.css?v=13">
 <style>
-/* ---- 模型設計頁專用 ---- */
-/* 權杖沿用專案的 tokens.css，跟手冊與產品同一套視覺 */
-
-.wrap { max-width:940px; margin:0 auto; padding:0 24px 96px; }
-
-/* ---------- 開場 ---------- */
-.hero { padding:60px 0 30px; }
-.eyebrow {
-  font-family:var(--mono); font-size:11px; letter-spacing:.22em;
-  color:var(--warn); text-transform:uppercase; margin-bottom:14px;
-}
-.hero h1 { font-size:clamp(28px,4vw,42px); line-height:1.26; font-weight:700; }
-.hero__lead { margin-top:16px; max-width:62ch; font-size:16.5px; color:var(--ink-soft); }
-
-.jump { display:flex; flex-wrap:wrap; gap:8px; margin:26px 0 0; padding-bottom:30px; border-bottom:1px solid var(--line); }
-.jump a {
-  padding:6px 14px; border-radius:var(--r-pill); text-decoration:none;
-  background:var(--card-2); border:1px solid var(--line); font-size:13px; color:var(--ink-soft);
-  transition:border-color .18s var(--ease), color .18s var(--ease);
-}
-.jump a:hover { color:var(--ink); border-color:var(--line-2); }
-
-/* ---------- 區塊 ---------- */
-.sec { padding:52px 0 0; }
-.sec__h { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
-.sec__n { display:grid; place-items:center; min-width:38px; height:38px; padding:0 8px; font-family:var(--mono); font-size:13px; font-weight:700; color:#fff; background:var(--warn); letter-spacing:.04em; }
-.sec h2 { font-size:25px; }
-.sec__lead { margin:8px 0 24px; max-width:64ch; color:var(--ink-soft); }
-h3.sub { font-family:var(--sans); font-size:18px; font-weight:700; margin:36px 0 12px; padding-left:13px; border-left:4px solid var(--warn); }
-
-/* ---------- 圖 ---------- */
-figure { margin:24px 0 0; }
-.figbox {
-  border:1px solid var(--line); border-radius:var(--r-card);
-  background:var(--card); padding:22px 20px 14px; overflow-x:auto;
-}
-.figbox svg { display:block; max-width:100%; height:auto; margin:0 auto; color:var(--ink-soft); }
-figcaption {
-  margin-top:12px; font-size:13px; color:var(--ink-faint);
-  max-width:66ch; padding-left:2px;
-}
-figcaption b { color:var(--ink-soft); font-weight:500; }
-
-/* ---------- 表 ---------- */
-.tw { overflow-x:auto; border-radius:var(--r-card); border:1px solid var(--line); margin-top:16px; }
-table { border-collapse:collapse; width:100%; min-width:560px; font-size:13.5px; }
-thead th {
-  text-align:left; padding:11px 14px; white-space:nowrap;
-  background:var(--card-3); color:var(--ink-soft);
-  font-weight:500; font-size:12px; letter-spacing:.06em;
-  border-bottom:1px solid var(--line-2);
-}
-tbody td { padding:10px 14px; vertical-align:top; border-bottom:1px solid var(--line); background:var(--card); }
-tbody tr:last-child td { border-bottom:none; }
-tbody tr:hover td { background:var(--card-2); }
-tbody tr.pick td { background:rgba(251,191,110,.07); }
-tbody tr.pick:hover td { background:rgba(251,191,110,.11); }
-td.mono, th.mono { font-family:var(--mono); font-variant-numeric:tabular-nums; }
-td.tight { white-space:nowrap; }
-
-.tag {
-  display:inline-block; padding:1px 8px; border-radius:var(--r-pill);
-  font-size:11px; line-height:1.7; white-space:nowrap;
-  border:1px solid var(--line-2); color:var(--ink-soft); background:var(--sunk);
-}
-.tag--pick { color:var(--warn); border-color:rgba(251,191,110,.45); background:var(--warn-wash); }
-.tag--no { color:var(--down); border-color:rgba(251,138,143,.4); background:var(--down-wash); }
-.tag--alt { color:var(--accent-hi); border-color:rgba(108,159,251,.4); background:var(--accent-wash); }
-
-/* ---------- 卡片與提示 ---------- */
-.card { background:var(--card); border:1px solid var(--line); border-radius:var(--r-card); padding:20px 22px; }
-.grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); margin-top:16px; }
-.card h4 { margin:0 0 8px; font-family:var(--serif); font-size:15px; font-weight:600; }
-.card p { font-size:13px; color:var(--ink-soft); }
-
-.note {
-  margin-top:20px; padding:16px 20px; border-radius:var(--r-card);
-  border:1px solid var(--line-2); border-left:3px solid var(--accent); background:var(--card-2);
-}
-.note--warn { border-left-color:var(--warn); }
-.note--crit { border-left-color:var(--down); }
-.note__k { font-family:var(--serif); font-weight:600; font-size:14.5px; margin-bottom:6px; }
-.note p { color:var(--ink-soft); font-size:13.5px; }
-.note b { color:var(--ink); font-weight:500; }
+/* ---- 記帳模型設計：代表色是琥珀（docs.css 的 .md）。通用元件都在 docs.css ---- */
+.wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px 96px; }
+.card h4 { margin: 0 0 8px; font-family: var(--sans); font-size: 15px; font-weight: 700; }
+.card p { font-size: 13.5px; color: var(--ink-soft); }
+.grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 14px; }
+tbody tr.pick td { background: color-mix(in srgb, var(--warn) 8%, var(--card)); }
+tbody tr.pick:hover td { background: color-mix(in srgb, var(--warn) 12%, var(--card)); }
+td.mono, th.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 /* ---------- 工具清單 ---------- */
-.tools { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+.tools { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
 .tool {
-  display:grid; grid-template-columns:210px 1fr; gap:16px;
-  padding:14px 18px; border-radius:var(--r-card);
-  background:var(--card); border:1px solid var(--line); border-left:3px solid var(--k);
+  display: grid; grid-template-columns: 210px 1fr; gap: 16px; padding: 14px 18px;
+  background: var(--card-2); border: 1px solid var(--line); border-left: 4px solid var(--k); border-radius: var(--r-input);
 }
-.tool__n { font-family:var(--mono); font-size:12.5px; color:var(--k); word-break:break-all; }
-.tool__w { font-size:13px; color:var(--ink-soft); }
-.tool__w b { color:var(--ink); font-weight:500; }
-@media (max-width:640px) { .tool { grid-template-columns:1fr; gap:6px; } }
-
-/* ---------- 步驟 ---------- */
-.steps { display:flex; flex-direction:column; margin-top:16px; }
-.step { display:flex; gap:16px; position:relative; padding-bottom:18px; }
-.step:last-child { padding-bottom:0; }
-.step::before { content:""; position:absolute; left:15px; top:32px; bottom:0; width:1px; background:var(--line-2); }
-.step:last-child::before { display:none; }
-.step__n {
-  flex:0 0 32px; width:32px; height:32px; border-radius:50%;
-  display:grid; place-items:center; position:relative; z-index:1;
-  background:var(--card-3); border:1px solid var(--line-2);
-  font-family:var(--mono); font-size:12px; color:var(--warn);
-}
-.step__b { padding-top:3px; min-width:0; }
-.step__t { font-family:var(--serif); font-weight:600; font-size:15px; margin-bottom:3px; }
-.step__d { font-size:13.5px; color:var(--ink-soft); }
-
-pre {
-  margin:14px 0 0; padding:16px 18px; overflow-x:auto;
-  background:var(--card); border:1px solid var(--line); border-radius:var(--r-card);
-  font-family:var(--mono); font-size:12.5px; line-height:1.75; color:var(--ink-soft);
-}
-pre b { color:var(--warn); font-weight:500; }
-pre i { color:var(--ink-faint); font-style:normal; }
-
-.foot {
-  margin-top:60px; padding-top:24px; border-top:1px solid var(--line);
-  font-size:12.5px; color:var(--ink-faint);
-  display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between;
-}
-
-@media (prefers-reduced-motion:reduce) { * { transition:none !important; } }
+.tool__n { font-family: var(--mono); font-size: 12.5px; color: var(--k); word-break: break-all; }
+.tool__w { font-size: 13.5px; color: var(--ink-soft); }
+.tool__w b { color: var(--ink); }
+pre b { color: var(--warn-ink); font-weight: 600; }
+pre i { color: var(--ink-faint); font-style: normal; }
+@media (max-width: 640px) { .tool { grid-template-columns: 1fr; gap: 6px; } .wrap { padding: 0 16px 72px; } }
 </style>
 </head>
-<body>
+<body class="md">
 <nav class="docbar">
+  <a class="docbar__brand" href="../index.html" aria-label="回到系統"><span class="rail__mark">FamBudget</span></a>
   <a href="index.html">← 專題手冊</a>
   <a href="fastapi.html">FastAPI 說明書</a>
   <a href="restful.html">RESTful 說明書</a>
@@ -170,6 +80,19 @@ pre i { color:var(--ink-faint); font-style:normal; }
     <a href="#risk">⑨ 風險與排程</a>
   </nav>
 </header>
+    <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
+    <section class="kp" aria-label="這一頁的重點">
+      <div class="kp__h"><span class="kp__ic" aria-hidden="true">★</span><span class="kp__t">這一頁的重點</span><span class="kp__s">只看這張卡，也能知道這份文件在講什麼</span></div>
+      <ul class="kp__l">
+      <li><b>選哪顆</b><span>繁中能用、有原生工具呼叫、免費 T4 跑得動、授權乾淨——主力挑最小的</span></li>
+      <li><b>模型與工具</b><span>模型負責語意判斷，工具負責事實與計算，兩者之間沒有捷徑</span></li>
+      <li><b>兩輪流程</b><span>第一輪問事實，第二輪交結果；中間由後端執行工具</span></li>
+      <li><b>訓練</b><span>QLoRA 微調；使用者修正過的解析就是新的訓練資料</span></li>
+      <li><b>上線</b><span>Render 免費方案跑不動模型，所以準備三層退路</span></li>
+      <li><b>目標</b><span>四個指標一張對照表，報告最後交的就是它</span></li>
+      </ul>
+    </section>
+
 
 <!-- ============ 前提 ============ -->
 <div class="note note--warn">
@@ -312,83 +235,83 @@ pre i { color:var(--ink-faint); font-style:normal; }
       <svg viewBox="0 0 860 400" role="img" aria-label="三段架構：左邊前端、中間後端含自架推論服務、右邊資料庫。推論服務只能透過後端的工具取得事實，沒有任何路徑直接連到資料庫">
         <defs>
           <marker id="aB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#3C5FA0"/>
+            <path d="M 0 0 L 10 5 L 0 10 z" style="fill:var(--m1)"/>
           </marker>
           <marker id="aV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#6A5B9E"/>
+            <path d="M 0 0 L 10 5 L 0 10 z" style="fill:var(--m2)"/>
           </marker>
           <marker id="aP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#7A4FA8"/>
+            <path d="M 0 0 L 10 5 L 0 10 z" style="fill:var(--book-violet)"/>
           </marker>
           <marker id="aW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#8C5409"/>
+            <path d="M 0 0 L 10 5 L 0 10 z" style="fill:var(--warn-ink)"/>
           </marker>
         </defs>
 
         <!-- ===== 三段底色：藍 → 藍紫 → 紫 ===== -->
-        <rect x="8" y="42" width="186" height="292" rx="14" fill="rgba(108,159,251,.06)" stroke="rgba(108,159,251,.32)" stroke-width="1.2"/>
-        <text x="101" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#3C5FA0" letter-spacing="2.4">前端</text>
+        <rect x="8" y="42" width="186" height="292" rx="14" stroke-width="1.2" style="fill:color-mix(in srgb, var(--m1) 6%, transparent);stroke:color-mix(in srgb, var(--m1) 32%, transparent)"/>
+        <text x="101" y="30" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="2.4" style="fill:var(--m1)">前端</text>
 
-        <rect x="210" y="42" width="390" height="292" rx="14" fill="rgba(139,124,240,.06)" stroke="rgba(139,124,240,.32)" stroke-width="1.2"/>
-        <text x="405" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#6A5B9E" letter-spacing="2.4">後端</text>
+        <rect x="210" y="42" width="390" height="292" rx="14" stroke-width="1.2" style="fill:color-mix(in srgb, var(--m2) 6%, transparent);stroke:color-mix(in srgb, var(--m2) 32%, transparent)"/>
+        <text x="405" y="30" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="2.4" style="fill:var(--m2)">後端</text>
 
-        <rect x="616" y="42" width="236" height="292" rx="14" fill="rgba(168,123,232,.06)" stroke="rgba(168,123,232,.32)" stroke-width="1.2"/>
-        <text x="734" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="#7A4FA8" letter-spacing="2.4">資料庫</text>
+        <rect x="616" y="42" width="236" height="292" rx="14" stroke-width="1.2" style="fill:color-mix(in srgb, var(--book-violet) 6%, transparent);stroke:color-mix(in srgb, var(--book-violet) 32%, transparent)"/>
+        <text x="734" y="30" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="2.4" style="fill:var(--book-violet)">資料庫</text>
 
         <!-- ===== 前端 ===== -->
-        <rect x="26" y="104" width="150" height="86" rx="11" fill="rgba(108,159,251,.12)" stroke="#3C5FA0" stroke-width="1.5"/>
-        <text x="101" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#2F5E9E">段落記帳畫面</text>
-        <text x="101" y="152" text-anchor="middle" font-size="10.5" fill="#2F5E9E" opacity=".8">site/ 純靜態</text>
-        <text x="101" y="170" text-anchor="middle" font-size="10.5" fill="#2F5E9E" opacity=".8">逐筆確認表格</text>
+        <rect x="26" y="104" width="150" height="86" rx="11" stroke-width="1.5" style="fill:color-mix(in srgb, var(--m1) 12%, transparent);stroke:var(--m1)"/>
+        <text x="101" y="132" text-anchor="middle" font-size="13" font-weight="600" style="fill:var(--info)">段落記帳畫面</text>
+        <text x="101" y="152" text-anchor="middle" font-size="10.5" opacity=".8" style="fill:var(--info)">site/ 純靜態</text>
+        <text x="101" y="170" text-anchor="middle" font-size="10.5" opacity=".8" style="fill:var(--info)">逐筆確認表格</text>
 
         <!-- ===== 後端 ===== -->
-        <rect x="250" y="104" width="300" height="86" rx="11" fill="rgba(139,124,240,.12)" stroke="#6A5B9E" stroke-width="1.5"/>
-        <text x="400" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#6A5B9E">FastAPI 路由與服務</text>
-        <text x="400" y="152" text-anchor="middle" font-size="10.5" fill="#6A5B9E" opacity=".8">工具派發層 · Pydantic 驗證</text>
-        <text x="400" y="170" text-anchor="middle" font-size="10.5" fill="#6A5B9E" opacity=".8">所有金額都在這一層算完</text>
+        <rect x="250" y="104" width="300" height="86" rx="11" stroke-width="1.5" style="fill:color-mix(in srgb, var(--m2) 12%, transparent);stroke:var(--m2)"/>
+        <text x="400" y="132" text-anchor="middle" font-size="13" font-weight="600" style="fill:var(--m2)">FastAPI 路由與服務</text>
+        <text x="400" y="152" text-anchor="middle" font-size="10.5" opacity=".8" style="fill:var(--m2)">工具派發層 · Pydantic 驗證</text>
+        <text x="400" y="170" text-anchor="middle" font-size="10.5" opacity=".8" style="fill:var(--m2)">所有金額都在這一層算完</text>
 
         <!-- 推論服務：本文件的主角，用橘色標出來 -->
-        <rect x="250" y="234" width="300" height="80" rx="11" fill="rgba(251,191,110,.11)" stroke="#8C5409" stroke-width="1.7"/>
-        <text x="400" y="262" text-anchor="middle" font-size="13" font-weight="600" fill="#8C5409">自架推論服務</text>
-        <text x="400" y="282" text-anchor="middle" font-size="10.5" fill="#8C5409" opacity=".85">Qwen2.5-1.5B-Instruct（已微調）</text>
-        <text x="400" y="300" text-anchor="middle" font-size="10.5" fill="#8C5409" opacity=".85">只做語意判斷，不碰任何事實</text>
+        <rect x="250" y="234" width="300" height="80" rx="11" stroke-width="1.7" style="fill:color-mix(in srgb, var(--warn) 11%, transparent);stroke:var(--warn-ink)"/>
+        <text x="400" y="262" text-anchor="middle" font-size="13" font-weight="600" style="fill:var(--warn-ink)">自架推論服務</text>
+        <text x="400" y="282" text-anchor="middle" font-size="10.5" opacity=".85" style="fill:var(--warn-ink)">Qwen2.5-1.5B-Instruct（已微調）</text>
+        <text x="400" y="300" text-anchor="middle" font-size="10.5" opacity=".85" style="fill:var(--warn-ink)">只做語意判斷，不碰任何事實</text>
 
         <!-- 後端 ↕ 模型 -->
-        <line x1="330" y1="190" x2="330" y2="230" stroke="#8C5409" stroke-width="1.6" marker-end="url(#aW)"/>
-        <text x="322" y="215" text-anchor="end" font-size="10.5" fill="#8C5409">prompt ＋ 工具定義</text>
-        <line x1="470" y1="230" x2="470" y2="190" stroke="#8C5409" stroke-width="1.6" marker-end="url(#aW)"/>
-        <text x="478" y="215" text-anchor="start" font-size="10.5" fill="#8C5409">tool_calls</text>
+        <line x1="330" y1="190" x2="330" y2="230" stroke-width="1.6" marker-end="url(#aW)" style="stroke:var(--warn-ink)"/>
+        <text x="322" y="215" text-anchor="end" font-size="10.5" style="fill:var(--warn-ink)">prompt ＋ 工具定義</text>
+        <line x1="470" y1="230" x2="470" y2="190" stroke-width="1.6" marker-end="url(#aW)" style="stroke:var(--warn-ink)"/>
+        <text x="478" y="215" text-anchor="start" font-size="10.5" style="fill:var(--warn-ink)">tool_calls</text>
 
         <!-- ===== 資料庫 ===== -->
-        <rect x="640" y="104" width="190" height="86" rx="11" fill="rgba(168,123,232,.12)" stroke="#7A4FA8" stroke-width="1.5"/>
-        <text x="735" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#7A4FA8">PostgreSQL</text>
-        <text x="735" y="152" text-anchor="middle" font-size="10.5" fill="#7A4FA8" opacity=".8">分類體系 · 收支明細</text>
-        <text x="735" y="170" text-anchor="middle" font-size="10.5" fill="#7A4FA8" opacity=".8">預算 · 存款目標</text>
+        <rect x="640" y="104" width="190" height="86" rx="11" stroke-width="1.5" style="fill:color-mix(in srgb, var(--book-violet) 12%, transparent);stroke:var(--book-violet)"/>
+        <text x="735" y="132" text-anchor="middle" font-size="13" font-weight="600" style="fill:var(--book-violet)">PostgreSQL</text>
+        <text x="735" y="152" text-anchor="middle" font-size="10.5" opacity=".8" style="fill:var(--book-violet)">分類體系 · 收支明細</text>
+        <text x="735" y="170" text-anchor="middle" font-size="10.5" opacity=".8" style="fill:var(--book-violet)">預算 · 存款目標</text>
 
         <!-- 前端 ↔ 後端 -->
-        <line x1="176" y1="128" x2="246" y2="128" stroke="#3C5FA0" stroke-width="1.6" marker-end="url(#aB)"/>
-        <text x="211" y="118" text-anchor="middle" font-size="10.5" fill="#2F5E9E">一段話</text>
-        <line x1="246" y1="166" x2="180" y2="166" stroke="#3C5FA0" stroke-width="1.6" marker-end="url(#aB)"/>
-        <text x="213" y="184" text-anchor="middle" font-size="10.5" fill="#2F5E9E">確認表格</text>
+        <line x1="176" y1="128" x2="246" y2="128" stroke-width="1.6" marker-end="url(#aB)" style="stroke:var(--m1)"/>
+        <text x="211" y="118" text-anchor="middle" font-size="10.5" style="fill:var(--info)">一段話</text>
+        <line x1="246" y1="166" x2="180" y2="166" stroke-width="1.6" marker-end="url(#aB)" style="stroke:var(--m1)"/>
+        <text x="213" y="184" text-anchor="middle" font-size="10.5" style="fill:var(--info)">確認表格</text>
 
         <!-- 後端 ↔ 資料庫 -->
-        <line x1="550" y1="128" x2="636" y2="128" stroke="#7A4FA8" stroke-width="1.6" marker-end="url(#aP)"/>
-        <text x="593" y="118" text-anchor="middle" font-size="10.5" fill="#7A4FA8">查詢 / 計算</text>
-        <line x1="636" y1="166" x2="554" y2="166" stroke="#7A4FA8" stroke-width="1.6" marker-end="url(#aP)"/>
-        <text x="595" y="184" text-anchor="middle" font-size="10.5" fill="#7A4FA8">事實</text>
+        <line x1="550" y1="128" x2="636" y2="128" stroke-width="1.6" marker-end="url(#aP)" style="stroke:var(--book-violet)"/>
+        <text x="593" y="118" text-anchor="middle" font-size="10.5" style="fill:var(--book-violet)">查詢 / 計算</text>
+        <line x1="636" y1="166" x2="554" y2="166" stroke-width="1.6" marker-end="url(#aP)" style="stroke:var(--book-violet)"/>
+        <text x="595" y="184" text-anchor="middle" font-size="10.5" style="fill:var(--book-violet)">事實</text>
 
         <!-- 被禁止的那條路：模型 → 資料庫 -->
-        <path d="M 550 274 C 660 274, 735 260, 735 194" fill="none" stroke="#A83A31"
-              stroke-width="1.6" stroke-dasharray="7 6" opacity=".9"/>
-        <circle cx="648" cy="272" r="14" fill="#F4F1EA" stroke="#A83A31" stroke-width="1.6"/>
-        <line x1="642" y1="266" x2="654" y2="278" stroke="#A83A31" stroke-width="2"/>
-        <line x1="654" y1="266" x2="642" y2="278" stroke="#A83A31" stroke-width="2"/>
-        <text x="700" y="318" text-anchor="middle" font-size="11.5" font-weight="600" fill="#A83A31">模型永遠沒有這條路</text>
+        <path d="M 550 274 C 660 274, 735 260, 735 194" fill="none"
+              stroke-width="1.6" stroke-dasharray="7 6" opacity=".9" style="stroke:var(--down)"/>
+        <circle cx="648" cy="272" r="14" stroke-width="1.6" style="fill:var(--paper);stroke:var(--down)"/>
+        <line x1="642" y1="266" x2="654" y2="278" stroke-width="2" style="stroke:var(--down)"/>
+        <line x1="654" y1="266" x2="642" y2="278" stroke-width="2" style="stroke:var(--down)"/>
+        <text x="700" y="318" text-anchor="middle" font-size="11.5" font-weight="600" style="fill:var(--down)">模型永遠沒有這條路</text>
 
         <!-- 底部三段說明 -->
-        <text x="101" y="360" text-anchor="middle" font-size="10.5" fill="#3C5FA0" opacity=".75">只顯示與收輸入</text>
-        <text x="405" y="360" text-anchor="middle" font-size="10.5" fill="#6A5B9E" opacity=".75">驗證、權限、計算，以及呼叫模型</text>
-        <text x="734" y="360" text-anchor="middle" font-size="10.5" fill="#7A4FA8" opacity=".75">唯一的事實來源</text>
+        <text x="101" y="360" text-anchor="middle" font-size="10.5" opacity=".75" style="fill:var(--m1)">只顯示與收輸入</text>
+        <text x="405" y="360" text-anchor="middle" font-size="10.5" opacity=".75" style="fill:var(--m2)">驗證、權限、計算，以及呼叫模型</text>
+        <text x="734" y="360" text-anchor="middle" font-size="10.5" opacity=".75" style="fill:var(--book-violet)">唯一的事實來源</text>
       </svg>
     </div>
     <figcaption>
@@ -463,26 +386,26 @@ pre i { color:var(--ink-faint); font-style:normal; }
         </defs>
 
         <!-- 泳道標題 -->
-        <text x="14" y="26" font-size="11" font-weight="600" fill="#8C5409" letter-spacing="1.4">ROUND 1 · 問事實</text>
-        <line x1="14" y1="36" x2="806" y2="36" stroke="#8C5409" stroke-width="1" opacity=".35"/>
+        <text x="14" y="26" font-size="11" font-weight="600" letter-spacing="1.4" style="fill:var(--warn-ink)">ROUND 1 · 問事實</text>
+        <line x1="14" y1="36" x2="806" y2="36" stroke-width="1" opacity=".35" style="stroke:var(--warn-ink)"/>
 
         <!-- R1 使用者輸入 -->
-        <rect x="14" y="56" width="250" height="62" rx="10" fill="rgba(27,29,33,.035)" stroke="currentColor" stroke-width="1.3"/>
+        <rect x="14" y="56" width="250" height="62" rx="10" stroke="currentColor" stroke-width="1.3" style="fill:color-mix(in srgb, var(--ink) 3.5%, transparent)"/>
         <text x="139" y="80" text-anchor="middle" font-size="12.5" font-weight="600" fill="currentColor">使用者寫一段話</text>
         <text x="139" y="100" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">「早餐55，全家買咖啡」</text>
 
         <line x1="264" y1="87" x2="330" y2="87" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
 
         <!-- R1 模型 -->
-        <rect x="334" y="56" width="190" height="62" rx="10" fill="rgba(251,191,110,.10)" stroke="#8C5409" stroke-width="1.5"/>
-        <text x="429" y="80" text-anchor="middle" font-size="12.5" font-weight="600" fill="#8C5409">模型</text>
-        <text x="429" y="100" text-anchor="middle" font-size="11" fill="#8C5409" opacity=".85">判斷需要哪些事實</text>
+        <rect x="334" y="56" width="190" height="62" rx="10" stroke-width="1.5" style="fill:color-mix(in srgb, var(--warn) 10%, transparent);stroke:var(--warn-ink)"/>
+        <text x="429" y="80" text-anchor="middle" font-size="12.5" font-weight="600" style="fill:var(--warn-ink)">模型</text>
+        <text x="429" y="100" text-anchor="middle" font-size="11" opacity=".85" style="fill:var(--warn-ink)">判斷需要哪些事實</text>
 
-        <line x1="524" y1="87" x2="590" y2="87" stroke="#8C5409" stroke-width="1.5" marker-end="url(#ar2)" color="#8C5409"/>
-        <text x="557" y="77" text-anchor="middle" font-size="10.5" fill="#8C5409">tool_calls</text>
+        <line x1="524" y1="87" x2="590" y2="87" stroke-width="1.5" marker-end="url(#ar2)" style="stroke:var(--warn-ink);color:var(--warn-ink)"/>
+        <text x="557" y="77" text-anchor="middle" font-size="10.5" style="fill:var(--warn-ink)">tool_calls</text>
 
         <!-- R1 工具 -->
-        <rect x="594" y="48" width="212" height="78" rx="10" fill="rgba(27,29,33,.035)" stroke="currentColor" stroke-width="1.3"/>
+        <rect x="594" y="48" width="212" height="78" rx="10" stroke="currentColor" stroke-width="1.3" style="fill:color-mix(in srgb, var(--ink) 3.5%, transparent)"/>
         <text x="700" y="70" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">後端執行工具</text>
         <text x="700" y="90" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">resolve_date → 2026-09-10</text>
         <text x="700" y="108" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">lookup_category → C01 餐飲</text>
@@ -491,20 +414,20 @@ pre i { color:var(--ink-faint); font-style:normal; }
         <path d="M 700 126 C 700 162, 429 162, 429 190" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
         <text x="565" y="156" text-anchor="middle" font-size="10.5" fill="currentColor">工具結果回填進對話</text>
 
-        <text x="14" y="216" font-size="11" font-weight="600" fill="#8C5409" letter-spacing="1.4">ROUND 2 · 交結果</text>
-        <line x1="14" y1="226" x2="806" y2="226" stroke="#8C5409" stroke-width="1" opacity=".35"/>
+        <text x="14" y="216" font-size="11" font-weight="600" letter-spacing="1.4" style="fill:var(--warn-ink)">ROUND 2 · 交結果</text>
+        <line x1="14" y1="226" x2="806" y2="226" stroke-width="1" opacity=".35" style="stroke:var(--warn-ink)"/>
 
         <!-- R2 模型 -->
         <rect x="334" y="190" width="190" height="20" rx="6" fill="none" stroke="none"/>
-        <rect x="14" y="246" width="250" height="62" rx="10" fill="rgba(251,191,110,.10)" stroke="#8C5409" stroke-width="1.5"/>
-        <text x="139" y="270" text-anchor="middle" font-size="12.5" font-weight="600" fill="#8C5409">模型</text>
-        <text x="139" y="290" text-anchor="middle" font-size="11" fill="#8C5409" opacity=".85">帶著事實切分並抽欄位</text>
+        <rect x="14" y="246" width="250" height="62" rx="10" stroke-width="1.5" style="fill:color-mix(in srgb, var(--warn) 10%, transparent);stroke:var(--warn-ink)"/>
+        <text x="139" y="270" text-anchor="middle" font-size="12.5" font-weight="600" style="fill:var(--warn-ink)">模型</text>
+        <text x="139" y="290" text-anchor="middle" font-size="11" opacity=".85" style="fill:var(--warn-ink)">帶著事實切分並抽欄位</text>
 
-        <line x1="264" y1="277" x2="330" y2="277" stroke="#8C5409" stroke-width="1.5" marker-end="url(#ar2)"/>
-        <text x="297" y="267" text-anchor="middle" font-size="10.5" fill="#8C5409">2 筆</text>
+        <line x1="264" y1="277" x2="330" y2="277" stroke-width="1.5" marker-end="url(#ar2)" style="stroke:var(--warn-ink)"/>
+        <text x="297" y="267" text-anchor="middle" font-size="10.5" style="fill:var(--warn-ink)">2 筆</text>
 
         <!-- R2 record -->
-        <rect x="334" y="238" width="212" height="78" rx="10" fill="rgba(27,29,33,.035)" stroke="currentColor" stroke-width="1.3"/>
+        <rect x="334" y="238" width="212" height="78" rx="10" stroke="currentColor" stroke-width="1.3" style="fill:color-mix(in srgb, var(--ink) 3.5%, transparent)"/>
         <text x="440" y="262" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">record_transactions</text>
         <text x="440" y="282" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">Pydantic 驗證格式</text>
         <text x="440" y="300" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".72">驗不過 → 帶錯誤重試一次</text>
@@ -512,18 +435,18 @@ pre i { color:var(--ink-faint); font-style:normal; }
         <line x1="546" y1="277" x2="612" y2="277" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar2)"/>
 
         <!-- 前端確認 -->
-        <rect x="616" y="238" width="190" height="78" rx="10" fill="rgba(108,159,251,.10)" stroke="#3C5FA0" stroke-width="1.5"/>
-        <text x="711" y="262" text-anchor="middle" font-size="12" font-weight="600" fill="#2F5E9E">前端逐筆確認</text>
-        <text x="711" y="282" text-anchor="middle" font-size="10.5" fill="#2F5E9E" opacity=".82">缺欄位標紅、低信心標黃</text>
-        <text x="711" y="300" text-anchor="middle" font-size="10.5" fill="#2F5E9E" opacity=".82">補齊前送出鈕停用</text>
+        <rect x="616" y="238" width="190" height="78" rx="10" stroke-width="1.5" style="fill:color-mix(in srgb, var(--m1) 10%, transparent);stroke:var(--m1)"/>
+        <text x="711" y="262" text-anchor="middle" font-size="12" font-weight="600" style="fill:var(--info)">前端逐筆確認</text>
+        <text x="711" y="282" text-anchor="middle" font-size="10.5" opacity=".82" style="fill:var(--info)">缺欄位標紅、低信心標黃</text>
+        <text x="711" y="300" text-anchor="middle" font-size="10.5" opacity=".82" style="fill:var(--info)">補齊前送出鈕停用</text>
 
         <!-- 寫入 -->
-        <path d="M 711 316 C 711 352, 440 352, 440 380" fill="none" stroke="#3C5FA0" stroke-width="1.5" marker-end="url(#ar2)" color="#3C5FA0"/>
-        <text x="576" y="346" text-anchor="middle" font-size="10.5" fill="#2F5E9E">使用者按下確認</text>
+        <path d="M 711 316 C 711 352, 440 352, 440 380" fill="none" stroke-width="1.5" marker-end="url(#ar2)" style="stroke:var(--m1);color:var(--m1)"/>
+        <text x="576" y="346" text-anchor="middle" font-size="10.5" style="fill:var(--info)">使用者按下確認</text>
 
-        <rect x="248" y="380" width="384" height="62" rx="10" fill="rgba(110,231,183,.09)" stroke="#2C7A56" stroke-width="1.4"/>
-        <text x="440" y="404" text-anchor="middle" font-size="12.5" font-weight="600" fill="#2C7A56">寫入 transactions ＋ nlp_parses</text>
-        <text x="440" y="424" text-anchor="middle" font-size="10.5" fill="#2C7A56" opacity=".82">模型解析值與使用者修正值一起存 → 下一輪訓練資料</text>
+        <rect x="248" y="380" width="384" height="62" rx="10" stroke-width="1.4" style="fill:color-mix(in srgb, var(--up) 9%, transparent);stroke:var(--up)"/>
+        <text x="440" y="404" text-anchor="middle" font-size="12.5" font-weight="600" style="fill:var(--up)">寫入 transactions ＋ nlp_parses</text>
+        <text x="440" y="424" text-anchor="middle" font-size="10.5" opacity=".82" style="fill:var(--up)">模型解析值與使用者修正值一起存 → 下一輪訓練資料</text>
       </svg>
     </div>
     <figcaption>
@@ -578,62 +501,62 @@ pre i { color:var(--ink-faint); font-style:normal; }
             <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
           </marker>
           <marker id="ar3g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#2C7A56"/>
+            <path d="M 0 0 L 10 5 L 0 10 z" style="fill:var(--up)"/>
           </marker>
         </defs>
 
         <!-- 上排：資料 -->
-        <rect x="14" y="30" width="150" height="58" rx="10" fill="rgba(27,29,33,.035)" stroke="currentColor" stroke-width="1.3"/>
+        <rect x="14" y="30" width="150" height="58" rx="10" stroke="currentColor" stroke-width="1.3" style="fill:color-mix(in srgb, var(--ink) 3.5%, transparent)"/>
         <text x="89" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">手寫種子</text>
         <text x="89" y="72" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">四人各 100 段 = 400</text>
 
         <line x1="164" y1="59" x2="212" y2="59" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
 
-        <rect x="216" y="30" width="150" height="58" rx="10" fill="rgba(27,29,33,.035)" stroke="currentColor" stroke-width="1.3"/>
+        <rect x="216" y="30" width="150" height="58" rx="10" stroke="currentColor" stroke-width="1.3" style="fill:color-mix(in srgb, var(--ink) 3.5%, transparent)"/>
         <text x="291" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">模板擴增</text>
         <text x="291" y="72" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">店家 × 金額 × 時間詞</text>
 
         <line x1="366" y1="59" x2="414" y2="59" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
         <text x="390" y="49" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">3–5k</text>
 
-        <rect x="418" y="30" width="166" height="58" rx="10" fill="rgba(27,29,33,.035)" stroke="currentColor" stroke-width="1.3"/>
+        <rect x="418" y="30" width="166" height="58" rx="10" stroke="currentColor" stroke-width="1.3" style="fill:color-mix(in srgb, var(--ink) 3.5%, transparent)"/>
         <text x="501" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">轉工具呼叫格式</text>
         <text x="501" y="72" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">Qwen chat template</text>
 
-        <line x1="584" y1="59" x2="632" y2="59" stroke="#8C5409" stroke-width="1.6" marker-end="url(#ar3)" color="#8C5409"/>
+        <line x1="584" y1="59" x2="632" y2="59" stroke-width="1.6" marker-end="url(#ar3)" style="stroke:var(--warn-ink);color:var(--warn-ink)"/>
 
-        <rect x="636" y="30" width="170" height="58" rx="10" fill="rgba(251,191,110,.10)" stroke="#8C5409" stroke-width="1.5"/>
-        <text x="721" y="53" text-anchor="middle" font-size="12" font-weight="600" fill="#8C5409">QLoRA 微調</text>
-        <text x="721" y="72" text-anchor="middle" font-size="10.5" fill="#8C5409" opacity=".85">Colab 免費 T4 · ~40 分</text>
+        <rect x="636" y="30" width="170" height="58" rx="10" stroke-width="1.5" style="fill:color-mix(in srgb, var(--warn) 10%, transparent);stroke:var(--warn-ink)"/>
+        <text x="721" y="53" text-anchor="middle" font-size="12" font-weight="600" style="fill:var(--warn-ink)">QLoRA 微調</text>
+        <text x="721" y="72" text-anchor="middle" font-size="10.5" opacity=".85" style="fill:var(--warn-ink)">Colab 免費 T4 · ~40 分</text>
 
         <!-- 下行 -->
         <path d="M 721 88 C 721 118, 501 118, 501 146" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
 
         <!-- 評測 -->
-        <rect x="386" y="146" width="230" height="58" rx="10" fill="rgba(108,159,251,.10)" stroke="#3C5FA0" stroke-width="1.5"/>
-        <text x="501" y="169" text-anchor="middle" font-size="12" font-weight="600" fill="#2F5E9E">評測（200 段留出集）</text>
-        <text x="501" y="188" text-anchor="middle" font-size="10.5" fill="#2F5E9E" opacity=".82">沒過門檻就回去改資料，不上線</text>
+        <rect x="386" y="146" width="230" height="58" rx="10" stroke-width="1.5" style="fill:color-mix(in srgb, var(--m1) 10%, transparent);stroke:var(--m1)"/>
+        <text x="501" y="169" text-anchor="middle" font-size="12" font-weight="600" style="fill:var(--info)">評測（200 段留出集）</text>
+        <text x="501" y="188" text-anchor="middle" font-size="10.5" opacity=".82" style="fill:var(--info)">沒過門檻就回去改資料，不上線</text>
 
         <line x1="386" y1="175" x2="330" y2="175" stroke="currentColor" stroke-width="1.5" marker-end="url(#ar3)"/>
         <text x="358" y="165" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">過</text>
 
         <!-- 匯出 -->
-        <rect x="150" y="146" width="176" height="58" rx="10" fill="rgba(27,29,33,.035)" stroke="currentColor" stroke-width="1.3"/>
+        <rect x="150" y="146" width="176" height="58" rx="10" stroke="currentColor" stroke-width="1.3" style="fill:color-mix(in srgb, var(--ink) 3.5%, transparent)"/>
         <text x="238" y="169" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">合併 LoRA ＋ 量化</text>
         <text x="238" y="188" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">GGUF q4_k_m ≈ 1GB</text>
 
         <!-- 上線 -->
         <path d="M 150 175 C 90 175, 60 175, 60 205" fill="none" stroke="currentColor" stroke-width="1.5"/>
-        <rect x="14" y="215" width="176" height="52" rx="10" fill="rgba(110,231,183,.09)" stroke="#2C7A56" stroke-width="1.4"/>
-        <text x="102" y="238" text-anchor="middle" font-size="12" font-weight="600" fill="#2C7A56">上線提供服務</text>
-        <text x="102" y="256" text-anchor="middle" font-size="10.5" fill="#2C7A56" opacity=".82">見「怎麼上線」一節</text>
+        <rect x="14" y="215" width="176" height="52" rx="10" stroke-width="1.4" style="fill:color-mix(in srgb, var(--up) 9%, transparent);stroke:var(--up)"/>
+        <text x="102" y="238" text-anchor="middle" font-size="12" font-weight="600" style="fill:var(--up)">上線提供服務</text>
+        <text x="102" y="256" text-anchor="middle" font-size="10.5" opacity=".82" style="fill:var(--up)">見「怎麼上線」一節</text>
 
         <!-- 飛輪回流 -->
-        <path d="M 190 241 C 420 241, 500 241, 600 241" fill="none" stroke="#2C7A56" stroke-width="1.5"
-              stroke-dasharray="6 5" marker-end="url(#ar3g)"/>
-        <rect x="604" y="215" width="202" height="52" rx="10" fill="rgba(110,231,183,.06)" stroke="#2C7A56" stroke-width="1.2" stroke-dasharray="4 4"/>
-        <text x="705" y="238" text-anchor="middle" font-size="11.5" font-weight="600" fill="#2C7A56">nlp_parses 的使用者修正</text>
-        <text x="705" y="256" text-anchor="middle" font-size="10.5" fill="#2C7A56" opacity=".8">回流成下一輪訓練資料</text>
+        <path d="M 190 241 C 420 241, 500 241, 600 241" fill="none" stroke-width="1.5"
+              stroke-dasharray="6 5" marker-end="url(#ar3g)" style="stroke:var(--up)"/>
+        <rect x="604" y="215" width="202" height="52" rx="10" stroke-width="1.2" stroke-dasharray="4 4" style="fill:color-mix(in srgb, var(--up) 6%, transparent);stroke:var(--up)"/>
+        <text x="705" y="238" text-anchor="middle" font-size="11.5" font-weight="600" style="fill:var(--up)">nlp_parses 的使用者修正</text>
+        <text x="705" y="256" text-anchor="middle" font-size="10.5" opacity=".8" style="fill:var(--up)">回流成下一輪訓練資料</text>
       </svg>
     </div>
     <figcaption>
@@ -950,6 +873,6 @@ pre i { color:var(--ink-faint); font-style:normal; }
 </footer>
 
 </div>
-<script src="docs.js?v=3"></script>
+<script src="docs.js?v=4"></script>
 </body>
 </html>

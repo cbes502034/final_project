@@ -7,27 +7,31 @@
 <meta name="description" content="這個專案的檔案系統：整棵目錄樹、每個路徑放什麼、工具箱有哪些工具。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Pacifico&family=Huninn&display=swap">
+<!-- 跟系統同一套主題：在系統裡選了什麼，文件就是什麼顏色 -->
+<script>
+  (function () {
+    /* 另外要載字體的兩套，跟 ../js/data.js 的 themes[].font 一樣（有測試對齊） */
+    var FONT = { literary: 'LXGW+WenKai+TC:wght@400;700', cute: 'Huninn' };
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+        if (FONT[t]) document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + FONT[t] + '&display=swap">');
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="../css/tokens.css?v=144">
+<link rel="stylesheet" href="../css/themes.css?v=144">
+<link rel="stylesheet" href="docs.css?v=13">
 <style>
-/* ---- 檔案系統說明書：用青色，跟 FastAPI 綠、RESTful 紫、手冊藍分開 ---- */
-.fs .sec__n { background: #1F6E82; color: #fff; }
-.fs h3.sub { border-left-color: #1F6E82; }
-.fs .hero__eyebrow { color: #1F6E82; }
-.fs .note { border-left-color: #1F6E82; }
-.fs .note--warn { border-left-color: var(--warn); }
-.fs .note--crit { border-left-color: var(--down); }
+/* ---- 檔案系統說明書：代表色是青（docs.css 的 .fs） ---- */
 
 /* 目錄樹 */
-pre.tree {
-  margin: 14px 0 0; padding: 16px 18px; overflow-x: auto;
-  border-radius: var(--r-sm); border: 1px solid var(--line);
-  background: var(--code-bg);
-  font-family: var(--mono); font-size: 12.5px; line-height: 1.95; color: var(--ink-soft);
-}
 pre.tree b   { color: var(--ink); font-weight: 500; }
 pre.tree i   { color: var(--ink-faint); font-style: normal; }
-pre.tree u   { color: #1F6E82; text-decoration: none; }
+pre.tree u   { color: var(--m3); text-decoration: none; }
 pre.tree s   { color: var(--warn); text-decoration: none; }
 pre.tree em  { color: var(--up); font-style: normal; }
 
@@ -42,9 +46,9 @@ pre.tree em  { color: var(--up); font-style: normal; }
 .vs__c { border-radius: var(--r-card); border: 1px solid var(--line); background: var(--card); padding: 16px 18px; }
 .vs__c h4 { margin: 0 0 8px; font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
 .vs__c p  { font-size: 13px; color: var(--ink-soft); }
-.vs--bad  { border-color: rgba(251,138,143,.3); }
+.vs--bad  { border-color: color-mix(in srgb, var(--down) 30%, transparent); }
 .vs--bad h4 { color: var(--down); }
-.vs--good { border-color: rgba(110,231,183,.3); }
+.vs--good { border-color: color-mix(in srgb, var(--up) 30%, transparent); }
 .vs--good h4 { color: var(--up); }
 
 /* 請求流程 */
@@ -56,13 +60,13 @@ pre.tree em  { color: var(--up); font-style: normal; }
 .fl__n {
   flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; z-index: 1;
   display: grid; place-items: center; font-family: var(--mono); font-size: 12px;
-  background: var(--card-3); border: 1px solid var(--line-2); color: #1F6E82;
+  background: var(--card-3); border: 1px solid var(--line-2); color: var(--m3);
 }
 .fl__b { flex: 1 1 auto; min-width: 0; padding-top: 3px; }
 .fl__t { font-family: var(--mono); font-size: 13px; color: var(--ink); }
 .fl__d { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
 
-td .fname { font-family: var(--mono); font-size: 12px; color: #1F6E82; }
+td .fname { font-family: var(--mono); font-size: 12px; color: var(--m3); }
 </style>
 </head>
 <body class="fs">
@@ -70,7 +74,7 @@ td .fname { font-family: var(--mono); font-size: 12px; color: #1F6E82; }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <div class="rail__mark" style="background:linear-gradient(135deg,#1F6E82,#3C5FA0)">檔</div>
+      <a class="rail__home" href="../index.html" aria-label="回到系統"><span class="rail__mark">FamBudget</span></a>
       <div>
         <div class="rail__t">檔案系統說明書</div>
         <div class="rail__s">專案結構</div>
@@ -103,6 +107,18 @@ td .fname { font-family: var(--mono); font-size: 12px; color: #1F6E82; }
         <div class="mchip"><span>對應</span><b class="mono">cbes502034/final_project</b></div>
       </div>
     </header>
+    <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
+    <section class="kp" aria-label="這一頁的重點">
+      <div class="kp__h"><span class="kp__ic" aria-hidden="true">★</span><span class="kp__t">這一頁的重點</span><span class="kp__s">只看這張卡，也能知道這份文件在講什麼</span></div>
+      <ul class="kp__l">
+      <li><b>兩個獨立的部分</b><span>frontend/ 純靜態、backend/ FastAPI，只靠 API 溝通</span></li>
+      <li><b>前端的資料入口</b><span>只有 js/api.js 碰資料，示範資料與真後端同一套簽名</span></li>
+      <li><b>後端分層</b><span>routers → services → models，每一層只跟相鄰的講話</span></li>
+      <li><b>toolkit/</b><span>已經寫好的工具，import 來用，不要改</span></li>
+      <li><b>找檔案</b><span>要改東西時，先查「每個路徑放什麼」那張表</span></li>
+      </ul>
+    </section>
+
 
     <!-- ============ 說明區：讀樹之前要知道的 ============ -->
     <section class="sec" id="read">
@@ -137,7 +153,7 @@ PostgreSQL
       <div class="tw">
         <table>
           <tbody>
-            <tr><td class="tight"><b style="color:#1F6E82">藍字 ★</b></td>
+            <tr><td class="tight"><b style="color:var(--m3)">藍字 ★</b></td>
                 <td>關鍵檔案，動工前先看過</td></tr>
             <tr><td class="tight"><b style="color:var(--up)">綠字</b></td>
                 <td><b>已經寫好、完整可用</b>，直接 import，不要改</td></tr>
@@ -292,6 +308,6 @@ PostgreSQL
   </main>
 </div>
 
-<script src="docs.js?v=3"></script>
+<script src="docs.js?v=4"></script>
 </body>
 </html>

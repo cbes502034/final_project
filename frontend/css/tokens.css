@@ -98,6 +98,9 @@
           "Microsoft JhengHei", sans-serif;
   --serif: "Noto Serif TC", "Songti TC", PMingLiU, Georgia, serif;
   --display: var(--serif);   /* 問候語、大數字、區塊標題。主題可以換成手寫或粉圓 */
+  /* 品牌字：草寫英文 ＋ 粉圓體。⚠️ 不跟主題換——換膚換的是顏色和形狀，名字要一眼認得 */
+  --font-script: "Pacifico", "Segoe Script", "Brush Script MT", cursive;
+  --font-cute: "Huninn", "jf-openhuninn-2.0", var(--sans);
   --mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, "Cascadia Mono",
           Consolas, monospace;
 

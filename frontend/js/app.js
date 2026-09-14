@@ -2422,7 +2422,7 @@
     document.body.classList.add('is-out');
     $view.innerHTML =
       '<div class="gate"><div class="gate__c">' +
-        '<div class="gate__b"><span class="brand__n">家庭記帳</span></div>' +
+        '<div class="gate__b"><span class="brand__m" aria-hidden="true">FamBudget</span><span class="brand__n">家庭記帳</span></div>' +
         '<h1 class="gate__t">' + title + '</h1>' +
         '<p class="gate__s">' + sub + '</p>' +
         inner +

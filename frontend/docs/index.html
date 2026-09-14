@@ -7,8 +7,24 @@
 <meta name="description" content="家庭記帳與財務控管系統的專題總文件：源起、功能清單、按人員分類的 API、系統架構、MVC 流程、資料庫設計與分工心智圖。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Pacifico&family=Huninn&display=swap">
+<!-- 跟系統同一套主題：在系統裡選了什麼，文件就是什麼顏色 -->
+<script>
+  (function () {
+    /* 另外要載字體的兩套，跟 ../js/data.js 的 themes[].font 一樣（有測試對齊） */
+    var FONT = { literary: 'LXGW+WenKai+TC:wght@400;700', cute: 'Huninn' };
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+        if (FONT[t]) document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + FONT[t] + '&display=swap">');
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="../css/tokens.css?v=144">
+<link rel="stylesheet" href="../css/themes.css?v=144">
+<link rel="stylesheet" href="docs.css?v=13">
 </head>
 <body>
 <div class="shell">
@@ -16,7 +32,7 @@
   <!-- ============ 側邊導覽 ============ -->
   <nav class="rail">
     <div class="rail__brand">
-      <div class="rail__mark">帳</div>
+      <a class="rail__home" href="../index.html" aria-label="回到系統"><span class="rail__mark">FamBudget</span></a>
       <div>
         <div class="rail__t">專題手冊</div>
         <div class="rail__s">FAMBUDGET</div>
@@ -62,6 +78,19 @@
         <div class="mchip"><span>資料表</span><b>19 張</b></div>
       </div>
     </header>
+    <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
+    <section class="kp" aria-label="這一頁的重點">
+      <div class="kp__h"><span class="kp__ic" aria-hidden="true">★</span><span class="kp__t">這一頁的重點</span><span class="kp__s">只看這張卡，也能知道這份文件在講什麼</span></div>
+      <ul class="kp__l">
+      <li><b>做什麼</b><span>以家庭為單位的記帳系統：每個人有自己的帳，家長照看家人</span></li>
+      <li><b>LLM 放哪</b><span>把一段話拆成好幾筆帳——拿掉模型，系統就回到手動輸入</span></li>
+      <li><b>怎麼分工</b><span>四個人各吃一條完整模組：認證、記帳、數字、家庭</span></li>
+      <li><b>系統架構</b><span>瀏覽器 → FastAPI → 資料庫／模型，每一層只跟相鄰的講話</span></li>
+      <li><b>資料庫</b><span>核心是 users 與 transactions；nlp_parses 記下每次解析與修正</span></li>
+      <li><b>評測</b><span>使用者每修正一次，就多一筆評測與訓練資料</span></li>
+      </ul>
+    </section>
+
 
     <!-- ============ 01 源起 ============ -->
     <section class="sec" id="origin">
@@ -718,7 +747,7 @@
 
         <div class="down"><span class="down__l">唯一的資料入口</span></div>
 
-        <div class="layer" style="border-color:rgba(108,159,251,.42)">
+        <div class="layer" style="border-color:color-mix(in srgb, var(--m1) 42%, transparent)">
           <div class="layer__h"><span class="layer__t">api.js 轉接層</span><span class="layer__s">mock ⇄ http 同簽章</span></div>
           <div class="boxes">
             <div class="box"><b>mockAdapter</b> 讀 data.js + localStorage</div>
@@ -886,7 +915,7 @@
       </p>
 
       <figure>
-        <div class="figbox"><svg viewBox="0 0 940 500" role="img" aria-label="十三張資料表的關聯圖，核心是 users 與 transactions，nlp_parses 與 savings_goals 是本專題新增的兩張" style="width:100%;height:auto;display:block"><line x1="185" y1="59" x2="470" y2="67" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="185" y1="139" x2="470" y2="67" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><text x="327.5" y="99" text-anchor="middle" font-size="9.5" fill="#7B8189">★存款目標</text><line x1="755" y1="151" x2="470" y2="67" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="755" y1="151" x2="755" y2="61" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="755" y1="241" x2="470" y2="67" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><text x="612.5" y="150" text-anchor="middle" font-size="9.5" fill="#7B8189">監管</text><line x1="185" y1="219" x2="470" y2="67" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="470" y2="67" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="755" y2="61" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="185" y2="219" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="470" y1="289" x2="185" y2="353" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="470" y1="421" x2="470" y2="289" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><text x="470" y="351" text-anchor="middle" font-size="9.5" fill="#7B8189">★評測</text><line x1="755" y1="353" x2="755" y2="61" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="755" y1="353" x2="185" y2="353" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="755" y1="443" x2="755" y2="61" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><line x1="185" y1="453" x2="470" y2="67" stroke="#4A5BA8" stroke-width="1" opacity=".28"/><rect x="385" y="36" width="170" height="62" rx="9" fill="rgba(108,159,251,.13)" stroke="#3C5FA0" stroke-width="1.6"/><text x="470" y="60" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#2F5E9E">users</text><text x="470" y="78" text-anchor="middle" font-size="10" fill="#2F5E9E" opacity=".72">使用者帳號</text><text x="470" y="92" text-anchor="middle" font-size="9.5" fill="#2F5E9E" opacity=".55">7 欄</text><rect x="110" y="116" width="150" height="46" rx="9" fill="rgba(251,191,110,.11)" stroke="#8C5409" stroke-width="1.6"/><text x="185" y="135" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#8C5409">savings_goals</text><text x="185" y="150" text-anchor="middle" font-size="10" fill="#8C5409" opacity=".72">每月存款目標</text><rect x="110" y="36" width="150" height="46" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="185" y="55" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">sessions</text><text x="185" y="70" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">登入工作階段</text><rect x="670" y="36" width="170" height="50" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="755" y="55" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">families</text><text x="755" y="70" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">家庭</text><rect x="670" y="126" width="170" height="50" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="755" y="145" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">family_members</text><text x="755" y="160" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">家庭成員與角色</text><rect x="670" y="216" width="170" height="50" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="755" y="235" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">guardianships</text><text x="755" y="250" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">監管關係</text><rect x="110" y="196" width="150" height="46" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="185" y="215" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">accounts</text><text x="185" y="230" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">帳戶／錢包</text><rect x="110" y="330" width="150" height="46" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="185" y="349" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">categories</text><text x="185" y="364" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">分類</text><rect x="385" y="256" width="170" height="66" rx="9" fill="rgba(108,159,251,.13)" stroke="#3C5FA0" stroke-width="1.6"/><text x="470" y="280" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#2F5E9E">transactions</text><text x="470" y="298" text-anchor="middle" font-size="10" fill="#2F5E9E" opacity=".72">收支明細</text><text x="470" y="312" text-anchor="middle" font-size="9.5" fill="#2F5E9E" opacity=".55">13 欄</text><rect x="385" y="396" width="170" height="50" rx="9" fill="rgba(251,191,110,.11)" stroke="#8C5409" stroke-width="1.6"/><text x="470" y="415" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#8C5409">nlp_parses</text><text x="470" y="430" text-anchor="middle" font-size="10" fill="#8C5409" opacity=".72">自然語言記帳解析紀錄</text><rect x="670" y="330" width="170" height="46" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="755" y="349" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">budgets</text><text x="755" y="364" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">預算</text><rect x="670" y="420" width="170" height="46" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="755" y="439" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">advices</text><text x="755" y="454" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">LLM 財務建議</text><rect x="110" y="430" width="150" height="46" rx="9" fill="rgba(27,29,33,.03)" stroke="#686D75" stroke-width="1.1"/><text x="185" y="449" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" fill="#4E535A">audit_logs</text><text x="185" y="464" text-anchor="middle" font-size="10" fill="#4E535A" opacity=".72">稽核紀錄</text></svg></div>
+        <div class="figbox"><svg viewBox="0 0 940 500" role="img" aria-label="十三張資料表的關聯圖，核心是 users 與 transactions，nlp_parses 與 savings_goals 是本專題新增的兩張" style="width:100%;height:auto;display:block"><line x1="185" y1="59" x2="470" y2="67" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="185" y1="139" x2="470" y2="67" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><text x="327.5" y="99" text-anchor="middle" font-size="9.5" style="fill:var(--ink-faint)">★存款目標</text><line x1="755" y1="151" x2="470" y2="67" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="755" y1="151" x2="755" y2="61" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="755" y1="241" x2="470" y2="67" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><text x="612.5" y="150" text-anchor="middle" font-size="9.5" style="fill:var(--ink-faint)">監管</text><line x1="185" y1="219" x2="470" y2="67" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="470" y1="289" x2="470" y2="67" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="470" y1="289" x2="755" y2="61" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="470" y1="289" x2="185" y2="219" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="470" y1="289" x2="185" y2="353" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="470" y1="421" x2="470" y2="289" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><text x="470" y="351" text-anchor="middle" font-size="9.5" style="fill:var(--ink-faint)">★評測</text><line x1="755" y1="353" x2="755" y2="61" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="755" y1="353" x2="185" y2="353" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="755" y1="443" x2="755" y2="61" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><line x1="185" y1="453" x2="470" y2="67" stroke-width="1" opacity=".28" style="stroke:var(--m1)"/><rect x="385" y="36" width="170" height="62" rx="9" stroke-width="1.6" style="fill:color-mix(in srgb, var(--m1) 13%, transparent);stroke:var(--m1)"/><text x="470" y="60" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--info)">users</text><text x="470" y="78" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--info)">使用者帳號</text><text x="470" y="92" text-anchor="middle" font-size="9.5" opacity=".55" style="fill:var(--info)">7 欄</text><rect x="110" y="116" width="150" height="46" rx="9" stroke-width="1.6" style="fill:color-mix(in srgb, var(--warn) 11%, transparent);stroke:var(--warn-ink)"/><text x="185" y="135" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--warn-ink)">savings_goals</text><text x="185" y="150" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--warn-ink)">每月存款目標</text><rect x="110" y="36" width="150" height="46" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="185" y="55" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">sessions</text><text x="185" y="70" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">登入工作階段</text><rect x="670" y="36" width="170" height="50" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="755" y="55" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">families</text><text x="755" y="70" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">家庭</text><rect x="670" y="126" width="170" height="50" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="755" y="145" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">family_members</text><text x="755" y="160" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">家庭成員與角色</text><rect x="670" y="216" width="170" height="50" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="755" y="235" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">guardianships</text><text x="755" y="250" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">監管關係</text><rect x="110" y="196" width="150" height="46" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="185" y="215" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">accounts</text><text x="185" y="230" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">帳戶／錢包</text><rect x="110" y="330" width="150" height="46" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="185" y="349" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">categories</text><text x="185" y="364" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">分類</text><rect x="385" y="256" width="170" height="66" rx="9" stroke-width="1.6" style="fill:color-mix(in srgb, var(--m1) 13%, transparent);stroke:var(--m1)"/><text x="470" y="280" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--info)">transactions</text><text x="470" y="298" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--info)">收支明細</text><text x="470" y="312" text-anchor="middle" font-size="9.5" opacity=".55" style="fill:var(--info)">13 欄</text><rect x="385" y="396" width="170" height="50" rx="9" stroke-width="1.6" style="fill:color-mix(in srgb, var(--warn) 11%, transparent);stroke:var(--warn-ink)"/><text x="470" y="415" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--warn-ink)">nlp_parses</text><text x="470" y="430" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--warn-ink)">自然語言記帳解析紀錄</text><rect x="670" y="330" width="170" height="46" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="755" y="349" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">budgets</text><text x="755" y="364" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">預算</text><rect x="670" y="420" width="170" height="46" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="755" y="439" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">advices</text><text x="755" y="454" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">LLM 財務建議</text><rect x="110" y="430" width="150" height="46" rx="9" stroke-width="1.1" style="fill:color-mix(in srgb, var(--ink) 3%, transparent);stroke:var(--ink-faint)"/><text x="185" y="449" text-anchor="middle" font-size="11.5" font-weight="600" font-family="var(--mono)" style="fill:var(--ink-soft)">audit_logs</text><text x="185" y="464" text-anchor="middle" font-size="10" opacity=".72" style="fill:var(--ink-soft)">稽核紀錄</text></svg></div>
         <figcaption>
           <b>藍色是核心、橘色是本專題新增的兩張。</b>
           <code>nlp_parses</code> 記下每一次的原始輸入、模型輸出與使用者修正值，
@@ -1012,25 +1041,25 @@
      葉節點先各佔一格，父節點取子節點的中線，所以連線不會交叉
      ============================================================ */
   var TREE = [
-    { dom: '認證', c: '#3C5FA0', api: '17 支', branch: 'm1-auth', groups: [
+    { dom: '認證', c: 'var(--m1)', api: '17 支', branch: 'm1-auth', groups: [
       { k: '資料表', items: ['users', 'sessions'] },
       { k: 'API', items: ['註冊 / 登入 / 登出', '密碼與工作階段'] },
       { k: '畫面', items: ['註冊與登入', '個人資料與大頭貼'] },
       { k: '共用', llm: true, items: ['core 設定與資料庫', 'core 密碼與 JWT', 'core 依賴注入', 'llm 呼叫層'] }
     ]},
-    { dom: '記帳', c: '#6A5B9E', api: '18 支', branch: 'm2-ledger', groups: [
+    { dom: '記帳', c: 'var(--m2)', api: '18 支', branch: 'm2-ledger', groups: [
       { k: '資料表', items: ['transactions', 'accounts', 'nlp_parses'] },
       { k: 'API', items: ['明細 CRUD', 'nlp 單句解析', 'nlp 段落解析', 'nlp 確認寫入'] },
       { k: '畫面', items: ['段落記帳', '單筆手動', '缺欄位提示'] },
       { k: 'LLM', llm: true, items: ['段落切分策略', '欄位抽取 prompt', '低信心判準'] }
     ]},
-    { dom: '數字', c: '#1F6E82', api: '13 支', branch: 'm3-analytics', groups: [
+    { dom: '數字', c: 'var(--m3)', api: '13 支', branch: 'm3-analytics', groups: [
       { k: '資料表', items: ['categories', 'budgets', 'savings_goals', 'advices'] },
       { k: 'API', items: [{ t: '分類體系 ⚑', flag: true }, '摘要與統計', '預算與存款目標', '財務建議'] },
       { k: '畫面', items: ['總覽（我／全家）', '統計圖表', '建議卡片'] },
       { k: 'LLM', llm: true, items: ['建議生成 prompt', '邊界規則'] }
     ]},
-    { dom: '家庭', c: '#2C7A56', api: '20 支', branch: 'm4-access', groups: [
+    { dom: '家庭', c: 'var(--m4)', api: '20 支', branch: 'm4-access', groups: [
       { k: '資料表', items: ['families', 'family_members', 'guardianships', 'audit_logs', 'notifications'] },
       { k: 'API', items: ['家庭綁定（邀請碼、用帳號邀請）', '成員角色', '監管關係'] },
       { k: '畫面', items: ['家庭成員與邀請', '監管通知鈴鐺', '成員紀錄（唯讀）'] },
@@ -1068,7 +1097,7 @@
     function edge(x1, y1, x2, y2, color, w, op) {
       var mx = (x1 + x2) / 2;
       return '<path d="M ' + x1 + ' ' + y1 + ' C ' + mx + ' ' + y1 + ', ' +
-        mx + ' ' + y2 + ', ' + x2 + ' ' + y2 + '" fill="none" stroke="' + color +
+        mx + ' ' + y2 + ', ' + x2 + ' ' + y2 + '" fill="none" style="stroke:' + color +
         '" stroke-width="' + w + '" opacity="' + op + '" stroke-linecap="round"/>';
     }
 
@@ -1230,6 +1259,6 @@
 })();
 
 </script>
-<script src="docs.js?v=3"></script>
+<script src="docs.js?v=4"></script>
 </body>
 </html>

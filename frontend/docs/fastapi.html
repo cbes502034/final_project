@@ -7,33 +7,35 @@
 <meta name="description" content="從零開始教會沒學過 FastAPI 的人：後端在做什麼、路由、Pydantic、依賴注入、資料庫、登入，全部用本專案的真實程式碼當例子。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Pacifico&family=Huninn&display=swap">
+<!-- 跟系統同一套主題：在系統裡選了什麼，文件就是什麼顏色 -->
+<script>
+  (function () {
+    /* 另外要載字體的兩套，跟 ../js/data.js 的 themes[].font 一樣（有測試對齊） */
+    var FONT = { literary: 'LXGW+WenKai+TC:wght@400;700', cute: 'Huninn' };
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+        if (FONT[t]) document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + FONT[t] + '&display=swap">');
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="../css/tokens.css?v=144">
+<link rel="stylesheet" href="../css/themes.css?v=144">
+<link rel="stylesheet" href="docs.css?v=13">
 <style>
-/* ---- FastAPI 說明書：用綠色當主色，跟手冊的藍、模型頁的琥珀分開 ---- */
-.fa .sec__n { background: var(--up); color: #fff; }
-.fa h3.sub { border-left-color: var(--up); }
-.fa .hero__eyebrow { color: var(--up); }
-.fa .nav a i { color: rgba(230, 240, 236, .7); }
-.fa .note { border-left-color: var(--up); }
-.fa .note--warn { border-left-color: var(--warn); }
-.fa .note--crit { border-left-color: var(--down); }
+/* ---- FastAPI 說明書：代表色是綠（docs.css 的 .fa） ---- */
 
 /* 程式碼區塊 */
-pre.py {
-  margin: 14px 0 0; padding: 15px 17px; overflow-x: auto;
-  border-radius: var(--r-sm); border: 1px solid var(--line);
-  background: var(--code-bg);
-  font-family: var(--mono); font-size: 12.5px; line-height: 1.85; color: var(--ink-soft);
-  tab-size: 4;
-}
-pre.py .tk-kw { color: #7A3E9D; }         /* 關鍵字 */
-pre.py .tk-st { color: #2F5E9E; }         /* 字串 */
-pre.py .tk-cm { color: #686D75; font-style: italic; }  /* 註解 */
-pre.py .tk-dc { color: #2C7A56; }         /* 裝飾器 */
-pre.py .tk-fn { color: #8C5409; }         /* 函式名 */
-pre.py .tk-nm { color: #1F6E82; }         /* 數字 */
-pre.py b.hi { color: var(--ink); font-weight: 500; background: rgba(110,231,183,.14);
+pre.py .tk-kw { color: var(--book-violet); }         /* 關鍵字 */
+pre.py .tk-st { color: var(--info); }         /* 字串 */
+pre.py .tk-cm { color: var(--ink-faint); font-style: italic; }  /* 註解 */
+pre.py .tk-dc { color: var(--up); }         /* 裝飾器 */
+pre.py .tk-fn { color: var(--warn-ink); }         /* 函式名 */
+pre.py .tk-nm { color: var(--m3); }         /* 數字 */
+pre.py b.hi { color: var(--ink); font-weight: 500; background: color-mix(in srgb, var(--up) 14%, transparent);
               padding: 0 3px; border-radius: 3px; }
 
 .codelabel {
@@ -48,9 +50,9 @@ pre.py b.hi { color: var(--ink); font-weight: 500; background: rgba(110,231,183,
 .vs__c { border-radius: var(--r-card); border: 1px solid var(--line); background: var(--card); padding: 16px 18px; }
 .vs__c h4 { margin: 0 0 8px; font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
 .vs__c p { font-size: 13px; color: var(--ink-soft); }
-.vs--bad { border-color: rgba(251,138,143,.3); }
+.vs--bad { border-color: color-mix(in srgb, var(--down) 30%, transparent); }
 .vs--bad h4 { color: var(--down); }
-.vs--good { border-color: rgba(110,231,183,.3); }
+.vs--good { border-color: color-mix(in srgb, var(--up) 30%, transparent); }
 .vs--good h4 { color: var(--up); }
 
 /* 請求流程圖 */
@@ -76,7 +78,7 @@ td .fname { font-family: var(--mono); font-size: 12px; color: var(--up); }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <div class="rail__mark" style="background:linear-gradient(135deg,#2C7A56,#1F6E82)">F</div>
+      <a class="rail__home" href="../index.html" aria-label="回到系統"><span class="rail__mark">FamBudget</span></a>
       <div>
         <div class="rail__t">FastAPI 說明書</div>
         <div class="rail__s">從零開始</div>
@@ -121,6 +123,19 @@ td .fname { font-family: var(--mono); font-size: 12px; color: var(--up); }
         <div class="mchip"><span>對應程式碼</span><b class="mono">backend/</b></div>
       </div>
     </header>
+    <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
+    <section class="kp" aria-label="這一頁的重點">
+      <div class="kp__h"><span class="kp__ic" aria-hidden="true">★</span><span class="kp__t">這一頁的重點</span><span class="kp__s">只看這張卡，也能知道這份文件在講什麼</span></div>
+      <ul class="kp__l">
+      <li><b>後端做什麼</b><span>聽前端的問題、查資料庫、給答案；密碼和權限只能在這裡檢查</span></li>
+      <li><b>一支 API</b><span>一個方法 ＋ 一個路徑，例如 GET /api/transactions</span></li>
+      <li><b>收資料</b><span>路徑參數指定哪一個、查詢參數做篩選、請求主體送整包</span></li>
+      <li><b>Pydantic</b><span>型別標註變成真的會執行的驗證，輸入輸出都擋</span></li>
+      <li><b>依賴注入</b><span>宣告需要什麼（資料庫、目前使用者），FastAPI 幫你準備</span></li>
+      <li><b>你要改哪裡</b><span>routers 收發、services 寫邏輯、models 定義資料表，照 TODO 填</span></li>
+      </ul>
+    </section>
+
 
     <!-- ============ 01 ============ -->
     <section class="sec" id="why">
@@ -895,6 +910,6 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
   </main>
 </div>
 
-<script src="docs.js?v=3"></script>
+<script src="docs.js?v=4"></script>
 </body>
 </html>

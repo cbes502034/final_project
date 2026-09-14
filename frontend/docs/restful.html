@@ -7,23 +7,27 @@
 <meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 38 支路由哪裡符合、哪裡故意不符合。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="docs.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Pacifico&family=Huninn&display=swap">
+<!-- 跟系統同一套主題：在系統裡選了什麼，文件就是什麼顏色 -->
+<script>
+  (function () {
+    /* 另外要載字體的兩套，跟 ../js/data.js 的 themes[].font 一樣（有測試對齊） */
+    var FONT = { literary: 'LXGW+WenKai+TC:wght@400;700', cute: 'Huninn' };
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) {
+        document.documentElement.setAttribute('data-theme', t);
+        if (FONT[t]) document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + FONT[t] + '&display=swap">');
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="../css/tokens.css?v=144">
+<link rel="stylesheet" href="../css/themes.css?v=144">
+<link rel="stylesheet" href="docs.css?v=13">
 <style>
-/* ---- RESTful 說明書：用紫色，跟 FastAPI 的綠、手冊的藍分開 ---- */
-.rs .sec__n { background: var(--accent-2); color: #fff; }
-.rs h3.sub { border-left-color: var(--accent-2); }
-.rs .hero__eyebrow { color: var(--accent-2); }
-.rs .note { border-left-color: var(--accent-2); }
-.rs .note--warn { border-left-color: var(--warn); }
-.rs .note--crit { border-left-color: var(--down); }
+/* ---- RESTful 說明書：代表色是紫（docs.css 的 .rs） ---- */
 
-pre.code2 {
-  margin: 14px 0 0; padding: 15px 17px; overflow-x: auto;
-  border-radius: var(--r-sm); border: 1px solid var(--line);
-  background: var(--code-bg);
-  font-family: var(--mono); font-size: 12.5px; line-height: 1.9; color: var(--ink-soft);
-}
 pre.code2 b.ok { color: var(--up); font-weight: 500; }
 pre.code2 b.no { color: var(--down); font-weight: 500; }
 pre.code2 i  { color: var(--ink-faint); font-style: normal; }
@@ -40,16 +44,16 @@ pre.code2 u  { color: var(--accent-hi); text-decoration: none; }
 .vs__c { border-radius: var(--r-card); border: 1px solid var(--line); background: var(--card); padding: 16px 18px; }
 .vs__c h4 { margin: 0 0 8px; font-family: var(--serif); font-size: 14.5px; font-weight: 600; }
 .vs__c p  { font-size: 13px; color: var(--ink-soft); }
-.vs--bad  { border-color: rgba(251,138,143,.3); }
+.vs--bad  { border-color: color-mix(in srgb, var(--down) 30%, transparent); }
 .vs--bad h4 { color: var(--down); }
-.vs--good { border-color: rgba(110,231,183,.3); }
+.vs--good { border-color: color-mix(in srgb, var(--up) 30%, transparent); }
 .vs--good h4 { color: var(--up); }
 
 /* 圖書館比喻用的小卡 */
 .lib { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 16px; }
 .lib__c {
-  padding: 14px 16px; border-radius: var(--r-card);
-  background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--k);
+  padding: 14px 16px; border-radius: var(--r-input);
+  background: var(--card-2); border: 1px solid var(--line); border-left: 3px solid var(--k);
 }
 .lib__v { font-family: var(--mono); font-size: 12px; color: var(--k); font-weight: 700; }
 .lib__p { font-family: var(--mono); font-size: 12.5px; color: var(--ink); margin: 4px 0 6px; }
@@ -65,7 +69,7 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <div class="rail__mark" style="background:linear-gradient(135deg,#6A5B9E,#3C5FA0)">R</div>
+      <a class="rail__home" href="../index.html" aria-label="回到系統"><span class="rail__mark">FamBudget</span></a>
       <div>
         <div class="rail__t">RESTful 說明書</div>
         <div class="rail__s">API 設計</div>
@@ -108,6 +112,19 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
         <div class="mchip"><span>本專案</span><b>38 支路由</b></div>
       </div>
     </header>
+    <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
+    <section class="kp" aria-label="這一頁的重點">
+      <div class="kp__h"><span class="kp__ic" aria-hidden="true">★</span><span class="kp__t">這一頁的重點</span><span class="kp__s">只看這張卡，也能知道這份文件在講什麼</span></div>
+      <ul class="kp__l">
+      <li><b>一句話</b><span>網址講「對誰做」，HTTP 方法講「做什麼」</span></li>
+      <li><b>網址</b><span>用名詞、複數、小寫；不要把動詞寫進網址</span></li>
+      <li><b>PUT 與 PATCH</b><span>PUT 整份換掉，PATCH 只改送來的欄位</span></li>
+      <li><b>狀態碼</b><span>失敗就回對的狀態碼，不要一律 200 再寫 success: false</span></li>
+      <li><b>冪等</b><span>GET、PUT、DELETE 做幾次結果都一樣；POST 不是</span></li>
+      <li><b>可以破例</b><span>REST 是指引不是法律，表達不了的動作可以用動詞</span></li>
+      </ul>
+    </section>
+
 
     <!-- ============ 01 ============ -->
     <section class="sec" id="what">
@@ -163,32 +180,32 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
       </p>
 
       <div class="lib">
-        <div class="lib__c" style="--k:#2C7A56">
+        <div class="lib__c" style="--k:var(--up)">
           <div class="lib__v">GET</div>
           <div class="lib__p">/books</div>
           <div class="lib__d">給我書單</div>
         </div>
-        <div class="lib__c" style="--k:#2C7A56">
+        <div class="lib__c" style="--k:var(--up)">
           <div class="lib__v">GET</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">給我第 5 本書</div>
         </div>
-        <div class="lib__c" style="--k:#3C5FA0">
+        <div class="lib__c" style="--k:var(--m1)">
           <div class="lib__v">POST</div>
           <div class="lib__p">/books</div>
           <div class="lib__d">進一本新書</div>
         </div>
-        <div class="lib__c" style="--k:#8C5409">
+        <div class="lib__c" style="--k:var(--warn-ink)">
           <div class="lib__v">PATCH</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">改第 5 本的書名</div>
         </div>
-        <div class="lib__c" style="--k:#6A5B9E">
+        <div class="lib__c" style="--k:var(--m2)">
           <div class="lib__v">PUT</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">把第 5 本整本換掉</div>
         </div>
-        <div class="lib__c" style="--k:#A83A31">
+        <div class="lib__c" style="--k:var(--down)">
           <div class="lib__v">DELETE</div>
           <div class="lib__p">/books/5</div>
           <div class="lib__d">報廢第 5 本</div>
@@ -702,6 +719,6 @@ DELETE /books/5
   </main>
 </div>
 
-<script src="docs.js?v=3"></script>
+<script src="docs.js?v=4"></script>
 </body>
 </html>

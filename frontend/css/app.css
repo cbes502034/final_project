@@ -3615,3 +3615,31 @@ body.is-admin .acctm__h { pointer-events: none; }
   #view .tdy__l { grid-template-columns: minmax(0, 1fr); }
   #view .tdy__l li:nth-child(odd) { border-right: 0; }
 }
+
+
+/* ============================================================
+   品牌：印著專案名稱的草寫徽章 ＋ 粉圓體「家庭記帳」
+   ------------------------------------------------------------
+   ⚠️ 2026-09-14 改。原本是一個方塊裡寫「帳」、旁邊襯線體的「家庭記帳」，
+   使用者覺得老土。現在徽章上是草寫的 FamBudget，中文名稱用圓滾滾的粉圓體。
+   品牌字體不跟主題換，顏色和圓角跟著主題。
+   ============================================================ */
+.brand__m,
+.appbar__brand .brand__m,
+.gate__b .brand__m {
+  width: auto; height: 34px; flex: 0 0 auto; padding: 0 14px 3px;
+  display: inline-grid; place-items: center; white-space: nowrap;
+  font-family: var(--font-script); font-size: 18px; font-weight: 400; line-height: 1; letter-spacing: .01em;
+  color: var(--on-accent); background: var(--accent); border-radius: var(--r-pill);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+.appbar__n,
+.gate__b .brand__n {
+  font-family: var(--font-cute); font-size: 18px; font-weight: 400; letter-spacing: .06em; color: var(--ink);
+}
+.gate__b { gap: 10px; }
+.gate__b .brand__m { height: 30px; padding: 0 12px 2px; font-size: 16px; }
+.gate__b .brand__n { font-size: 16px; }
+@media (max-width: 560px) {
+  .appbar__brand .brand__m { height: 32px; padding: 0 12px 3px; font-size: 16.5px; }
+}
