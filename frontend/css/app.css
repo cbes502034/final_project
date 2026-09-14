@@ -3557,6 +3557,18 @@ body.is-admin .acctm__h { pointer-events: none; }
 #view .card, #view .lgl, #view .mt, #view .found, #view .invc, #view .leave, #view .nudge,
 #view .pcard, #view .fam0, .gate__c, .hp__c { border-radius: var(--r-card); }
 #view .card--flush, #view .lgl, #view .txw { overflow: hidden; }
+/* ⚠️ 上面這條會蓋掉窄螢幕「卡片裡的表格可以左右滑」的規則，表格最右一欄就被切掉了。
+   overflow-x: auto 一樣會把內容裁在圓角裡，所以窄螢幕改回可以滑 */
+@media (max-width: 640px) {
+  #view .card--flush { overflow-x: auto; }
+}
+/* 手機：收支對照的「存下」只留百分比，五欄才放得進 375 寬 */
+@media (max-width: 420px) {
+  #view .dt th, #view .dt td { padding-left: 10px; padding-right: 10px; }
+  #view .dt__bar { min-width: 0; }
+  #view .dt__bar .mbar { display: none; }
+  #view .dt__bar em { margin-left: 0; }
+}
 .seg { overflow: hidden; border-radius: var(--r-input); }
 .seg__b { border-radius: var(--r-card); }
 #view .btn, .btn, #view .fold__b, #view .fsel select, #view .fsel input, #view .fld input, #view .fld select,
