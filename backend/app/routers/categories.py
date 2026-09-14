@@ -52,6 +52,7 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
 
     POST /api/categories
 
-    名稱 1～10 字、同 kind 不重複（409）。
+    只有家長（守衛擋好）；名稱 1～10 字（422）、同 kind 跟系統或我們家已有的重名回 409。
+    回新的分類：custom=true、familyId、color 一律 cat-other、icon 取第一個字。
     """
     raise not_ready("POST /api/categories", OWNER)

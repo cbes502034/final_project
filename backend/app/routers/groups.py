@@ -52,7 +52,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
 
     POST /api/groups
 
-    建立者自動寫一筆 group_members；temp 要有 endsOn。
+    建立者自動寫一筆 group_members；temp 要有 endsOn；同一個家庭裡重名（含封存的）回 409。
     """
     raise not_ready("POST /api/groups", OWNER)
 
@@ -68,7 +68,7 @@ def update_group(
 
     PATCH /api/groups/{gid}
 
-    守衛已經確認是建立的人。
+    守衛已經確認是建立的人。可以改 name／color／note；archived: false = 復原封存；同一個家庭裡重名回 409。
     """
     raise not_ready("PATCH /api/groups/{gid}", OWNER)
 

@@ -65,7 +65,7 @@ def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
 
     POST /api/nlp/confirm
 
-    source = nlp；同時寫 nlp_parses（原文、模型輸出、使用者改過的值）。
+    source = nlp；同時寫 nlp_parses（raw、model_output = orig、user_corrected = 跟 orig 不一樣的欄位）。
     """
     raise not_ready("POST /api/nlp/confirm", OWNER)
 

@@ -39,7 +39,7 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
 
     GET /api/budgets
 
-    used 一律從明細算；pct／over 前端會自己算。
+    used 一律從明細算；pct／over／catName／userName 前端會自己補。只回看得到的人（visible）。
     """
     raise not_ready("GET /api/budgets", OWNER)
 
@@ -52,7 +52,8 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
 
     PUT /api/budgets
 
-    只設自己的；只能設在支出分類。
+    只設自己的（不收 userId）；只能設在支出分類（400）；limit 0 = 刪掉那一列；period 只能 month／year。
+    同一個人、分類、週期只有一列：crud.save(..., where=..., upsert=True)。
     """
     raise not_ready("PUT /api/budgets", OWNER)
 

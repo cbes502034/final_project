@@ -70,7 +70,7 @@
         <div class="mchip"><span>原始碼</span><b class="mono">cbes502034/final_project</b></div>
         <div class="mchip"><span>技術棧</span><b>FastAPI · PostgreSQL · 純靜態前端</b></div>
         <div class="mchip"><span>API</span><b>70 支路由</b></div>
-        <div class="mchip"><span>資料表</span><b>19 張</b></div>
+        <div class="mchip"><span>資料表</span><b>20 張</b></div>
       </div>
     </header>
     <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
@@ -203,7 +203,7 @@
           <div class="step__n">W1</div>
           <div class="step__b">
             <div class="step__t">地基與標註同時開始</div>
-            <div class="step__d"><b>後端</b>　core/ 能動、每個人的前幾支路由打得通<br><b>模型</b>　標註 150 筆（不用寫程式，每人每天 1 小時）</div>
+            <div class="step__d"><b>後端</b>　地基已經做好（toolkit、guards、models）：每個人拿掉前幾支的 @stub、打得通<br><b>模型</b>　標註 150 筆（不用寫程式，每人每天 1 小時）</div>
           </div>
         </div>
         <div class="step">
@@ -288,7 +288,7 @@
             <tr><td class="num">A5</td><td>密碼雜湊</td><td>bcrypt 或 argon2，<b>絕不存明碼</b></td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">A6</td><td>修改密碼</td><td>需驗證舊密碼，並讓所有其他工作階段失效</td><td><span class="tag tag--s">S</span></td></tr>
             <tr><td class="num">A7</td><td>忘記密碼</td><td>寄一次性的重設連結（Brevo HTTP API）：30 分鐘失效、只能用一次，改完登出所有裝置。<b>有沒有這個帳號都回同一句話</b></td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">A8</td><td>查看登入裝置</td><td>列出有效 session，可個別登出</td><td><span class="tag tag--s">S</span></td></tr>
+            <tr><td class="num">A8</td><td>查看登入裝置</td><td>列出有效 session，一鍵登出所有裝置（改密碼時其他裝置也會登出）</td><td><span class="tag tag--s">S</span></td></tr>
             <tr><td class="num">A9</td><td><b>個人資料</b></td><td>修改顯示名稱、出生年。<b>email 不開放改</b>（那是登入帳號）</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">A10</td><td><b>上傳大頭貼</b></td><td>前端 canvas 縮到 256×256 再上傳，後端驗證後存資料庫</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">A11</td><td>移除大頭貼</td><td>退回顯示文字頭像</td><td><span class="tag tag--m">M</span></td></tr>
@@ -301,7 +301,7 @@
         <div class="note__k">大頭貼不能存檔案系統</div>
         <p><b>Render 的磁碟是暫時性的</b> —— 檔案寫進去，服務重新部署或重啟之後就不見了，
         免費方案沒有持久磁碟。<br>
-        所以大頭貼要<b>存進資料庫</b>（<code>users.avatar_blob</code>）。
+        所以大頭貼要<b>存進資料庫</b>（<code>users.avatar_bytes</code> ＋ <code>avatar_mime</code>）。
         縮到 256×256 之後大約 20~50 KB，完全沒問題。<br>
         <b>縮圖在前端做</b>，後端縮圖要裝 Pillow，映像檔會大好幾十 MB；
         瀏覽器的 canvas 一行 <code>toBlob()</code> 就搞定。</p>
@@ -314,12 +314,14 @@
           <tbody>
             <tr><td class="num">B1</td><td>建立家庭</td><td>建立的人成為家長；一個人同時只屬於一個家庭</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B2</td><td>邀請家人</td><td>兩種方式：<b>邀請碼</b>（只能用一次、七天過期），或<b>輸入完整 email 找人送出邀請</b>。身分由家長決定</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B3</td><td>角色指派</td><td>parent / child 兩種</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B3</td><td>角色</td><td>parent / child 兩種。邀請時由家長決定；之後家長可以把子女設為家長，家長也可以把<b>自己</b>改成子女（家裡要還有別的家長）。<b>不能把另一位家長改成子女</b></td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B4</td><td>移除成員、退出家庭</td><td>家長可以把子女移出；任何人可以自己退出。資料保留，監管與共用帳本一起結束</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B5</td><td>建立監管關係</td><td>指定「誰看得到誰」，只有家長可設</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B6</td><td>解除監管</td><td>設 <code>ended_at</code> 而非刪除，稽核要看得到歷史</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B5</td><td>開始照看</td><td>家長在子女的卡片上按「開始照看」。<b>監管人一定是自己</b>，不能替別的家長決定要看誰</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B6</td><td>停止照看</td><td>監管人自己或同家庭的家長可以停止；<b>被照看的人不行</b>。設 <code>ended_at</code> 而非刪除，稽核要看得到歷史</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">B7</td><td>家長之間互相看得到</td><td>同一個家庭的家長看得到彼此的紀錄（唯讀）；看子女一樣要有監管關係</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">B8</td><td>稽核紀錄</td><td>誰看了誰的資料、誰改了權限</td><td><span class="tag tag--s">S</span></td></tr>
+            <tr><td class="num">B8</td><td>稽核紀錄</td><td>誰改了權限、誰停了誰的權（平台管理員看）。只記動作，不記金額</td><td><span class="tag tag--s">S</span></td></tr>
+            <tr><td class="num">B9</td><td><b>解散家庭</b></td><td><b>唯一的家長</b>可以解散（還有別的家長時，他只能自己退出）。每個人離開、監管與零用金結束、帳本互相移出；<b>紀錄一筆都不刪</b></td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">B10</td><td>零用金</td><td>家長在孩子的紀錄頁設定每月零用金，對照他這個月花了多少。<b>是設定，不是一筆支出</b></td><td><span class="tag tag--s">S</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -386,7 +388,7 @@
         <div class="note__k">監管必須雙向可見</div>
         <p>系統不提供「隱藏監管」的選項。<b>偷偷監看家人的消費會破壞信任</b>，
         而信任正是家庭記帳能持續下去的前提。</p>
-        <p style="margin-top:8px"><b>可見範圍來自監管關係，不是頭銜。</b>家長能做家庭治理，但他能看誰的明細，一樣要看 <code>guardianships</code> 這張表——<b>沒有被指派監管誰，就只看得到自己</b>。<br>這條界線讓「誰看得到我」永遠是一個可以查、可以列出來的清單，而不是一句「家長本來就看得到」。</p>
+        <p style="margin-top:8px"><b>可見範圍來自監管關係，不是頭銜。</b>家長能做家庭治理，但他能看誰的明細，一樣要看 <code>guardianships</code> 這張表——<b>家長之間互相看得到；沒有照看任何子女的家長，看不到任何子女</b>。<br>這條界線讓「誰看得到我」永遠是一個可以查、可以列出來的清單，而不是一句「家長本來就看得到」。</p>
         <p style="margin-top:8px"><b>而且監管是唯讀的。</b>監管者看得到對方的記帳明細，但<b>不能改、不能刪，更不能登入對方的帳號</b>。<br>        這條界線讓監管站得住腳：被監管的人知道自己的紀錄<b>不會被動手腳</b>。能登入對方帳號的話，這份信任就沒了。</p>
       </div>
 
@@ -400,11 +402,11 @@
             <tr><td class="num">C3</td><td><b>解析結果確認</b></td><td>逐欄顯示信心度，<b>使用者確認後才寫入</b></td><td><span class="tag tag--core">M 核心</span></td></tr>
             <tr><td class="num">C4</td><td><b>缺欄位標記</b></td><td>缺什麼就標在<b>那一欄</b>上（紅框 + 必填），補齊前送出鈕停用</td><td><span class="tag tag--core">M 核心</span></td></tr>
             <tr><td class="num">C5</td><td>低信心提示</td><td>信心 &lt; 85% 的欄位標黃並說明原因</td><td><span class="tag tag--core">M 核心</span></td></tr>
-            <tr><td class="num">C6</td><td>記錄修正</td><td>使用者改了什麼要存起來，這是訓練資料</td><td><span class="tag tag--core">M 核心</span></td></tr>
+            <tr><td class="num">C6</td><td>記錄修正</td><td>前端記下解析當下的結果（<code>orig</code>），確認時一起送出；使用者改了什麼存進 <code>nlp_parses</code>，這是訓練資料</td><td><span class="tag tag--core">M 核心</span></td></tr>
             <tr><td class="num">C7</td><td><b>兩種模式互斥</b></td><td>段落記帳／單筆手動，選定一種另一種停用</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">C8</td><td>單筆手動記帳</td><td>傳統表單，不經過模型，走 <code>POST /api/transactions</code></td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">C9</td><td>編輯／刪除</td><td>修改既有紀錄</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">C10</td><td>分類體系</td><td>系統預設 + 家庭自訂，支援兩層</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">C9</td><td>編輯／刪除</td><td>修改一筆、一次刪多筆。只有本人；結算過的帳本裡的紀錄唯讀</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">C10</td><td>分類體系</td><td>系統預設 ＋ 家庭自訂（家長在家庭成員頁新增，全家共用）。兩層分類資料表有保留（<code>parent_id</code>），畫面還沒做</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">C11</td><td>帳戶管理</td><td>現金／銀行／信用卡／悠遊卡</td><td><span class="tag tag--s">S</span></td></tr>
             <tr><td class="num">C12</td><td>CSV 匯入</td><td>從銀行帳單匯入</td><td><span class="tag tag--s">S</span></td></tr>
             <tr><td class="num">C13</td><td>收據拍照 OCR</td><td>辨識金額。<b>第二階段，不進第一版</b></td><td><span class="tag tag--s">S</span></td></tr>
@@ -427,12 +429,13 @@
             <tr><td class="num">D2</td><td>年統計</td><td>同上。<b>當年度要標示「未完整」</b></td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">D3</td><td>分類佔比</td><td>圓環圖</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">D4</td><td>趨勢圖</td><td>近 6 個月收支對照</td><td><span class="tag tag--m">M</span></td></tr>
-            <tr><td class="num">D5</td><td>月預算</td><td>依分類設上限，超支變紅</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">D5</td><td>月預算</td><td>在個人資料頁依分類設上限，超支變紅。<b>只設自己的</b>；全家模式看得到家人的預算與使用率</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">D6</td><td>總覽・全家模式</td><td>全家的還可以花與收支、預算、每個人的這個月（唯讀）</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">D7</td><td><b>每月存款目標</b></td><td>註冊後的個人化設定第一步就問（可以跳過）。改動保留歷史不覆蓋</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">D8</td><td><b>超支警告</b></td><td>三級：達標中／接近上限／存不到目標</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">D9</td><td>年預算</td><td>同 D5</td><td><span class="tag tag--s">S</span></td></tr>
             <tr><td class="num">D10</td><td>匯出報表</td><td>CSV / PDF</td><td><span class="tag tag--s">S</span></td></tr>
+            <tr><td class="num">D11</td><td>家庭總預算</td><td>整個家一個上限（家長設定）。資料表有保留（<code>budgets.user_id</code> 為 NULL），畫面與路由第二階段</td><td><span class="tag tag--s">S</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -456,7 +459,7 @@
         <table>
           <thead><tr><th class="num">#</th><th>功能</th><th>說明</th><th class="tight">優先</th></tr></thead>
           <tbody>
-            <tr><td class="num">E1</td><td>月度建議</td><td>結算後產生，個人 + 家庭兩個層級</td><td><span class="tag tag--m">M</span></td></tr>
+            <tr><td class="num">E1</td><td>月度建議</td><td>按「產生這個月的建議」產生，個人＋家庭兩個層級（全家限家長）。同一個月再產生會蓋掉舊的；模型還沒接上時前端用同一批數字先寫（不會存）</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">E2</td><td><b>附依據</b></td><td>每條建議都要列出可驗算的數字</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">E3</td><td>分級</td><td>良好 / 參考 / 需注意</td><td><span class="tag tag--m">M</span></td></tr>
             <tr><td class="num">E4</td><td>受監管者建議同步</td><td>同時送給監管者</td><td><span class="tag tag--m">M</span></td></tr>
@@ -493,7 +496,7 @@
             <tr><td><b>原生 HTML / CSS / JS</b></td><td>—</td><td>整個前端</td><td>沒有建置步驟，改完存檔就看得到。見下方辯護</td></tr>
             <tr><td>Noto Sans TC / Noto Serif TC</td><td>Google Fonts</td><td>字體</td><td>中文顯示品質。襯線標題是設計語言的一部分</td></tr>
             <tr><td>Canvas API</td><td>瀏覽器內建</td><td>星空背景</td><td>無相依，四十行搞定</td></tr>
-            <tr><td>localStorage</td><td>瀏覽器內建</td><td>mock 模式暫存</td><td>沒有後端時也能完整展示</td></tr>
+            <tr><td>localStorage</td><td>瀏覽器內建</td><td>mock 模式（跑在瀏覽器裡的後端）存資料</td><td>沒有後端時也能完整操作。不放任何假資料或範例帳號</td></tr>
           </tbody>
         </table>
       </div>
@@ -577,7 +580,7 @@
         <div class="card" style="border-top:2px solid var(--m1)">
           <div class="mvc__k" style="color:var(--m1)">成員1　<span style="opacity:.7">m1-auth</span></div>
           <div class="mvc__t">認證 · 19 支</div>
-          <p style="font-size:13px;color:var(--ink-soft)">路由不多是刻意的——他同時扛著 <b>core/ 這個所有人都要用的地基</b>，路由少一點才能最快做完解鎖別人。</p>
+          <p style="font-size:13px;color:var(--ink-soft)">他負責「你是誰」，也負責維護<b>所有人都要用的地基</b>（設定、資料庫、增刪改查、路由守衛、模型呼叫層）——這一版已經先做好了。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m2)">
           <div class="mvc__k" style="color:var(--m2)">成員2　<span style="opacity:.7">m2-ledger</span></div>
@@ -587,22 +590,18 @@
         <div class="card" style="border-top:2px solid var(--m3)">
           <div class="mvc__k" style="color:var(--m3)">成員3　<span style="opacity:.7">m3-analytics</span></div>
           <div class="mvc__t">數字 · 11 支</div>
-          <p style="font-size:13px;color:var(--ink-soft)"><b>整個系統只有這裡算錢</b>。分類體系也由這裡定義，是第 1 週唯一要凍結的跨模組契約。</p>
+          <p style="font-size:13px;color:var(--ink-soft)"><b>整個系統只有這裡加總錢</b>——前端只補衍生值（結餘、比例）。財務建議的 prompt 與邊界規則也在這裡。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m4)">
           <div class="mvc__k" style="color:var(--m4)">成員4　<span style="opacity:.7">m4-access</span></div>
           <div class="mvc__t">家庭 · 21 支</div>
-          <p style="font-size:13px;color:var(--ink-soft)">回答「你能看到什麼」。<code>permission.py</code> 是共用元件，成員2 與成員3 的查詢都要用，第 1 週要最優先完成。</p>
+          <p style="font-size:13px;color:var(--ink-soft)">回答「你能看到什麼」。可見範圍的規則（<code>toolkit/scope.py</code>）已經寫好，他負責家庭、監管、通知與模型評測。</p>
         </div>
       </div>
 
       <div class="note">
         <div class="note__k">分工的單一事實來源是程式，不是這一頁</div>
         <p>歸屬寫在 <code>backend/app/ownership.py</code>，而且 <code>pytest</code> 會檢查它有沒有跟程式碼走散——有人新增路由卻沒認領、或兩個人宣告同一支，測試就會紅燈。<br>完整的 API 清單與篩選在 <a href="api.html">API 瀏覽</a>。</p>
-      </div>
-        <p>17 支 對 2 支看起來很不平均，可是<b>成員4 要扛整個專題的量化成果</b>——
-        模型評測是報告的重點，那份工作沒有對應的路由數。
-        分工要用<b>「一條完整的功能模組」</b>來衡量，不是數 API。</p>
       </div>
 
       <h3 class="sub" style="border-left-color:var(--m1)">成員1 · 認證　<span style="font-family:var(--code);font-size:12px;opacity:.6">m1-auth</span></h3>
@@ -615,15 +614,15 @@
             <tr><td class="num">3</td><td class="tight">POST</td><td class="rt">/api/auth/refresh</td><td class="tight">公開</td><td>用 refresh token 換新的 access token</td></tr>
             <tr><td class="num">4</td><td class="tight">POST</td><td class="rt">/api/auth/logout</td><td class="tight">登入</td><td>撤銷目前這台裝置的 refresh token</td></tr>
             <tr><td class="num">5</td><td class="tight">POST</td><td class="rt">/api/auth/logout-all</td><td class="tight">登入</td><td>撤銷所有裝置的 token</td></tr>
-            <tr><td class="num">6</td><td class="tight">GET</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>目前使用者、家庭角色、被誰監管</td></tr>
-            <tr><td class="num">7</td><td class="tight">PATCH</td><td class="rt">/api/auth/password</td><td class="tight">登入</td><td>修改密碼，同時讓其他 session 失效</td></tr>
+            <tr><td class="num">6</td><td class="tight">GET</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>目前使用者、家庭角色、看得到誰、被誰監管</td></tr>
+            <tr><td class="num">7</td><td class="tight">PATCH</td><td class="rt">/api/auth/password</td><td class="tight">登入</td><td>修改密碼，同時讓其他裝置的 session 失效。舊密碼不對回 400</td></tr>
             <tr><td class="num">74</td><td class="tight">POST</td><td class="rt">/api/auth/password-reset</td><td class="tight">公開</td><td>忘記密碼：寄重設信（Brevo）。<b>有沒有這個帳號都回同一句話</b></td></tr>
             <tr><td class="num">75</td><td class="tight">POST</td><td class="rt">/api/auth/password-reset/confirm</td><td class="tight">公開</td><td>用信裡的 token 設新密碼。一次性、30 分鐘，成功後撤銷所有 sessions</td></tr>
             <tr><td class="num">11</td><td class="tight">GET</td><td class="rt">/api/auth/sessions</td><td class="tight">登入</td><td>列出有效的登入裝置</td></tr>
             <tr><td class="num">12</td><td class="tight">PATCH</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 <code>onboarded</code></td></tr>
             <tr><td class="num">13</td><td class="tight">PUT</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>上傳大頭貼。前端已縮到 256×256</td></tr>
             <tr><td class="num">14</td><td class="tight">DELETE</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>移除大頭貼，改回顯示文字頭像</td></tr>
-            <tr><td class="num">10</td><td class="tight">POST</td><td class="rt">/api/auth/verify-password</td><td class="tight">本人</td><td>重大操作前再確認一次</td></tr>
+            <tr><td class="num">10</td><td class="tight">POST</td><td class="rt">/api/auth/verify-password</td><td class="tight">本人</td><td>重大操作前再確認一次。不發新 token；不對回 400</td></tr>
             <tr><td class="num">8</td><td class="tight">GET</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>我的理財習慣（財務建議的背景）</td></tr>
             <tr><td class="num">9</td><td class="tight">PUT</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>改理財習慣。body: { style, goals[], habits[], note }</td></tr>
           </tbody>
@@ -635,10 +634,10 @@
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
           <tbody>
-            <tr><td class="num">15</td><td class="tight">GET</td><td class="rt">/api/transactions</td><td class="tight">登入</td><td>明細。可帶 <code>userId</code> / <code>from</code> / <code>to</code> / <code>categoryId</code> / <code>kind</code> / <code>source</code> / <code>q</code> / <code>page</code></td></tr>
+            <tr><td class="num">15</td><td class="tight">GET</td><td class="rt">/api/transactions</td><td class="tight">登入</td><td>明細。可帶 <code>userId</code> / <code>groupId</code> / <code>from</code> / <code>to</code> / <code>categoryId</code> / <code>kind</code> / <code>source</code> / <code>q</code> / <code>page</code>；不認得的參數回 422</td></tr>
             <tr><td class="num">16</td><td class="tight">POST</td><td class="rt">/api/transactions</td><td class="tight">登入</td><td>手動新增。<b>單筆手動走這支</b>，不經過模型，<code>source</code> 記成 <code>manual</code></td></tr>
-            <tr><td class="num">17</td><td class="tight">PATCH</td><td class="rt">/api/transactions/{id}</td><td class="tight">本人</td><td>修改。監管者只能看，不能改也不能刪；結算過的帳本裡的不能改</td></tr>
-            <tr><td class="num">18</td><td class="tight">DELETE</td><td class="rt">/api/transactions/{id}</td><td class="tight">本人</td><td>刪除一筆。<b>只有本人</b>，監管者不行</td></tr>
+            <tr><td class="num">17</td><td class="tight">PATCH</td><td class="rt">/api/transactions/{tx_id}</td><td class="tight">本人</td><td>修改。監管者只能看，不能改也不能刪；結算過的帳本裡的不能改</td></tr>
+            <tr><td class="num">18</td><td class="tight">DELETE</td><td class="rt">/api/transactions/{tx_id}</td><td class="tight">本人</td><td>刪除一筆。<b>只有本人</b>，監管者不行</td></tr>
             <tr><td class="num">73</td><td class="tight">DELETE</td><td class="rt">/api/transactions?ids=</td><td class="tight">本人</td><td>一次刪多筆，最多 100 筆。<b>全部成功或全部不動</b></td></tr>
             <tr><td class="num">19</td><td class="tight">POST</td><td class="rt">/api/nlp/parse <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td>單句：一句話 → 一筆。<b>只解析，不寫入</b></td></tr>
             <tr><td class="num">20</td><td class="tight">POST</td><td class="rt">/api/nlp/parse-batch <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td><b>段落：一段話 → 切成 N 筆</b>。只解析，不寫入</td></tr>
@@ -658,14 +657,14 @@
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
           <tbody>
-            <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約</td></tr>
-            <tr><td class="num">24</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">家長</td><td>新增家庭自訂分類</td></tr>
-            <tr><td class="num">33</td><td class="tight">GET</td><td class="rt">/api/summary</td><td class="tight">登入</td><td>摘要。<code>scope=me|family</code>、<code>period=2026-09</code></td></tr>
+            <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約（成員2 定義）</td></tr>
+            <tr><td class="num">24</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">家長</td><td>新增家庭自訂分類。body: { name, kind }</td></tr>
+            <tr><td class="num">33</td><td class="tight">GET</td><td class="rt">/api/summary</td><td class="tight">登入</td><td>摘要。<code>scope=me|family</code>、<code>period=2026-09</code>、<code>groupId</code>。統計頁唯一的來源</td></tr>
             <tr><td class="num">35</td><td class="tight">GET</td><td class="rt">/api/budgets</td><td class="tight">登入</td><td>預算與使用率</td></tr>
-            <tr><td class="num">36</td><td class="tight">PUT</td><td class="rt">/api/budgets</td><td class="tight">本人</td><td>設定預算</td></tr>
+            <tr><td class="num">36</td><td class="tight">PUT</td><td class="rt">/api/budgets</td><td class="tight">本人</td><td>設定自己的分類預算。body: { cat, limit, period }，<code>limit: 0</code> = 拿掉</td></tr>
             <tr><td class="num">38</td><td class="tight">PUT</td><td class="rt">/api/savings-goal</td><td class="tight">本人</td><td><b>設定每月存款目標</b>（註冊後的個人化設定也走這支）。監管者不能代設</td></tr>
             <tr><td class="num">44</td><td class="tight">GET</td><td class="rt">/api/advices</td><td class="tight">登入</td><td>建議清單。每條都帶 <code>basis_json</code> 讓使用者驗算</td></tr>
-            <tr><td class="num">45</td><td class="tight">POST</td><td class="rt">/api/advices/generate <span class="tag tag--llm">★</span></td><td class="tight">家長</td><td>重新產生。<b>後端先算好數字再餵給模型</b></td></tr>
+            <tr><td class="num">45</td><td class="tight">POST</td><td class="rt">/api/advices/generate <span class="tag tag--llm">★</span></td><td class="tight">登入（全家限家長）</td><td>產生這個月的建議。<b>後端先算好數字再餵給模型</b></td></tr>
             <tr><td class="num">39</td><td class="tight">GET</td><td class="rt">/api/savings-goals</td><td class="tight">登入</td><td>我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的</td></tr>
             <tr><td class="num">40</td><td class="tight">GET</td><td class="rt">/api/alerts</td><td class="tight">登入</td><td>我設定的階段性提醒門檻</td></tr>
             <tr><td class="num">41</td><td class="tight">POST</td><td class="rt">/api/alerts</td><td class="tight">本人</td><td>新增一個門檻（百分比 1~200）</td></tr>
@@ -690,22 +689,22 @@
             <tr><td class="num">70</td><td class="tight">POST</td><td class="rt">/api/family/invites</td><td class="tight">家長</td><td>用帳號邀請。body: { userId, role }</td></tr>
             <tr><td class="num">71</td><td class="tight">POST</td><td class="rt">/api/family/invites/{invite_id}/accept</td><td class="tight">被邀請的人</td><td>接受邀請，加入家庭</td></tr>
             <tr><td class="num">72</td><td class="tight">DELETE</td><td class="rt">/api/family/invites/{invite_id}</td><td class="tight">被邀請的人／家長</td><td>婉拒（被邀請的人）或取消（發邀請那一家的家長）</td></tr>
-            <tr><td class="num">50</td><td class="tight">PATCH</td><td class="rt">/api/family/members/{userId}</td><td class="tight">家長</td><td>修改成員角色</td></tr>
-            <tr><td class="num">51</td><td class="tight">DELETE</td><td class="rt">/api/family/members/{userId}</td><td class="tight">家長／本人</td><td>家長把子女移出；寫 <code>me</code> 就是自己退出</td></tr>
+            <tr><td class="num">50</td><td class="tight">PATCH</td><td class="rt">/api/family/members/{user_id}</td><td class="tight">家長</td><td>改角色。子女可以設為家長；<b>不能把另一位家長改成子女</b></td></tr>
+            <tr><td class="num">51</td><td class="tight">DELETE</td><td class="rt">/api/family/members/{user_id}</td><td class="tight">家長／本人</td><td>家長把子女移出；寫 <code>me</code> 就是自己退出</td></tr>
             <tr><td class="num">52</td><td class="tight">GET</td><td class="rt">/api/guardianships</td><td class="tight">登入</td><td>監管關係。<b>被監管者也看得到</b></td></tr>
-            <tr><td class="num">53</td><td class="tight">POST</td><td class="rt">/api/guardianships</td><td class="tight">家長</td><td>建立監管關係</td></tr>
-            <tr><td class="num">54</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{id}</td><td class="tight">家長</td><td>解除監管（設 <code>ended_at</code>，不刪除）</td></tr>
+            <tr><td class="num">53</td><td class="tight">POST</td><td class="rt">/api/guardianships</td><td class="tight">家長</td><td>開始照看一個子女。<b>監管人一定是自己</b></td></tr>
+            <tr><td class="num">54</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{gid}</td><td class="tight">監管人／同家庭的家長</td><td>停止照看（設 <code>ended_at</code>，不刪除）。被照看的人不能自己解除</td></tr>
             <tr><td class="num">55</td><td class="tight">GET</td><td class="rt">/api/notifications</td><td class="tight">登入</td><td>通知清單。帶 <code>since</code> 只拿新的</td></tr>
             <tr><td class="num">56</td><td class="tight">PATCH</td><td class="rt">/api/notifications/{nid}</td><td class="tight">本人</td><td>把一則標記成已讀</td></tr>
             <tr><td class="num">57</td><td class="tight">PATCH</td><td class="rt">/api/notifications</td><td class="tight">本人</td><td>整批標記已讀</td></tr>
             <tr><td class="num">25</td><td class="tight">GET</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>我加入的群組（帳本）</td></tr>
             <tr><td class="num">26</td><td class="tight">POST</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>建立一個群組，建立者自動加入</td></tr>
-            <tr><td class="num">27</td><td class="tight">PATCH</td><td class="rt">/api/groups/{gid}</td><td class="tight">建立者</td><td>改名稱、圖示、顏色</td></tr>
+            <tr><td class="num">27</td><td class="tight">PATCH</td><td class="rt">/api/groups/{gid}</td><td class="tight">建立者</td><td>改名稱、顏色、備註，或復原封存</td></tr>
             <tr><td class="num">28</td><td class="tight">DELETE</td><td class="rt">/api/groups/{gid}</td><td class="tight">建立者</td><td>封存這本帳；帶 <code>?permanent=true</code> 是移除已結算的活動帳本（紀錄保留）</td></tr>
             <tr><td class="num">29</td><td class="tight">POST</td><td class="rt">/api/groups/{gid}/members</td><td class="tight">建立者</td><td>把家人加進這本帳</td></tr>
             <tr><td class="num">30</td><td class="tight">DELETE</td><td class="rt">/api/groups/{gid}/members/{user_id}</td><td class="tight">建立者</td><td>把某個人移出這本帳</td></tr>
-            <tr><td class="num">58</td><td class="tight">GET</td><td class="rt">/api/allowances</td><td class="tight">登入</td><td>我每月給每個被監管者多少零用金</td></tr>
-            <tr><td class="num">59</td><td class="tight">PUT</td><td class="rt">/api/allowance</td><td class="tight">監管者</td><td>設定零用金。body: { wardId, amount }</td></tr>
+            <tr><td class="num">58</td><td class="tight">GET</td><td class="rt">/api/allowances</td><td class="tight">登入</td><td>我每月給每個照看的人多少零用金，對照他這個月花了多少</td></tr>
+            <tr><td class="num">59</td><td class="tight">PUT</td><td class="rt">/api/allowance</td><td class="tight">監管人</td><td>設定零用金。body: { wardId, amount }</td></tr>
             <tr><td class="num">31</td><td class="tight">POST</td><td class="rt">/api/groups/{gid}/settle</td><td class="tight">本人（開帳本的人）</td><td>結算活動帳本。之後唯讀，不能再往裡面記</td></tr>
             <tr><td class="num">32</td><td class="tight">PATCH</td><td class="rt">/api/groups/{gid}/notify</td><td class="tight">帳本成員</td><td>這本帳有動靜要不要通知我。body: { notify }</td></tr>
           </tbody>
@@ -733,7 +732,7 @@
 
       <div class="stack">
         <div class="layer">
-          <div class="layer__h"><span class="layer__t">瀏覽器</span><span class="layer__s">site/ · 純靜態，無建置步驟</span></div>
+          <div class="layer__h"><span class="layer__t">瀏覽器</span><span class="layer__s">frontend/ · 純靜態，無建置步驟</span></div>
           <div class="boxes">
             <div class="box"><b>index.html</b> 單頁 · hash 路由</div>
             <div class="box"><b>app.js</b> 十四個畫面的繪製與互動</div>
@@ -748,25 +747,27 @@
         <div class="layer" style="border-color:color-mix(in srgb, var(--m1) 42%, transparent)">
           <div class="layer__h"><span class="layer__t">api.js 轉接層</span><span class="layer__s">mock ⇄ http 同簽章</span></div>
           <div class="boxes">
-            <div class="box"><b>mockAdapter</b> 讀 data.js + localStorage</div>
-            <div class="box"><b>httpAdapter</b> fetch 真後端</div>
+            <div class="box"><b>mock</b> 跑在瀏覽器裡的後端，資料存 localStorage，沒有假資料</div>
+            <div class="box"><b>http</b> fetch 真後端</div>
+            <div class="box"><b>前端代勞</b> 名稱、結餘、比例、預算百分比</div>
+            <div class="box"><b>出錯指出是哪一支</b> 函式 · 路由 · 負責人</div>
             <div class="box">切換方式：<code>&lt;meta name="api-base"&gt;</code> 留空＝mock</div>
           </div>
           <p style="margin-top:12px;font-size:13px;color:var(--ink-soft)">
             兩個轉接器的<b>簽章完全一致</b>，所以可以一支一支路由慢慢接——
-            後端做好哪支就改哪支，<b>不必等全部完成</b>。這是四人平行動工的關鍵。
+            後端還沒做的回 501，畫面會講「是哪一支、誰負責」，其他頁照常能用；<b>不必等全部完成</b>。這是四人平行動工的關鍵。
           </p>
         </div>
 
         <div class="down"><span class="down__l">HTTP · JSON</span></div>
 
         <div class="layer">
-          <div class="layer__h"><span class="layer__t">FastAPI</span><span class="layer__s">api/app/</span></div>
+          <div class="layer__h"><span class="layer__t">FastAPI</span><span class="layer__s">backend/app/</span></div>
           <div class="boxes" style="margin-bottom:10px">
-            <div class="box"><b>routers/</b> 只做接收與回傳</div>
-            <div class="box"><b>services/</b> 商業邏輯全部在這</div>
+            <div class="box"><b>routers/</b> 70 支路由，只做接收與回傳</div>
+            <div class="box"><b>guards.py</b> 路由守衛：登入 · 角色 · 本人 · 帳本成員</div>
             <div class="box"><b>schemas/</b> Pydantic 驗證</div>
-            <div class="box"><b>core/</b> 設定 · 密碼雜湊 · JWT · 權限守門</div>
+            <div class="box"><b>toolkit/</b> 設定 · 資料庫 · 增刪改查 · 密碼 · JWT · 規則</div>
           </div>
           <div class="boxes">
             <div class="box box--hi"><b>services/llm/</b> client 成員1 · parse 成員2 · advice 成員3</div>
@@ -774,8 +775,8 @@
             <div class="box"><b>services/analytics.py</b> 唯一算錢的地方　<em style="color:var(--m3)">成員3</em></div>
           </div>
           <p style="margin-top:12px;font-size:13px;color:var(--ink-soft)">
-            <b>分層原則：routers 只負責接收與回傳，商業邏輯一律放 services。</b>
-            這樣測試時可以直接測 service，不必每次都起一個 HTTP 請求。
+            <b>分層原則：routers 只負責接收與回傳，規則放 toolkit，加總與模型放 services。</b>
+            這樣測試時可以直接測函式，不必每次都起一個 HTTP 請求。
           </p>
         </div>
 
@@ -816,7 +817,7 @@
           <ul class="mvc__l">
             <li><code>app.js</code> 十四個畫面的繪製</li>
             <li><code>api.js</code> 唯一的資料入口</li>
-            <li>不含任何金額計算</li>
+            <li>不做金額加總（只補結餘、比例這類衍生值）</li>
             <li>只負責顯示與收集輸入</li>
           </ul>
         </div>
@@ -824,8 +825,8 @@
           <div class="mvc__k">Controller</div>
           <div class="mvc__t">routers/ + services/</div>
           <ul class="mvc__l">
-            <li><code>routers/</code> 接收請求、驗權限、回傳</li>
-            <li><code>services/</code> 商業邏輯</li>
+            <li><code>routers/</code> 接收請求、回傳；<code>guards.py</code> 驗權限</li>
+            <li><code>toolkit/</code> 規則、<code>services/</code> 加總與模型</li>
             <li><code>schemas/</code> Pydantic 驗證進出</li>
             <li>模型呼叫也在這一層</li>
           </ul>
@@ -857,23 +858,24 @@
           <div class="step__b">
             <div class="step__t">View · api.js 決定送去哪裡</div>
             <div class="step__d">mock 模式寫進 <code>localStorage</code>；http 模式 <code>fetch</code> 打
-            <code>POST /api/nlp/confirm-batch</code>。<b>兩個轉接器的簽章一樣</b>，上層完全無感。</div>
+            <code>POST /api/nlp/confirm-batch</code>。<b>兩個轉接器的簽章一樣</b>，上層完全無感。
+            每一列除了使用者確認過的值，還帶著解析當下的原始結果（<code>orig</code>）。</div>
           </div>
         </div>
         <div class="step">
           <div class="step__n">3</div>
           <div class="step__b">
             <div class="step__t">Controller · router 收下並驗證</div>
-            <div class="step__d">Pydantic schema 驗欄位型別；<code>core/deps.py</code> 從 JWT 取出目前使用者；
-            <code>services/permission.py</code> 確認這個人有沒有權限寫這筆。<b>驗不過就 403，不進 service。</b></div>
+            <div class="step__d">Pydantic schema 驗欄位型別；守衛（<code>guards.py</code>）從 JWT 取出目前使用者、擋掉停權與平台管理員；
+            帳本結算了沒由 <code>toolkit/ledger.py</code> 判斷。<b>驗不過就 401／403／409，不往下走。</b></div>
           </div>
         </div>
         <div class="step">
           <div class="step__n">4</div>
           <div class="step__b">
             <div class="step__t">Controller · service 執行商業邏輯</div>
-            <div class="step__d">寫入 <code>transactions</code>，同時把「模型原本解析的值」與「使用者改成什麼」
-            一起寫進 <code>nlp_parses</code>。<b>這一步就是資料飛輪的入口。</b></div>
+            <div class="step__d">寫入 <code>transactions</code>，同時把 <code>orig</code>（模型原本解析的值）與「使用者改成什麼」
+            一起寫進 <code>nlp_parses</code>；增刪改查用 <code>toolkit/crud.py</code>，同一個交易。<b>這一步就是資料飛輪的入口。</b></div>
           </div>
         </div>
         <div class="step">

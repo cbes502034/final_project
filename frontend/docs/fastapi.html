@@ -128,7 +128,7 @@ td .fname { font-family: var(--code); font-size: 12px; color: var(--up); }
       <li><b>收資料</b><span>路徑參數指定哪一個、查詢參數做篩選、請求主體送整包</span></li>
       <li><b>Pydantic</b><span>型別標註變成真的會執行的驗證，輸入輸出都擋</span></li>
       <li><b>依賴注入</b><span>宣告需要什麼（資料庫、目前使用者），FastAPI 幫你準備</span></li>
-      <li><b>你要改哪裡</b><span>routers 收發、services 寫邏輯、models 定義資料表，照 TODO 填</span></li>
+      <li><b>你要改哪裡</b><span>70 支路由已經掛好（回 501）：換成真的實作、拿掉 @stub。增刪改查用 toolkit/crud.py，權限用 guards.py</span></li>
       </ul>
     </section>
 
@@ -529,9 +529,16 @@ page: int = Query(<span class="tk-nm">1</span>, <b class="hi">ge=<span class="tk
 
       <div class="note">
         <div class="note__k">這在我們專案的哪裡</div>
-        <p><code class="fname">backend/app/core/deps.py</code> ——
-        <code>get_current_user</code> 和 <code>require_parent</code> 都在這個檔案。
+        <p><code class="fname">backend/app/guards.py</code> —— 我們的版本叫 <code>current_user</code>（登入者），
+        「要是家長」寫成裝飾器 <code>@parent_required</code>（跟 MineMarket 的 <code>@userRequired</code> 同一個寫法），
+        另外還有 <code>own()</code>（這筆是不是我的）、<code>in_group()</code>（我在不在這本帳）。
         你寫路由時只要 import 進來用就好，<b>不用理解裡面怎麼實作的</b>。</p>
+        <pre class="py" style="margin-top:10px"><span class="tk-kw">from</span> app.guards <span class="tk-kw">import</span> parent_required
+
+<span class="tk-dc">@router.post</span>(<span class="tk-st">"/family/invite"</span>)
+<span class="tk-dc">@parent_required</span>                  <span class="tk-cm"># 寫在 @router 的下面</span>
+<span class="tk-kw">def</span> <span class="tk-fn">create_code</span>(body: InviteIn, me: User):   <span class="tk-cm"># me 自動塞進來</span>
+    ...</pre>
       </div>
     </section>
 
@@ -711,14 +718,15 @@ app.include_router(auth.router, <b class="hi">prefix=<span class="tk-st">"/api/a
       <div class="note">
         <div class="note__k">這就是四個人能平行動工的關鍵</div>
         <p>每個人改自己的 router 檔案，<b>git 幾乎不會衝突</b>。
-        <code>main.py</code> 只有七行 <code>include_router</code>，
-        任何人打開它三十秒就能看懂整個系統有哪些功能。</p>
+        我們的 <code>main.py</code> 用一個迴圈把 <code>app/routers/</code> 的每一組掛上去
+        （<code>for module in routers.ALL: app.include_router(module.router, prefix="/api")</code>），
+        所以每個 router 裡的路徑寫 <code>/auth/login</code>、<code>/family</code>，前面的 <code>/api</code> 是統一加的。</p>
       </div>
 
       <h3 class="sub">為什麼 routers 不寫邏輯</h3>
       <p style="color:var(--ink-soft);max-width:64ch">
         我們的規定是：<b>routers 只做三件事——收請求、驗權限、回結果。</b>
-        真正的計算與規則寫在 <code>services/</code>。
+        規則寫在 <code>toolkit/</code>（例如 <code>family.require_can_dissolve()</code>），加總與模型寫在 <code>services/</code>。
       </p>
       <div class="vs">
         <div class="vs__c vs--bad">
@@ -738,12 +746,14 @@ app.include_router(auth.router, <b class="hi">prefix=<span class="tk-st">"/api/a
     <section class="sec" id="ours">
       <div class="sec__h"><span class="sec__n">11</span><h2>在我們的專案裡，你要改哪個檔案</h2></div>
       <p class="sec__lead">
-        骨架已經搭好了，每支路由都有中文說明和 <code>TODO</code>。你的工作是把 TODO 填掉。
+        骨架已經搭好了：70 支路由都掛好、守衛和請求主體接好、說明字串寫好，函式裡只有一行 <code>raise not_ready(...)</code>（回 501）。
+        你的工作是把那一行換成真的實作，然後拿掉 <code>@stub</code>。
       </p>
 
       <h3 class="sub">先找到自己的工作</h3>
-      <pre class="py"><span class="tk-cm"># 把「成員2」換成你自己</span>
-grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
+      <pre class="py">cd backend
+python -m app.ownership        <span class="tk-cm"># 每個人還剩哪幾支（有 @stub 的算還沒做）</span>
+grep -rn <span class="tk-st">"TODO(成員2)"</span> app/services/   <span class="tk-cm"># services 裡要補的（把「成員2」換成你自己）</span></pre>
 
       <h3 class="sub">誰負責哪些檔案</h3>
       <div class="tw">
@@ -752,37 +762,37 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
           <tbody>
             <tr>
               <td><b style="color:var(--m1)">成員1</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m1-auth</span></td>
-              <td>認證與基礎建設</td>
-              <td><span class="fname">routers/auth.py</span>、<span class="fname">models/user.py</span>、<span class="fname">schemas/auth.py</span>、<span class="fname">core/*</span>、<span class="fname">services/llm/client.py</span></td>
-              <td class="tight">8 支</td>
+              <td>認證</td>
+              <td><span class="fname">routers/auth.py</span>、<span class="fname">routers/admin.py</span>、<span class="fname">models/user.py</span>、<span class="fname">schemas/auth.py</span></td>
+              <td class="tight">19 支</td>
             </tr>
             <tr>
               <td><b style="color:var(--m2)">成員2</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m2-ledger</span></td>
               <td>記帳 ★ 核心</td>
-              <td><span class="fname">routers/transactions.py</span>、<span class="fname">routers/nlp.py</span>、<span class="fname">models/transaction.py</span>、<span class="fname">models/nlp.py</span>、<span class="fname">schemas/*</span>、<span class="fname">services/llm/parse.py</span></td>
-              <td class="tight">8 支</td>
+              <td><span class="fname">routers/transactions.py</span>、<span class="fname">routers/nlp.py</span>、<span class="fname">routers/categories.py</span>、<span class="fname">routers/groups.py</span>、<span class="fname">models/category.py</span>、<span class="fname">models/group.py</span>、<span class="fname">schemas/group.py</span>、<span class="fname">services/evaluation.py</span>、<span class="fname">models/transaction.py</span>、<span class="fname">models/nlp.py</span>、<span class="fname">schemas/transaction.py</span>、<span class="fname">schemas/nlp.py</span>、<span class="fname">services/llm/parse.py</span></td>
+              <td class="tight">19 支</td>
             </tr>
             <tr>
               <td><b style="color:var(--m3)">成員3</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m3-analytics</span></td>
               <td>數字與建議</td>
-              <td><span class="fname">routers/categories.py</span>、<span class="fname">routers/stats.py</span>、<span class="fname">routers/budgets.py</span>、<span class="fname">routers/advices.py</span>、<span class="fname">services/analytics.py</span>、<span class="fname">services/llm/advice.py</span></td>
-              <td class="tight">10 支</td>
+              <td><span class="fname">routers/stats.py</span>、<span class="fname">routers/alerts.py</span>、<span class="fname">models/alert.py</span>、<span class="fname">routers/budgets.py</span>、<span class="fname">routers/advices.py</span>、<span class="fname">models/budget.py</span>、<span class="fname">models/advice.py</span>、<span class="fname">schemas/stats.py</span>、<span class="fname">schemas/advice.py</span>、<span class="fname">services/llm/advice.py</span></td>
+              <td class="tight">11 支</td>
             </tr>
             <tr>
               <td><b style="color:var(--m4)">成員4</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m4-access</span></td>
               <td>家庭與可見範圍</td>
-              <td><span class="fname">routers/family.py</span>、<span class="fname">models/family.py</span>、<span class="fname">schemas/family.py</span>、<span class="fname">services/permission.py</span>、<span class="fname">services/evaluation.py</span></td>
-              <td class="tight">9 支</td>
+              <td><span class="fname">routers/family.py</span>、<span class="fname">routers/notifications.py</span>、<span class="fname">models/family.py</span>、<span class="fname">models/guardianship.py</span>、<span class="fname">models/notification.py</span>、<span class="fname">models/audit.py</span>、<span class="fname">schemas/family.py</span></td>
+              <td class="tight">21 支</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="note note--warn">
-        <div class="note__k">兩件事要最優先完成</div>
-        <p><code>core/deps.py</code> 的 <code>get_current_user</code> 和
-        <code>services/permission.py</code> 的 <code>visible_user_ids</code>
-        <b>其他三個人全部都要用</b>。這兩塊沒好，別人的路由寫不下去。</p>
+      <div class="note">
+        <div class="note__k">地基已經做好了，第一天就能開工</div>
+        <p>以前要最優先完成的兩塊——「取出登入者」和「可見範圍」——已經寫好、測好：
+        <code>app/guards.py</code>（<code>current_user</code>、<code>@login_required</code>、<code>visible_scope()</code>）、
+        <code>app/toolkit/crud.py</code>（增刪改查）、<code>app/models/</code>（20 張表）。直接 import 來用。</p>
       </div>
 
       <div class="note">
@@ -793,17 +803,17 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
       <h3 class="sub">實作一支路由的順序</h3>
       <div class="flow">
         <div class="fl"><div class="fl__n">1</div><div class="fl__b">
-          <div class="fl__t">先寫 schemas/</div>
-          <div class="fl__d">決定這支 API <b>收什麼、回什麼</b>。先把資料形狀定下來，後面才不會改來改去。</div></div></div>
+          <div class="fl__t">先讀契約</div>
+          <div class="fl__d"><code>docs/02-前後端串接契約.md</code> 同名的那一節：前端送什麼、要回什麼。請求主體的模型（<code>schemas/</code>）已經照它寫好了。</div></div></div>
         <div class="fl"><div class="fl__n">2</div><div class="fl__b">
-          <div class="fl__t">再寫 models/</div>
-          <div class="fl__d">資料表長什麼樣。欄位定義照專題手冊的資料庫設計那一節。</div></div></div>
+          <div class="fl__t">資料表已經在 models/</div>
+          <div class="fl__d">20 張表跟 <code>data.js</code> 的 schema 逐欄對齊（有測試擋）。要改欄位：data.js → models → <code>alembic revision --autogenerate</code>。</div></div></div>
         <div class="fl"><div class="fl__n">3</div><div class="fl__b">
-          <div class="fl__t">邏輯寫進 services/</div>
-          <div class="fl__d">計算、規則。<b>純函式，好測試。</b></div></div></div>
+          <div class="fl__t">規則用 toolkit/、加總寫進 services/</div>
+          <div class="fl__d">「誰可以、什麼時候不行」多半已經寫在 <code>toolkit/</code>；加總與模型在 <code>services/</code>。<b>純函式，好測試。</b></div></div></div>
         <div class="fl"><div class="fl__n">4</div><div class="fl__b">
-          <div class="fl__t">最後回到 routers/ 把 TODO 填掉</div>
-          <div class="fl__d">路由只負責串起來：驗權限 → 呼叫 service → 回結果。</div></div></div>
+          <div class="fl__t">最後回到 routers/ 換掉 not_ready</div>
+          <div class="fl__d">路由只負責串起來：守衛已經驗好權限 → <code>crud</code> 讀寫、呼叫 toolkit／service → <code>crud.to_dict</code> 回結果。做完拿掉 <code>@stub</code>。</div></div></div>
         <div class="fl"><div class="fl__n">5</div><div class="fl__b">
           <div class="fl__t">打開 /docs 直接試打</div>
           <div class="fl__d">不用等前端、不用裝 Postman。右上角 Authorize 貼上 token 就能試需要登入的路由。</div></div></div>
@@ -811,11 +821,11 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
 
       <div class="note">
         <div class="note__k">前端已經寫好了，回應形狀要對得上</div>
-        <p><code class="fname">frontend/js/api.js</code> 裡面有<b>完整的路由契約</b>，
-        而且 mock 模式已經用假資料把所有畫面跑起來了。<br>
+        <p><code class="fname">frontend/js/api.js</code> 的 mock 是<b>跑在瀏覽器裡的後端</b>（沒有假資料，從註冊開始），
+        每一支的形狀都寫進了 <code>docs/02-前後端串接契約.md</code>。<br>
         你的 API 回應只要跟那份形狀一致，前端把 <code>&lt;meta name="api-base"&gt;</code>
-        填上網址就能直接接上，<b>一行前端程式碼都不用改</b>。<br>
-        不確定要回什麼形狀時，<b>去看 api.js，那是唯一的真相來源</b>。</p>
+        填上網址就能直接接上，<b>一行前端程式碼都不用改</b>。名稱、結餘、比例這些前端補得出來，可以不帶。<br>
+        還沒做的回 501，畫面會直接講「是哪一支、誰負責」；<code>pytest</code> 的 <code>test_frontend_adapter.py</code> 會確認前端接得住。</p>
       </div>
     </section>
 
@@ -844,7 +854,7 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
             </tr>
             <tr>
               <td class="rt">501 Not Implemented</td>
-              <td>那支路由還沒實作。<b>這是正常的，不是 bug</b>——去找對應的 TODO。</td>
+              <td>那支路由還沒實作（還標著 <code>@stub</code>）。<b>這是正常的，不是 bug</b>——回應裡就寫著路由與負責人。</td>
             </tr>
             <tr>
               <td class="rt">資料沒有存進去</td>
@@ -874,8 +884,7 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
         <div class="card">
           <h4 class="sub2" style="margin-top:0;color:var(--ink)">2. 看實際送出的 SQL</h4>
           <p style="font-size:13px;color:var(--ink-soft)">
-            把 <code class="fname">core/database.py</code> 的
-            <code>echo=False</code> 改成 <code>True</code>，
+            在 <code class="fname">backend/.env</code> 設 <code>DB_ECHO=true</code>，
             SQLAlchemy 會把每一句 SQL 印出來。<b>查完記得改回去。</b>
           </p>
         </div>
@@ -893,7 +902,7 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> backend/app/</pre>
         <p>這份文件涵蓋的是你這個專案<b>真的會用到</b>的部分，不是 FastAPI 的全部。
         遇到這裡沒寫的東西，官方文件 <a href="https://fastapi.tiangolo.com/zh/" target="_blank" rel="noopener">fastapi.tiangolo.com</a>
         有中文版，寫得很好。<br>
-        但<b>先把 TODO 填完再去讀那些</b>——會用比全懂重要。</p>
+        但<b>先把自己的路由做完再去讀那些</b>——會用比全懂重要。</p>
       </div>
     </section>
 

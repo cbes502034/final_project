@@ -208,7 +208,7 @@ def create_guardianship(body: GuardianshipIn, me: User, db: Session = Depends(ge
 
     POST /api/guardianships
 
-    family.require_can_guard；audit。
+    family.require_can_guard（監管人一定是自己；只能照看同家庭的子女；已經在照看回 409）；audit。
     """
     raise not_ready("POST /api/guardianships", OWNER)
 
@@ -233,6 +233,8 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
     """我給每個被照看的人多少零用金
 
     GET /api/allowances
+
+    只列我照看的人；回 {allowances: [{wardId, wardName, amount, spent}]}，spent 是他這個月的支出（從明細算）。
     """
     raise not_ready("GET /api/allowances", OWNER)
 
@@ -258,6 +260,7 @@ def list_audit(me: User, db: Session = Depends(get_db)):
 
     GET /api/audit
 
-    只記動作，不記金額。
+    只記動作，不記金額。回 {logs: [{id, at, actor, actorName, action, target, note}]}，由新到舊。
+    at 用 ISO 8601；actorName 要帶（平台管理員沒有家庭，前端沒有成員清單可以對）。
     """
     raise not_ready("GET /api/audit", OWNER)

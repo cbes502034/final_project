@@ -104,7 +104,8 @@ def get_me(me: User, db: Session = Depends(get_db)):
 
     GET /api/auth/me
 
-    回 {user, family, visible, queryable, guardedBy}。user 要有 onboardedAt。crud.to_dict(me, rename={"display_name": "name"})。
+    回 {user, family, visible, queryable, guardedBy}。user 要有 onboardedAt、theme、savingsGoal；不帶 income／expense（從明細算）。
+    crud.to_dict(me, rename={"display_name": "name"})，密碼雜湊與大頭貼原始 bytes 預設不會送出去。
     """
     raise not_ready("GET /api/auth/me", OWNER)
 
@@ -130,7 +131,7 @@ def change_password(body: PasswordChangeIn, me: User, db: Session = Depends(get_
 
     PATCH /api/auth/password
 
-    舊密碼 verify_password；新密碼 check_strength；成功後撤銷其他 sessions。
+    舊密碼 verify_password（不對回 400，不是 401）；新密碼 check_strength（422）；成功後撤銷其他 sessions。
     """
     raise not_ready("PATCH /api/auth/password", OWNER)
 

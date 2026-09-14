@@ -79,5 +79,7 @@ def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_d
     """刪門檻
 
     DELETE /api/alerts/{aid}
+
+    只能刪自己的（403）；回 {id, deleted: true}。
     """
     raise not_ready("DELETE /api/alerts/{aid}", OWNER)

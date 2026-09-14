@@ -2848,7 +2848,7 @@
      忘記密碼
 
      ⚠️ 不管 email 有沒有註冊，畫面都說同一句話（後端也是），不然就是帳號列舉工具。
-     示範站沒有後端寄不出信，mock 會把「信的內容」一起回來，直接攤在畫面上。
+     還沒連接後端時（mock）寄不出信，mock 會把「信的內容」一起回來，直接攤在畫面上。
      ============================================================ */
   function vForgot() {
     gateStep = 'login';                    // 從這裡回登入，要看到登入表單，不是主頁
@@ -2870,13 +2870,13 @@
       '<p class="fgt__h">沒收到的話，看一下垃圾信件匣；過一分鐘可以再申請一次。</p>' +
       (mail
         ? '<div class="fgt__mail">' +
-            '<div class="fgt__k">示範模式：真的系統會把這封信寄到信箱，這裡直接給你看</div>' +
+            '<div class="fgt__k">還沒連接後端，寄不出信：接上後端之後這封信會寄到信箱，現在直接給你看</div>' +
             '<dl class="fgt__dl"><dt>寄給</dt><dd>' + esc(mail.to) + '</dd><dt>主旨</dt><dd>' + esc(mail.subject) + '</dd></dl>' +
             '<p>按下面的按鈕設定新密碼。這個連結 ' + esc(mail.minutes) + ' 分鐘內有效，而且只能用一次。</p>' +
             '<a class="btn btn--go gate__go" href="' + esc(mail.link) + '">設定新密碼</a>' +
           '</div>'
         : (API.mode === 'http' ? '' :
-            '<p class="fgt__demo">示範模式：這個 email 沒有註冊，或一分鐘內已經寄過，所以這次沒有信。</p>')) +
+            '<p class="fgt__demo">還沒連接後端：這個 email 沒有註冊，或一分鐘內已經寄過，所以這次沒有信。</p>')) +
       '<p class="gate__alt"><a href="#/login">回去登入</a>　·　' +
         '<button type="button" class="gate__lnk" data-fg-again>換一個 email</button></p>' +
     '</div>';

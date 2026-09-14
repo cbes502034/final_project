@@ -59,6 +59,8 @@ def read_notification(
     """一則標記已讀
 
     PATCH /api/notifications/{nid}
+
+    body {read: true}；只能標自己的通知（recipient_id = 我）；回 {id, readAt}。
     """
     raise not_ready("PATCH /api/notifications/{nid}", OWNER)
 

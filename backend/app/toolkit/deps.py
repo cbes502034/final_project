@@ -24,32 +24,20 @@ FastAPI 的解法是把它包成一個函式，路由這樣宣告：
 如果驗證失敗，函式裡會丟出 401，**路由的程式碼一行都不會被執行**。
 
 ===========================================================================
-⚠️ 這個檔案只做到第 5 步，第 6、7 步是你們的
+這個檔案只做到第 5 步，第 6、7 步在 app/guards.py
 ===========================================================================
-因為第 6 步要用到 `User` 資料表，**而那是你們自己定義的**。
-工具箱不知道你的表長什麼樣，也不該知道。
+第 6 步要用到 `User` 資料表，工具箱不該綁資料模型，所以這裡只提供 `current_user_id`
+（回傳一個**已經驗證過的使用者 ID**）。撈使用者、擋停權、掛上家庭角色的是
+`app/guards.py` 的 `current_user`——路由直接用守衛就好：
 
-所以這裡提供 `current_user_id` —— 它回傳一個**已經驗證過的使用者 ID**。
-你們在自己的程式裡這樣包一層：
+    from app.guards import login_required
 
-    # 你們的 app/deps.py
-    from fastapi import Depends
-    from sqlalchemy.orm import Session
-    from app.toolkit.deps import current_user_id
-    from app.toolkit.db import get_db
-    from app.toolkit import errors
-    from app.models.user import User
+    @router.get("/transactions")
+    @login_required
+    def list_transactions(me: User, db: Session = Depends(get_db)):
+        ...                               # me 已經撈好、沒被停權，me.family_role 也掛好了
 
-    def get_current_user(
-        uid: int = Depends(current_user_id),
-        db: Session = Depends(get_db),
-    ) -> User:
-        user = db.get(User, uid)
-        if user is None or not user.is_active:
-            raise errors.unauthorized()
-        return user
-
-這樣切的好處是：**工具箱不綁你的資料模型**，你換掉 User 的定義也不用改它。
+這樣切的好處是：**工具箱不綁資料模型**，換掉 User 的定義也不用改它。
 """
 
 from __future__ import annotations

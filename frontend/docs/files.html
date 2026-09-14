@@ -108,9 +108,9 @@ td .fname { font-family: var(--code); font-size: 12px; color: var(--m3); }
       <div class="kp__h"><span class="kp__ic" aria-hidden="true">★</span><span class="kp__t">這一頁的重點</span><span class="kp__s">只看這張卡，也能知道這份文件在講什麼</span></div>
       <ul class="kp__l">
       <li><b>兩個獨立的部分</b><span>frontend/ 純靜態、backend/ FastAPI，只靠 API 溝通</span></li>
-      <li><b>前端的資料入口</b><span>只有 js/api.js 碰資料，示範資料與真後端同一套簽名</span></li>
-      <li><b>後端分層</b><span>routers → services → models，每一層只跟相鄰的講話</span></li>
-      <li><b>toolkit/</b><span>已經寫好的工具，import 來用，不要改</span></li>
+      <li><b>前端的資料入口</b><span>只有 js/api.js 碰資料：mock（跑在瀏覽器裡的後端，沒有假資料）與真後端同一套簽名</span></li>
+      <li><b>後端分層</b><span>routers（守衛擋在前面）→ toolkit／services → models，每一層只跟相鄰的講話</span></li>
+      <li><b>已經做好的</b><span>toolkit/、guards.py、models/、routers/ 的骨架、alembic/——import 來用</span></li>
       <li><b>找檔案</b><span>要改東西時，先查「每個路徑放什麼」那張表</span></li>
       </ul>
     </section>
@@ -124,14 +124,17 @@ td .fname { font-family: var(--code); font-size: 12px; color: var(--m3); }
       <p style="color:var(--ink-soft);max-width:66ch">
         <code>frontend/</code> 是純靜態網頁，<b>沒有建置步驟</b>，用瀏覽器打開就會動。
         它跟後端之間只透過 <code>js/api.js</code> 這一層講話——
-        把 <code>&lt;meta name="api-base"&gt;</code> 留空就用示範資料，
+        把 <code>&lt;meta name="api-base"&gt;</code> 留空就用 mock（跑在瀏覽器裡的後端，資料存 localStorage，沒有假資料），
         填上網址就打真的後端，<b>畫面程式碼一行都不用改</b>。
       </p>
 
       <h3 class="sub">後端分四層，每一層只跟相鄰的講話</h3>
-      <pre class="tree"><b>routers/</b>    收請求、驗權限、回結果      <i>← 不寫計算</i>
+      <pre class="tree"><b>guards.py</b>   擋在路由前面：登入、角色、本人  <i>← 路由不用自己判斷身分</i>
     ↓
-<b>services/</b>   真正做事：計算、規則         <i>← 不碰 HTTP</i>
+<b>routers/</b>    收請求、回結果              <i>← 不寫計算</i>
+    ↓
+<b>toolkit/</b>    規則（誰可以、什麼時候不行）、crud 增刪改查
+<b>services/</b>   加總與模型                   <i>← 不碰 HTTP</i>
     ↓
 <b>models/</b>     資料表長什麼樣               <i>← 不寫商業邏輯</i>
     ↓
@@ -154,8 +157,7 @@ PostgreSQL
             <tr><td class="tight"><b style="color:var(--up)">綠字</b></td>
                 <td><b>已經寫好、完整可用</b>，直接 import，不要改</td></tr>
             <tr><td class="tight"><b style="color:var(--warn)">黃字刪除線</b></td>
-                <td><b>現在還不存在，你們自己 mkdir</b>。
-                    那是後端開發的主體，先給空檔案就變成填空題了</td></tr>
+                <td><b>骨架在、內容要你們做</b>：路由還回 501（<code>@stub</code>）、services 裡有 <code>TODO(成員N)</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -186,10 +188,11 @@ PostgreSQL
 │   │   ├── <u>api.js</u>        ★    <i>唯一的資料入口（mock / http 兩套同簽名）</i>
 │   │   ├── app.js            <i>畫面繪製與互動</i>
 │   │   ├── notify.js         <i>監管通知：輪詢、音效、鈴鐺</i>
-│   │   ├── data.js           <i>示範資料與資料表草案（mock 模式用）</i>
+│   │   ├── data.js           <i>資料表草案與固定清單（分類、主題、角色）。沒有假資料</i>
 │   │   └── stars.js          <i>背景星空</i>
 │   └── docs/                 <i>說明文件，也是靜態網頁</i>
 │       ├── index.html        <i>專題手冊</i>
+│       ├── guide.html        <i>操作說明</i>
 │       ├── fastapi.html      <i>FastAPI 說明書</i>
 │       ├── restful.html      <i>RESTful 說明書</i>
 │       ├── files.html        <i>就是你現在看的這一份</i>
@@ -200,17 +203,22 @@ PostgreSQL
 │
 ├── <b>backend/</b>                 <i>後端：FastAPI</i>
 │   ├── app/
-│   │   ├── main.py           <i>入口，只負責組裝</i>
+│   │   ├── main.py           <i>入口，只負責組裝（掛上 routers/ 的每一組）</i>
 │   │   ├── <u>ownership.py</u>  ★    <i>分工的單一事實來源，pytest 會檢查它</i>
-│   │   ├── <em>toolkit/</em>          <em>已經寫好的工具，不用改（見 03）</em>
-│   │   ├── <s>models/</s>           <s>你們要建：資料表定義</s>
-│   │   ├── <s>schemas/</s>          <s>你們要建：API 進出的形狀</s>
-│   │   ├── <s>routers/</s>          <s>你們要建：路由</s>
-│   │   └── <s>services/</s>         <s>你們要建：商業邏輯</s>
-│   ├── tests/                <i>一致性測試：程式跟文件不准走散</i>
+│   │   ├── <em>guards.py</em>         <em>路由守衛：@login_required、own()、in_group()…</em>
+│   │   ├── <em>cli.py</em>            <em>python -m app.cli：init-env · check-config · init-db · make-admin</em>
+│   │   ├── <em>toolkit/</em>          <em>已經寫好的工具（見 03）</em>
+│   │   ├── <em>models/</em>           <em>20 張表，跟 data.js 的 schema 逐欄對齊</em>
+│   │   ├── <em>schemas/</em>          <em>請求主體，欄位名字跟前端送的一樣</em>
+│   │   ├── <s>routers/</s>          <s>70 支路由：守衛與說明寫好，內容要做（還回 501）</s>
+│   │   └── <s>services/</s>         <s>llm/client 已完成；parse、advice、analytics 要做</s>
+│   ├── alembic/              <i>資料庫遷移（versions/ 第一版 = 20 張表）</i>
+│   ├── alembic.ini           <i>⚠️ 只能有英文</i>
+│   ├── tests/                <i>一致性、工具箱、後端核心、前端代勞；fixtures/ 放測試資料</i>
+│   ├── tools/                <i>sync_spec.py、sync_schema.py：文件從程式產生</i>
 │   ├── requirements.txt      <i>要裝哪些套件</i>
-│   ├── Dockerfile
-│   └── .env.example          <i>環境變數範本（沒有真正的值）</i>
+│   ├── Dockerfile            <i>啟動前先 alembic upgrade head</i>
+│   └── .env.example          <i>設定範本：依成員分段，機密留空</i>
 │
 ├── <b>docs/</b>                    <i>規格文件（Markdown）</i>
 │   ├── 01-tech-stack-and-api.md
@@ -231,18 +239,23 @@ PostgreSQL
           <thead><tr><th>路徑</th><th>放什麼</th><th>誰動它</th></tr></thead>
           <tbody>
             <tr><td><span class="fname">frontend/index.html</span></td><td>整個系統的畫面骨架。新增一個畫面要在這裡加導覽項目</td><td class="tight">前端</td></tr>
-            <tr><td><span class="fname">frontend/js/api.js</span></td><td>★ <b>唯一的資料入口</b>。mock 與 http 兩套實作簽名完全相同，切換只改 <code>&lt;meta name="api-base"&gt;</code></td><td class="tight">前端</td></tr>
+            <tr><td><span class="fname">frontend/js/api.js</span></td><td>★ <b>唯一的資料入口</b>。mock 與 http 兩套實作簽名完全相同，切換只改 <code>&lt;meta name="api-base"&gt;</code>。
+            名稱、結餘、比例前端補（<code>fillIn</code>）；出錯時講出是哪一支（<code>FN</code>：函式 → 路由 → 負責人）</td><td class="tight">前端</td></tr>
             <tr><td><span class="fname">frontend/js/app.js</span></td><td>每個畫面怎麼畫、怎麼互動。<b>不直接 fetch</b>，一律走 api.js</td><td class="tight">前端</td></tr>
-            <tr><td><span class="fname">frontend/js/data.js</span></td><td>示範資料，同時是資料表草案（<code>schema</code>／<code>relations</code>）。手冊的資料表區塊就是從這裡生出來的。示範紀錄載入時會<b>對齊到真實的今天</b>（<code>fbToday()</code>），測試用 <code>__FAMBUDGET_TODAY__</code> 固定日期</td><td class="tight">前端</td></tr>
+            <tr><td><span class="fname">frontend/js/data.js</span></td><td>資料表草案（<code>schema</code>／<code>relations</code>）與固定清單（分類、主題、角色、權限）。<b>沒有任何假資料或範例帳號</b>——測試用的一家人放在 <code>backend/tests/fixtures/demo_seed.js</code>。手冊的資料表區塊就是從這裡生出來的；「今天」一律是真實的日期（<code>fbToday()</code>），測試用 <code>__FAMBUDGET_TODAY__</code> 固定</td><td class="tight">前端</td></tr>
             <tr><td><span class="fname">frontend/docs/</span></td><td>這些說明文件本身，也是靜態網頁</td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">backend/app/main.py</span></td><td>只負責組裝：掛 CORS、掛路由。<b>不寫任何業務邏輯</b></td><td class="tight">後端</td></tr>
             <tr><td><span class="fname">backend/app/ownership.py</span></td><td>★ 誰負責哪些路由、哪些檔案、排程到哪。<code>python -m app.ownership</code> 印出分工表</td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">backend/app/toolkit/</span></td><td>已經寫好的工具，<b>直接 import，不要改</b></td><td class="tight">已交付</td></tr>
-            <tr><td><span class="fname">backend/app/models/</span></td><td>資料表長什麼樣。<b>資料庫裡存什麼</b></td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/app/schemas/</span></td><td>API 進出的形狀。<b>API 收送什麼</b>——跟 models 分開，密碼雜湊才不會被不小心送出去</td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/app/routers/</span></td><td>收請求、驗權限、回結果。<b>不寫計算</b></td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/app/services/</span></td><td>真正做事：計算與規則。<b>不碰 HTTP</b>，所以可以直接測</td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/tests/</span></td><td>一致性測試。改了路由沒改文件，這裡會紅</td><td class="tight">共同</td></tr>
+            <tr><td><span class="fname">backend/app/guards.py</span></td><td>路由守衛（參考 MineMarket 的 AuthDecorator）。沒登入、被停權、角色不對、不是自己的資料，路由一行都不會跑</td><td class="tight">已交付</td></tr>
+            <tr><td><span class="fname">backend/app/cli.py</span></td><td>小工具指令：建 .env、檢查設定、建表放系統分類、設定平台管理員</td><td class="tight">已交付</td></tr>
+            <tr><td><span class="fname">backend/app/models/</span></td><td>20 張表。<b>資料庫裡存什麼</b>。改欄位三處一起改：data.js → models → Alembic</td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/schemas/</span></td><td>請求主體的形狀。<b>API 收什麼</b>——回應用 <code>crud.to_dict</code>，密碼雜湊預設就不會送出去</td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/routers/</span></td><td>70 支路由，一人一組檔案。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/services/</span></td><td>加總與模型。<code>llm/client.py</code> 已完成；<code>parse</code>、<code>advice</code>、<code>analytics.summary</code> 要做。<b>不碰 HTTP</b>，所以可以直接測</td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/alembic/</span></td><td>資料庫結構的版本。部署時啟動前自動 <code>alembic upgrade head</code></td><td class="tight">共同</td></tr>
+            <tr><td><span class="fname">backend/.env.example</span></td><td>設定範本，依「共用／成員1～4」分段；<code>python -m app.cli init-env</code> 從它建出 .env</td><td class="tight">共同</td></tr>
+            <tr><td><span class="fname">backend/tests/</span></td><td>一致性測試（改了路由沒改文件會紅）、工具箱、後端核心（模型、增刪改查、守衛、遷移）、前端代勞與錯誤訊息</td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">docs/02-前後端串接契約.md</span></td><td>★ 每一支 API 的請求與回應形狀，以及踩過的坑</td><td class="tight">共同</td></tr>
           </tbody>
         </table>
@@ -293,7 +306,8 @@ PostgreSQL
 
       <div class="note" style="margin-top:18px">
         <div class="note__k">tools/：產生文件的程式，不是給路由用的</div>
-        <p><span class="fname">tools/sync_spec.py</span>　把 <code>docs/01</code> 的分工總表與各領域路由清單，從 <code>ownership.py</code> 重新產生一次。<br>
+        <p><span class="fname">tools/sync_spec.py</span>　把 <code>docs/01</code> 與兩份 README 的分工總表、各領域路由清單，從 <code>ownership.py</code> 重新產生一次。<br>
+        <span class="fname">tools/sync_schema.py</span>　把手冊的「各表欄位」從 <code>data.js</code> 的 schema 重新產生一次。<br>
         搬了一支路由之後跑 <code>python backend/tools/sync_spec.py</code>；忘了跑，pytest 會紅燈。<br>
         ⚠️ 這兩段手動維護過，結果文件停在 8/8/10/9，實際已經 17/18/13/15。<b>跨檔案的數字不要靠人記。</b></p>
       </div>
