@@ -317,6 +317,13 @@
   }
 
   function num(v) { return Number(Math.round(v || 0)).toLocaleString('en-US'); }
+  /* ISO 8601（後端一律回 UTC）→ 使用者時區的「2026-09-14 18:05」。不是 ISO 的原樣顯示 */
+  function localAt(iso) {
+    var d = /T/.test(String(iso || '')) ? new Date(iso) : null;
+    if (!d || isNaN(d)) return String(iso || '');
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
 
   /* 三個字的名字叫後兩個字（王小明 → 小明），兩個字的名字就整個叫 */
   function callName(name) {
@@ -964,7 +971,14 @@
   function renderBatch(r) {
     var out = document.getElementById('paraOut');
     if (!out) return;
-    batch = r.items.map(function (x) { return Object.assign({}, x); });
+    /* orig：解析當下的原始結果，之後使用者怎麼改都不動它。
+       確認寫入時一起送出，後端比對「原本解析成什麼、使用者改成什麼」寫進 nlp_parses——
+       那就是模型抓錯的標註（資料飛輪）。by 標出是模型還是前端規則解析的，規則的不能當模型的成績。 */
+    batch = r.items.map(function (x) {
+      var o = Object.assign({}, x);
+      if (!o.orig) o.orig = { by: r.fallback ? 'rules' : 'model', date: x.date, amount: x.amount, kind: x.kind, cat: x.cat, merchant: x.merchant || '', note: x.note || '' };
+      return o;
+    });
 
     var miss = batch.filter(function (x) { return x.missing && x.missing.length; }).length;
     var h = '<div class="prs">';
@@ -1548,7 +1562,7 @@
     h += '<div class="mtiles">' + d.members.map(function (u, i) {
       var full = (d.visible || []).indexOf(u.id) >= 0;
       /* ⚠️ 只有共用帳本的人也點得進去（只看得到共用帳本那部分）。
-         以前這裡只看 visible，於是陳淑芬那張卡沒有「看紀錄」，
+         以前這裡只看 visible，於是只跟我共用帳本的家人那張卡沒有「看紀錄」，
          看起來像完全不能看，其實共用帳本裡的紀錄都看得到。 */
       var shared = !full && (d.queryable || []).indexOf(u.id) >= 0;
       var go = full || shared;
@@ -1567,6 +1581,10 @@
         '</div>' +
         (u.id === d.me ? '' : full ? '<span class="mt__go">看紀錄</span>'
           : shared ? '<span class="mt__go mt__go--part">看共用帳本</span>' : '') +
+        /* 自己：家裡還有別的家長時，可以把自己改成子女（唯一的家長不行，家裡會沒人管） */
+        (parent && u.id === d.me && d.members.filter(function (x) { return x.role === 'parent'; }).length > 1
+          ? '<div class="mt__acts"><button class="mt__x" data-role-child="' + esc(u.id) + '">改成子女</button></div>'
+          : '') +
         /* 家長對子女：開始／停止照看、設為家長、移出家庭。
            另一位家長只能自己退出，所以家長的卡片沒有這些 */
         (parent && u.role === 'child' && u.id !== d.me
@@ -2514,7 +2532,7 @@
           '<div class="card card--flush"><ol class="audl">' + logs.map(function (a) {
             return '<li class="audl__i">' +
               '<div class="audl__top"><b>' + esc(AUDIT_TW[a.action] || a.action) + '</b>' +
-                '<time>' + esc(a.at) + '</time></div>' +
+                '<time>' + esc(localAt(a.at)) + '</time></div>' +
               '<div class="audl__s">' + esc(a.actorName) + (a.note ? '　' + esc(a.note) : '') + '</div>' +
             '</li>';
           }).join('') + '</ol></div>' +
@@ -3481,6 +3499,23 @@
       });
       return;
     }
+    var rc = t.closest('[data-role-child]');
+    if (rc) {
+      danger({
+        title: '把自己改成子女',
+        detail: '改成子女之後，你不能再邀請家人、改角色或解散家庭，<b>你照看家人的關係會結束</b>，' +
+                '跟其他家長之間也不再互相看得到紀錄。<br>要改回家長，要請另一位家長幫你設定。',
+        level: 'password',
+        ok: '改成子女',
+        onOk: function () {
+          API.changeMemberRole(rc.dataset.roleChild, 'child').then(function () {
+            afterFamilyChange('你現在是子女');
+          }).catch(function (err) { toast(err.message || '沒有改成功', 'err'); });
+        }
+      });
+      return;
+    }
+
     if (t.closest('[data-family-dissolve]')) {
       var dName = t.closest('[data-family-dissolve]').dataset.name;
       danger({

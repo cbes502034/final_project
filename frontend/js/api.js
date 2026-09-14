@@ -112,6 +112,16 @@
   var KEY = 'fambudget.state.v2';
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* 新資料的編號：毫秒時間戳，但保證遞增。
+     同一毫秒建兩筆（段落記帳一次確認好幾筆、連點兩下）用 Date.now() 會撞號，
+     撞號的兩筆改一筆會兩筆一起變、刪一筆會兩筆一起不見。 */
+  var lastStamp = 0;
+  function stampId(prefix) {
+    var n = Date.now();
+    lastStamp = n > lastStamp ? n : lastStamp + 1;
+    return prefix + lastStamp;
+  }
   function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
   /* ---------- mock 模式的「資料庫」 ---------- */
@@ -302,7 +312,7 @@
     s.audit = (s.audit || []).concat([{
       id: 'A' + (2000 + (s.audit || []).length),
       actor: s.me, action: action, target: target,
-      at: localStamp(new Date()), note: note
+      at: new Date().toISOString(), note: note
     }]);
   }
 
@@ -589,6 +599,14 @@
 
   /* 種子群組 + 這個瀏覽器建立的群組。
      withArchived = true 時連封存的一起回（管理頁的「已封存」區塊要用）。 */
+  /* 同一個家庭裡有沒有同名的帳本（沒有家庭就只看自己開的）。
+     ⚠️ 只比自己家的：別的家庭有沒有「家用」不關我們的事，比了等於透露別人帳本的名字。 */
+  function sameNameGroup(s, name, exceptId) {
+    var fam = (memberOf(s.me) || {}).familyId;
+    var peers = fam ? global.DATA.members.filter(function (m) { return m.familyId === fam; }).map(function (m) { return m.id; }) : [s.me];
+    return allGroups(true).some(function (g) { return g.id !== exceptId && g.name === name && peers.indexOf(g.owner) >= 0; });
+  }
+
   function allGroups(withArchived) {
     var s = load();
     return global.DATA.groups.concat(s.newGroups || [])
@@ -929,7 +947,7 @@
           id: 'U' + n, name: name, email: mail, role: null, familyId: null,
           avatar: name.slice(-1), age: null,
           joined: todayStr(),
-          income: 0, expense: 0, budget: 0,
+          // 收入、支出不放在人身上：一律從明細現算（GET /api/summary 的 members[]），放了就會跟明細對不起來
           savingsGoal: 0,
           onboardedAt: null           // 還沒走個人化設定
         };
@@ -989,7 +1007,7 @@
            沒有「退回沒走過」這回事，存款目標之後到個人資料改就好。 */
         if (p.onboarded !== undefined) {
           if (p.onboarded !== true) throw oops('onboarded 只能是 true', 422);
-          if (!m.onboardedAt) q.onboardedAt = localStamp(new Date());
+          if (!m.onboardedAt) q.onboardedAt = new Date().toISOString();
         }
         applyPatch(s.patch);
         save();
@@ -1006,6 +1024,12 @@
         // 粗估 base64 解出來的大小，跟後端的 200 KB 上限對齊
         var bytes = Math.floor(String(dataUri).split(',')[1].length * 3 / 4);
         if (bytes > 200 * 1024) throw new Error('圖片太大了（上限 200 KB）');
+        // 看檔案開頭的識別位元組，不信宣告的型別（跟後端 toolkit/images.py 同一個檢查）
+        var decode = global.atob || (typeof atob === 'function' ? atob : null), head = '';
+        try { head = decode ? decode(String(dataUri).split(',')[1].slice(0, 16)) : ''; } catch (e) { head = ''; }
+        var magic = head.slice(0, 4) === '\x89PNG' || head.slice(0, 3) === '\xff\xd8\xff' ||
+          (head.slice(0, 4) === 'RIFF' && head.slice(8, 12) === 'WEBP');
+        if (!magic) throw oops('檔案內容不是 PNG / JPEG / WebP', 422);
         patchOf(s, s.me).avatarUrl = dataUri;
         applyPatch(s.patch);
         save();
@@ -1155,7 +1179,8 @@
     verifyPassword: function (pw) {
       var s = load();
       return sleep(320).then(function () {
-        if (!checkPw(s, s.me, pw)) throw oops('密碼不正確', 401);
+        /* 400 不是 401：401 會讓 http 轉接器以為 token 過期、白白續期一次再重送 */
+        if (!checkPw(s, s.me, pw)) throw oops('密碼不正確', 400);
         return { ok: true };
       });
     },
@@ -1321,9 +1346,7 @@
       return sleep(300).then(function () {
         var name = String(p.name || '').trim();
         if (!name) throw new Error('帳本要有名字');
-        if (allGroups().some(function (g) { return g.name === name; })) {
-          throw new Error('已經有一本叫「' + name + '」的帳了');
-        }
+        if (sameNameGroup(s, name)) throw oops('家裡已經有一本叫「' + name + '」的帳了', 409);
         var n = allGroups().reduce(function (mx, g) {
           return Math.max(mx, Number(String(g.id).replace(/\D/g, '')) || 0);
         }, 0) + 1;
@@ -1359,6 +1382,7 @@
         if (p.name !== undefined) {
           var nm = String(p.name).trim();
           if (!nm) throw new Error('群組要有名字');
+          if (nm !== g.name && sameNameGroup(s, nm, gid)) throw oops('家裡已經有一本叫「' + nm + '」的帳了', 409);
           q.name = nm; q.icon = nm.slice(-1);
         }
         if (p.color !== undefined) q.color = p.color;
@@ -1453,7 +1477,10 @@
             return {
               wardId: w, wardName: m.name || w,
               amount: allowanceOf(st.me, w),
-              spent: m.expense || 0
+              // 這個月花掉多少：從明細現算（人身上沒有彙總欄位）
+              spent: st.transactions.filter(function (t) {
+                return t.user === w && t.kind === 'expense' && t.date.indexOf(global.DATA.meta.period) === 0;
+              }).reduce(function (n, t) { return n + t.amount; }, 0)
             };
           })
         };
@@ -1516,8 +1543,7 @@
         if (myAlerts(s.me).some(function (a) {
           return a.percent === pct && (a.group || null) === gid;
         })) throw new Error('這個門檻已經設過了');
-        var n = Date.now();
-        var a = { id: 'ALN' + n, user: s.me, group: gid, percent: pct,
+        var a = { id: stampId('ALN'), user: s.me, group: gid, percent: pct,
                   enabled: true, firedPeriod: null };
         s.newAlerts = (s.newAlerts || []).concat([a]);
         save();
@@ -1538,7 +1564,9 @@
         // 關掉但不刪除——使用者常常只是這個月不想被吵
         if (p.enabled !== undefined) q.enabled = !!p.enabled;
         save();
-        return { id: aid };
+        var row = myAlerts(s.me).filter(function (a) { return a.id === aid; })[0];
+        if (!row) throw oops('找不到這個門檻', 404);
+        return { id: aid, user: row.user, group: row.group || null, percent: row.percent, enabled: row.enabled, firedPeriod: row.firedPeriod || null };
       });
     },
 
@@ -1793,7 +1821,7 @@
         var g = groupFor(s.me, items[0] && items[0].groupId);
         var made = items.map(function (p, i) {
           return {
-            id: 'N' + (Date.now() + i), user: s.me, date: p.date,
+            id: stampId('N'), user: s.me, date: p.date,
             amount: Number(p.amount), kind: p.kind, cat: p.cat,
             group: g,
             merchant: p.merchant || '', note: p.note || '',
@@ -1813,7 +1841,7 @@
       var s = load();
       return sleep(260).then(function () {
         var t = {
-          id: 'N' + Date.now(), user: s.me, date: p.date, amount: Number(p.amount),
+          id: stampId('N'), user: s.me, date: p.date, amount: Number(p.amount),
           group: groupFor(s.me, p.groupId),
           kind: p.kind, cat: p.cat, merchant: p.merchant || '',
           note: p.note || '', source: 'manual', raw: ''
@@ -1827,7 +1855,7 @@
       var s = load();
       return sleep(260).then(function () {
         var t = {
-          id: 'N' + Date.now(), user: s.me, date: parsed.date, amount: Number(parsed.amount),
+          id: stampId('N'), user: s.me, date: parsed.date, amount: Number(parsed.amount),
           group: groupFor(s.me, parsed.groupId),
           kind: parsed.kind, cat: parsed.cat, merchant: parsed.merchant || '',
           note: parsed.note || '', source: 'nlp', raw: parsed.raw || '',
@@ -2133,16 +2161,23 @@
       });
     },
 
+    /* 整批已讀：只標到 readUntil 那一則（含）為止。
+       按下「全部已讀」的瞬間剛好進來的新通知不能一起被標掉——使用者根本沒看到它。 */
     readNotifications: function (untilId) {
-      var s = load();
-      return sleep(80).then(function () {
+      if (!untilId) return Promise.reject(oops('要帶 readUntil（按下去當時最新的那一則）', 400));
+      return mock.notifications({}).then(function (res) {
+        var s = load();
         s.readNotify = s.readNotify || [];
-        s.transactions.forEach(function (t) {
-          var nid = 'NT' + t.id;
-          if (s.readNotify.indexOf(nid) < 0) s.readNotify.push(nid);
+        var ids = res.notifications.map(function (r) { return r.id; });   // 由新到舊
+        var from = ids.indexOf(untilId);
+        var updated = 0;
+        res.notifications.slice(from < 0 ? 0 : from).forEach(function (r) {
+          if (r.readAt || s.readNotify.indexOf(r.id) >= 0) return;
+          s.readNotify.push(r.id);
+          updated++;
         });
         save();
-        return { updated: s.readNotify.length, unread: 0 };
+        return { updated: updated, unread: Math.max(0, res.unread - updated) };
       });
     },
 
@@ -2332,7 +2367,7 @@
         (s.codes || []).forEach(function (c) {
           if (c.familyId === me.familyId && c.role === p.role && c.status === 'pending') c.status = 'cancelled';
         });
-        var row = { id: 'K' + Date.now(), familyId: me.familyId, role: p.role, code: newCode(),
+        var row = { id: stampId('K'), familyId: me.familyId, role: p.role, code: newCode(),
                     createdBy: s.me, status: 'pending', expiresAt: daysLater(INVITE_DAYS) };
         s.codes = (s.codes || []).concat([row]);
         save();
@@ -2405,7 +2440,7 @@
           return i.invitee === u.id && i.familyId === me.familyId && i.status === 'pending' && !expired(i);
         });
         if (dup) throw oops('已經邀請過了，等對方回覆就好', 409);
-        var row = { id: 'I' + Date.now(), familyId: me.familyId, inviter: s.me, invitee: u.id,
+        var row = { id: stampId('I'), familyId: me.familyId, inviter: s.me, invitee: u.id,
                     role: p.role, status: 'pending', createdAt: new Date().toISOString(),
                     expiresAt: daysLater(INVITE_DAYS) };
         s.invites = (s.invites || []).concat([row]);
@@ -2527,7 +2562,7 @@
         if (global.DATA.guardianships.some(function (g) { return g.guardian === s.me && g.ward === ward.id; })) {
           throw oops('你已經在照看' + ward.name + '了', 409);
         }
-        var row = { id: 'GS' + Date.now(), guardian: s.me, ward: ward.id, since: todayStr(), scope: '全部明細' };
+        var row = { id: stampId('GS'), guardian: s.me, ward: ward.id, since: todayStr(), scope: '全部明細' };
         s.newGuardians = (s.newGuardians || []).concat([row]);
         global.DATA.guardianships.push(clone(row));
         pushAudit(s, 'grant_guardianship', ward.id, '開始照看' + ward.name);
@@ -2640,7 +2675,7 @@
         if (allCats(s).some(function (c) { return c.kind === p.kind && c.name === name; })) {
           throw oops('已經有「' + name + '」這個分類了', 409);
         }
-        var c = { id: 'CX' + Date.now(), name: name, kind: p.kind, color: 'cat-other',
+        var c = { id: stampId('CX'), name: name, kind: p.kind, color: 'cat-other',
                   icon: name.charAt(0), familyId: me.familyId, custom: true };
         s.customCategories = (s.customCategories || []).concat([c]);
         save();

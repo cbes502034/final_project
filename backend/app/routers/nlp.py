@@ -79,5 +79,7 @@ def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db))
     POST /api/nlp/confirm-batch
 
     ⚠️ 全部成功或全部不寫（同一個交易）；回 {created: 幾筆}。
+    每一筆同時寫 nlp_parses：raw = span、model_output = orig、user_corrected = 跟 orig 不一樣的欄位；
+    orig.by == "rules"（前端規則頂著的）不算模型的成績。第一筆的 groupId 決定記進哪本帳。
     """
     raise not_ready("POST /api/nlp/confirm-batch", OWNER)

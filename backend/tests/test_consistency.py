@@ -1445,10 +1445,11 @@ def test_已經登入的人被停權_下一次請求就會被踢出去():
 
 
 def test_稽核時間是當地時間不是_UTC():
-    """toISOString() 是 UTC：下午三點停的權，在台灣會記成早上七點。
+    """下午三點停的權，在台灣不能顯示成早上七點。
 
-    ⚠️ 瀏覽器實測時抓到的。稽核紀錄就是拿來對時間的，差 8 小時等於紀錄是錯的。
-    這裡用 TZ=Asia/Taipei 跑一次，確認寫進去的時間跟當地時鐘一樣。
+    ⚠️ 瀏覽器實測時抓到的：當時存 toISOString()（UTC）又原樣顯示。稽核紀錄就是拿來對時間的，差 8 小時等於紀錄是錯的。
+    現在跟其他時間一樣：**存帶時區的 ISO 8601，顯示時才轉成當地時間**（app.js 的 localAt）。
+    這裡用 TZ=Asia/Taipei 跑一次，確認存的是絕對時間、轉出來跟當地時鐘一樣。
     """
     import json
     import shutil
@@ -1469,7 +1470,9 @@ def test_稽核時間是當地時間不是_UTC():
   const p = n => String(n).padStart(2, '0');
   const local = before.getFullYear() + '-' + p(before.getMonth() + 1) + '-' + p(before.getDate()) +
                 ' ' + p(before.getHours()) + ':';
-  process.stdout.write(JSON.stringify({ at: top.at, localPrefix: local }));
+  const d = new Date(top.at);
+  const shown = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':';
+  process.stdout.write(JSON.stringify({ at: top.at, shown: shown, localPrefix: local }));
 })().catch(e => { console.error(e); process.exit(1); });
 """
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -1483,9 +1486,11 @@ def test_稽核時間是當地時間不是_UTC():
         capture_output=True, env=dict(os.environ, TZ="Asia/Taipei"))
     assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
     out = json.loads(res.stdout.decode("utf-8"))
-    assert out["at"].startswith(out["localPrefix"]), \
-        "稽核時間 %s 跟當地時間 %s 對不上——大概又用了 toISOString()" % (
-            out["at"], out["localPrefix"])
+    assert re.search(r"T\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)$", out["at"]), \
+        "稽核時間 %s 不是帶時區的 ISO 8601——沒有時區就分不出是哪裡的時間" % out["at"]
+    assert out["shown"].startswith(out["localPrefix"]), \
+        "稽核時間 %s 轉成當地是 %s，跟當地時鐘 %s 對不上" % (out["at"], out["shown"], out["localPrefix"])
+    assert "esc(localAt(a.at))" in read("frontend/js/app.js"), "平台管理頁要把稽核時間轉成當地時間再顯示"
 
 
 def test_家長不能用平台管理的任何一支():

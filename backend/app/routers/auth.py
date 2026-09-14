@@ -198,6 +198,7 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
 
     POST /api/auth/verify-password
 
+    密碼不對回 400（不是 401——401 會讓前端以為 token 過期去續期）。
     ⚠️ 不發新 token；一定要做速率限制，否則是免費的密碼嘗試器。
     """
     raise not_ready("POST /api/auth/verify-password", OWNER)

@@ -13,7 +13,7 @@
 | **只有一個月** | 不能有學習曲線陡的東西。每個新框架都要換算成「幾天學會」 |
 | **四人中三人沒有專案經驗** | 工具要好上手、錯誤訊息要看得懂、出問題查得到中文資料 |
 | **冠文有 FastAPI / Docker / Render 實戰經驗** | 後端主幹沿用他熟的，不要為了「更好」而換 |
-| **沒有 GPU** | 模型只能用 API，或在 Colab 免費 T4 上微調小模型 |
+| **沒有 GPU** | 在 Colab 免費 T4 上微調小模型，量化之後 CPU 就跑得動 |
 
 **選型原則：能不加的就不加。** 每多一個相依，就多一個可能在最後一週爆炸的點。
 
@@ -28,7 +28,7 @@
 | **原生 HTML / CSS / JS** | — | 整個前端 | 見下方說明 |
 | **Noto Sans TC / Noto Serif TC** | Google Fonts | 字體 | 中文顯示品質，襯線標題是設計語言的一部分 |
 | **Canvas API** | 瀏覽器內建 | 星空背景 | 無相依，四十行搞定 |
-| **localStorage** | 瀏覽器內建 | mock 模式暫存 | 沒有後端時也能完整展示 |
+| **localStorage** | 瀏覽器內建 | mock 模式（跑在瀏覽器裡的後端）存資料 | 沒有後端時也能完整操作；不放任何假資料或範例帳號 |
 
 ### 為什麼不用 React / Vue
 
@@ -91,22 +91,25 @@ Django 內建 admin 與 auth，聽起來很划算。但：
 
 | 工具 | 用途 | 說明 |
 |---|---|---|
-| **Anthropic API** | 一句話記帳的解析、財務建議生成 | 冠文履歷有實戰經驗（Tool Use 兩輪架構、強制結構化輸出） |
+| **Qwen2.5-1.5B-Instruct** | 一句話記帳的解析、財務建議的敘述 | 自己微調的開源權重。選型與理由在專題手冊的「模型」那一頁 |
+| **QLoRA ＋ Colab 免費 T4** | 微調 | 沒有 GPU，只能靠免費雲端；1.5B 一輪約一小時 |
+| **GGUF ＋ llama.cpp（Hugging Face Space）** | 上線提供服務 | 量化成 q4 約 1 GB，CPU 跑得動；提供 OpenAI 相容的 `/v1/chat/completions` |
+| **httpx** | 後端呼叫模型 | `services/llm/client.py` 已經寫好：逾時、重試、剝掉 ```json 包裝 |
 | **Pydantic** | 約束模型輸出格式 | 模型回傳的 JSON 一定要過 Pydantic 驗證才採用 |
-| **Colab 免費 T4** | 微調（第二階段） | 沒有 GPU，只能靠免費雲端 |
 
-### 第一版建議先不微調
+後端只認一個網址（`MODEL_BASE_URL`），**換模型不用改程式**：few-shot 基準線、第一輪、第二輪微調都是換網址。
+商業 API（OpenAI 相容的）接得上同一支 client，可以拿來當對照組；課程重點是自己操作 LLM，**上線的模型用自己微調的**。
 
-| 做法 | 成本 | 預期效果 |
-|---|---|---|
-| **API + few-shot + 結構化輸出** | 低，一週內可上線 | 一次輸入完全正確率約 0.6–0.75 |
-| API + 微調小模型 | 高，要標註 + 訓練 + 評測 | 目標 0.75+ |
+### 模型還沒好的時候
 
-**第一版先用 API 把系統跑起來**，收集 `nlp_parses` 的真實資料，第二階段再微調。
-這樣即使微調來不及，系統仍然是完整可用的。
+| 狀況 | 系統怎麼辦 |
+|---|---|
+| `MODEL_BASE_URL` 沒填、或模型服務叫不動 | 解析與建議的路由回 **503**；前端用規則頂著（解析：金額、中文數字、分類關鍵字；建議：用算好的數字寫成句子），畫面照常能用 |
+| few-shot 基準線 | 同一顆 1.5B 不微調，只給範例。這就是對照表的第一列 |
+| 微調後 | 換 `MODEL_BASE_URL`，其他程式碼一行都不用改 |
 
-> **但評測不能省。** 就算不微調，也要交出「零樣本 vs few-shot」的對照數字，
-> 那是本專題的量化成果。
+> **評測不能省。** 要交出「零樣本 vs few-shot vs 微調」的對照數字，那是本專題的量化成果。
+> 評測工具在 `services/evaluation.py`（完全正確率、分類 Macro-F1）。
 
 ## 2-4　開發與部署
 
@@ -125,52 +128,51 @@ Django 內建 admin 與 auth，聽起來很划算。但：
 
 ```
 final_project/
-├── site/                        前端（純靜態，可直接發布）
-│   ├── index.html
+├── frontend/                    前端（純靜態，可直接發布）
+│   ├── index.html               <meta name="api-base"> 留空 = mock、填網址 = 真後端
 │   ├── css/
-│   │   ├── tokens.css          設計權杖：顏色、圓角、字體（預設的米白）
-│   │   ├── app.css             元件與畫面，只准用變數
-│   │   └── themes.css          另外七套主題（晴空藍、資訊科技、文青、流行、少女、可愛、藝術）
-│   └── js/
-│       ├── stars.js            canvas 星空與流星
-│       ├── data.js             模擬資料（mock 模式用）
-│       ├── api.js         ★    唯一的資料入口，mock / http 兩轉接器
-│       └── app.js              路由、畫面繪製、互動
+│   │   ├── tokens.css           設計權杖：顏色、圓角、字體（預設的米白）
+│   │   ├── app.css              元件與畫面，只准用變數
+│   │   └── themes.css           另外七套主題
+│   ├── js/
+│   │   ├── data.js              資料表草案（schema）與固定清單（分類、主題、角色）。沒有假資料
+│   │   ├── api.js          ★    唯一的資料入口：mock／http 兩個轉接器 ＋ 前端代勞 ＋ 錯誤指出是哪一支
+│   │   ├── app.js               路由、畫面繪製、互動
+│   │   └── notify.js            通知鈴鐺（20 秒輪詢）
+│   └── docs/                    專題手冊（站上的 /docs/）
 │
-├── api/                        後端
+├── backend/
 │   ├── app/
-│   │   ├── main.py             入口，掛載路由與中介層
-│   │   ├── core/
-│   │   │   ├── config.py       環境變數（pydantic-settings）
-│   │   │   ├── security.py     密碼雜湊、JWT 簽發驗證
-│   │   │   └── deps.py         依賴注入：取得目前使用者、權限守門
-│   │   ├── models/             SQLAlchemy 資料表定義（19 張）
-│   │   ├── schemas/            Pydantic 請求／回應模型
-│   │   ├── routers/            API 路由，一個檔案一組
-│   │   │   ├── auth.py
-│   │   │   ├── family.py
-│   │   │   ├── transactions.py
-│   │   │   ├── nlp.py     ★    一句話記帳
-│   │   │   ├── stats.py
-│   │   │   ├── budgets.py
-│   │   │   └── advices.py
-│   │   └── services/           商業邏輯，路由只負責接收與回傳
-│   │       ├── llm.py     ★    Anthropic 呼叫、結構化輸出約束、重試
-│   │       ├── permission.py   算可見範圍：監管關係 ＋ 同家庭的家長
-│   │       └── analytics.py    月年統計、預算使用率
-│   ├── tests/
+│   │   ├── main.py              入口：CORS、錯誤處理、掛上 routers/ 的每一組
+│   │   ├── guards.py        ★   路由守衛：@login_required、@parent_required、own()、in_group()…
+│   │   ├── cli.py               python -m app.cli：init-env、check-config、init-db、make-admin
+│   │   ├── ownership.py         分工的單一事實來源（誰負責哪支路由、哪些檔案）
+│   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
+│   │   ├── models/              20 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
+│   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
+│   │   ├── routers/             70 支路由，一人一組檔案。還沒做的回 501
+│   │   └── services/
+│   │       ├── llm/client.py    模型呼叫層（已完成）
+│   │       ├── llm/parse.py     記帳解析（成員2）
+│   │       ├── llm/advice.py    財務建議（成員3）
+│   │       ├── analytics.py     所有加總（成員3）
+│   │       ├── permission.py    可見範圍（成員4）
+│   │       └── evaluation.py    模型評測指標
+│   ├── alembic/                 資料庫遷移（versions/ 第一版就是 20 張表）
+│   ├── tests/                   pytest（含 fixtures/：測試用的一家人、假後端）
+│   ├── tools/                   sync_spec.py、sync_schema.py：文件從程式產生
 │   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env.example
+│   ├── Dockerfile               啟動前先 alembic upgrade head
+│   └── .env.example             設定範本，依成員分段
 │
-├── docs/                       規格文件
-├── docker-compose.yml          本機一鍵啟動
-├── render.yaml                 部署設定
+├── docs/                        規格文件
+├── docker-compose.yml           本機一鍵啟動
+├── render.yaml                  部署設定
 └── README.md
 ```
 
-**分層原則：`routers` 只做接收與回傳，商業邏輯一律放 `services`。**
-這樣測試時可以直接測 service，不必每次都起一個 HTTP 請求。
+**分層原則：`routers` 只做接收與回傳，規則放 `toolkit/`、加總與模型放 `services/`。**
+這樣測試時可以直接測函式，不必每次都起一個 HTTP 請求。
 
 ---
 
@@ -191,13 +193,13 @@ final_project/
 | 3 | POST | `/api/auth/refresh` | 成員1 | 公開 | 用 refresh token 換新的 access token |
 | 4 | POST | `/api/auth/logout` | 成員1 | 登入 | 撤銷目前的 refresh token |
 | 5 | POST | `/api/auth/logout-all` | 成員1 | 登入 | 撤銷所有裝置的 token |
-| 6 | GET | `/api/auth/me` | 成員1 | 登入 | 目前使用者、家庭角色、被誰監管 |
-| 7 | PATCH | `/api/auth/password` | 成員1 | 登入 | 修改密碼，同時讓其他 session 失效 |
+| 6 | GET | `/api/auth/me` | 成員1 | 登入 | 目前使用者、家庭角色、看得到誰、被誰監管 |
+| 7 | PATCH | `/api/auth/password` | 成員1 | 登入 | 修改密碼，同時讓其他 session 失效。舊密碼不對回 400 |
 | 74 | POST | `/api/auth/password-reset` | 成員1 | 公開 | 忘記密碼：寄一次性的重設連結（Brevo）。**有沒有這個帳號都回同一句話** |
 | 75 | POST | `/api/auth/password-reset/confirm` | 成員1 | 公開 | 用信裡的 token 設新密碼。30 分鐘失效、只能用一次，成功後撤銷所有 sessions |
 | 8 | GET | `/api/auth/me/finance` | 成員1 | 本人 | 我的理財習慣（財務建議的背景） |
 | 9 | PUT | `/api/auth/me/finance` | 成員1 | 本人 | 改理財習慣。body: { style, goals[], habits[], note } |
-| 10 | POST | `/api/auth/verify-password` | 成員1 | 本人 | 重大操作前再確認一次 |
+| 10 | POST | `/api/auth/verify-password` | 成員1 | 本人 | 重大操作前再確認一次。不發新 token；不對回 400 |
 | 11 | GET | `/api/auth/sessions` | 成員1 | 登入 | 列出有效的登入裝置 |
 | 12 | PATCH | `/api/auth/me` | 成員1 | 登入 | 修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 `onboarded: true` |
 | 13 | PUT | `/api/auth/me/avatar` | 成員1 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
@@ -231,9 +233,13 @@ final_project/
   "accessToken": "eyJhbGciOi...",
   "refreshToken": "eyJhbGciOi...",
   "expiresIn": 1800,
-  "user": { "id": 1, "displayName": "林建國", "role": "parent" }
+  "user": { "id": "1", "name": "林建國", "email": "jianguo@lin.tw", "role": "parent",
+            "familyId": "1", "avatar": "國", "avatarUrl": null,
+            "onboardedAt": "2026-01-05T09:00:00+08:00", "theme": "sky", "savingsGoal": 20000 }
 }
 ```
+
+⚠️ ID 回字串（`crud.to_dict` 預設就轉）。每一支的完整形狀在 `02-前後端串接契約.md`。
 
 ## 4-2　家庭與權限 `/api/family`
 
@@ -249,17 +255,17 @@ final_project/
 | 70 | POST | `/api/family/invites` | 成員4 | 家長 | 用帳號邀請。body: { userId, role } |
 | 71 | POST | `/api/family/invites/{invite_id}/accept` | 成員4 | 被邀請的人 | 接受邀請，加入家庭 |
 | 72 | DELETE | `/api/family/invites/{invite_id}` | 成員4 | 被邀請的人／家長 | 婉拒（被邀請的人）或取消（發邀請那一家的家長） |
-| 50 | PATCH | `/api/family/members/{userId}` | 成員4 | 家長 | 修改成員角色 |
-| 51 | DELETE | `/api/family/members/{userId}` | 成員4 | 家長／本人 | 家長把子女移出家庭；寫 `me` 就是自己退出。不刪資料 |
-| 52 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
-| 53 | POST | `/api/guardianships` | 成員4 | 家長 | 建立監管關係 |
-| 54 | DELETE | `/api/guardianships/{id}` | 成員4 | 家長 | 解除監管（設 `ended_at`，不刪除） |
+| 50 | PATCH | `/api/family/members/{user_id}` | 成員4 | 家長 | 改角色。子女可以設為家長；**不能把另一位家長改成子女**，只能自己改（家裡要還有別的家長） |
+| 51 | DELETE | `/api/family/members/{user_id}` | 成員4 | 家長／本人 | 家長把子女移出家庭；寫 `me` 就是自己退出。不刪資料 |
+| 52 | GET | `/api/guardianships` | 成員4 | 登入 | 同一個家庭的監管關係。**被監管者也看得到** |
+| 53 | POST | `/api/guardianships` | 成員4 | 家長 | 開始照看一個子女。body: { wardId }，**監管人一定是自己** |
+| 54 | DELETE | `/api/guardianships/{gid}` | 成員4 | 監管人／同家庭的家長 | 停止照看（設 `ended_at`，不刪除）。被照看的人自己不能解除 |
 | 55 | GET | `/api/notifications` | 成員4 | 登入 | 通知清單。帶 since 只拿新的 |
 | 56 | PATCH | `/api/notifications/{nid}` | 成員4 | 本人 | 把一則標記成已讀 |
 | 57 | PATCH | `/api/notifications` | 成員4 | 本人 | 整批標記已讀 |
 | 25 | GET | `/api/groups` | 成員2 | 登入 | 我加入的群組（帳本） |
 | 26 | POST | `/api/groups` | 成員2 | 登入 | 建立一個群組，建立者自動加入 |
-| 27 | PATCH | `/api/groups/{gid}` | 成員2 | 建立者 | 改名稱、圖示、顏色 |
+| 27 | PATCH | `/api/groups/{gid}` | 成員2 | 建立者 | 改名稱、顏色、備註，或復原封存（`archived: false`） |
 | 28 | DELETE | `/api/groups/{gid}` | 成員2 | 建立者 | 封存這本帳；`?permanent=true` 移除已結算的活動帳本（紀錄保留） |
 | 29 | POST | `/api/groups/{gid}/members` | 成員2 | 建立者 | 把家人加進這本帳 |
 | 30 | DELETE | `/api/groups/{gid}/members/{user_id}` | 成員2 | 建立者 | 把某個人移出這本帳 |
@@ -273,13 +279,13 @@ final_project/
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 15 | GET | `/api/transactions` | 成員2 | 登入 | 明細。可帶 `userId` / `from` / `to` / `categoryId` / `kind` / `q` / `page` |
+| 15 | GET | `/api/transactions` | 成員2 | 登入 | 明細。可帶 `userId` / `groupId` / `from` / `to` / `categoryId` / `kind` / `source` / `q` / `page`；不認得的參數回 422 |
 | 16 | POST | `/api/transactions` | 成員2 | 登入 | 手動新增。**單筆手動模式走這支**，不經過模型，寫入的 `source` 記成 `manual` |
 | 17 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改。只送要改的欄位；結算過的帳本裡的不能改（409） |
 | 18 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除一筆。結算過的帳本裡的不能刪（409） |
 | 73 | DELETE | `/api/transactions` | 成員2 | 本人 | 一次刪多筆。`?ids=T1,T2`，最多 100 筆；**全部成功或全部不動** |
 | 23 | GET | `/api/categories` | 成員2 | 登入 | 分類體系（系統預設 + 家庭自訂） |
-| 24 | POST | `/api/categories` | 成員2 | 家長 | 新增家庭自訂分類 |
+| 24 | POST | `/api/categories` | 成員2 | 家長 | 新增家庭自訂分類。body: { name, kind }，1～10 字、同收支不重名 |
 
 **查詢參數的權限行為**：不帶 `userId` 時回傳「你看得到的所有人」；
 帶 `userId` 但你沒有權限看那個人 → **回 403 而不是空陣列**（空陣列會讓人以為對方沒記帳）。
@@ -313,40 +319,31 @@ final_project/
 ```json
 {
   "raw": "今天午餐吃了120",
-  "parsed": {
-    "occurredOn": "2026-09-10",
-    "amount": 120,
-    "kind": "expense",
-    "categoryId": 1,
-    "merchant": null
-  },
-  "confidence": { "amount": 0.98, "occurredOn": 0.96, "kind": 0.97, "category": 0.94 },
-  "note": "「今天」已換算成實際日期",
-  "modelVer": "claude-haiku-4-5-20251001"
+  "matched": false,
+  "out": { "date": "2026-09-10", "amount": 120, "kind": "expense", "cat": "1",
+           "merchant": "", "conf": 0.98, "catConf": 0.94 },
+  "note": "「今天」已換算成實際日期"
 }
 ```
 
-**請求 — `POST /api/nlp/confirm`**
+**請求 — `POST /api/nlp/confirm-batch`**（段落版，畫面實際在用的）
 
 ```json
-{
-  "raw": "今天午餐吃了120",
-  "parsed": { "occurredOn": "2026-09-10", "amount": 120, "kind": "expense", "categoryId": 1 },
-  "corrected": { "categoryId": 4 },
-  "parseId": 881
-}
+{ "items": [ { "span": "今天午餐吃了120", "date": "2026-09-10", "amount": 120, "kind": "expense",
+               "cat": "4", "merchant": "", "note": "",
+               "orig": { "by": "model", "date": "2026-09-10", "amount": 120, "kind": "expense", "cat": "1" } } ] }
 ```
 
-`corrected` 有值就表示使用者改過 —— **這筆會被存進 `nlp_parses.user_corrected`，
-成為下一輪的訓練資料。這是本系統的資料飛輪。**
+外層是使用者確認過的值，`orig` 是解析當下的原始結果。**兩邊不一樣的欄位存進 `nlp_parses.user_corrected`，
+成為下一輪的訓練資料。這是本系統的資料飛輪。**（`orig.by` 是 `rules` 的是前端規則頂著的，不算模型的成績。）
 
 ## 4-5　統計與預算
 
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 33 | GET | `/api/summary` | 成員3 | 登入 | 摘要。`scope=me\|family`、`period=2026-09` |
+| 33 | GET | `/api/summary` | 成員3 | 登入 | 摘要。`scope=me\|family`、`period=2026-09`、`groupId`。統計頁唯一的來源 |
 | 35 | GET | `/api/budgets` | 成員3 | 登入 | 預算與使用率 |
-| 36 | PUT | `/api/budgets` | 成員3 | 本人 | 設定預算 |
+| 36 | PUT | `/api/budgets` | 成員3 | 本人 | 設定自己的分類預算。body: { cat, limit, period }，`limit: 0` = 拿掉 |
 | 38 | PUT | `/api/savings-goal` | 成員3 | 本人 | **設定每月存款目標**（註冊後的個人化設定也走這支）。⚠️ 只有本人能設，監管者不能代設 |
 | 39 | GET | `/api/savings-goals` | 成員3 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
 | 40 | GET | `/api/alerts` | 成員3 | 登入 | 我設定的階段性提醒門檻 |
@@ -373,7 +370,7 @@ final_project/
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
 | 44 | GET | `/api/advices` | 成員3 | 登入 | 建議清單。`scope`、`period` |
-| 45 | POST | `/api/advices/generate` | 成員3 ★ | 家長 | 重新產生。**後端先算好數字再餵給模型** |
+| 45 | POST | `/api/advices/generate` | 成員3 ★ | 登入（全家限家長） | 產生這個月的建議。body: { scope }。**後端先算好數字再餵給模型** |
 
 **產生流程（順序不能顛倒）**
 
@@ -402,17 +399,21 @@ final_project/
 
 # 五、前端如何接上
 
-前端目前跑在 **mock 模式**，所有資料來自 `web/js/data.js`。
-要切換到真後端，只要改 `site/index.html` 一行：
+前端的 `frontend/js/api.js` 有兩個轉接器，**簽章完全一致**：
+
+| 模式 | 什麼時候 | 資料在哪 |
+|---|---|---|
+| **mock** | `<meta name="api-base">` 留空 | 跑在瀏覽器裡的後端，規則跟契約一樣，資料存在 `localStorage`。**沒有任何假資料或範例帳號**，從註冊開始 |
+| **http** | 填上後端網址 | 全部改用 `fetch` 打真後端，不會混著用 mock |
 
 ```html
 <meta name="api-base" content="https://fambudget-backend.onrender.com">
 ```
 
-留空 = mock 模式。填上網址 = 改用 `fetch` 打真後端。
-
-**`frontend/js/api.js` 裡 `mockAdapter` 與 `httpAdapter` 的簽章完全一致**，
-所以可以一支一支路由慢慢接 —— 後端做好哪支就改哪支，不必等全部完成。
+切到 http 之後，後端還沒做的路由回 501，**畫面會直接講是哪一支、哪條路由、誰負責**，其他頁照常能用；
+有四支（`nlp/parse`、`nlp/parse-batch`、`advices/generate`、`auth/sessions`）前端還會先頂著。
+所以可以一支一支慢慢接，不必等全部完成。名稱、結餘、比例、預算百分比這些前端補得出來，後端可以不帶——
+細節在 `02-前後端串接契約.md` 的「已經定案的四件事」。
 
 ---
 
@@ -473,7 +474,8 @@ python -m app.ownership      # 印出分工表並檢查一致性
 ### 成員1 · 認證　`m1-auth`
 
 負責「你是誰」以及整個後端的地基。
-屬於他的：註冊登入登出、密碼、JWT、資料庫連線、設定管理、依賴注入、模型呼叫層，以及平台管理員的停權（停權擋的是登入，所以歸認證）。
+屬於他的：註冊登入登出、密碼與忘記密碼、JWT、工作階段、個人資料與理財習慣，以及平台管理員的停權（停權擋的是登入，所以歸認證）。
+地基（設定 `toolkit/config.py`、資料庫連線 `toolkit/db.py`、增刪改查 `toolkit/crud.py`、路由守衛 `guards.py`、模型呼叫層 `services/llm/client.py`、20 張表與 Alembic）**已經做好了**，他負責維護。
 不屬於他的：家庭角色與監管關係（那是成員4）。users 表存的是登入身分，family_members 表才是家庭角色，兩者刻意分開。
 
 **路由（19 支）**
@@ -504,7 +506,8 @@ DELETE /api/admin/users/{user_id}/suspend
 
 負責「記一筆帳」這個動作，從文字進來到寫進資料庫。★ 這是整個系統的核心。
 屬於他的：明細的增刪改查、段落解析、單句解析、確認後寫入、nlp_parses 的寫入。
-不屬於他的：分類體系的定義與 /api/categories（那是成員3 —— 分類由成員3 定義，成員2 只是把清單寫進 prompt）；統計加總（那是成員3，前端和這裡都不做任何加總）。
+帳本（開、改、封存、結算、成員）與分類也在這裡：帳本是「這筆算在哪」的容器，分類是記帳時要選的欄位，統計只是拿它分組。
+不屬於他的：統計加總（那是成員3，前端和這裡都不做任何加總）。
 
 **路由（19 支）**
 
@@ -533,8 +536,8 @@ PATCH  /api/groups/{gid}/notify
 ### 成員3 · 數字　`m3-analytics`
 
 負責所有「算出來的東西」，以及把那些數字講成人話。
-屬於他的：分類體系、月年統計、預算、每月存款目標、財務建議。
-**整個系統只有這裡算錢** —— 路由不算、前端不算、模型更不算。
+屬於他的：月年統計、預算、每月存款目標、階段性提醒的門檻、財務建議。
+**整個系統只有這裡加總錢** —— 模型不算，前端只做衍生（結餘、比例、預算百分比）。
 不屬於他的：明細的寫入（那是成員2）；決定要算哪些人（那是成員4 的 permission）。
 
 **路由（11 支）**
@@ -556,7 +559,7 @@ POST   /api/advices/generate
 ### 成員4 · 家庭　`m4-access`
 
 負責「誰在這個家庭裡」以及「誰看得到誰的資料」，另外扛模型評測。
-屬於他的：家庭、成員角色、家庭綁定（邀請碼與用帳號邀請）、監管關係、權限計算、稽核紀錄、評測。
+屬於他的：家庭（建立、解散）、成員角色、家庭綁定（邀請碼與用帳號邀請）、監管關係、權限計算、通知、零用金、稽核紀錄、評測。
 不屬於他的：登入本身（那是成員1）。成員1 回答「你是誰」，成員4 回答「你能看到什麼」。
 
 **路由（21 支）**
@@ -643,15 +646,22 @@ GET    /api/audit
 
 ## 6-5　第 1 週的相依順序
 
-這三件事會擋住別人，**要最優先完成**：
+原本會擋住別人的地基**已經做好了**，四個人第一天就能開工：
 
 ```
-成員1  core/deps.py 的 get_current_user          ← 其他三人的每一支路由都要用
-成員4  services/permission.py 的 visible_user_ids ← 成員2、成員3 的查詢要用
-成員3  分類體系（GET /api/categories）            ← 成員2 寫 prompt、成員4 評測要用
+✅ 路由守衛        app/guards.py（@login_required、own()、in_group()、can_see_user()）
+✅ 資料庫與增刪改查 app/toolkit/db.py、crud.py、models/（20 張表）、alembic/
+✅ 可見範圍        app/guards.py 的 visible_scope()、services/permission.py 的 visible()
+✅ 模型呼叫層      app/services/llm/client.py
 ```
 
-前兩件可以平行做。**分類體系是唯一的跨模組契約**，成員3 定好就凍結，
+還剩一件跨模組的事**要最優先**：
+
+```
+成員2  分類體系（GET /api/categories）  ← 成員2 寫 prompt、成員4 評測、成員3 統計分組都要用
+```
+
+系統預設分類跟 `data.js` 一致，`python -m app.cli init-db` 會放進去。**分類清單是唯一要凍結的跨模組契約**，
 要改先在群組講。
 
 ## 6-6　分支規則
@@ -685,7 +695,7 @@ docker compose up
 # 文件  http://localhost:8000/docs
 ```
 
-只跑前端（不需要後端也能完整展示）：
+只跑前端（不需要後端也能完整操作，資料存在瀏覽器裡）：
 
 ```bash
 python -m http.server 5174 --directory frontend
