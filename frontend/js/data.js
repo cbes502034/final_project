@@ -183,25 +183,31 @@ window.DATA = {
     { id: 'U0', name: '系統管理員', email: 'admin@fambudget.tw', role: null,
       avatar: '管', age: null, isPlatformAdmin: true,
       joined: '2026-01-01', income: 0, expense: 0, budget: 0, savingsGoal: 0 },
-    { id: 'U1', name: '林建國', email: 'jianguo@lin.tw', role: 'parent', avatar: '國', age: 52,
+    { id: 'U1', name: '林建國', email: 'jianguo@lin.tw', role: 'parent', familyId: 'F1', avatar: '國', age: 52,
       joined: '2026-01-05', income: 68000, expense: 41230, budget: 45000,
       savingsGoal: 20000,
       finance: { style: 'balanced', goals: ['house', 'education'],
                  habits: ['mortgage', 'insurance'],
                  note: '房貸還有十二年，小孩教育費是最優先的，旅遊可以省。' },
       monthly: [{ m: '2026-04', income: 68000, expense: 39519 }, { m: '2026-05', income: 68000, expense: 37680 }, { m: '2026-06', income: 85000, expense: 44609 }, { m: '2026-07', income: 68000, expense: 50725 }, { m: '2026-08', income: 68000, expense: 41572 }, { m: '2026-09', income: 68000, expense: 41230 }] },
-    { id: 'U2', name: '陳淑芬', email: 'shufen@lin.tw', role: 'parent', avatar: '芬', age: 49,
+    { id: 'U2', name: '陳淑芬', email: 'shufen@lin.tw', role: 'parent', familyId: 'F1', avatar: '芬', age: 49,
       joined: '2026-01-05', income: 52000, expense: 38900, budget: 40000,
       savingsGoal: 15000 ,
       monthly: [{ m: '2026-04', income: 52000, expense: 37286 }, { m: '2026-05', income: 52000, expense: 35551 }, { m: '2026-06', income: 52000, expense: 42088 }, { m: '2026-07', income: 52000, expense: 47858 }, { m: '2026-08', income: 52000, expense: 39223 }, { m: '2026-09', income: 52000, expense: 38900 }] },
-    { id: 'U3', name: '林宇涵', email: 'yuhan@lin.tw', role: 'child', avatar: '涵', age: 19,
+    { id: 'U3', name: '林宇涵', email: 'yuhan@lin.tw', role: 'child', familyId: 'F1', avatar: '涵', age: 19,
       joined: '2026-02-11', income: 8000, expense: 11450, budget: 10000,
       savingsGoal: 2000 ,
       monthly: [{ m: '2026-04', income: 8000, expense: 10975 }, { m: '2026-05', income: 8000, expense: 10464 }, { m: '2026-06', income: 8000, expense: 12388 }, { m: '2026-07', income: 8000, expense: 14087 }, { m: '2026-08', income: 8000, expense: 11545 }, { m: '2026-09', income: 8000, expense: 11450 }] },
-    { id: 'U4', name: '林宇軒', email: 'yuxuan@lin.tw', role: 'child', avatar: '軒', age: 16,
+    { id: 'U4', name: '林宇軒', email: 'yuxuan@lin.tw', role: 'child', familyId: 'F1', avatar: '軒', age: 16,
       joined: '2026-02-11', income: 3000, expense: 4820, budget: 4000,
       savingsGoal: 500 ,
-      monthly: [{ m: '2026-04', income: 3000, expense: 4620 }, { m: '2026-05', income: 3000, expense: 4405 }, { m: '2026-06', income: 3000, expense: 5215 }, { m: '2026-07', income: 3000, expense: 5930 }, { m: '2026-08', income: 3000, expense: 4860 }, { m: '2026-09', income: 3000, expense: 4820 }] }
+      monthly: [{ m: '2026-04', income: 3000, expense: 4620 }, { m: '2026-05', income: 3000, expense: 4405 }, { m: '2026-06', income: 3000, expense: 5215 }, { m: '2026-07', income: 3000, expense: 5930 }, { m: '2026-08', income: 3000, expense: 4860 }, { m: '2026-09', income: 3000, expense: 4820 }] },
+    /* 還沒加入任何家庭的帳號——拿來示範「家庭綁定」。
+       用家長登入，到「家庭成員」輸入 yuzhen@mail.tw 就能邀請她；
+       或是用她登入，輸入家長產生的邀請碼加入。 */
+    { id: 'U5', name: '林玉珍', email: 'yuzhen@mail.tw', role: null, familyId: null, avatar: '珍', age: 74,
+      joined: '2026-09-01', income: 0, expense: 0, budget: 0, savingsGoal: 0,
+      monthly: [{ m: '2026-04', income: 0, expense: 0 }, { m: '2026-05', income: 0, expense: 0 }, { m: '2026-06', income: 0, expense: 0 }, { m: '2026-07', income: 0, expense: 0 }, { m: '2026-08', income: 0, expense: 0 }, { m: '2026-09', income: 0, expense: 0 }] }
   ],
 
   /* 超支警告的分級門檻。刻意讓使用者看得到，因為每個人對「接近」的定義不同 */
@@ -211,7 +217,13 @@ window.DATA = {
     note: '可支配上限 = 本月收入 − 每月存款目標。支出超過上限，就代表這個月存不到原本設定的金額。'
   },
 
-  /* 監管關係：誰看得到誰。刻意雙向透明——被監管者自己也看得到這張表 */
+  /* 家庭。一個人同時只屬於一個家庭（members[].familyId）。
+     邀請與邀請碼不放種子資料——示範時現場產生。 */
+  families: [
+    { id: 'F1', name: '林家', createdBy: 'U1', createdAt: '2026-01-05' }
+  ],
+
+  /* 監管關係：家長看得到哪幾個孩子的紀錄。家長之間不用設，同一個家庭的家長互相看得到 */
   guardianships: [
     { guardian: 'U1', ward: 'U3', since: '2026-02-11', scope: '全部明細' },
     { guardian: 'U1', ward: 'U4', since: '2026-02-11', scope: '全部明細' },
@@ -553,15 +565,26 @@ window.DATA = {
       cols: [['id', 'BIGSERIAL', 'PK'], ['name', 'TEXT', '例如「林家」'],
              ['created_by', 'BIGINT', 'FK → users，開這個家的人。⚠️ 僅供稽核，不給任何額外權限'],
              ['currency', 'TEXT', "預設 'TWD'"],
-             ['invite_code', 'TEXT', '邀請碼，可重新產生'],
              ['created_at', 'TIMESTAMPTZ', '']] },
 
-    { t: 'family_members', label: '家庭成員與角色', note: '一人可屬於多個家庭',
+    { t: 'family_members', label: '家庭成員與角色', note: '一個人同時只屬於一個家庭',
       cols: [['family_id', 'BIGINT', 'PK, FK → families'],
-             ['user_id', 'BIGINT', 'PK, FK → users'],
-             ['role', 'TEXT', "'parent' / 'child'。只決定治理動作，不決定可見度"],
+             ['user_id', 'BIGINT', 'PK, FK → users。UNIQUE：一個人只能在一個家庭'],
+             ['role', 'TEXT', "'parent' / 'child'。家長之間互相看得到；看子女要有監管關係"],
              ['joined_at', 'TIMESTAMPTZ', ''],
-             ['status', 'TEXT', "'active' / 'invited' / 'removed'"]] },
+             ['status', 'TEXT', "'active' / 'removed'"]] },
+
+    { t: 'family_invites', label: '家庭邀請', note: '★ 邀請碼與用帳號邀請都記在這裡',
+      cols: [['id', 'BIGSERIAL', 'PK'],
+             ['family_id', 'BIGINT', 'FK → families'],
+             ['inviter_id', 'BIGINT', 'FK → users，發出邀請的家長'],
+             ['invitee_id', 'BIGINT', 'FK → users。用邀請碼時為 NULL，有人拿碼加入才填'],
+             ['code_hash', 'TEXT', '邀請碼的雜湊，只有邀請碼才有。⚠️ 不存明碼'],
+             ['role', 'TEXT', "'parent' / 'child'，由家長決定，被邀請的人不能改"],
+             ['status', 'TEXT', "'pending' / 'accepted' / 'declined' / 'cancelled'"],
+             ['expires_at', 'TIMESTAMPTZ', '七天後過期'],
+             ['created_at', 'TIMESTAMPTZ', ''],
+             ['responded_at', 'TIMESTAMPTZ', '']] },
 
     { t: 'guardianships', label: '監管關係', note: '誰看得到誰的明細。雙方都看得到這張表',
       cols: [['id', 'BIGSERIAL', 'PK'],
@@ -691,6 +714,8 @@ window.DATA = {
     ['savings_goals', 'users', 'N:1', '★存款目標'],
     ['family_members', 'users', 'N:1', ''],
     ['family_members', 'families', 'N:1', ''],
+    ['family_invites', 'families', 'N:1', ''],
+    ['family_invites', 'users', 'N:1', '邀請人與被邀請人'],
     ['guardianships', 'users', 'N:1', '監管'],
     ['accounts', 'users', 'N:1', ''],
     ['transactions', 'users', 'N:1', ''],
@@ -716,13 +741,16 @@ window.DATA = {
     { action: '設定自己的預算', parent: 'Y', child: 'Y' },
     { action: '設定每月存款目標', parent: 'Y（只有自己的）', child: 'Y（只有自己的）' },
     { action: '查看被監管者的明細', parent: 'Y（被指派的）', child: 'Y（被指派的）' },
-    { action: '查看沒有指派給自己的人', parent: 'N', child: 'N' },
+    { action: '查看同家庭其他家長的紀錄（唯讀）', parent: 'Y', child: 'N' },
+    { action: '查看沒有指派給自己的子女', parent: 'N', child: 'N' },
     { action: '修改／刪除被監管者的紀錄', parent: 'N', child: 'N' },
     { action: '登入被監管者的帳號', parent: 'N', child: 'N' },
     { action: '收到被監管者新增紀錄的通知', parent: 'Y（被指派的）', child: 'Y（被指派的）' },
     { action: '切換到「全家」（唯讀）', parent: 'Y', child: 'N' },
     { action: '設定家庭預算', parent: 'Y', child: 'N' },
-    { action: '邀請／移除成員', parent: 'Y', child: 'N' },
+    { action: '建立家庭、邀請家人', parent: 'Y', child: 'N' },
+    { action: '決定被邀請的人是家長或子女', parent: 'Y', child: 'N' },
+    { action: '用邀請碼或邀請加入家庭', parent: 'Y', child: 'Y' },
     { action: '建立監管關係', parent: 'Y', child: 'N' },
     /* 帳本不看角色：誰都可以開自己的帳本。
        ⚠️ 這是刻意的——記帳的分類方式是個人的事，不該由家裡的階級決定。 */
@@ -730,7 +758,7 @@ window.DATA = {
     { action: '管理自己建的帳本', parent: 'Y', child: 'Y' },
     { action: '管理別人建的帳本', parent: 'N', child: 'N' },
     { action: '設定自己的階段性提醒', parent: 'Y', child: 'Y' },
-    { action: '查看「誰看得到我」', parent: 'Y（強制可見）', child: 'Y（強制可見）' },
+    { action: '查看「誰看得到我」', parent: 'Y', child: 'Y' },
     { action: '匯出資料', parent: 'Y（限可見範圍）', child: 'Y（限可見範圍）' }
   ],
 

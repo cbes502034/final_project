@@ -27,7 +27,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>63 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>68 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -69,7 +69,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">63 ROUTES · 4 MODULES</div>
+    <div class="mono">68 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -115,12 +115,16 @@
     { n: 46, o: 'm4', m: 'GET', p: '/api/family', a: '登入',
       d: '家庭資訊、成員清單、角色' },
     { n: 47, o: 'm4', m: 'POST', p: '/api/family', a: '登入',
-      d: '建立家庭。建立者記在 created_by，僅供稽核，不給額外權限' },
+      d: '建立家庭，建立的人成為家長。body: { name }',
+      note: '已經在家庭裡的人不能再建立。一個人同時只屬於一個家庭。' },
     { n: 48, o: 'm4', m: 'POST', p: '/api/family/invite', a: '家長',
-      d: '產生邀請碼',
-      res: '{ "code": "F7K2-9QX4", "expiresAt": "2026-09-18T00:00:00Z" }' },
+      d: '產生邀請碼。body: { role }',
+      body: '{ "role": "child" }',
+      res: '{ "code": "K7QM-3XWP", "role": "child", "expiresAt": "2026-09-21T00:00:00Z" }',
+      note: '⚠️ <b>身分由家長決定</b>，拿到碼的人不能自己選，否則任何人拿到碼都能以家長身分加入。碼<b>只能用一次</b>、七天過期，資料庫只存雜湊（toolkit/family.py）。同一個身分再產生一次，舊的那組就作廢。' },
     { n: 49, o: 'm4', m: 'POST', p: '/api/family/join', a: '登入',
-      d: '用邀請碼加入家庭', body: '{ "code": "F7K2-9QX4" }' },
+      d: '用邀請碼加入家庭', body: '{ "code": "K7QM-3XWP" }',
+      note: '比對前先正規化：去掉空白與 -、轉大寫，所以 k7qm 3xwp 也能用。' },
     { n: 50, o: 'm4', m: 'PATCH', p: '/api/family/members/{userId}', a: '家長',
       d: '修改成員角色', body: '{ "role": "parent" }' },
     { n: 51, o: 'm4', m: 'DELETE', p: '/api/family/members/{userId}', a: '家長',
@@ -256,6 +260,22 @@
     { n: 59, o: 'm4', m: 'PUT', p: '/api/allowance', a: '監管者',
       d: '設定零用金。body: { wardId, amount }',
       note: '⚠️ <b>零用金是設定，不是一筆支出紀錄。</b>家長記一筆「給小孩 3000」、小孩再把它花掉記成支出，家庭總支出就會變成 6000——同一筆錢被算了兩次。' },
+
+    { n: 68, o: 'm4', m: 'GET', p: '/api/family/lookup', a: '家長',
+      d: '用完整 email 找人，準備邀請他加入家庭',
+      note: '只接受完整 email，不做模糊搜尋。只回名字、頭像與 status（available／member／invited／unavailable），不回任何財務資料。在別的家庭或是平台管理員一律回 unavailable，不說原因。要做速率限制。' },
+    { n: 69, o: 'm4', m: 'GET', p: '/api/family/invites', a: '登入',
+      d: '我收到的邀請、我們家送出去還沒回覆的、還有效的邀請碼',
+      note: 'received 給被邀請的人；sent 與 codes 只有家長拿得到。過期的不回。' },
+    { n: 70, o: 'm4', m: 'POST', p: '/api/family/invites', a: '家長',
+      d: '用帳號邀請。body: { userId, role }',
+      note: '身分由家長決定，被邀請的人不能改。對方已經在家庭裡、或同一個人還有沒回覆的邀請，就不能再送。' },
+    { n: 71, o: 'm4', m: 'POST', p: '/api/family/invites/{invite_id}/accept', a: '被邀請的人',
+      d: '接受邀請，加入家庭',
+      note: '只有 invitee 本人能接受。已經在家庭裡、邀請過期或已處理過都要擋。' },
+    { n: 72, o: 'm4', m: 'DELETE', p: '/api/family/invites/{invite_id}', a: '被邀請的人／家長',
+      d: '婉拒（被邀請的人）或取消（發邀請那一家的家長）',
+      note: '不刪資料，把 status 改成 declined 或 cancelled。' },
 
     { n: 31, o: 'm2', m: 'POST', p: '/api/groups/{gid}/settle', a: '本人（開帳本的人）',
       d: '結算活動帳本。之後唯讀，不能再往裡面記',

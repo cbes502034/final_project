@@ -61,7 +61,7 @@
 | **Pydantic** | v2 | 請求／回應驗證 | **強制結構化輸出的關鍵**，LLM 回傳也用它驗 |
 | **pydantic-settings** | 2.6+ | 環境變數管理 | 設定集中，不散落在各處 |
 | **SQLAlchemy** | 2.0 | ORM | 2.0 的型別標註對新手比較友善 |
-| **Alembic** | 1.14+ | 資料庫遷移 | 18 張表一定會改，沒有遷移工具會很痛苦 |
+| **Alembic** | 1.14+ | 資料庫遷移 | 19 張表一定會改，沒有遷移工具會很痛苦 |
 | **psycopg** | 3.2+ | PostgreSQL 驅動 | `[binary]` 版有預編譯輪檔，不用編譯 |
 | **PyJWT** | 2.10+ | JWT 簽發驗證 | 比 python-jose 維護更活躍 |
 | **passlib[bcrypt]** | 1.7+ | 密碼雜湊 | **絕不自己實作密碼雜湊** |
@@ -143,7 +143,7 @@ final_project/
 │   │   │   ├── config.py       環境變數（pydantic-settings）
 │   │   │   ├── security.py     密碼雜湊、JWT 簽發驗證
 │   │   │   └── deps.py         依賴注入：取得目前使用者、權限守門
-│   │   ├── models/             SQLAlchemy 資料表定義（18 張）
+│   │   ├── models/             SQLAlchemy 資料表定義（19 張）
 │   │   ├── schemas/            Pydantic 請求／回應模型
 │   │   ├── routers/            API 路由，一個檔案一組
 │   │   │   ├── auth.py
@@ -155,7 +155,7 @@ final_project/
 │   │   │   └── advices.py
 │   │   └── services/           商業邏輯，路由只負責接收與回傳
 │   │       ├── llm.py     ★    Anthropic 呼叫、結構化輸出約束、重試
-│   │       ├── permission.py   依監管關係算出可見範圍（角色不參與）
+│   │       ├── permission.py   算可見範圍：監管關係 ＋ 同家庭的家長
 │   │       └── analytics.py    月年統計、預算使用率
 │   ├── tests/
 │   ├── requirements.txt
@@ -175,7 +175,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **63 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **68 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -237,9 +237,14 @@ final_project/
 | # | 方法 | 路徑 | 負責人 | 權限 | 用途 |
 |---|---|---|---|---|---|
 | 46 | GET | `/api/family` | 成員4 | 登入 | 家庭資訊、成員清單、角色 |
-| 47 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立者成為家長（僅記於 `created_by`，不給額外權限） |
-| 48 | POST | `/api/family/invite` | 成員4 | 家長 | 產生邀請碼 |
+| 47 | POST | `/api/family` | 成員4 | 登入 | 建立家庭，建立的人成為家長。已經在家庭裡就不行 |
+| 48 | POST | `/api/family/invite` | 成員4 | 家長 | 產生邀請碼。body: { role }，只能用一次、七天過期 |
 | 49 | POST | `/api/family/join` | 成員4 | 登入 | 用邀請碼加入家庭 |
+| 68 | GET | `/api/family/lookup` | 成員4 | 家長 | 用完整 email 找人，準備邀請他加入家庭 |
+| 69 | GET | `/api/family/invites` | 成員4 | 登入 | 我收到的邀請、我們家送出去還沒回覆的、還有效的邀請碼 |
+| 70 | POST | `/api/family/invites` | 成員4 | 家長 | 用帳號邀請。body: { userId, role } |
+| 71 | POST | `/api/family/invites/{invite_id}/accept` | 成員4 | 被邀請的人 | 接受邀請，加入家庭 |
+| 72 | DELETE | `/api/family/invites/{invite_id}` | 成員4 | 被邀請的人／家長 | 婉拒（被邀請的人）或取消（發邀請那一家的家長） |
 | 50 | PATCH | `/api/family/members/{userId}` | 成員4 | 家長 | 修改成員角色 |
 | 51 | DELETE | `/api/family/members/{userId}` | 成員4 | 家長 | 移除成員（標記 removed，不刪資料） |
 | 52 | GET | `/api/guardianships` | 成員4 | 登入 | 監管關係。**被監管者也看得到** |
@@ -434,7 +439,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 | **成員1** | **認證** | `m1-auth` | 17 支 | `users` `sessions` | 註冊與登入、個人資料與大頭貼 | 共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證 |
 | **成員2** | **記帳** | `m2-ledger` | 18 支 | `transactions` `accounts` `nlp_parses` | 段落記帳、單筆手動、缺欄位提示 | 段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準 |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `categories` `budgets` `savings_goals` `advices` `alert_rules` | 總覽（我／全家）、統計圖表、超支警告、建議卡片 | 財務建議的 prompt 與邊界規則 |
-| **成員4** | **家庭** | `m4-access` | 15 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
+| **成員4** | **家庭** | `m4-access` | 20 支 | `families` `family_members` `guardianships` `family_invites` `audit_logs` `notifications` `groups` `group_members` `allowances` | 成員與權限、成員紀錄（唯讀）、監管通知、群組 | 模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1 |
 
 ### 切分原則
 
@@ -445,7 +450,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 ### 為什麼路由數不是 10 / 10 / 10 / 5 這種平均切法
 
-因為**路由數不是工作量**，但它也不能差太多。這一版是 17 / 18 / 13 / 15，
+因為**路由數不是工作量**，但它也不能差太多。這一版是 17 / 18 / 13 / 20，
 差距控制在合理範圍，同時讓每個領域維持概念上的完整。
 
 成員3 的路由最少，是刻意的：他那一條的重量不在路由數，而在**整個系統只有他算錢**，
@@ -547,16 +552,21 @@ POST   /api/advices/generate
 ### 成員4 · 家庭　`m4-access`
 
 負責「誰在這個家庭裡」以及「誰看得到誰的資料」，另外扛模型評測。
-屬於他的：家庭、成員角色、邀請碼、監管關係、權限計算、稽核紀錄、評測。
+屬於他的：家庭、成員角色、家庭綁定（邀請碼與用帳號邀請）、監管關係、權限計算、稽核紀錄、評測。
 不屬於他的：登入本身（那是成員1）。成員1 回答「你是誰」，成員4 回答「你能看到什麼」。
 
-**路由（15 支）**
+**路由（20 支）**
 
 ```
 GET    /api/family
 POST   /api/family
 POST   /api/family/invite
 POST   /api/family/join
+GET    /api/family/lookup
+GET    /api/family/invites
+POST   /api/family/invites
+POST   /api/family/invites/{invite_id}/accept
+DELETE /api/family/invites/{invite_id}
 PATCH  /api/family/members/{user_id}
 DELETE /api/family/members/{user_id}
 GET    /api/guardianships

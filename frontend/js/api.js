@@ -27,8 +27,15 @@
    GET    /api/auth/me                目前登入者 + 家庭角色
 
    家庭與權限
-   GET    /api/family                 家庭資訊與成員清單
-   POST   /api/family/invite          產生邀請碼（家長）
+   GET    /api/family                 家庭資訊與成員清單（沒有家庭時 family 為 null）
+   POST   /api/family                 建立家庭，建立的人成為家長（body: { name }）
+   POST   /api/family/invite          產生邀請碼（家長；body: { role }，只能用一次、七天過期）
+   POST   /api/family/join            用邀請碼加入（body: { code }）
+   GET    /api/family/lookup          用完整 email 找人（家長；只回名字、頭像、能不能邀請）
+   GET    /api/family/invites         我收到的邀請 ＋ 我們家送出去還沒回覆的
+   POST   /api/family/invites         用帳號邀請（家長；body: { userId, role }）
+   POST   /api/family/invites/{id}/accept   接受邀請
+   DELETE /api/family/invites/{id}   被邀請的人婉拒，或家長取消
    PATCH  /api/family/members/{id}    改角色（家長）
    DELETE /api/family/members/{id}    移除成員（家長）
    GET    /api/guardianships          監管關係（雙方都看得到）
@@ -143,7 +150,7 @@
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
         ['newGroups', 'groupPatch', 'joined', 'left', 'archived',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
-         'suspended', 'audit'].forEach(function (k) {
+         'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
         });
       }
@@ -151,6 +158,7 @@
     applyGoals(base.goals);
     applyUsers(base.newUsers);
     applyPatch(base.patch);
+    applyMemberships(base.memberships);
     state = base;
     return state;
   }
@@ -174,7 +182,11 @@
         alertPatch: state.alertPatch || {},
         alertGone: state.alertGone || [],
         suspended: state.suspended || {},
-        audit: state.audit || []
+        audit: state.audit || [],
+        newFamilies: state.newFamilies || [],
+        memberships: state.memberships || {},
+        invites: state.invites || [],
+        codes: state.codes || []
       }));
     } catch (e) {}
   }
@@ -248,6 +260,80 @@
   function memberOf(id) {
     return global.DATA.members.filter(function (m) { return m.id === id; })[0];
   }
+
+  /* ============================================================
+     家庭
+
+     一個人同時只屬於一個家庭（members[].familyId）。
+     加入或建立家庭時，把「這個人現在在哪一家、是什麼身分」記在 memberships，
+     重新整理之後蓋回 DATA.members。
+     ============================================================ */
+  function applyMemberships(map) {
+    Object.keys(map || {}).forEach(function (id) {
+      var m = memberOf(id);
+      if (m) { m.familyId = map[id].familyId; m.role = map[id].role; }
+    });
+  }
+
+  function allFamilies() {
+    return (global.DATA.families || []).concat((state && state.newFamilies) || []);
+  }
+
+  function familyById(id) {
+    return allFamilies().filter(function (f) { return f.id === id; })[0] || null;
+  }
+
+  function familyOf(uid) {
+    var m = memberOf(uid);
+    return m && m.familyId ? familyById(m.familyId) : null;
+  }
+
+  function setMembership(s, uid, familyId, role) {
+    var m = memberOf(uid);
+    m.familyId = familyId; m.role = role;
+    s.memberships = s.memberships || {};
+    s.memberships[uid] = { familyId: familyId, role: role };
+  }
+
+  /* 同一個家庭的**家長**（含我自己）。我不是家長就是空的。
+     ⚠️ 角色只打開「家長 ↔ 家長」這一條——家長看子女一樣要有監管關係，
+        子女也不會因為角色看到任何人。後端用 toolkit/scope.py 的 co_parents()。 */
+  function coParents(meId) {
+    var me = memberOf(meId);
+    if (!me || me.role !== 'parent' || !me.familyId) return [];
+    return global.DATA.members
+      .filter(function (m) { return m.familyId === me.familyId && m.role === 'parent'; })
+      .map(function (m) { return m.id; });
+  }
+
+  function isParentOf(s, familyId) {
+    var me = memberOf(s.me);
+    return !!(me && me.role === 'parent' && me.familyId && me.familyId === familyId);
+  }
+
+  /* ⚠️ 不要叫 fail——http 轉接器裡已經有一個 fail(r)，
+     同名的函式宣告後面那個會蓋掉前面的，錯誤訊息會變成「r.text is not a function」。 */
+  function oops(msg, status) {
+    var e = new Error(msg);
+    if (status) e.status = status;
+    return e;
+  }
+
+  var INVITE_DAYS = 7;
+  var CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';     // 拿掉 0/O、1/I/L
+
+  /* ⚠️ mock 用 Math.random 就好；真後端要用 secrets（toolkit/family.py 的 new_code） */
+  function newCode() {
+    var raw = '';
+    for (var i = 0; i < 8; i++) raw += CODE_CHARS.charAt(Math.floor(Math.random() * CODE_CHARS.length));
+    return raw.slice(0, 4) + '-' + raw.slice(4);
+  }
+
+  function normCode(raw) { return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+  function daysLater(n) { return new Date(Date.now() + n * 86400000).toISOString(); }
+
+  function expired(row) { return Date.parse(row.expiresAt) <= Date.now(); }
   /* 我看得到誰的資料：自己 ＋ 我監管的人。就這樣。
      ------------------------------------------------------------
      ⚠️ 角色不給可見範圍。家長也一樣——沒有被指派監管誰，
@@ -382,7 +468,7 @@
   function groupFor(meId, wanted) {
     var mine = visibleGroups(meId);
     if (wanted && mine.indexOf(wanted) >= 0) return wanted;
-    if (!mine.length) throw new Error('你還沒有任何帳本，先去「群組」開一本');
+    if (!mine.length) throw new Error('你還沒有任何帳本，先到「帳本」開一本');
     return mine[0];
   }
 
@@ -413,12 +499,15 @@
     return out;
   }
 
+  /* 我看得到誰的**全部**紀錄：自己 ＋ 我監管的人 ＋ 同家庭的其他家長。 */
   function visibleUsers(meId) {
     if (!memberOf(meId)) return [meId];
-    var wards = global.DATA.guardianships
+    var out = [meId];
+    global.DATA.guardianships
       .filter(function (g) { return g.guardian === meId; })
-      .map(function (g) { return g.ward; });
-    return [meId].concat(wards);
+      .forEach(function (g) { if (out.indexOf(g.ward) < 0) out.push(g.ward); });
+    coParents(meId).forEach(function (u) { if (out.indexOf(u) < 0) out.push(u); });
+    return out;
   }
 
   function sum(list, kind) {
@@ -435,9 +524,10 @@
       var s = load();
       return sleep(120).then(function () {
         var m = memberOf(s.me);
+        var fam = familyOf(s.me);
         return {
           user: clone(m),
-          family: clone(global.DATA.meta),
+          family: fam ? { id: fam.id, name: fam.name, period: global.DATA.meta.period } : null,
           visible: visibleUsers(s.me),
           queryable: queryableUsers(s.me),
           guardedBy: global.DATA.guardianships
@@ -513,8 +603,10 @@
         var n = global.DATA.members.reduce(function (mx, m) {
           return Math.max(mx, Number(String(m.id).replace(/\D/g, '')) || 0);
         }, 0) + 1;
+        /* 新註冊的人**還不屬於任何家庭**：自己建立一個（成為家長），
+           或是等家人邀請、輸入邀請碼加入。身分由加入的方式決定，不是註冊時選。 */
         var u = {
-          id: 'U' + n, name: name, email: mail, role: 'child',
+          id: 'U' + n, name: name, email: mail, role: null, familyId: null,
           avatar: name.slice(-1), age: null,
           joined: new Date().toISOString().slice(0, 10),
           income: 0, expense: 0, budget: 0,
@@ -897,8 +989,12 @@
         if (!g) throw new Error('找不到這個群組');
         if (g.owner !== s.me) { var e = new Error('只有建立者可以加人'); e.status = 403; throw e; }
         var who = memberOf(userId);
-        /* 平台管理員加進帳本，就等於讓他讀得到那本帳——停權是關門，不是配鑰匙 */
-        if (!who || who.isPlatformAdmin) throw new Error('這個家庭裡沒有這個人');
+        var me = memberOf(s.me);
+        /* 平台管理員加進帳本，就等於讓他讀得到那本帳——停權是關門，不是配鑰匙。
+           不同家庭的人也不行：帳本的成員只能從自己家裡選。 */
+        if (!who || who.isPlatformAdmin || !me.familyId || who.familyId !== me.familyId) {
+          throw new Error('這個家庭裡沒有這個人');
+        }
         if (memberIdsOf(gid).indexOf(userId) >= 0) throw new Error('他已經在這本帳裡了');
         s.joined = (s.joined || []).concat([{ group: gid, user: userId }]);
         save();
@@ -1602,14 +1698,21 @@
            看不到那個人的就不要送過去。⚠️ 後端也要這樣做：
            前端把欄位藏起來不算保護，資料根本不該離開伺服器。 */
         var vis = visibleUsers(s.me);
+        var me = memberOf(s.me) || {};
+        var fam = familyOf(s.me);
         return {
           me: s.me,
+          myRole: me.role || null,
+          family: fam ? { id: fam.id, name: fam.name, createdBy: fam.createdBy } : null,
           visible: vis,
           queryable: queryableUsers(s.me),
-          /* ⚠️ 平台管理員不屬於任何家庭，不可以出現在家庭成員清單裡。
-             漏過一次：成員與權限多出第五個人「系統管理員」，角色顯示 undefined，
-             帳本的加人清單也能把他加進來——等於讓平台管理員讀到那本帳。 */
-          members: D.members.filter(function (m) { return !m.isPlatformAdmin; }).map(function (m) {
+          /* 只列**同一個家庭**的人；還沒有家庭就只有自己。
+             ⚠️ 平台管理員不屬於任何家庭，不可以出現在這裡——漏過一次，
+             帳本的加人清單能把他加進來，等於讓平台管理員讀到那本帳。 */
+          members: D.members.filter(function (m) {
+            if (m.isPlatformAdmin) return false;
+            return fam ? m.familyId === fam.id : m.id === s.me;
+          }).map(function (m) {
             var o = clone(m);
             if (vis.indexOf(m.id) < 0) {
               delete o.savingsGoal;
@@ -1620,7 +1723,9 @@
             return o;
           }),
           roles: clone(D.roles),
-          guardianships: D.guardianships.map(function (g) {
+          guardianships: D.guardianships.filter(function (g) {
+            return fam && (memberOf(g.guardian) || {}).familyId === fam.id;
+          }).map(function (g) {
             return Object.assign(clone(g), {
               guardianName: memberOf(g.guardian).name,
               wardName: memberOf(g.ward).name
@@ -1628,6 +1733,179 @@
           }),
           permissions: clone(D.permissions)
         };
+      });
+    },
+
+    /* ---------------------------------------------------------
+       家庭綁定
+       --------------------------------------------------------- */
+
+    /* 建立家庭。建立的人成為家長。已經在家庭裡就不行。 */
+    createFamily: function (p) {
+      var s = load(); p = p || {};
+      return sleep(280).then(function () {
+        var me = memberOf(s.me);
+        if (me.isPlatformAdmin) throw oops('平台管理員不屬於任何家庭', 403);
+        if (me.familyId) throw oops('你已經在一個家庭裡了', 409);
+        var name = String(p.name || '').replace(/\s+/g, ' ').trim().slice(0, 20);
+        if (!name) throw oops('幫你的家庭取個名字，例如「林家」');
+        var f = { id: 'F' + (allFamilies().length + 1) + '-' + Date.now().toString(36),
+                  name: name, createdBy: s.me, createdAt: new Date().toISOString().slice(0, 10) };
+        s.newFamilies = (s.newFamilies || []).concat([f]);
+        setMembership(s, s.me, f.id, 'parent');
+        pushAudit(s, 'create_family', null, '建立「' + name + '」');
+        save();
+        return { family: clone(f), role: 'parent' };
+      });
+    },
+
+    /* 產生邀請碼。⚠️ 身分由家長決定，拿到碼的人不能自己選。
+       同一個身分再產生一次，舊的那組就作廢——「重新產生」就是這個意思。 */
+    createInviteCode: function (p) {
+      var s = load(); p = p || {};
+      return sleep(240).then(function () {
+        var me = memberOf(s.me);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以邀請家人', 403);
+        if (p.role !== 'parent' && p.role !== 'child') throw oops('身分只能是家長或子女');
+        (s.codes || []).forEach(function (c) {
+          if (c.familyId === me.familyId && c.role === p.role && c.status === 'pending') c.status = 'cancelled';
+        });
+        var row = { id: 'K' + Date.now(), familyId: me.familyId, role: p.role, code: newCode(),
+                    createdBy: s.me, status: 'pending', expiresAt: daysLater(INVITE_DAYS) };
+        s.codes = (s.codes || []).concat([row]);
+        save();
+        return { code: row.code, role: row.role, expiresAt: row.expiresAt };
+      });
+    },
+
+    /* 用邀請碼加入。碼只能用一次。 */
+    joinFamily: function (p) {
+      var s = load(); p = p || {};
+      return sleep(300).then(function () {
+        var me = memberOf(s.me);
+        if (me.isPlatformAdmin) throw oops('平台管理員不屬於任何家庭', 403);
+        if (me.familyId) throw oops('你已經在一個家庭裡了', 409);
+        var want = normCode(p.code);
+        if (want.length !== 8) throw oops('邀請碼是 8 個字，例如 K7QM-3XWP');
+        var row = (s.codes || []).filter(function (c) { return normCode(c.code) === want; })[0];
+        if (!row) throw oops('找不到這組邀請碼，確認一下有沒有打錯', 404);
+        if (row.status === 'used') throw oops('這組邀請碼已經用過了');
+        if (row.status !== 'pending') throw oops('這組邀請碼已經失效，請家人重新產生一組');
+        if (expired(row)) throw oops('這組邀請碼已經過期了，請家人重新產生一組');
+        row.status = 'used'; row.usedBy = s.me;
+        setMembership(s, s.me, row.familyId, row.role);
+        var fam = familyById(row.familyId);
+        pushAudit(s, 'join_family', s.me, '用邀請碼加入「' + fam.name + '」');
+        save();
+        return { family: { id: fam.id, name: fam.name }, role: row.role };
+      });
+    },
+
+    /* 用帳號找人。⚠️ 只接受完整的 email，不做模糊搜尋；
+       找到了也只回名字與頭像，不回任何財務資料。
+       在別的家庭、或是平台管理員，一律只說「目前不能邀請」，不說原因。 */
+    lookupUser: function (email) {
+      var s = load();
+      return sleep(260).then(function () {
+        var me = memberOf(s.me);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以邀請家人', 403);
+        var mail = String(email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw oops('請輸入完整的 email');
+        var u = global.DATA.members.filter(function (m) {
+          return String(m.email || '').toLowerCase() === mail;
+        })[0];
+        if (!u) throw oops('找不到這個帳號', 404);
+        var pending = (s.invites || []).some(function (i) {
+          return i.invitee === u.id && i.familyId === me.familyId && i.status === 'pending' && !expired(i);
+        });
+        var status = u.isPlatformAdmin ? 'unavailable'
+          : (u.familyId && u.familyId === me.familyId) ? 'member'
+          : u.familyId ? 'unavailable'
+          : pending ? 'invited' : 'available';
+        return {
+          user: { id: u.id, name: u.name, avatar: u.avatar, avatarUrl: u.avatarUrl || null },
+          status: status
+        };
+      });
+    },
+
+    /* 用帳號邀請。對方會在自己的畫面上看到邀請，按「加入」才算數。 */
+    sendInvite: function (p) {
+      var s = load(); p = p || {};
+      return sleep(280).then(function () {
+        var me = memberOf(s.me);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以邀請家人', 403);
+        if (p.role !== 'parent' && p.role !== 'child') throw oops('身分只能是家長或子女');
+        var u = memberOf(p.userId);
+        if (!u || u.isPlatformAdmin || u.familyId) throw oops('這個帳號目前不能邀請');
+        var dup = (s.invites || []).some(function (i) {
+          return i.invitee === u.id && i.familyId === me.familyId && i.status === 'pending' && !expired(i);
+        });
+        if (dup) throw oops('已經邀請過了，等對方回覆就好', 409);
+        var row = { id: 'I' + Date.now(), familyId: me.familyId, inviter: s.me, invitee: u.id,
+                    role: p.role, status: 'pending', createdAt: new Date().toISOString(),
+                    expiresAt: daysLater(INVITE_DAYS) };
+        s.invites = (s.invites || []).concat([row]);
+        pushAudit(s, 'invite_member', u.id, '邀請' + u.name + '成為' + (p.role === 'parent' ? '家長' : '子女'));
+        save();
+        return { id: row.id, status: 'pending' };
+      });
+    },
+
+    /* 我收到的邀請、我們家送出去還沒回覆的、我們家還有效的邀請碼 */
+    invites: function () {
+      var s = load();
+      return sleep(200).then(function () {
+        var me = memberOf(s.me);
+        var parent = isParentOf(s, me.familyId);
+        var live = function (r) { return r.status === 'pending' && !expired(r); };
+        return {
+          received: (s.invites || []).filter(function (i) { return i.invitee === s.me && live(i); })
+            .map(function (i) {
+              var f = familyById(i.familyId) || {}, who = memberOf(i.inviter) || {};
+              return { id: i.id, familyName: f.name, inviterName: who.name, role: i.role, expiresAt: i.expiresAt };
+            }),
+          sent: parent ? (s.invites || []).filter(function (i) { return i.familyId === me.familyId && live(i); })
+            .map(function (i) {
+              var u = memberOf(i.invitee) || {};
+              return { id: i.id, name: u.name, email: u.email, avatar: u.avatar, role: i.role, expiresAt: i.expiresAt };
+            }) : [],
+          codes: parent ? (s.codes || []).filter(function (c) { return c.familyId === me.familyId && live(c); })
+            .map(function (c) { return { code: c.code, role: c.role, expiresAt: c.expiresAt }; }) : []
+        };
+      });
+    },
+
+    acceptInvite: function (id) {
+      var s = load();
+      return sleep(300).then(function () {
+        var me = memberOf(s.me);
+        var row = (s.invites || []).filter(function (i) { return i.id === id; })[0];
+        if (!row || row.invitee !== s.me) throw oops('找不到這個邀請', 404);
+        if (row.status !== 'pending') throw oops('這個邀請已經處理過了');
+        if (expired(row)) throw oops('這個邀請已經過期了，請家人重新邀請一次');
+        if (me.familyId) throw oops('你已經在一個家庭裡了', 409);
+        row.status = 'accepted'; row.respondedAt = new Date().toISOString();
+        setMembership(s, s.me, row.familyId, row.role);
+        var fam = familyById(row.familyId);
+        pushAudit(s, 'join_family', s.me, '接受邀請加入「' + fam.name + '」');
+        save();
+        return { family: { id: fam.id, name: fam.name }, role: row.role };
+      });
+    },
+
+    /* 被邀請的人婉拒，或是發邀請那一家的家長取消 */
+    declineInvite: function (id) {
+      var s = load();
+      return sleep(240).then(function () {
+        var row = (s.invites || []).filter(function (i) { return i.id === id; })[0];
+        if (!row || row.status !== 'pending') throw oops('找不到這個邀請', 404);
+        if (row.invitee === s.me) row.status = 'declined';
+        else if (isParentOf(s, row.familyId)) row.status = 'cancelled';
+        else throw oops('這個邀請不是給你的', 403);
+        row.respondedAt = new Date().toISOString();
+        save();
+        return { id: row.id, status: row.status };
       });
     },
 
@@ -1827,6 +2105,14 @@
     setSavingsGoal:    function (u, g, gid) { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g, groupId: gid || null } }); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
     members:           function ()      { return req('/api/family'); },
+    createFamily:      function (p)     { return req('/api/family', { method: 'POST', body: p }); },
+    createInviteCode:  function (p)     { return req('/api/family/invite', { method: 'POST', body: p }); },
+    joinFamily:        function (p)     { return req('/api/family/join', { method: 'POST', body: p }); },
+    lookupUser:        function (e)     { return req('/api/family/lookup' + qs({ email: e })); },
+    invites:           function ()      { return req('/api/family/invites'); },
+    sendInvite:        function (p)     { return req('/api/family/invites', { method: 'POST', body: p }); },
+    acceptInvite:      function (i)     { return req('/api/family/invites/' + i + '/accept', { method: 'POST' }); },
+    declineInvite:     function (i)     { return req('/api/family/invites/' + i, { method: 'DELETE' }); },
     categories:        function ()      { return req('/api/categories'); },
     reset:             function ()      { return Promise.resolve({ reset: false, note: '真後端不提供重置' }); }
   };
@@ -1881,6 +2167,14 @@
     setSavingsGoal:    function (u, g, gid) { return impl.setSavingsGoal(u, g, gid); },
     advices:           function (f)    { return impl.advices(f); },
     members:           function ()     { return impl.members(); },
+    createFamily:      function (p)    { return impl.createFamily(p); },
+    createInviteCode:  function (p)    { return impl.createInviteCode(p); },
+    joinFamily:        function (p)    { return impl.joinFamily(p); },
+    lookupUser:        function (e)    { return impl.lookupUser(e); },
+    invites:           function ()     { return impl.invites(); },
+    sendInvite:        function (p)    { return impl.sendInvite(p); },
+    acceptInvite:      function (i)    { return impl.acceptInvite(i); },
+    declineInvite:     function (i)    { return impl.declineInvite(i); },
     categories:        function ()     { return impl.categories(); },
     reset:             function ()     { return impl.reset(); }
   };

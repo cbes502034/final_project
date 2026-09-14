@@ -249,12 +249,17 @@ MEMBERS: list[Member] = [
         color="#6EE7B7",
         scope=(
             "負責「誰在這個家庭裡」以及「誰看得到誰的資料」。\n"
-            "屬於他的：家庭、成員角色、邀請碼、監管關係、權限計算、"
+            "屬於他的：家庭、成員角色、家庭綁定（邀請碼與用帳號邀請）、監管關係、權限計算、"
             "唯讀監管檢視與即時通知、零用金、稽核紀錄。\n"
+            "家庭綁定：家長建立家庭，用邀請碼或輸入對方 email 邀請家人加入。\n"
+            "⚠️ 身分（家長／子女）由發邀請的家長決定，被邀請的人不能自己選。\n"
+            "⚠️ 用帳號找人只接受完整 email，不做模糊搜尋，也不回任何財務資料。\n"
+            "⚠️ 邀請碼只能用一次、七天過期、資料庫只存雜湊。工具在 toolkit/family.py。\n"
             "⚠️ 監管是**唯讀**的：看得到，但不能改、不能刪，"
             "更不能登入對方的帳號。\n"
             "⚠️ **可見範圍是兩條路的聯集，過一條就看得到**：\n"
-            "  A. 這筆是誰記的 → guardianships（自己 ＋ 我監管的人），**跨所有帳本**\n"
+            "  A. 這筆是誰記的 → 自己 ＋ 我監管的人 ＋ 同家庭的其他家長，**跨所有帳本**\n"
+            "     （家長之間互相看得到；家長看子女一樣要有監管關係）\n"
             "  B. 這筆在哪一本帳 → group_members（我在不在那本帳裡）\n"
             "  A 是監管：不該被帳本切斷，否則被監管的人另開一本帳就躲掉了。\n"
             "  B 是分享：把誰加進帳本，就是選擇讓他看到那一本。\n"
@@ -275,6 +280,11 @@ MEMBERS: list[Member] = [
             ("POST", "/api/family"),
             ("POST", "/api/family/invite"),
             ("POST", "/api/family/join"),
+            ("GET", "/api/family/lookup"),
+            ("GET", "/api/family/invites"),
+            ("POST", "/api/family/invites"),
+            ("POST", "/api/family/invites/{invite_id}/accept"),
+            ("DELETE", "/api/family/invites/{invite_id}"),
             ("PATCH", "/api/family/members/{user_id}"),
             ("DELETE", "/api/family/members/{user_id}"),
             ("GET", "/api/guardianships"),

@@ -21,7 +21,7 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-at-least-32-
 import pytest  # noqa: E402
 
 from app.toolkit import (  # noqa: E402
-    alerts, scope, roles, notify, profile, images, money, passwords,
+    alerts, scope, roles, notify, profile, images, money, passwords, family,
     period, tokens,
 )
 
@@ -275,9 +275,35 @@ _M = [
 
 
 def test_可見範圍只看監管關係不看角色():
-    """家長沒有例外：沒指派監管誰，就只看得到自己。"""
+    """沒有傳家庭成員的時候，就只有監管關係這一條。"""
     assert scope.visible_users("U1", _G) == {"U1", "U3", "U4"}
     assert scope.visible_users("U2", _G) == {"U2", "U4"}
+
+
+_FM = [
+    {"family_id": "F1", "user_id": "U1", "role": "parent", "status": "active"},
+    {"family_id": "F1", "user_id": "U2", "role": "parent", "status": "active"},
+    {"family_id": "F1", "user_id": "U3", "role": "child", "status": "active"},
+    {"family_id": "F1", "user_id": "U4", "role": "child", "status": "active"},
+    {"family_id": "F1", "user_id": "U7", "role": "parent", "status": "removed"},
+    {"family_id": "F2", "user_id": "U9", "role": "parent", "status": "active"},
+]
+
+
+def test_同家庭的家長互相看得到():
+    assert scope.visible_users("U1", _G, _FM) == {"U1", "U2", "U3", "U4"}
+    assert scope.visible_users("U2", _G, _FM) == {"U1", "U2", "U4"}
+
+
+def test_角色不會讓子女看到任何人():
+    assert scope.co_parents("U3", _FM) == set()
+    assert scope.visible_users("U3", _G, _FM) == {"U3"}
+
+
+def test_被移除的家長與別家的家長都不算():
+    assert "U7" not in scope.co_parents("U1", _FM)
+    assert "U9" not in scope.co_parents("U1", _FM)
+    assert scope.co_parents("U9", _FM) == {"U9"}
 
 
 def test_被監管的人看不到任何別人():
@@ -643,3 +669,67 @@ def test_每次都要附上投資建議的邊界():
     """
     block = profile.to_prompt_block({"habits": ["dca"]}, _STYLES, _GOALS, _HABITS)
     assert "不要據此提供投資、保險或稅務建議" in block
+
+
+# ===========================================================================
+# family —— 家庭綁定
+# ===========================================================================
+def test_邀請碼的格式好念也好打():
+    code = family.new_code()
+    assert len(code) == 9 and code[4] == "-"
+    assert all(ch in family.CODE_ALPHABET for ch in code.replace("-", ""))
+    for bad in "01OIL":
+        assert bad not in family.CODE_ALPHABET, "容易看錯的字 %s 不該出現在邀請碼裡" % bad
+
+
+def test_邀請碼每次都不一樣():
+    assert len({family.new_code() for _ in range(200)}) == 200
+
+
+def test_邀請碼比對前會正規化_雜湊不是明碼():
+    assert family.normalize_code(" k7qm-3xwp ") == "K7QM3XWP"
+    assert family.hash_code("K7QM-3XWP") == family.hash_code("k7qm 3xwp")
+    assert "K7QM" not in family.hash_code("K7QM-3XWP")
+
+
+def test_只有家長能邀請():
+    family.require_can_invite("parent")
+    for role in ("child", None, "master"):
+        with pytest.raises(scope.Forbidden):
+            family.require_can_invite(role)
+
+
+def test_身分只能是家長或子女():
+    assert family.clean_role("child") == "child"
+    for bad in ("master", "", None, "admin"):
+        with pytest.raises(ValueError):
+            family.clean_role(bad)
+
+
+def test_家庭名稱不能空白():
+    assert family.clean_family_name("  林  家 ") == "林 家"
+    with pytest.raises(ValueError):
+        family.clean_family_name("   ")
+    assert len(family.clean_family_name("家" * 50)) == 20
+
+
+def test_找人的狀態不透露他在哪一家():
+    assert family.lookup_status(False, None, "F1", False) == "available"
+    assert family.lookup_status(False, "F1", "F1", False) == "member"
+    assert family.lookup_status(False, None, "F1", True) == "invited"
+    assert family.lookup_status(False, "F2", "F1", False) == "unavailable"
+    assert family.lookup_status(True, None, "F1", False) == "unavailable"
+
+
+def test_邀請用過_取消_過期都不能再用():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 9, 14, tzinfo=timezone.utc)
+    later = now + timedelta(days=family.INVITE_TTL_DAYS)
+    family.require_joinable("pending", later, now)
+    for status in ("used", "accepted", "declined", "cancelled", "weird"):
+        with pytest.raises(ValueError):
+            family.require_joinable(status, later, now)
+    with pytest.raises(ValueError):
+        family.require_joinable("pending", now, now)
+    assert family.expires_at(now) == later

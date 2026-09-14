@@ -96,6 +96,8 @@
     { name: '陳淑芬 · 家長',   email: 'shufen@lin.tw' },
     { name: '林宇涵 · 子女',   email: 'yuhan@lin.tw' },
     { name: '林宇軒 · 子女',   email: 'yuxuan@lin.tw' },
+    /* 還沒加入家庭——用家長登入邀請她，或用她登入輸入邀請碼 */
+    { name: '林玉珍 · 還沒加入家庭', email: 'yuzhen@mail.tw' },
     /* ⚠️ 用他登入會看到完全不同的側欄——那正是這個角色的重點 */
     { name: '系統管理員 · 平台', email: 'admin@fambudget.tw' }
   ];
@@ -267,9 +269,10 @@
              scopeSeg(m));
 
         var sv = d.savings, lv = sv.level;
+        var inviteBox = '<div id="homeInv"></div>';
         var budgets = fam ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; });
 
-        var h = '<div class="page"><div class="kpis">' +
+        var h = '<div class="page">' + inviteBox + '<div class="kpis">' +
           kpi('in', fam ? '全家收入' : '本月收入', d.income, d.period, 'ok') +
           kpi('out', fam ? '全家支出' : '本月支出', d.expense, d.count + ' 筆紀錄', 'warn') +
           kpi('net', '結餘', d.net, '存下 ' + pct(d.rate), d.net >= 0 ? 'a' : 'crit') +
@@ -301,6 +304,17 @@
 
         $view.innerHTML = h + '</div>';
         animate();
+
+        /* 有人邀請你、或是你還沒有家庭，放在最上面——這是現在唯一要你決定的事 */
+        API.invites().then(function (inv) {
+          var box = document.getElementById('homeInv');
+          if (!box) return;
+          if (inv.received.length) box.innerHTML = inviteCards(inv.received);
+          else if (!m.family && !m.user.isPlatformAdmin) {
+            box.innerHTML = '<a class="nudge" href="#/members"><b>還沒有加入家庭</b>' +
+              '<span>建立一個，或輸入家人給你的邀請碼 →</span></a>';
+          }
+        }).catch(function () {});
       });
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
@@ -1012,41 +1026,204 @@
   /* ============================================================
      06 成員與權限
      ============================================================ */
+  /* ============================================================
+     家庭
+
+     還沒有家庭：建立一個（成為家長），或用邀請碼加入；有人邀請就先看到邀請。
+     已經有家庭：成員卡片。家長多一個「邀請家人」——
+       用帳號邀請   輸入完整 email → 找到人 → 選家長或子女 → 送出
+       邀請碼       選身分 → 產生 → 複製給家人
+
+     ⚠️ 身分由家長決定，被邀請的人不能自己選。
+     ============================================================ */
+  var INV = { role: 'child', codeRole: 'child', found: null };
+
+  function roleTW(r) { return r === 'parent' ? '家長' : '子女'; }
+
+  function shortDate(iso) {
+    var d = new Date(iso);
+    return (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+  }
+
+  /* 收到的邀請：一張卡一個，直接按加入或婉拒 */
+  function inviteCards(list) {
+    return list.map(function (i) {
+      return '<div class="card invc">' +
+        '<div class="invc__mark" aria-hidden="true">' + esc(String(i.familyName || '家').charAt(0)) + '</div>' +
+        '<div class="invc__m">' +
+          '<div class="invc__t"><b>' + esc(i.inviterName) + '</b> 邀請你加入「' + esc(i.familyName) + '」</div>' +
+          '<div class="invc__s">身分：' + roleTW(i.role) + '　·　' + shortDate(i.expiresAt) + '前有效</div>' +
+        '</div>' +
+        '<div class="invc__a">' +
+          '<button class="btn btn--sm btn--ghost" data-inv-decline="' + esc(i.id) + '">婉拒</button>' +
+          '<button class="btn btn--sm btn--go" data-inv-accept="' + esc(i.id) + '">加入</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
   function vMembers() {
-    head('成員與權限', '家裡的每一個人');
+    head('家庭', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
-    API.members().then(function (d) {
+    Promise.all([API.members(), API.invites()]).then(function (r) {
+      var d = r[0], inv = r[1];
       PERMS = d;   // 「誰可以做什麼」要用，見 HELP.perms
-      function names(list, key) {
-        return list.map(function (g) { return esc(g[key]); }).join('、');
-      }
-      var h = '<div class="page"><div class="sec"><h2 class="sec__t">家庭成員</h2>' +
-        '<span class="sec__n">' + d.members.length + ' 人</span>' +
-        '<div class="sec__tools"><button class="btn btn--sm" data-help="perms">誰可以做什麼</button></div></div>';
-
-      h += '<div class="mtiles">' + d.members.map(function (u, i) {
-        var seeable = (d.visible || []).indexOf(u.id) >= 0;
-        var wards = d.guardianships.filter(function (g) { return g.guardian === u.id; });
-        var by = d.guardianships.filter(function (g) { return g.ward === u.id; });
-        return '<article class="mt' + (seeable ? ' mt--go' : '') + '"' +
-          (seeable ? ' data-open="' + esc(u.id) + '" title="看 ' + esc(u.name) + ' 的紀錄"' : '') +
-          ' style="animation-delay:' + (i * 60) + 'ms">' +
-          (u.id === d.me ? '<span class="mt__me">你</span>' : '') +
-          ava(u, 'ava--lg') +
-          '<div class="mt__n">' + esc(u.name) + '</div>' +
-          '<div class="mt__r">' + esc(ROLE_TW[u.role] || '') + '</div>' +
-          '<div class="mt__rel">' +
-            (wards.length ? '<span>監管 ' + names(wards, 'wardName') + '</span>' : '') +
-            (by.length ? '<span>監管人 ' + names(by, 'guardianName') + '</span>' : '') +
-          '</div>' +
-          (seeable ? '<span class="mt__go">看紀錄</span>' : '') +
-        '</article>';
-      }).join('') + '</div></div>';
-
-      $view.innerHTML = h;
+      if (!d.family) return renderNoFamily(inv);
+      renderFamily(d, inv);
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
+  function renderNoFamily(inv) {
+    head('家庭', '和家人一起記帳');
+    var h = '<div class="page">';
+    if (inv.received.length) {
+      h += '<div class="sec"><h2 class="sec__t">收到的邀請</h2><span class="sec__n">' + inv.received.length + '</span></div>' +
+        inviteCards(inv.received);
+    }
+    h += '<div class="duo' + (inv.received.length ? '' : ' duo--first') + '">' +
+      '<section class="duo__c"><div class="card fam0">' +
+        '<div class="fam0__ic" aria-hidden="true">＋</div>' +
+        '<h3 class="fam0__t">建立我的家庭</h3>' +
+        '<p class="fam0__s">建立的人會是家長，之後可以邀請家人加入。</p>' +
+        '<form class="fam0__f" id="famNewF">' +
+          '<input type="text" id="famName" maxlength="20" placeholder="例如 林家" aria-label="家庭名稱" required>' +
+          '<button class="btn btn--go" type="submit">建立</button>' +
+        '</form>' +
+      '</div></section>' +
+      '<section class="duo__c"><div class="card fam0">' +
+        '<div class="fam0__ic fam0__ic--key" aria-hidden="true">#</div>' +
+        '<h3 class="fam0__t">用邀請碼加入</h3>' +
+        '<p class="fam0__s">輸入家人傳給你的 8 碼邀請碼。</p>' +
+        '<form class="fam0__f" id="famJoinF">' +
+          '<input type="text" id="famCode" class="codein" maxlength="9" placeholder="K7QM-3XWP" ' +
+            'autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="邀請碼" required>' +
+          '<button class="btn btn--go" type="submit">加入</button>' +
+        '</form>' +
+      '</div></section>' +
+    '</div></div>';
+    $view.innerHTML = h;
+  }
+
+  function renderFamily(d, inv) {
+    var parent = d.myRole === 'parent';
+    head('家庭成員', d.family.name + '　·　' + d.members.length + ' 位');
+
+    function names(list, key) {
+      return list.map(function (g) { return esc(g[key]); }).join('、');
+    }
+
+    var tools = '<button class="btn btn--sm btn--ghost" data-help="perms">誰可以做什麼</button>';
+    /* 子女沒有邀請的功能，標題列就不放「邀請家人」 */
+    var h = '<div class="page">' + (parent
+      ? foldHead('finv', d.family.name, '邀請家人', d.members.length + ' 人', null, tools)
+      : '<div class="sec"><h2 class="sec__t">' + esc(d.family.name) + '</h2>' +
+        '<span class="sec__n">' + d.members.length + ' 人</span><div class="sec__tools">' + tools + '</div></div>');
+
+    if (parent && inv.sent.length) {
+      h += '<div class="card card--flush pend">' +
+        '<div class="card__h"><span class="card__t">等待回覆</span><span class="card__s">' + inv.sent.length + ' 個邀請</span></div>' +
+        inv.sent.map(function (i) {
+          return '<div class="pend__i">' + ava({ name: i.name, avatar: i.avatar }, 'ava--sm') +
+            '<div class="pend__m"><b>' + esc(i.name) + '</b><small>' + esc(i.email) + '</small></div>' +
+            '<span class="pill pill--near">' + roleTW(i.role) + '</span>' +
+            '<button class="btn btn--sm btn--ghost" data-inv-cancel="' + esc(i.id) + '">取消</button>' +
+          '</div>';
+        }).join('') + '</div>';
+    }
+
+    h += '<div class="mtiles">' + d.members.map(function (u, i) {
+      var full = (d.visible || []).indexOf(u.id) >= 0;
+      /* ⚠️ 只有共用帳本的人也點得進去（只看得到共用帳本那部分）。
+         以前這裡只看 visible，於是陳淑芬那張卡沒有「看紀錄」，
+         看起來像完全不能看，其實共用帳本裡的紀錄都看得到。 */
+      var shared = !full && (d.queryable || []).indexOf(u.id) >= 0;
+      var go = full || shared;
+      var wards = d.guardianships.filter(function (g) { return g.guardian === u.id; });
+      var by = d.guardianships.filter(function (g) { return g.ward === u.id; });
+      return '<article class="mt' + (go ? ' mt--go' : '') + '"' +
+        (go ? ' data-open="' + esc(u.id) + '" title="看 ' + esc(u.name) + ' 的紀錄"' : '') +
+        ' style="animation-delay:' + (i * 60) + 'ms">' +
+        (u.id === d.me ? '<span class="mt__me">你</span>' : '') +
+        ava(u, 'ava--lg') +
+        '<div class="mt__n">' + esc(u.name) + '</div>' +
+        '<div class="mt__r">' + esc(ROLE_TW[u.role] || '') + '</div>' +
+        '<div class="mt__rel">' +
+          (wards.length ? '<span>照看 ' + names(wards, 'wardName') + '</span>' : '') +
+          (by.length ? '<span>由 ' + names(by, 'guardianName') + ' 照看</span>' : '') +
+        '</div>' +
+        (u.id === d.me ? '' : full ? '<span class="mt__go">看紀錄</span>'
+          : shared ? '<span class="mt__go mt__go--part">看共用帳本</span>' : '') +
+      '</article>';
+    }).join('') + '</div></div>';
+
+    $view.innerHTML = h;
+    foldRestore();
+  }
+
+  /* 邀請家人的面板：展開的時候才畫 */
+  FOLD_BUILD.finv = function (wrap) {
+    wrap.innerHTML = '<div class="duo duo--tight">' +
+      '<section class="duo__c"><div class="card invp">' +
+        '<div class="invp__h"><span class="invp__n">1</span><b>用帳號邀請</b></div>' +
+        '<form class="invp__f" id="invFindF">' +
+          '<input type="email" id="invEmail" placeholder="輸入家人的完整 email" autocomplete="off" aria-label="家人的 email" required>' +
+          '<button class="btn btn--sm" type="submit">找人</button>' +
+        '</form>' +
+        '<div id="invFound" class="invp__r"><p class="invp__hint">只接受完整的 email，找到之後再選身分。</p></div>' +
+      '</div></section>' +
+      '<section class="duo__c"><div class="card invp">' +
+        '<div class="invp__h"><span class="invp__n">2</span><b>或是給他邀請碼</b></div>' +
+        '<div class="invp__row"><span class="invp__k">身分</span>' +
+          seg('codrole', [['child', '子女'], ['parent', '家長']], INV.codeRole) +
+          '<button class="btn btn--sm btn--go" data-code-new>產生邀請碼</button></div>' +
+        '<div id="invCodes"></div>' +
+      '</div></section>' +
+    '</div>';
+    paintCodes();
+  };
+
+  function paintCodes() {
+    var box = document.getElementById('invCodes');
+    if (!box) return;
+    API.invites().then(function (inv) {
+      box.innerHTML = inv.codes.length
+        ? inv.codes.map(function (c) {
+            return '<div class="code">' +
+              '<div class="code__v" aria-label="邀請碼">' + esc(c.code) + '</div>' +
+              '<div class="code__m">' + roleTW(c.role) + '　·　' + shortDate(c.expiresAt) + '前有效　·　只能用一次</div>' +
+              '<button class="btn btn--sm" data-copy="' + esc(c.code) + '">複製</button>' +
+            '</div>';
+          }).join('')
+        : '<p class="invp__hint">產生之後傳給家人，他在「家庭」頁輸入就能加入。</p>';
+    });
+  }
+
+  function paintFound(r) {
+    var box = document.getElementById('invFound');
+    if (!box) return;
+    INV.found = r && r.user ? r.user : null;
+    if (!r || !r.user) { box.innerHTML = '<p class="invp__hint">' + esc(r && r.msg || '找不到這個帳號') + '</p>'; return; }
+    var st = {
+      member: '已經是你的家人了',
+      invited: '已經邀請過了，等對方回覆就好',
+      unavailable: '這個帳號目前不能邀請'
+    }[r.status];
+    box.innerHTML = '<div class="found">' + ava(r.user, 'ava--md') +
+      '<div class="found__m"><b>' + esc(r.user.name) + '</b>' + (st ? '<small>' + st + '</small>' : '') + '</div>' +
+      (r.status === 'available'
+        ? '<div class="found__a">' + seg('invrole', [['child', '子女'], ['parent', '家長']], INV.role) +
+            '<button class="btn btn--sm btn--go" data-inv-send="' + esc(r.user.id) + '">送出邀請</button></div>'
+        : '') +
+    '</div>';
+  }
+
+  /* 加入或建立家庭之後，身分變了：側欄、帳本清單、目前這一頁都要重畫 */
+  function afterFamilyChange(msg) {
+    ME = null;
+    FOLD.finv = false;
+    paintWho(); paintGroups(); paint();
+    toast(msg, 'ok');
+  }
 
   /* ============================================================
      單一成員的記帳紀錄（唯讀）
@@ -1056,7 +1233,7 @@
        通知點某一則             → #/member/U3/T1051（那一筆會標起來）
      ============================================================ */
   function vMember(id, hit) {
-    head('成員紀錄', '看得到，不能改');
+    head('成員紀錄', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
     /* 先問「我看不看得到」，確認之後才去拿明細。
@@ -1115,8 +1292,9 @@
           '</div>' +
           '<div class="pcard__stat"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
         '</div></section>' +
-        /* 零用金只有監管他的人看得到——那是監管者對他的設定，不是一筆支出 */
-        (!mine && !partial
+        /* 零用金只有**監管他的人**看得到——那是監管者對他的設定，不是一筆支出。
+           ⚠️ 不能用「看得到全部紀錄」判斷：家長之間也看得到全部，但不會給對方零用金。 */
+        (!mine && d.guardianships.some(function (g) { return g.guardian === d.me && g.ward === id; })
           ? '<section class="duo__c"><div class="card allow">' +
               '<div class="allow__k">每個月給' + esc(callName(u.name)) + '的零用金' + helpBtn('allowance') + '</div>' +
               '<label class="money"><i>NT$</i><input type="number" min="0" inputmode="numeric" ' +
@@ -1141,7 +1319,7 @@
   }
 
   function backLink() {
-    return '<a class="back" href="javascript:history.back()">← 返回</a>';
+    return '<a class="back" href="#/members">← 家庭成員</a>';
   }
 
 
@@ -1858,7 +2036,8 @@
   var AUDIT_TW = {
     suspend_user: '停權帳號', unsuspend_user: '解除停權',
     grant_guardianship: '建立監管關係', end_guardianship: '解除監管',
-    change_role: '變更角色', create_family: '建立家庭', view_ward: '查看被監管者'
+    change_role: '變更角色', create_family: '建立家庭', view_ward: '查看被監管者',
+    invite_member: '邀請家人', join_family: '加入家庭'
   };
 
   /* ---------- 共用 ---------- */
@@ -2269,7 +2448,7 @@
       ME = m;
       var card = ava(m.user, 'ava--md') +
         '<span class="acct__m"><b class="acct__n">' + esc(m.user.name) + '</b>' +
-          '<span class="acct__r">' + esc(ROLE_TW[m.user.role] || (m.user.isPlatformAdmin ? '平台管理員' : '')) + '</span></span>' +
+          '<span class="acct__r">' + esc(ROLE_TW[m.user.role] || (m.user.isPlatformAdmin ? '平台管理員' : '還沒有家庭')) + '</span></span>' +
         '<svg class="acct__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
           'aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
       ['who', 'whoSheet'].forEach(function (k) {
@@ -2601,6 +2780,66 @@
       return;
     }
 
+    /* ---- 家庭 ---- */
+    var ia = t.closest('[data-inv-accept]');
+    if (ia) {
+      ia.disabled = true;
+      API.acceptInvite(ia.dataset.invAccept).then(function (r) {
+        afterFamilyChange('歡迎加入「' + r.family.name + '」');
+      }).catch(function (err) { ia.disabled = false; toast(err.message || '加入失敗', 'err'); });
+      return;
+    }
+    var idc = t.closest('[data-inv-decline]');
+    if (idc) {
+      API.declineInvite(idc.dataset.invDecline).then(function () {
+        toast('已婉拒', 'ok'); paint();
+      }).catch(function (err) { toast(err.message || '操作失敗', 'err'); });
+      return;
+    }
+    var icn = t.closest('[data-inv-cancel]');
+    if (icn) {
+      API.declineInvite(icn.dataset.invCancel).then(function () {
+        toast('已取消邀請', 'ok'); vMembers();
+      }).catch(function (err) { toast(err.message || '操作失敗', 'err'); });
+      return;
+    }
+    var ir = t.closest('[data-invrole]');
+    if (ir) {
+      INV.role = ir.dataset.invrole;
+      Array.prototype.forEach.call(ir.parentNode.children, function (b) { b.classList.toggle('on', b === ir); b.setAttribute('aria-pressed', b === ir); });
+      return;
+    }
+    var cr = t.closest('[data-codrole]');
+    if (cr) {
+      INV.codeRole = cr.dataset.codrole;
+      Array.prototype.forEach.call(cr.parentNode.children, function (b) { b.classList.toggle('on', b === cr); b.setAttribute('aria-pressed', b === cr); });
+      return;
+    }
+    var isd = t.closest('[data-inv-send]');
+    if (isd) {
+      isd.disabled = true;
+      API.sendInvite({ userId: isd.dataset.invSend, role: INV.role }).then(function () {
+        toast('邀請送出了，等' + (INV.found ? INV.found.name : '對方') + '按「加入」', 'ok');
+        vMembers();
+      }).catch(function (err) { isd.disabled = false; toast(err.message || '送不出去', 'err'); });
+      return;
+    }
+    if (t.closest('[data-code-new]')) {
+      API.createInviteCode({ role: INV.codeRole }).then(function (c) {
+        paintCodes(); toast('邀請碼 ' + c.code + ' 產生好了', 'ok');
+      }).catch(function (err) { toast(err.message || '產生失敗', 'err'); });
+      return;
+    }
+    var cp = t.closest('[data-copy]');
+    if (cp) {
+      var txt = cp.dataset.copy;
+      (navigator.clipboard && navigator.clipboard.writeText
+        ? navigator.clipboard.writeText(txt) : Promise.reject())
+        .then(function () { toast('已複製 ' + txt, 'ok'); })
+        .catch(function () { toast('複製不了，請手動記下：' + txt, 'info'); });
+      return;
+    }
+
     /* ---- 帳本管理 ---- */
     var lgh = t.closest('[data-lg]');
     if (lgh) { ledgerToggle(lgh.dataset.lg); return; }
@@ -2906,6 +3145,33 @@
         busy(f, false);
         toast(err.message || '註冊失敗', 'err');
       });
+      return;
+    }
+
+    if (f.id === 'famNewF') {
+      e.preventDefault();
+      busy(f, true, '建立中…');
+      API.createFamily({ name: document.getElementById('famName').value }).then(function (r) {
+        busy(f, false);
+        afterFamilyChange('「' + r.family.name + '」建好了，現在可以邀請家人');
+      }).catch(function (err) { busy(f, false); toast(err.message || '建立失敗', 'err'); });
+      return;
+    }
+    if (f.id === 'famJoinF') {
+      e.preventDefault();
+      busy(f, true, '加入中…');
+      API.joinFamily({ code: document.getElementById('famCode').value }).then(function (r) {
+        busy(f, false);
+        afterFamilyChange('歡迎加入「' + r.family.name + '」');
+      }).catch(function (err) { busy(f, false); toast(err.message || '加入失敗', 'err'); });
+      return;
+    }
+    if (f.id === 'invFindF') {
+      e.preventDefault();
+      busy(f, true, '找…');
+      API.lookupUser(document.getElementById('invEmail').value).then(function (r) {
+        busy(f, false); paintFound(r);
+      }).catch(function (err) { busy(f, false); paintFound({ msg: err.message }); });
       return;
     }
 

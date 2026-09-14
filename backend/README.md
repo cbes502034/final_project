@@ -97,7 +97,7 @@ python -m app.ownership      # 印出分工表並檢查一致性
 | **成員1** | **認證** | `m1-auth` | 17 支 | `routers/auth.py`<br>`models/user.py`<br>`schemas/auth.py` | `core/config.py`<br>`core/database.py`<br>`core/security.py`<br>`core/deps.py`<br>`services/llm/client.py` |
 | **成員2** | **記帳** | `m2-ledger` | 18 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
 | **成員3** | **數字** | `m3-analytics` | 13 支 | `routers/categories.py`<br>`routers/stats.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
-| **成員4** | **家庭** | `m4-access` | 15 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
+| **成員4** | **家庭** | `m4-access` | 20 支 | `routers/family.py`<br>`models/family.py`<br>`models/audit.py`<br>`schemas/family.py`<br>`services/evaluation.py` | `services/permission.py` |
 
 ### 切分原則
 
@@ -199,18 +199,23 @@ POST   /api/advices/generate
 #### 成員4 · 家庭　`m4-access`
 
 負責「誰在這個家庭裡」以及「誰看得到誰的資料」，另外扛模型評測。
-屬於他的：家庭、成員角色、邀請碼、監管關係、權限計算、稽核紀錄、評測。
+屬於他的：家庭、成員角色、家庭綁定（邀請碼與用帳號邀請）、監管關係、權限計算、稽核紀錄、評測。
 不屬於他的：登入本身（那是成員1）。成員1 回答「你是誰」，成員4 回答「你能看到什麼」。
 
 **LLM 工作**：模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1。**留出集必須 100% 人工標註**，否則量到的是「多像那個老師」而不是「多正確」。
 
-**路由（15 支）**
+**路由（20 支）**
 
 ```
 GET    /api/family
 POST   /api/family
 POST   /api/family/invite
 POST   /api/family/join
+GET    /api/family/lookup
+GET    /api/family/invites
+POST   /api/family/invites
+POST   /api/family/invites/{invite_id}/accept
+DELETE /api/family/invites/{invite_id}
 PATCH  /api/family/members/{user_id}
 DELETE /api/family/members/{user_id}
 GET    /api/guardianships

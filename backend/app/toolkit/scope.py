@@ -8,7 +8,8 @@
 ===========================================================================
 一筆紀錄只要通過**其中一條**，你就看得到：
 
-    A. 這筆是誰記的  → 我自己，或我監管的人（**跨所有帳本，無條件**）
+    A. 這筆是誰記的  → 我自己、我監管的人、或同一個家庭的另一位家長
+                       （**跨所有帳本，無條件**）
     B. 這筆在哪本帳  → 我有加入的帳本（那本帳的成員彼此看得到）
 
 **兩條是聯集，不是交集。** 兩者各自回答一個不同的問題：
@@ -23,15 +24,17 @@
    一鍵可繞的破口，同時又讓「把人加進帳本」什麼也不代表。
 
 ===========================================================================
-為什麼可見範圍不看角色
+角色只在一個地方影響可見範圍：家長之間
 ===========================================================================
-**家長沒有例外。** 是家長不等於看得到每個人的消費明細——
-前者是「管得動」，後者是「看得到」，是兩件事。角色管的是治理動作
-（邀請成員、設家庭預算），那些寫在 `app.toolkit.roles`。
+**同一個家庭的家長互相看得到。** 他們一起管這個家的錢，這是使用者明確要的。
 
-這樣做的理由是：**「誰看得到我」必須是一份可以查、可以列出來的清單。**
-一旦寫成 `if role == "parent": return everyone`，被監管的人就再也無法
-確認自己的紀錄到底被誰看過。
+**但家長看子女，一樣要有監管關係。** 是家長不等於看得到每個孩子的消費明細——
+「管得動」和「看得到」是兩件事。所以角色只打開「家長 ↔ 家長」這一條，
+不打開「家長 → 子女」，更不打開「子女 → 任何人」。
+
+這樣「誰看得到我」仍然是一份列得出來的清單：
+監管我的人 ＋（如果我是家長）同家庭的其他家長 ＋ 跟我共用帳本的人。
+⚠️ 不要寫成 `if role == "parent": return everyone`——那會連子女一起打開。
 
 **平台管理員（master）更是完全看不到。** 他能停權，但讀不到任何一筆帳——
 停權是關門，不是配鑰匙。一個能讀全系統消費明細的帳號，
@@ -42,7 +45,7 @@
 ===========================================================================
     from app.toolkit import scope
 
-    users  = scope.visible_users(me_id, guardianships)
+    users  = scope.visible_users(me_id, guardianships, family_members)
     groups = scope.visible_groups(me_id, group_members)
 
     rows = (
@@ -62,7 +65,7 @@ B 會把帳本裡別人的錢算進這個人的總額。
 要擋單一目標（例如 `GET /api/transactions?userId=U3`）：
 
     scope.require_user(target_id, scope.queryable_users(
-        me_id, guardianships, group_members))
+        me_id, guardianships, group_members, family_members))
     scope.require_group(group_id, groups)
 
 `queryable_users` 比 `visible_users` 寬：跟我同帳本的人，我看得到他在
@@ -79,6 +82,7 @@ from typing import Iterable, Protocol, Sequence
 __all__ = [
     "Forbidden",
     "visible_users",
+    "co_parents",
     "co_members",
     "queryable_users",
     "can_see_row",
@@ -120,24 +124,66 @@ def _attr(obj: object, *names: str) -> object:
     raise AttributeError(f"{obj!r} 沒有 {' / '.join(names)} 任何一個欄位")
 
 
-def visible_users(me: object, guardianships: Iterable[object]) -> set:
-    """我看得到誰的紀錄：自己 ＋ 我監管的人。
+def _opt(obj: object, name: str) -> object:
+    """可有可無的欄位。沒有就回 None。"""
+    if isinstance(obj, dict):
+        return obj.get(name)
+    return getattr(obj, name, None)
+
+
+def co_parents(me: object, family_members: Iterable[object]) -> set:
+    """跟我同一個家庭的**家長**（含我自己）。我不是家長就回空集合。
+
+    `family_members` 的每一列要有 `family_id`、`user_id`、`role`、`status`。
+    只算 `status == 'active'` 的——被移除的家長不該還看得到。
+
+    >>> rows = [{"family_id": "F1", "user_id": "U1", "role": "parent", "status": "active"},
+    ...         {"family_id": "F1", "user_id": "U2", "role": "parent", "status": "active"},
+    ...         {"family_id": "F1", "user_id": "U3", "role": "child", "status": "active"},
+    ...         {"family_id": "F2", "user_id": "U9", "role": "parent", "status": "active"}]
+    >>> co_parents("U1", rows) == {"U1", "U2"}
+    True
+    >>> co_parents("U3", rows) == set()          # 子女不因為角色看到任何人
+    True
+    """
+    rows = [r for r in family_members if (_opt(r, "status") or "active") == "active"]
+    my_families = {
+        _attr(r, "family_id", "family") for r in rows
+        if _attr(r, "user_id", "user") == me and _attr(r, "role") == "parent"
+    }
+    if not my_families:
+        return set()
+    return {
+        _attr(r, "user_id", "user") for r in rows
+        if _attr(r, "family_id", "family") in my_families and _attr(r, "role") == "parent"
+    }
+
+
+def visible_users(
+    me: object,
+    guardianships: Iterable[object],
+    family_members: Iterable[object] = (),
+) -> set:
+    """我看得到誰的**全部**紀錄：自己 ＋ 我監管的人 ＋ 同家庭的其他家長。
 
     ⚠️ 只算還有效的監管關係。已經解除的（`ended_at` 有值）要先濾掉，
-    這裡不幫你濾——查資料庫時就該加 `WHERE ended_at IS NULL`，
-    不要把整張表撈出來再用 Python 過濾。
+    這裡不幫你濾——查資料庫時就該加 `WHERE ended_at IS NULL`。
 
-    >>> visible_users("U1", [{"guardian_id": "U1", "ward_id": "U3"},
-    ...                      {"guardian_id": "U2", "ward_id": "U4"}]) == {"U1", "U3"}
+    >>> g = [{"guardian_id": "U1", "ward_id": "U3"}, {"guardian_id": "U2", "ward_id": "U4"}]
+    >>> visible_users("U1", g) == {"U1", "U3"}
     True
-    >>> visible_users("U3", []) == {"U3"}
+    >>> fm = [{"family_id": "F1", "user_id": "U1", "role": "parent", "status": "active"},
+    ...       {"family_id": "F1", "user_id": "U2", "role": "parent", "status": "active"}]
+    >>> visible_users("U1", g, fm) == {"U1", "U2", "U3"}
+    True
+    >>> visible_users("U3", [], fm) == {"U3"}
     True
     """
     out = {me}
     for g in guardianships:
         if _attr(g, "guardian_id", "guardian") == me:
             out.add(_attr(g, "ward_id", "ward"))
-    return out
+    return out | co_parents(me, family_members)
 
 
 def visible_groups(me: object, group_members: Iterable[object]) -> set:
@@ -178,13 +224,14 @@ def queryable_users(
     me: object,
     guardianships: Iterable[object],
     group_members: Iterable[object],
+    family_members: Iterable[object] = (),
 ) -> set:
     """我可以拿誰的 id 來查：我監管的人 ＋ 跟我同帳本的人。
 
     ⚠️ 「查得到」不等於「看得到全部」。同帳本的人只會查到共用帳本那部分，
     這由 :func:`can_see_row` 逐筆決定——這裡只負責擋掉完全無關的人。
     """
-    return visible_users(me, guardianships) | co_members(me, group_members)
+    return visible_users(me, guardianships, family_members) | co_members(me, group_members)
 
 
 def can_see_row(

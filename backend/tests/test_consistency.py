@@ -349,20 +349,29 @@ def test_規格文件的分工總表也要對():
                 m.label, mo.group(1), len(m.routes))
 
 
-def test_可見範圍不可以用角色判斷():
-    """可見範圍只能由 guardianships 決定。
+def test_可見範圍只有三條路_角色只打開家長之間():
+    """看得到誰的全部紀錄：自己、我監管的人、同家庭的其他家長。
 
-    寫成 `if role == 'master': return everyone` 的話，
-    被監管的人就無法確認自己的紀錄被誰看過——「誰看得到我」
-    必須是一份可以查、可以列出來的清單。
+    ⚠️ 2026-09-14 使用者決定「家長之間本身就看得到」。
+    但角色**只能**打開「家長 ↔ 家長」這一條：
+      · 家長看子女，一樣要有監管關係
+      · 子女不會因為角色看到任何人
+    寫成 `if (role === 'parent') return 全家` 就會連子女一起打開。
     """
     api = read("frontend/js/api.js")
     mo = re.search(r"function visibleUsers\(meId\) \{(.*?)\n  \}", api, re.S)
     assert mo, "api.js 裡找不到 visibleUsers"
     body = mo.group(1)
-    assert "role" not in body, \
-        "visibleUsers 又用角色判斷了：\n" + body
     assert "guardianships" in body, "visibleUsers 沒有看 guardianships"
+    assert "coParents(" in body, "visibleUsers 沒有算同家庭的家長"
+    assert "role" not in body, "角色判斷只能放在 coParents 裡：\n" + body
+
+    mo2 = re.search(r"function coParents\(meId\) \{(.*?)\n  \}", api, re.S)
+    assert mo2, "api.js 裡找不到 coParents"
+    cp = mo2.group(1)
+    assert "me.role !== 'parent'" in cp, "我不是家長時 coParents 必須是空的"
+    assert "m.role === 'parent'" in cp, "coParents 只能回家長，不能連子女一起回"
+    assert "familyId" in cp, "coParents 必須限同一個家庭"
 
 
 def test_檔案系統說明書要跟得上實際的檔案():
@@ -1606,7 +1615,8 @@ def test_個人建議只給本人_全家建議只給家長():
     assert "if (a.user === s.me) return !fam;" in body
 
     D = _load_data()
-    people = {m["id"] for m in D["members"] if not m.get("isPlatformAdmin")}
+    # 還沒加入家庭、也還沒有任何紀錄的人（示範用的林玉珍）沒有東西可以建議
+    people = {m["id"] for m in D["members"] if not m.get("isPlatformAdmin") and m.get("familyId")}
     has = {a.get("user") for a in D["advices"] if a["scope"] == "user"}
     assert people <= has, "每個人都該有至少一則自己的建議，缺：%s" % (people - has)
 
@@ -1651,3 +1661,125 @@ def test_電腦版的搜尋框不會被點掉():
     """點外面收起搜尋框只能在手機上。電腦版曾經點一下任何地方搜尋框就消失，旁邊的按鈕跟著位移。"""
     app = read("frontend/js/app.js")
     assert "if (narrowBar.matches && !t.closest('#searchDrawer') && !t.closest('#searchBtn'))" in app
+
+
+# ===========================================================================
+# 家庭綁定：用 node 把 mock 真的跑一次
+# ===========================================================================
+
+_FAMILY_DRIVER = _ADMIN_DRIVER.split("(async () => {")[0] + r"""
+(async () => {
+  const out = {}, PW = 'password123';
+  let API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.u1Visible = (await API.me()).visible;
+  out.lookGrandma = await API.lookupUser('yuzhen@mail.tw');
+  out.lookSpouse = (await API.lookupUser('shufen@lin.tw')).status;
+  out.lookAdmin = (await API.lookupUser('admin@fambudget.tw')).status;
+  out.lookPartial = await fails(API.lookupUser('yuzhen'));
+  out.send = await API.sendInvite({ userId: 'U5', role: 'child' });
+  out.sendDup = await fails(API.sendInvite({ userId: 'U5', role: 'child' }));
+
+  await API.login({ email: 'yuhan@lin.tw', password: PW });
+  out.u3Visible = (await API.me()).visible;
+  out.childLookup = await fails(API.lookupUser('yuzhen@mail.tw'));
+  out.childCode = await fails(API.createInviteCode({ role: 'parent' }));
+  await API.login({ email: 'shufen@lin.tw', password: PW });
+  out.u2Visible = (await API.me()).visible;
+
+  API = boot();
+  await API.login({ email: 'yuzhen@mail.tw', password: PW });
+  const inv = await API.invites();
+  out.received = inv.received;
+  out.beforeMembers = (await API.members());
+  out.accept = await API.acceptInvite(inv.received[0].id);
+  out.after = (await API.me()).user;
+  out.afterVisible = (await API.me()).visible;
+
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.u1SeesU5 = (await API.me()).visible.includes('U5');
+  const code = await API.createInviteCode({ role: 'parent' });
+  out.code = code;
+  await API.register({ name: '林小姑', email: 'aunt@mail.tw', password: PW });
+  out.newUser = (await API.me()).user;
+  out.join = await API.joinFamily({ code: code.code.toLowerCase().replace('-', ' ') });
+  out.newParentVisible = (await API.me()).visible;
+  await API.register({ name: '陌生人', email: 'x@mail.tw', password: PW });
+  out.reuse = await fails(API.joinFamily({ code: code.code }));
+  out.strangerMembers = (await API.members()).members.map(m => m.id);
+  const stranger = (await API.me()).user.id;
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
+  out.addStranger = await fails(API.addGroupMember('G1', stranger));
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+_FAMILY_RUN = {}
+
+
+def _run_family_flow():
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    if "out" in _FAMILY_RUN:
+        return _FAMILY_RUN["out"]
+    if not shutil.which("node"):
+        import pytest
+        pytest.skip("這台機器沒有 node")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(_FAMILY_DRIVER)
+        tmp = fh.name
+    res = subprocess.run(
+        ["node", tmp, os.path.join(REPO, "frontend", "js", "data.js"),
+         os.path.join(REPO, "frontend", "js", "api.js")], capture_output=True)
+    assert res.returncode == 0, res.stderr.decode("utf-8", "replace")
+    _FAMILY_RUN["out"] = json.loads(res.stdout.decode("utf-8"))
+    return _FAMILY_RUN["out"]
+
+
+def test_同家庭的家長互相看得到_子女不會因為角色看到人():
+    out = _run_family_flow()
+    assert "U2" in out["u1Visible"] and "U1" in out["u2Visible"], "家長之間應該互相看得到"
+    assert out["u3Visible"] == ["U3"], "子女不會因為角色看到任何人：%s" % out["u3Visible"]
+    assert not out["u1SeesU5"], "新加入的子女沒有監管關係，家長不該看得到全部"
+    assert out["afterVisible"] == ["U5"], "新加入的子女只看得到自己"
+    assert set(out["newParentVisible"]) == {out["newUser"]["id"], "U1", "U2"}, \
+        "拿家長邀請碼加入的人，看得到的應該是自己和兩位家長（看不到孩子）"
+
+
+def test_用帳號找人只接受完整email_也不回財務資料():
+    out = _run_family_flow()
+    assert out["lookPartial"], "只打一半的 email 也查得到——那就變成帳號名單了"
+    assert set(out["lookGrandma"]["user"]) <= {"id", "name", "avatar", "avatarUrl"}, \
+        "找人的回應帶了多餘的欄位：%s" % sorted(out["lookGrandma"]["user"])
+    assert out["lookGrandma"]["status"] == "available"
+    assert out["lookSpouse"] == "member"
+    assert out["lookAdmin"] == "unavailable", "平台管理員不能被邀請，也不該說原因"
+
+
+def test_只有家長能邀請_而且不能重複邀請():
+    out = _run_family_flow()
+    assert out["childLookup"] and out["childLookup"]["status"] == 403
+    assert out["childCode"] and out["childCode"]["status"] == 403
+    assert out["sendDup"] and out["sendDup"]["status"] == 409
+
+
+def test_接受邀請之後加入家庭_身分由家長決定():
+    out = _run_family_flow()
+    assert out["beforeMembers"]["family"] is None, "還沒接受邀請前不該有家庭"
+    assert [m["id"] for m in out["beforeMembers"]["members"]] == ["U5"], "沒有家庭時只列自己"
+    assert out["received"][0]["familyName"] == "林家" and out["received"][0]["role"] == "child"
+    assert out["after"]["familyId"] == "F1" and out["after"]["role"] == "child"
+
+
+def test_邀請碼只能用一次_而且大小寫空白都吃得下():
+    out = _run_family_flow()
+    assert out["newUser"]["role"] is None and out["newUser"]["familyId"] is None, \
+        "新註冊的人不該自動屬於任何家庭"
+    assert out["join"]["role"] == "parent", "邀請碼要帶著家長決定的身分"
+    assert out["reuse"], "同一組邀請碼被用了第二次"
+    assert out["strangerMembers"] == [m for m in out["strangerMembers"] if m.startswith("U")] \
+        and len(out["strangerMembers"]) == 1, "沒有家庭的人不該看到別人家的成員"
+    assert out["addStranger"], "別人家的人被加進了自己家的帳本"
