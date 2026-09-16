@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RESTful API 說明書</title>
-<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 38 支路由哪裡符合、哪裡故意不符合。">
+<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 70 支路由哪裡符合、哪裡故意不符合。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -100,12 +100,12 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
         REST 不是技術，是一套<b>取名字的約定</b>。約定好之後，
         別人看到你的網址就猜得出它會做什麼——不用問你、不用翻文件。<br>
         這份文件會先用<b>圖書館</b>把概念講完，再回頭誠實檢查
-        我們自己的 38 支路由：哪些符合、哪些故意不符合、哪些該改。
+        我們自己的 70 支路由：哪些符合、哪些故意不符合、哪些可以改。
       </p>
       <div class="hero__meta">
         <div class="mchip"><span>預計閱讀</span><b>25 分鐘</b></div>
         <div class="mchip"><span>前置知識</span><b>看過 FastAPI 說明書</b></div>
-        <div class="mchip"><span>本專案</span><b>38 支路由</b></div>
+        <div class="mchip"><span>本專案</span><b>70 支路由</b></div>
       </div>
     </header>
     <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
@@ -520,16 +520,27 @@ DELETE /books/5
 
     <!-- ============ 08 ============ -->
     <section class="sec" id="ours">
-      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 38 支</h2></div>
+      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 70 支</h2></div>
       <p class="sec__lead">
-        我把本專案的每一支路由都對上面的規則檢查過。
-        結果是：<b>38 支裡有 22 支不符合嚴格的 REST 慣例。</b>
+        我把本專案的每一支路由都對上面的規則檢查過（清單跟 <code>backend/app/ownership.py</code> 一致，有測試對）。
+        結果是：<b>70 支裡有 35 支完全符合，35 支嚴格說不符合 REST 慣例。</b>
       </p>
 
       <div class="note">
         <div class="note__k">這個數字不代表設計很差</div>
-        <p>22 支裡面，<b>大部分是業界通用做法或刻意的取捨</b>，
-        只有 3 支是真的該改。下面逐類講。</p>
+        <p>不符合的 35 支裡，<b>17 支是業界通用做法、8 支是刻意的動作</b>，
+        真的可以改得更一致的是 10 支。下面逐類講。</p>
+      </div>
+
+      <h3 class="sub">完全符合（35 支）</h3>
+      <p style="color:var(--ink-soft);max-width:64ch">網址是名詞、集合用複數、動作靠方法表達，照第 2～4 節寫的就是這些：</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>路由</th></tr></thead>
+          <tbody>
+            <tr><td class="rt">POST /api/auth/password-reset<br>GET /api/auth/sessions<br>GET /api/admin/users<br>GET /api/transactions<br>POST /api/transactions<br>PATCH /api/transactions/{tx_id}<br>DELETE /api/transactions/{tx_id}<br>DELETE /api/transactions<br>GET /api/categories<br>POST /api/categories<br>GET /api/groups<br>POST /api/groups<br>PATCH /api/groups/{gid}<br>POST /api/groups/{gid}/members<br>DELETE /api/groups/{gid}/members/{user_id}<br>GET /api/budgets<br>GET /api/savings-goals<br>GET /api/alerts<br>POST /api/alerts<br>PATCH /api/alerts/{aid}<br>DELETE /api/alerts/{aid}<br>GET /api/advices<br>GET /api/family/invites<br>POST /api/family/invites<br>DELETE /api/family/invites/{invite_id}<br>PATCH /api/family/members/{user_id}<br>DELETE /api/family/members/{user_id}<br>GET /api/guardianships<br>POST /api/guardianships<br>DELETE /api/guardianships/{gid}<br>GET /api/notifications<br>PATCH /api/notifications/{nid}<br>PATCH /api/notifications<br>GET /api/allowances<br>GET /api/audit</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <h3 class="sub">第一類：業界通用，不用改（17 支）</h3>
@@ -537,75 +548,93 @@ DELETE /books/5
         <table>
           <thead><tr><th>路由</th><th>嚴格說的問題</th><th>為什麼不改</th></tr></thead>
           <tbody>
-            <tr><td class="rt">POST /api/auth/login<br>POST /api/auth/logout<br>POST /api/auth/refresh<br>POST /api/auth/register</td>
+            <tr><td class="rt">POST /api/auth/register<br>POST /api/auth/login<br>POST /api/auth/refresh<br>POST /api/auth/logout</td>
                 <td>網址有動詞</td>
-                <td>REST 純粹主義者會說應該是 <code>POST /sessions</code>，但<b>沒有人真的這樣做</b>。
-                    這四支是全世界都看得懂的慣例，改成「正確」的反而沒人看得懂。</td></tr>
-            <tr><td class="rt">GET /api/auth/me</td>
-                <td>單數、而且 me 不是資源</td>
-                <td>「目前登入的那個人」的通用寫法。替代方案是
-                    <code>/users/{我的id}</code>，但前端還要先知道自己的 ID，多一趟往返。</td></tr>
-            <tr><td class="rt">GET,PATCH /api/auth/me<br>PUT,DELETE /api/auth/me/avatar<br>GET /api/summary<br>GET /api/family<br>GET,PUT /api/savings-goal<br>PATCH /api/auth/password</td>
+                <td>純粹主義者會說應該是 <code>POST /sessions</code>，但<b>沒有人真的這樣做</b>。這四支是全世界都看得懂的慣例，改成「正確」的反而沒人看得懂。</td></tr>
+            <tr><td class="rt">GET /api/auth/me<br>PATCH /api/auth/me</td>
+                <td><code>me</code> 不是一個資源 id</td>
+                <td>「目前登入的那個人」的通用寫法。替代方案是 <code>/users/{我的id}</code>，前端還得先知道自己的 id，多一趟往返。</td></tr>
+            <tr><td class="rt">PATCH /api/auth/password<br>GET /api/auth/me/finance<br>PUT /api/auth/me/finance<br>PUT /api/auth/me/avatar<br>DELETE /api/auth/me/avatar<br>GET /api/summary<br>GET /api/family<br>POST /api/family<br>DELETE /api/family<br>PATCH /api/groups/{gid}/notify</td>
                 <td>用了單數名詞</td>
-                <td>這些是 <b>singleton resource</b>（單例資源）——
-                    一個使用者只有一份摘要、只屬於一個家庭、每期只有一個存款目標。
-                    <b>單數在這種情況是正確的</b>，複數才奇怪。</td></tr>
+                <td>這些是 <b>singleton resource</b>（單例資源）：一個人只有一組密碼、一份理財習慣、一張大頭貼，只屬於一個家庭，在一本帳裡只有一個通知開關。<b>單數在這種情況是正確的</b>，複數才奇怪。</td></tr>
+            <tr><td class="rt">GET /api/family/lookup</td>
+                <td>網址有動詞</td>
+                <td>查詢類的慣例寫法（跟 <code>/search</code> 一樣）。它只讀、不建立任何東西，而且只收完整 email。</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3 class="sub">第二類：刻意違反，因為 REST 表達不了（5 支）</h3>
+      <h3 class="sub">第二類：刻意的動作，REST 表達不了（8 支）</h3>
       <div class="tw">
         <table>
-          <thead><tr><th>路由</th><th>為什麼 REST 表達不了</th></tr></thead>
+          <thead><tr><th>路由</th><th>為什麼用動作的名字</th></tr></thead>
           <tbody>
             <tr><td class="rt">POST /api/nlp/parse<br>POST /api/nlp/parse-batch</td>
-                <td><b>它不建立任何東西。</b> 它把一段文字算成結構化欄位然後回傳，
-                    <b>刻意不寫進資料庫</b>。REST 的五個方法裡沒有一個能表達
-                    「幫我算一下但不要存」。硬要套的話只能叫
-                    <code>POST /parse-results</code>，然後假裝建立了一個不存在的資源——
-                    那更難懂。</td></tr>
+                <td><b>它不建立任何東西。</b>把一段文字算成結構化欄位然後回傳，<b>刻意不寫進資料庫</b>。五個方法裡沒有一個能表達「幫我算一下但不要存」；硬要套只能叫 <code>POST /parse-results</code>，假裝建立了一個不存在的資源，更難懂。</td></tr>
             <tr><td class="rt">POST /api/nlp/confirm<br>POST /api/nlp/confirm-batch</td>
-                <td>這兩支<b>其實是在建立 transactions</b>，嚴格說應該是
-                    <code>POST /api/transactions</code>。但我們刻意分開，
-                    因為<b>來源必須分得清楚</b>：走這支的 <code>source</code> 記
-                    <code>nlp</code>，走 transactions 的記 <code>manual</code>。
-                    混在一起的話模型正確率的分母就錯了。</td></tr>
-            <tr><td class="rt">POST /api/family/invite</td>
-                <td>產生一組邀請碼。勉強可以說是
-                    <code>POST /api/family/invites</code>（建立一張邀請），
-                    其實這樣更好——見下面第三類。</td></tr>
+                <td>這兩支<b>其實是在建立 transactions</b>，嚴格說應該是 <code>POST /api/transactions</code>。刻意分開是因為<b>來源必須分得清楚</b>：走這支的 <code>source</code> 記 <code>nlp</code>、還要寫 <code>nlp_parses</code>；混在一起，模型正確率的分母就錯了。</td></tr>
+            <tr><td class="rt">POST /api/auth/password-reset/confirm<br>POST /api/auth/verify-password</td>
+                <td>兩支都是「驗一個祕密」：前者驗信裡的一次性 token 再換密碼，後者只回答密碼對不對、<b>什麼都不改</b>。它們不是對某個資源的增刪改查。</td></tr>
+            <tr><td class="rt">POST /api/groups/{gid}/settle</td>
+                <td>結算是<b>做了就回不去</b>的狀態轉換，而且有自己的規則（只有活動帳本、只有開帳本的人）。寫成 <code>PATCH /api/groups/{gid}</code> 帶 <code>settled: true</code> 的話，看起來像能改回 false，反而誤導。</td></tr>
+            <tr><td class="rt">POST /api/family/invites/{invite_id}/accept</td>
+                <td>接受邀請會同時做兩件事：把邀請標成已接受、把人加進家庭。一個動作動到兩個資源，用動作的名字講最清楚。</td></tr>
           </tbody>
         </table>
       </div>
 
-      <h3 class="sub">第三類：真的該改（3 支）</h3>
+      <h3 class="sub">第三類：可以改得更一致（10 支）</h3>
       <p style="color:var(--ink-soft);max-width:64ch">
-        這三支改成 RESTful 之後<b>更清楚</b>，不是為了合規而合規：
+        改成下面的寫法之後<b>更清楚</b>，不是為了合規而合規：
       </p>
       <div class="tw">
         <table>
           <thead><tr><th>現在</th><th>建議改成</th><th>為什麼比較好</th></tr></thead>
           <tbody>
             <tr>
-              <td class="rt">POST /api/advices/<b style="color:var(--down)">generate</b></td>
+              <td class="rt">POST /api/advices/generate</td>
               <td class="rt">POST /api/advices</td>
-              <td>產生建議<b>就是在建立 advices 資源</b>。
-                  已經有 <code>GET /api/advices</code> 了，
-                  用同一個網址加 POST 完全符合直覺，也少一個網址。</td>
+              <td>產生建議<b>就是在建立 advices</b>。已經有 <code>GET /api/advices</code>，同一個網址加 POST 最直覺。</td>
             </tr>
             <tr>
-              <td class="rt">POST /api/family/<b style="color:var(--down)">join</b></td>
+              <td class="rt">POST /api/family/join</td>
               <td class="rt">POST /api/family/members</td>
-              <td>加入家庭<b>就是建立一筆成員關係</b>。
-                  而且已經有 <code>PATCH /api/family/members/{id}</code> 了，
-                  用同一組路徑比較一致。</td>
+              <td>加入家庭<b>就是建立一筆成員關係</b>，跟 <code>PATCH／DELETE /api/family/members/{user_id}</code> 同一組路徑。</td>
             </tr>
             <tr>
-              <td class="rt">POST /api/auth/<b style="color:var(--down)">logout-all</b></td>
+              <td class="rt">POST /api/auth/logout-all</td>
               <td class="rt">DELETE /api/auth/sessions</td>
-              <td>「撤銷所有工作階段」<b>就是刪掉 sessions 集合</b>。
-                  而且已經有 <code>GET /api/auth/sessions</code> 了。</td>
+              <td>「撤銷所有登入」<b>就是刪掉 sessions 集合</b>，而且已經有 <code>GET /api/auth/sessions</code>。</td>
+            </tr>
+            <tr>
+              <td class="rt">POST /api/family/invite</td>
+              <td class="rt">POST /api/family/invite-codes</td>
+              <td>現在 <code>/family/invite</code>（邀請碼）跟 <code>/family/invites</code>（用帳號邀請）只差一個 s，<b>最容易打錯的一組</b>。</td>
+            </tr>
+            <tr>
+              <td class="rt">PUT /api/savings-goal</td>
+              <td class="rt">PUT /api/savings-goals</td>
+              <td>讀的是 <code>GET /api/savings-goals</code>（複數）、寫的卻是單數——這就是第 10 節的錯誤 7「單複數混用」。</td>
+            </tr>
+            <tr>
+              <td class="rt">PUT /api/allowance</td>
+              <td class="rt">PUT /api/allowances/{ward_id}</td>
+              <td>跟上一支同樣是單複數混用；零用金是「每個被照看的人一筆」，放在路徑上比放在主體裡清楚。</td>
+            </tr>
+            <tr>
+              <td class="rt">PUT /api/budgets</td>
+              <td class="rt">PUT /api/budgets/{category_id}</td>
+              <td>現在是對整個集合 PUT、主體裡再帶是哪個分類。一個分類一筆預算，<b>分類放在路徑上</b>才是「把這一筆設定成這樣」。</td>
+            </tr>
+            <tr>
+              <td class="rt">POST /api/admin/users/{user_id}/suspend<br>DELETE /api/admin/users/{user_id}/suspend</td>
+              <td class="rt">PUT／DELETE /api/admin/users/{user_id}/suspension</td>
+              <td>網址用名詞（停權這件事），建立與解除就是對它 PUT 與 DELETE。現在的動詞寫法也看得懂，改不改影響不大。</td>
+            </tr>
+            <tr>
+              <td class="rt">DELETE /api/groups/{gid}</td>
+              <td class="rt">封存改成 PATCH /api/groups/{gid}（archived: true）</td>
+              <td>現在同一個 DELETE 靠 <code>?permanent=true</code> 分成「封存」跟「移除」兩件事。封存其實是改狀態，而且復原已經走 PATCH（archived: false），封存也走 PATCH 會比較對稱；DELETE 就只留給真正的移除。</td>
             </tr>
           </tbody>
         </table>
@@ -613,10 +642,11 @@ DELETE /books/5
 
       <div class="note note--warn">
         <div class="note__k">改不改？</div>
-        <p>這三支目前<b>前端都還沒在用</b>，所以改的成本很低（改 router + 契約文件）。<br>
-        但也不是非改不可——<b>一致性比正確性重要</b>。
-        如果決定不改，就在報告裡誠實寫「我們知道這裡不是嚴格的 REST，理由是 X」，
-        那比假裝沒發現好得多。</p>
+        <p>這幾支<b>前端都已經在用了</b>，後端則都還沒實作（回 501）。所以現在改的成本是：
+        改 <code>ownership.py</code> 與路由檔的路徑、改 <code>api.js</code> 的 FN 與 http 轉接器各一行、跑 <code>sync_spec.py</code> 更新文件——
+        <b>要改就在各自實作之前一次改完</b>，做完再改就要動到測試與實作。<br>
+        也不是非改不可——<b>一致性比正確性重要</b>。
+        如果決定不改，就在報告裡誠實寫「我們知道這裡不是嚴格的 REST，理由是 X」，那比假裝沒發現好得多。</p>
       </div>
     </section>
 
@@ -701,14 +731,14 @@ DELETE /books/5
       <div class="note">
         <div class="note__k">動工前先看這兩份</div>
         <p><a href="fastapi.html">FastAPI 說明書</a> —— 怎麼用程式把這些實作出來<br>
-        <a href="api.html">API 瀏覽</a> —— 本專案 38 支路由的完整清單<br>
+        <a href="api.html">API 瀏覽</a> —— 本專案 70 支路由的完整清單<br>
         還有 <code>docs/02-前後端串接契約.md</code> —— 每一支「我送什麼、你吐什麼」</p>
       </div>
     </section>
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · RESTful API 說明書</div>
-      <div class="mono">38 ROUTES · 5 METHODS</div>
+      <div class="mono">70 ROUTES · 5 METHODS</div>
     </footer>
 
   </div>

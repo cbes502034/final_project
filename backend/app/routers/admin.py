@@ -47,7 +47,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
 @router.post("/admin/users/{user_id}/suspend", summary="停權")
 @admin_required
 @stub
-def suspend_user(body: SuspendIn, me: User, db: Session = Depends(get_db)):
+def suspend_user(user_id: str, body: SuspendIn, me: User, db: Session = Depends(get_db)):
     """停權
 
     POST /api/admin/users/{user_id}/suspend
@@ -60,7 +60,7 @@ def suspend_user(body: SuspendIn, me: User, db: Session = Depends(get_db)):
 @router.delete("/admin/users/{user_id}/suspend", summary="解除停權")
 @admin_required
 @stub
-def unsuspend_user(me: User, db: Session = Depends(get_db)):
+def unsuspend_user(user_id: str, me: User, db: Session = Depends(get_db)):
     """解除停權
 
     DELETE /api/admin/users/{user_id}/suspend

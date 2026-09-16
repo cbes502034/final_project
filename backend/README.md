@@ -63,7 +63,7 @@ backend/
 ├── alembic/               ← 資料庫結構的版本控制（versions/ 第一版就是 20 張表）
 ├── alembic.ini            ← ⚠️ 只能有英文（Windows 的 alembic 用 cp950 讀它）
 ├── tests/                 ← pytest；fixtures/ 放測試用的一家人與假後端
-├── tools/                 ← sync_spec.py、sync_schema.py：文件從程式產生
+├── tools/                 ← sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生
 ├── requirements.txt
 ├── Dockerfile             ← 啟動前先 alembic upgrade head
 └── .env.example           ← 設定範本，依成員分段，機密一律留空
@@ -504,6 +504,10 @@ alembic upgrade head
 
 **路由回 501**
 → 那支還沒實作（還標著 `@stub`）。回應裡就寫著路由與負責人，前端畫面也會講。這是正常的，不是 bug。
+
+**畫面寫「後端出錯（HTTP 500）：系統發生錯誤…」**
+→ 路由裡丟出了沒接住的例外。開發環境的訊息後面會附上例外的類型與內容，完整的追蹤在 uvicorn 的 log 裡；
+正式環境（`APP_ENV=production`）只回一句話，不會把表名、SQL 送出去。規則類的錯誤請用 `toolkit/errors.py` 轉成 400／403／409。
 
 **`alembic` 指令噴 `UnicodeDecodeError: 'cp950'`**
 → 有人在 `alembic.ini` 裡寫了中文。那個檔案只能有英文，說明寫在 `alembic/env.py`。

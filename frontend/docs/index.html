@@ -572,7 +572,7 @@
     <section class="sec" id="api">
       <div class="sec__h"><span class="sec__n">05</span><h2>API 目錄：按人員分類</h2></div>
       <p class="sec__lead">
-        共 <b>70 支路由</b>。權限標示：公開 / 登入 / 家長 / 監管者 / 平台。
+        共 <b>70 支路由</b>。權限標示：公開 / 登入 / 本人 / 家長 / 監管者 / 建立者 / 平台管理員。
         <span class="tag tag--llm">★</span> 代表與 LLM 直接相關。
       </p>
 
@@ -618,13 +618,16 @@
             <tr><td class="num">7</td><td class="tight">PATCH</td><td class="rt">/api/auth/password</td><td class="tight">登入</td><td>修改密碼，同時讓其他裝置的 session 失效。舊密碼不對回 400</td></tr>
             <tr><td class="num">74</td><td class="tight">POST</td><td class="rt">/api/auth/password-reset</td><td class="tight">公開</td><td>忘記密碼：寄重設信（Brevo）。<b>有沒有這個帳號都回同一句話</b></td></tr>
             <tr><td class="num">75</td><td class="tight">POST</td><td class="rt">/api/auth/password-reset/confirm</td><td class="tight">公開</td><td>用信裡的 token 設新密碼。一次性、30 分鐘，成功後撤銷所有 sessions</td></tr>
+            <tr><td class="num">8</td><td class="tight">GET</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>我的理財習慣（財務建議的背景）</td></tr>
+            <tr><td class="num">9</td><td class="tight">PUT</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>改理財習慣。body: { style, goals[], habits[], note }</td></tr>
+            <tr><td class="num">10</td><td class="tight">POST</td><td class="rt">/api/auth/verify-password</td><td class="tight">本人</td><td>重大操作前再確認一次。不發新 token；不對回 400</td></tr>
             <tr><td class="num">11</td><td class="tight">GET</td><td class="rt">/api/auth/sessions</td><td class="tight">登入</td><td>列出有效的登入裝置</td></tr>
             <tr><td class="num">12</td><td class="tight">PATCH</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 <code>onboarded</code></td></tr>
             <tr><td class="num">13</td><td class="tight">PUT</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>上傳大頭貼。前端已縮到 256×256</td></tr>
             <tr><td class="num">14</td><td class="tight">DELETE</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>移除大頭貼，改回顯示文字頭像</td></tr>
-            <tr><td class="num">10</td><td class="tight">POST</td><td class="rt">/api/auth/verify-password</td><td class="tight">本人</td><td>重大操作前再確認一次。不發新 token；不對回 400</td></tr>
-            <tr><td class="num">8</td><td class="tight">GET</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>我的理財習慣（財務建議的背景）</td></tr>
-            <tr><td class="num">9</td><td class="tight">PUT</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>改理財習慣。body: { style, goals[], habits[], note }</td></tr>
+            <tr><td class="num">62</td><td class="tight">GET</td><td class="rt">/api/admin/users</td><td class="tight">平台管理員</td><td>帳號清單（停權用）。⚠️ 刻意不回傳任何金額</td></tr>
+            <tr><td class="num">63</td><td class="tight">POST</td><td class="rt">/api/admin/users/{user_id}/suspend</td><td class="tight">平台管理員</td><td>停權一個帳號。body: { reason }，理由必填</td></tr>
+            <tr><td class="num">64</td><td class="tight">DELETE</td><td class="rt">/api/admin/users/{user_id}/suspend</td><td class="tight">平台管理員</td><td>解除停權</td></tr>
           </tbody>
         </table>
       </div>
@@ -643,6 +646,16 @@
             <tr><td class="num">20</td><td class="tight">POST</td><td class="rt">/api/nlp/parse-batch <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td><b>段落：一段話 → 切成 N 筆</b>。只解析，不寫入</td></tr>
             <tr><td class="num">21</td><td class="tight">POST</td><td class="rt">/api/nlp/confirm <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td>單筆確認後寫入，同時記錄修正。<code>source</code> 記成 <code>nlp</code></td></tr>
             <tr><td class="num">22</td><td class="tight">POST</td><td class="rt">/api/nlp/confirm-batch <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td>批次確認後一次寫入 N 筆。要嘛全成功要嘛全不寫</td></tr>
+            <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約（成員2 定義）</td></tr>
+            <tr><td class="num">24</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">家長</td><td>新增家庭自訂分類。body: { name, kind }</td></tr>
+            <tr><td class="num">25</td><td class="tight">GET</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>我加入的群組（帳本）</td></tr>
+            <tr><td class="num">26</td><td class="tight">POST</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>建立一個群組，建立者自動加入</td></tr>
+            <tr><td class="num">27</td><td class="tight">PATCH</td><td class="rt">/api/groups/{gid}</td><td class="tight">建立者</td><td>改名稱、顏色、備註，或復原封存</td></tr>
+            <tr><td class="num">28</td><td class="tight">DELETE</td><td class="rt">/api/groups/{gid}</td><td class="tight">建立者</td><td>封存這本帳；帶 <code>?permanent=true</code> 是移除已結算的活動帳本（紀錄保留）</td></tr>
+            <tr><td class="num">29</td><td class="tight">POST</td><td class="rt">/api/groups/{gid}/members</td><td class="tight">建立者</td><td>把家人加進這本帳</td></tr>
+            <tr><td class="num">30</td><td class="tight">DELETE</td><td class="rt">/api/groups/{gid}/members/{user_id}</td><td class="tight">建立者</td><td>把某個人移出這本帳</td></tr>
+            <tr><td class="num">31</td><td class="tight">POST</td><td class="rt">/api/groups/{gid}/settle</td><td class="tight">本人（開帳本的人）</td><td>結算活動帳本。之後唯讀，不能再往裡面記</td></tr>
+            <tr><td class="num">32</td><td class="tight">PATCH</td><td class="rt">/api/groups/{gid}/notify</td><td class="tight">帳本成員</td><td>這本帳有動靜要不要通知我。body: { notify }</td></tr>
           </tbody>
         </table>
       </div>
@@ -657,19 +670,17 @@
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
           <tbody>
-            <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約（成員2 定義）</td></tr>
-            <tr><td class="num">24</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">家長</td><td>新增家庭自訂分類。body: { name, kind }</td></tr>
             <tr><td class="num">33</td><td class="tight">GET</td><td class="rt">/api/summary</td><td class="tight">登入</td><td>摘要。<code>scope=me|family</code>、<code>period=2026-09</code>、<code>groupId</code>。統計頁唯一的來源</td></tr>
             <tr><td class="num">35</td><td class="tight">GET</td><td class="rt">/api/budgets</td><td class="tight">登入</td><td>預算與使用率</td></tr>
             <tr><td class="num">36</td><td class="tight">PUT</td><td class="rt">/api/budgets</td><td class="tight">本人</td><td>設定自己的分類預算。body: { cat, limit, period }，<code>limit: 0</code> = 拿掉</td></tr>
             <tr><td class="num">38</td><td class="tight">PUT</td><td class="rt">/api/savings-goal</td><td class="tight">本人</td><td><b>設定每月存款目標</b>（註冊後的個人化設定也走這支）。監管者不能代設</td></tr>
-            <tr><td class="num">44</td><td class="tight">GET</td><td class="rt">/api/advices</td><td class="tight">登入</td><td>建議清單。每條都帶 <code>basis_json</code> 讓使用者驗算</td></tr>
-            <tr><td class="num">45</td><td class="tight">POST</td><td class="rt">/api/advices/generate <span class="tag tag--llm">★</span></td><td class="tight">登入（全家限家長）</td><td>產生這個月的建議。<b>後端先算好數字再餵給模型</b></td></tr>
             <tr><td class="num">39</td><td class="tight">GET</td><td class="rt">/api/savings-goals</td><td class="tight">登入</td><td>我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的</td></tr>
             <tr><td class="num">40</td><td class="tight">GET</td><td class="rt">/api/alerts</td><td class="tight">登入</td><td>我設定的階段性提醒門檻</td></tr>
             <tr><td class="num">41</td><td class="tight">POST</td><td class="rt">/api/alerts</td><td class="tight">本人</td><td>新增一個門檻（百分比 1~200）</td></tr>
             <tr><td class="num">42</td><td class="tight">PATCH</td><td class="rt">/api/alerts/{aid}</td><td class="tight">本人</td><td>改百分比、或暫時關掉</td></tr>
             <tr><td class="num">43</td><td class="tight">DELETE</td><td class="rt">/api/alerts/{aid}</td><td class="tight">本人</td><td>刪掉一個門檻</td></tr>
+            <tr><td class="num">44</td><td class="tight">GET</td><td class="rt">/api/advices</td><td class="tight">登入</td><td>建議清單。每條都帶 <code>basis_json</code> 讓使用者驗算</td></tr>
+            <tr><td class="num">45</td><td class="tight">POST</td><td class="rt">/api/advices/generate <span class="tag tag--llm">★</span></td><td class="tight">登入（全家限家長）</td><td>產生這個月的建議。<b>後端先算好數字再餵給模型</b></td></tr>
           </tbody>
         </table>
       </div>
@@ -693,20 +704,13 @@
             <tr><td class="num">51</td><td class="tight">DELETE</td><td class="rt">/api/family/members/{user_id}</td><td class="tight">家長／本人</td><td>家長把子女移出；寫 <code>me</code> 就是自己退出</td></tr>
             <tr><td class="num">52</td><td class="tight">GET</td><td class="rt">/api/guardianships</td><td class="tight">登入</td><td>監管關係。<b>被監管者也看得到</b></td></tr>
             <tr><td class="num">53</td><td class="tight">POST</td><td class="rt">/api/guardianships</td><td class="tight">家長</td><td>開始照看一個子女。<b>監管人一定是自己</b></td></tr>
-            <tr><td class="num">54</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{gid}</td><td class="tight">監管人／同家庭的家長</td><td>停止照看（設 <code>ended_at</code>，不刪除）。被照看的人不能自己解除</td></tr>
+            <tr><td class="num">54</td><td class="tight">DELETE</td><td class="rt">/api/guardianships/{gid}</td><td class="tight">監管者／同家庭的家長</td><td>停止照看（設 <code>ended_at</code>，不刪除）。被照看的人不能自己解除</td></tr>
             <tr><td class="num">55</td><td class="tight">GET</td><td class="rt">/api/notifications</td><td class="tight">登入</td><td>通知清單。帶 <code>since</code> 只拿新的</td></tr>
             <tr><td class="num">56</td><td class="tight">PATCH</td><td class="rt">/api/notifications/{nid}</td><td class="tight">本人</td><td>把一則標記成已讀</td></tr>
             <tr><td class="num">57</td><td class="tight">PATCH</td><td class="rt">/api/notifications</td><td class="tight">本人</td><td>整批標記已讀</td></tr>
-            <tr><td class="num">25</td><td class="tight">GET</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>我加入的群組（帳本）</td></tr>
-            <tr><td class="num">26</td><td class="tight">POST</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>建立一個群組，建立者自動加入</td></tr>
-            <tr><td class="num">27</td><td class="tight">PATCH</td><td class="rt">/api/groups/{gid}</td><td class="tight">建立者</td><td>改名稱、顏色、備註，或復原封存</td></tr>
-            <tr><td class="num">28</td><td class="tight">DELETE</td><td class="rt">/api/groups/{gid}</td><td class="tight">建立者</td><td>封存這本帳；帶 <code>?permanent=true</code> 是移除已結算的活動帳本（紀錄保留）</td></tr>
-            <tr><td class="num">29</td><td class="tight">POST</td><td class="rt">/api/groups/{gid}/members</td><td class="tight">建立者</td><td>把家人加進這本帳</td></tr>
-            <tr><td class="num">30</td><td class="tight">DELETE</td><td class="rt">/api/groups/{gid}/members/{user_id}</td><td class="tight">建立者</td><td>把某個人移出這本帳</td></tr>
             <tr><td class="num">58</td><td class="tight">GET</td><td class="rt">/api/allowances</td><td class="tight">登入</td><td>我每月給每個照看的人多少零用金，對照他這個月花了多少</td></tr>
-            <tr><td class="num">59</td><td class="tight">PUT</td><td class="rt">/api/allowance</td><td class="tight">監管人</td><td>設定零用金。body: { wardId, amount }</td></tr>
-            <tr><td class="num">31</td><td class="tight">POST</td><td class="rt">/api/groups/{gid}/settle</td><td class="tight">本人（開帳本的人）</td><td>結算活動帳本。之後唯讀，不能再往裡面記</td></tr>
-            <tr><td class="num">32</td><td class="tight">PATCH</td><td class="rt">/api/groups/{gid}/notify</td><td class="tight">帳本成員</td><td>這本帳有動靜要不要通知我。body: { notify }</td></tr>
+            <tr><td class="num">59</td><td class="tight">PUT</td><td class="rt">/api/allowance</td><td class="tight">監管者</td><td>設定零用金。body: { wardId, amount }</td></tr>
+            <tr><td class="num">65</td><td class="tight">GET</td><td class="rt">/api/audit</td><td class="tight">平台管理員</td><td>稽核紀錄：誰做了什麼。⚠️ 只記動作，不記金額</td></tr>
           </tbody>
         </table>
       </div>
@@ -1043,26 +1047,27 @@
   var TREE = [
     { dom: '認證', c: 'var(--m1)', api: '19 支', branch: 'm1-auth', groups: [
       { k: '資料表', items: ['users', 'sessions', 'password_resets'] },
-      { k: 'API', items: ['註冊 / 登入 / 登出', '密碼與工作階段', '忘記密碼（寄信）'] },
-      { k: '畫面', items: ['註冊與登入', '個人化設定', '忘記密碼', '個人資料與大頭貼'] },
-      { k: '共用', llm: true, items: ['core 設定與資料庫', 'core 密碼與 JWT', 'core 依賴注入', 'llm 呼叫層'] }
+      { k: 'API', items: ['註冊／登入／登出', '密碼與忘記密碼（寄信）', '個人資料與理財習慣', '登入裝置', '平台管理員停權'] },
+      { k: '畫面', items: ['註冊與登入', '個人化設定', '忘記與重設密碼', '個人資料', '平台管理'] },
+      { k: '共用', items: ['設定與資料庫連線', '增刪改查 crud', '路由守衛 guards', '資料表與 Alembic'] },
+      { k: 'LLM', llm: true, items: ['模型呼叫層（逾時、重試）', '回傳 JSON 交給 Pydantic'] }
     ]},
     { dom: '記帳', c: 'var(--m2)', api: '19 支', branch: 'm2-ledger', groups: [
-      { k: '資料表', items: ['transactions', 'accounts', 'nlp_parses'] },
-      { k: 'API', items: ['明細 CRUD', 'nlp 單句解析', 'nlp 段落解析', 'nlp 確認寫入'] },
-      { k: '畫面', items: ['段落記帳', '單筆手動', '缺欄位提示'] },
+      { k: '資料表', items: ['categories', 'accounts', 'transactions', 'nlp_parses', 'groups', 'group_members'] },
+      { k: 'API', items: ['明細增刪改查', 'nlp 單句／段落解析', 'nlp 確認寫入', { t: '分類體系 ⚑', flag: true }, '帳本：開、封存、結算'] },
+      { k: '畫面', items: ['段落記帳', '單筆手動', '收支明細', '帳本'] },
       { k: 'LLM', llm: true, items: ['段落切分策略', '欄位抽取 prompt', '低信心判準'] }
     ]},
     { dom: '數字', c: 'var(--m3)', api: '11 支', branch: 'm3-analytics', groups: [
-      { k: '資料表', items: ['categories', 'budgets', 'savings_goals', 'advices'] },
-      { k: 'API', items: [{ t: '分類體系 ⚑', flag: true }, '摘要與統計', '預算與存款目標', '財務建議'] },
+      { k: '資料表', items: ['budgets', 'savings_goals', 'alert_rules', 'advices'] },
+      { k: 'API', items: ['摘要與統計', '預算與存款目標', '階段性提醒', '財務建議'] },
       { k: '畫面', items: ['總覽（我／全家）', '統計圖表', '建議卡片'] },
       { k: 'LLM', llm: true, items: ['建議生成 prompt', '邊界規則'] }
     ]},
     { dom: '家庭', c: 'var(--m4)', api: '21 支', branch: 'm4-access', groups: [
-      { k: '資料表', items: ['families', 'family_members', 'guardianships', 'audit_logs', 'notifications'] },
-      { k: 'API', items: ['家庭綁定（邀請碼、用帳號邀請）', '成員角色', '監管關係'] },
-      { k: '畫面', items: ['家庭成員與邀請', '監管通知鈴鐺', '成員紀錄（唯讀）'] },
+      { k: '資料表', items: ['families', 'family_members', 'family_invites', 'guardianships', 'allowances', 'notifications', 'audit_logs'] },
+      { k: 'API', items: ['家庭綁定與解散', '成員角色', '監管關係與零用金', '通知', '稽核紀錄'] },
+      { k: '畫面', items: ['家庭成員與邀請', '成員紀錄（唯讀）', '通知鈴鐺'] },
       { k: 'LLM', llm: true, items: ['留出集人工標註', '零樣本 vs few-shot', '正確率與 Macro-F1'] }
     ]}
   ];

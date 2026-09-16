@@ -5,97 +5,88 @@
    要接真後端，只要改 index.html 的 <meta name="api-base">。
 
    ------------------------------------------------------------
-   後端契約
+   後端契約（由 backend/tools/sync_spec.py 從 ownership.py 產生，不要手改）
+   每一支的完整形狀：docs/02-前後端串接契約.md；前端函式與路由的對照：本檔的 FN。
 
-   身分
-   POST   /api/auth/register          註冊（名字、email、密碼。存款目標不在這裡，註冊完的個人化設定再設）
-   POST   /api/auth/password-reset    忘記密碼：寄重設信（有沒有這個帳號都回同一句）
-   POST   /api/auth/password-reset/confirm  用信裡的 token 設新密碼（一次性，並登出所有裝置）
-   POST   /api/auth/login             登入 → { accessToken, refreshToken, user }
-   POST   /api/auth/refresh           換新 token
-   POST   /api/auth/logout            登出（撤銷 refresh token）
-   POST   /api/auth/refresh           access token 過期時換新的
-   PATCH  /api/auth/me                改個人資料（displayName / birthYear / theme / onboarded）
-   PUT    /api/auth/me/avatar         上傳大頭貼（body: { image: dataUri }）
-   DELETE /api/auth/me/avatar         移除大頭貼
-   GET    /api/auth/me/finance        我的理財習慣（拿去當建議的背景）
-   PUT    /api/auth/me/finance        改理財習慣
-   PATCH  /api/auth/password          改密碼
-   POST   /api/auth/verify-password   重大操作前再確認一次（不發新 token）
-   GET    /api/admin/users             平台管理員：帳號清單（⚠️ 不含任何金額）
-   POST   /api/admin/users/{id}/suspend    停權（body: { reason }）
-   DELETE /api/admin/users/{id}/suspend    解除停權
-   GET    /api/audit                   稽核紀錄
-   GET    /api/auth/me                目前登入者 + 家庭角色
+   成員1 · 認證（19 支）
+   POST   /api/auth/register                   註冊：名字、email、密碼
+   POST   /api/auth/login                      登入
+   POST   /api/auth/refresh                    用 refresh token 換新的 access token
+   POST   /api/auth/logout                     登出（撤銷這一台的 refresh token）
+   POST   /api/auth/logout-all                 登出所有裝置
+   GET    /api/auth/me                         我是誰
+   PATCH  /api/auth/password                   改密碼
+   POST   /api/auth/password-reset             忘記密碼：寄重設信
+   POST   /api/auth/password-reset/confirm     用信裡的 token 設新密碼
+   GET    /api/auth/me/finance                 我的理財習慣
+   PUT    /api/auth/me/finance                 改理財習慣
+   POST   /api/auth/verify-password            重大操作前再確認一次密碼
+   GET    /api/auth/sessions                   登入中的裝置
+   PATCH  /api/auth/me                         改個人資料、主題、個人化設定走完
+   PUT    /api/auth/me/avatar                  上傳大頭貼
+   DELETE /api/auth/me/avatar                  移除大頭貼
+   GET    /api/admin/users                     帳號清單（停權用）
+   POST   /api/admin/users/{user_id}/suspend   停權
+   DELETE /api/admin/users/{user_id}/suspend   解除停權
 
-   家庭與權限
-   GET    /api/family                 家庭資訊與成員清單（沒有家庭時 family 為 null）
-   POST   /api/family                 建立家庭，建立的人成為家長（body: { name }）
-   POST   /api/family/invite          產生邀請碼（家長；body: { role }，只能用一次、七天過期）
-   POST   /api/family/join            用邀請碼加入（body: { code }）
-   GET    /api/family/lookup          用完整 email 找人（家長；只回名字、頭像、能不能邀請）
-   GET    /api/family/invites         我收到的邀請 ＋ 我們家送出去還沒回覆的
-   POST   /api/family/invites         用帳號邀請（家長；body: { userId, role }）
-   POST   /api/family/invites/{id}/accept   接受邀請
-   DELETE /api/family/members/{id}    家長把子女移出家庭；{id} 寫 me 就是自己退出
-   DELETE /api/family/invites/{id}   被邀請的人婉拒，或家長取消
-   PATCH  /api/family/members/{id}    改角色（家長）
-   DELETE /api/family/members/{id}    移除成員（家長）
-   GET    /api/guardianships          監管關係（雙方都看得到）
-   POST   /api/guardianships          建立監管（家長）
-   DELETE /api/guardianships/{id}     解除監管（家長）
+   成員2 · 記帳（19 支）
+   GET    /api/transactions                     收支明細
+   POST   /api/transactions                     手動新增一筆
+   PATCH  /api/transactions/{tx_id}             修改一筆
+   DELETE /api/transactions/{tx_id}             刪除一筆
+   DELETE /api/transactions                     一次刪多筆
+   POST   /api/nlp/parse                        單句解析（不寫入）
+   POST   /api/nlp/parse-batch                  段落解析（不寫入）
+   POST   /api/nlp/confirm                      單筆確認後寫入
+   POST   /api/nlp/confirm-batch                批次確認後一次寫入
+   GET    /api/categories                       分類（系統預設＋我們家自訂）
+   POST   /api/categories                       新增家庭自訂分類
+   GET    /api/groups                           我加入的帳本
+   POST   /api/groups                           開一本帳
+   PATCH  /api/groups/{gid}                     改名稱、顏色、說明
+   DELETE /api/groups/{gid}                     封存；permanent=true 是移除
+   POST   /api/groups/{gid}/members             把家人加進這本帳
+   DELETE /api/groups/{gid}/members/{user_id}   把人移出這本帳
+   POST   /api/groups/{gid}/settle              結算活動帳本
+   PATCH  /api/groups/{gid}/notify              這本帳有動靜要不要通知我
 
-   記帳
-   GET    /api/transactions           明細（可帶 user / from / to / cat / kind / q）
-   POST   /api/transactions           新增（手動記帳走這支，不經過模型）
-   PATCH  /api/transactions/{id}      修改（只送要改的欄位；結算過的帳本裡的不能改）
-   DELETE /api/transactions/{id}      刪除一筆
-   DELETE /api/transactions?ids=a,b   一次刪多筆（全部成功或全部不動）
-   POST   /api/nlp/parse              ★ 單句記帳：一句話 → 一筆（不寫入）
-   POST   /api/nlp/parse-batch        ★ 段落記帳：一段話 → 切分成 N 筆（不寫入）
-   POST   /api/nlp/confirm            單筆確認後寫入，並記錄修正供評測
-   POST   /api/nlp/confirm-batch      批次確認後一次寫入 N 筆
+   成員3 · 數字（11 支）
+   GET    /api/summary            個人／家庭摘要
+   GET    /api/budgets            預算與已花
+   PUT    /api/budgets            設定預算（limit 0 = 拿掉）
+   PUT    /api/savings-goal       設定每月存款目標
+   GET    /api/savings-goals      整體＋各帳本的存款目標
+   GET    /api/alerts             我設的提醒門檻
+   POST   /api/alerts             新增門檻
+   PATCH  /api/alerts/{aid}       改門檻或暫停
+   DELETE /api/alerts/{aid}       刪門檻
+   GET    /api/advices            財務建議清單
+   POST   /api/advices/generate   產生這個月的建議
 
-   統計與預算
-   GET    /api/summary                個人／家庭摘要（帶 scope=me|family, period）
-   GET    /api/stats                  月或年統計（帶 periodType=month|year）
-   GET    /api/budgets                預算與使用率
-   PUT    /api/budgets                設定預算
-   GET    /api/savings-goal           ★ 每月存款目標與達成狀態
-   PUT    /api/savings-goal           ★ 設定每月存款目標（註冊時也走這支）
+   成員4 · 家庭（21 支）
+   GET    /api/family                              家庭、成員、監管關係
+   POST   /api/family                              建立家庭（建立的人是家長）
+   DELETE /api/family                              解散家庭（唯一的家長）
+   POST   /api/family/invite                       產生邀請碼
+   POST   /api/family/join                         用邀請碼加入
+   GET    /api/family/lookup                       用完整 email 找人
+   GET    /api/family/invites                      收到的邀請、送出去的、邀請碼
+   POST   /api/family/invites                      用帳號邀請
+   POST   /api/family/invites/{invite_id}/accept   接受邀請
+   DELETE /api/family/invites/{invite_id}          婉拒或取消邀請
+   PATCH  /api/family/members/{user_id}            改角色
+   DELETE /api/family/members/{user_id}            家長移出子女；{user_id} 寫 me 是自己退出
+   GET    /api/guardianships                       監管關係（雙向可見）
+   POST   /api/guardianships                       開始照看（監管人一定是自己）
+   DELETE /api/guardianships/{gid}                 解除監管
+   GET    /api/notifications                       通知清單（輪詢）
+   PATCH  /api/notifications/{nid}                 一則標記已讀
+   PATCH  /api/notifications                       整批標記已讀
+   GET    /api/allowances                          我給每個被照看的人多少零用金
+   PUT    /api/allowance                           設定零用金
+   GET    /api/audit                               稽核紀錄
 
-   建議
-   監管通知
-   GET    /api/notifications          通知清單（帶 since 只拿新的）
-   PATCH  /api/notifications/{id}     標記單則已讀
-   PATCH  /api/notifications          整批已讀（帶 readUntil）
-
-   群組（帳本）
-   GET    /api/groups                 我加入的群組
-   POST   /api/groups                 建立
-   PATCH  /api/groups/{gid}           改名稱／圖示／顏色
-   DELETE /api/groups/{gid}           封存（不刪除）；?permanent=true 移除已結算的活動帳本（紀錄保留）
-   POST   /api/groups/{gid}/members   把家人加進這本帳
-   DELETE /api/groups/{gid}/members/{uid}  移出
-
-   零用金
-   GET    /api/allowances            我每月給每個被監管者多少
-   PUT    /api/allowance             設定 { wardId, amount }
-
-   階段性提醒
-   GET    /api/savings-goals          整體 + 各群組的每月存款目標
-   GET    /api/alerts                 我設的百分比門檻
-   POST   /api/alerts                 新增門檻
-   PATCH  /api/alerts/{aid}           改百分比或開關
-   DELETE /api/alerts/{aid}           刪掉
-
-   建議
-   GET    /api/advices                LLM 財務建議（帶 scope / period）
-   POST   /api/advices/generate       重新產生（後端先算好數字再餵給模型）
-
-   其他
-   GET    /api/categories             分類體系
-   GET    /api/schema                 資料表結構與關聯（ER 圖用）
+   另外 GET /healthz（健康檢查）、GET /docs（自動文件）前端不會用到。
    ============================================================ */
 (function (global) {
   'use strict';
@@ -272,7 +263,7 @@
     return n;
   }
 
-  /* 今天：真實日期（本機時區）。示範資料在 data.js 載入時已經對齊到今天。
+  /* 今天：真實日期（本機時區），跟 data.js 的 fbToday() 同一個來源。
      ⚠️ 不要用 toISOString()——那是 UTC，台灣早上 8 點前會變成昨天。 */
   function todayStr() {
     return global.fbToday();

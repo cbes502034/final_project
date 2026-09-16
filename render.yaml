@@ -52,6 +52,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"
+      # production：資料庫不印 SQL、錯誤訊息不帶內部細節
+      - key: APP_ENV
+        value: production
       - key: DATABASE_URL
         fromDatabase:
           name: fambudget-db
@@ -79,3 +82,6 @@ services:
       # 重設密碼信裡的連結開頭
       - key: APP_BASE_URL
         value: https://fambudget-web.onrender.com
+      # 平台管理員的 email（逗號分隔），python -m app.cli make-admin 會用到。是個人信箱，在後台填
+      - key: ADMIN_EMAILS
+        sync: false

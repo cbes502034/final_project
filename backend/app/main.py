@@ -42,8 +42,11 @@ FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試�
 這個檔案不用動——所有 router 已經掛上了（下面的 include_router）。
 """
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.toolkit.config import settings
 
@@ -82,6 +85,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ===========================================================================
+# 沒接住的錯誤：一律回 JSON 的 500
+# ===========================================================================
+# 前端只會讀 {"detail": ...}；回純文字的話，畫面只能寫「HTTP 500」。
+# ⚠️ 正式環境（APP_ENV=production）只回一句話——例外訊息可能帶著表名、欄位、SQL，
+#    那些是攻擊者不需要知道的事（見 toolkit/errors.py 的 safe_message）。
+#    開發環境多附上例外的類型與訊息，組員才知道錯在哪；完整的追蹤一律寫進 log。
+log = logging.getLogger("fambudget")
+
+
+@app.exception_handler(Exception)
+async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    log.exception("未預期的錯誤：%s %s", request.method, request.url.path)
+    detail = "系統發生錯誤，請稍後再試"
+    if not settings.is_production:
+        detail += "（開發環境才看得到：%s: %s）" % (type(exc).__name__, exc)
+    return JSONResponse(status_code=500, content={"detail": detail})
 
 
 # ---------------------------------------------------------------------------

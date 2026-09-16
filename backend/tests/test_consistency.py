@@ -2903,3 +2903,106 @@ def test_前端的_API_清單跟分工表一對一():
         assert re.search(r"^    %s: function \(" % name, api, re.M), "mock 少了 " + name
         if fn[name][0]:
             assert re.search(r"^    %s:\s+function \(" % name, api[api.index("  var http = {"):], re.M), "http 轉接器少了 " + name
+
+
+def test_分工心智圖由_ownership_與_models_產生():
+    """docs/分工心智圖.svg 和手冊第 10 節的互動版，都由 tools/sync_mindmap.py 產生。
+
+    SVG 手改過，停在「8／8／10／9 支」「core/ 設定」好幾天，沒有任何測試抓到。
+    """
+    import subprocess
+    import sys
+
+    res = subprocess.run(
+        [sys.executable, os.path.join(REPO, "backend", "tools", "sync_mindmap.py"), "--check"],
+        capture_output=True, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+    assert res.returncode == 0, res.stdout.decode("utf-8", "replace")
+
+
+def _ownership_keys():
+    from app.ownership import MEMBERS
+    return {(v, p): m.label for m in MEMBERS for v, p in m.routes}
+
+
+def test_手冊的_API_目錄照_ownership_分組_一支不少():
+    """手冊的 API 目錄曾經把分類、帳本放在舊的負責人底下，平台管理的四支整個不見。"""
+    own = _ownership_keys()
+    hb = read("frontend/docs/index.html")
+    sec = hb[hb.index('id="api"'):hb.index('id="arch"')]
+    seen, wrong, current = {}, [], None
+    for line in sec.splitlines():
+        mo = re.search(r'<h3 class="sub"[^>]*>(成員\d)', line)
+        if mo:
+            current = mo.group(1)
+        if "共用 · 系統" in line:
+            current = None
+        mo = re.search(r'<td class="tight">(\w+)</td><td class="rt">([^<\s?]+)', line)
+        if mo and current:
+            k = (mo.group(1), mo.group(2))
+            seen[k] = current
+            if own.get(k) != current:
+                wrong.append("%s %s 放在 %s，ownership 是 %s" % (k[0], k[1], current, own.get(k)))
+    assert not wrong, wrong
+    assert set(seen) == set(own), sorted(set(own) ^ set(seen))
+
+
+def test_規格與_API_瀏覽頁的路徑_就是後端的路徑():
+    """路徑參數的名字也要一樣：文件寫 {id}、後端是 {tx_id}，組員照文件找會找不到。"""
+    own = _ownership_keys()
+    spec = read("docs/01-tech-stack-and-api.md")
+    rows = re.findall(r"^\| (\d+) \| (GET|POST|PUT|PATCH|DELETE) \| `([^`?]+)[^`]*` \| (成員\d)", spec, re.M)
+    got = {(v, p): who for _, v, p, who in rows}
+    assert got == own, sorted(set(got.items()) ^ set(own.items()))
+    api = read("frontend/docs/api.html")
+    labels = {"m1": "成員1", "m2": "成員2", "m3": "成員3", "m4": "成員4"}
+    rows = re.findall(r"\{ n: \d+, o: '(m\d)', m: '(\w+)', p: '([^']+)'", api)
+    got = {(v, p): labels[o] for o, v, p in rows}
+    assert got == own, sorted(set(got.items()) ^ set(own.items()))
+
+
+def test_每一頁寫的路由總數都對():
+    """API 瀏覽頁的描述寫過 37 支、FastAPI 說明書頁尾寫過 35——都是很久以前的數字。"""
+    n = len(_ownership_keys())
+    stale = []
+    for f in ["README.md", "backend/README.md", "docs/01-tech-stack-and-api.md", "docs/02-前後端串接契約.md"] + \
+            [os.path.relpath(p, REPO) for p in glob.glob(os.path.join(REPO, "frontend", "docs", "*.html"))]:
+        for mo in re.finditer(r"(\d+) (?:支路由|支 API|條路由|ROUTES)", read(f)):
+            if int(mo.group(1)) != n:
+                stale.append("%s：%s" % (f, mo.group(0)))
+    assert not stale, "實際 %d 支：%s" % (n, stale)
+
+
+def test_文件的權限欄三份一致():
+    own = _ownership_keys()
+    spec = read("docs/01-tech-stack-and-api.md")
+    api = read("frontend/docs/api.html")
+    hb = read("frontend/docs/index.html")
+    diff = []
+    for v, p in own:
+        a = re.search(r"^\| \d+ \| %s \| `%s(?:\?[^`]*)?` \| 成員\d[^|]* \| ([^|]+) \|" % (v, re.escape(p)), spec, re.M)
+        b = re.search(r"m: '%s', p: '%s', a: '([^']+)'" % (v, re.escape(p)), api)
+        c = re.search(r'<td class="tight">%s</td><td class="rt">%s(?:\?[^<]*)?(?: <span[^<]*</span>)?</td><td class="tight">([^<]*)</td>'
+                      % (v, re.escape(p)), hb)
+        vals = {x.group(1).strip() for x in (a, b, c) if x}
+        if len(vals) != 1 or not (a and b and c):
+            diff.append("%s %s：%s" % (v, p, vals))
+    assert not diff, diff
+
+
+def test_RESTful_說明書逐支檢查的清單就是現在的路由():
+    """第 8 節「誠實檢查我們自己的 N 支」曾經停在 38 支，還寫著「這三支前端都還沒在用」。
+    現在每一支都要剛好出現一次（完全符合、通用、刻意、可以改，四類擇一）。"""
+    own = _ownership_keys()
+    t = read("frontend/docs/restful.html")
+    sec = t[t.index('id="ours"'):t.index('id="break"')]
+    cells = re.findall(r'<td class="rt">(.*?)</td>', sec, re.S)
+    found = []
+    for c in cells:
+        for line in re.sub(r"<(?!br)[^>]+>", "", c).split("<br>"):
+            mo = re.match(r"\s*(GET|POST|PUT|PATCH|DELETE) (/api/\S+)\s*$", line)
+            if mo and (mo.group(1), mo.group(2)) in own:
+                found.append((mo.group(1), mo.group(2)))
+    dup = sorted({k for k in found if found.count(k) > 1})
+    assert not dup, "出現不只一次：%s" % dup
+    assert set(found) == set(own), "少了：%s" % sorted(set(own) - set(found))
+    assert "誠實檢查我們自己的 %d 支" % len(own) in sec

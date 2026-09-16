@@ -160,7 +160,7 @@ final_project/
 │   │       └── evaluation.py    模型評測指標
 │   ├── alembic/                 資料庫遷移（versions/ 第一版就是 20 張表）
 │   ├── tests/                   pytest（含 fixtures/：測試用的一家人、假後端）
-│   ├── tools/                   sync_spec.py、sync_schema.py：文件從程式產生
+│   ├── tools/                   sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生
 │   ├── requirements.txt
 │   ├── Dockerfile               啟動前先 alembic upgrade head
 │   └── .env.example             設定範本，依成員分段
@@ -180,7 +180,7 @@ final_project/
 
 共 **70 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
-- **權限**：`公開` / `登入` / `家長` / `監管者` / `平台`
+- **權限**：`公開` / `登入` / `本人` / `家長` / `監管者` / `建立者` / `平台管理員`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
 - ★ 記號代表與 LLM 直接相關
 
@@ -233,8 +233,8 @@ final_project/
   "accessToken": "eyJhbGciOi...",
   "refreshToken": "eyJhbGciOi...",
   "expiresIn": 1800,
-  "user": { "id": "1", "name": "林建國", "email": "jianguo@lin.tw", "role": "parent",
-            "familyId": "1", "avatar": "國", "avatarUrl": null,
+  "user": { "id": "1", "name": "王大明", "email": "daming@wang.tw", "role": "parent",
+            "familyId": "1", "avatar": "明", "avatarUrl": null,
             "onboardedAt": "2026-01-05T09:00:00+08:00", "theme": "sky", "savingsGoal": 20000 }
 }
 ```
@@ -259,7 +259,7 @@ final_project/
 | 51 | DELETE | `/api/family/members/{user_id}` | 成員4 | 家長／本人 | 家長把子女移出家庭；寫 `me` 就是自己退出。不刪資料 |
 | 52 | GET | `/api/guardianships` | 成員4 | 登入 | 同一個家庭的監管關係。**被監管者也看得到** |
 | 53 | POST | `/api/guardianships` | 成員4 | 家長 | 開始照看一個子女。body: { wardId }，**監管人一定是自己** |
-| 54 | DELETE | `/api/guardianships/{gid}` | 成員4 | 監管人／同家庭的家長 | 停止照看（設 `ended_at`，不刪除）。被照看的人自己不能解除 |
+| 54 | DELETE | `/api/guardianships/{gid}` | 成員4 | 監管者／同家庭的家長 | 停止照看（設 `ended_at`，不刪除）。被照看的人自己不能解除 |
 | 55 | GET | `/api/notifications` | 成員4 | 登入 | 通知清單。帶 since 只拿新的 |
 | 56 | PATCH | `/api/notifications/{nid}` | 成員4 | 本人 | 把一則標記成已讀 |
 | 57 | PATCH | `/api/notifications` | 成員4 | 本人 | 整批標記已讀 |
@@ -281,8 +281,8 @@ final_project/
 |---|---|---|---|---|---|
 | 15 | GET | `/api/transactions` | 成員2 | 登入 | 明細。可帶 `userId` / `groupId` / `from` / `to` / `categoryId` / `kind` / `source` / `q` / `page`；不認得的參數回 422 |
 | 16 | POST | `/api/transactions` | 成員2 | 登入 | 手動新增。**單筆手動模式走這支**，不經過模型，寫入的 `source` 記成 `manual` |
-| 17 | PATCH | `/api/transactions/{id}` | 成員2 | 本人 | 修改。只送要改的欄位；結算過的帳本裡的不能改（409） |
-| 18 | DELETE | `/api/transactions/{id}` | 成員2 | 本人 | 刪除一筆。結算過的帳本裡的不能刪（409） |
+| 17 | PATCH | `/api/transactions/{tx_id}` | 成員2 | 本人 | 修改。只送要改的欄位；結算過的帳本裡的不能改（409） |
+| 18 | DELETE | `/api/transactions/{tx_id}` | 成員2 | 本人 | 刪除一筆。結算過的帳本裡的不能刪（409） |
 | 73 | DELETE | `/api/transactions` | 成員2 | 本人 | 一次刪多筆。`?ids=T1,T2`，最多 100 筆；**全部成功或全部不動** |
 | 23 | GET | `/api/categories` | 成員2 | 登入 | 分類體系（系統預設 + 家庭自訂） |
 | 24 | POST | `/api/categories` | 成員2 | 家長 | 新增家庭自訂分類。body: { name, kind }，1～10 字、同收支不重名 |
@@ -677,7 +677,8 @@ git switch -c m2-ledger
 
 ## 6-7　分工心智圖
 
-見 [`分工心智圖.svg`](分工心智圖.svg)。
+見 [`分工心智圖.svg`](分工心智圖.svg)。它跟手冊裡的互動版都由 `python backend/tools/sync_mindmap.py` 產生：
+路由數從 `ownership.py` 算、資料表從各人名下的 `models/` 讀，**不要手改**（pytest 會檢查）。
 
 可填寫的互動版在站上的[專題手冊](https://fambudget-web.onrender.com/docs/)，
 四個人各自填名字、按儲存後可以複製分享連結給組員。

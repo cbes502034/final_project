@@ -215,7 +215,7 @@ PostgreSQL
 │   ├── alembic/              <i>資料庫遷移（versions/ 第一版 = 20 張表）</i>
 │   ├── alembic.ini           <i>⚠️ 只能有英文</i>
 │   ├── tests/                <i>一致性、工具箱、後端核心、前端代勞；fixtures/ 放測試資料</i>
-│   ├── tools/                <i>sync_spec.py、sync_schema.py：文件從程式產生</i>
+│   ├── tools/                <i>sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生</i>
 │   ├── requirements.txt      <i>要裝哪些套件</i>
 │   ├── Dockerfile            <i>啟動前先 alembic upgrade head</i>
 │   └── .env.example          <i>設定範本：依成員分段，機密留空</i>
@@ -308,6 +308,7 @@ PostgreSQL
         <div class="note__k">tools/：產生文件的程式，不是給路由用的</div>
         <p><span class="fname">tools/sync_spec.py</span>　把 <code>docs/01</code> 與兩份 README 的分工總表、各領域路由清單，從 <code>ownership.py</code> 重新產生一次。<br>
         <span class="fname">tools/sync_schema.py</span>　把手冊的「各表欄位」從 <code>data.js</code> 的 schema 重新產生一次。<br>
+        <span class="fname">tools/sync_mindmap.py</span>　分工心智圖（<code>docs/分工心智圖.svg</code> 與手冊第 10 節）從 <code>ownership.py</code> 與 <code>models/</code> 重新產生一次。<br>
         搬了一支路由之後跑 <code>python backend/tools/sync_spec.py</code>；忘了跑，pytest 會紅燈。<br>
         ⚠️ 這兩段手動維護過，結果文件停在 8/8/10/9，實際已經 17/18/13/15。<b>跨檔案的數字不要靠人記。</b></p>
       </div>

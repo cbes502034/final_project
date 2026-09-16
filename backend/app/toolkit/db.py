@@ -69,7 +69,8 @@ class Base(DeclarativeBase):
 
 def make_engine(url: str, *, echo: bool | None = None) -> Engine:
     """依網址建立 engine。PostgreSQL 開連線池；SQLite 處理掉它的限制。"""
-    echo = settings.db_echo if echo is None else echo
+    if echo is None:                      # 正式環境一律不印 SQL（log 裡會有使用者的資料）
+        echo = settings.db_echo and not settings.is_production
     if url.startswith("sqlite"):
         memory = url in ("sqlite://", "sqlite:///:memory:")
         eng = create_engine(

@@ -7,7 +7,7 @@
 ⚠️ 為什麼要有這支程式，而不是「記得去改文件」。
 
 分工總表、各領域的路由清單，跟 ownership.py 講的是同一件事，
-而且被抄進了三份文件（docs/01、README.md、backend/README.md）。
+而且被抄進了三份文件（docs/01、README.md、backend/README.md），還有 frontend/js/api.js 開頭的路由清單。
 只要是同一件事被寫在好幾個地方，它就一定會走散——而且真的走散過：
 ownership.py 已經 17/18/13/15 了，三份文件全部還停在 8/8/10/9，整整差了一倍。
 沒有人是不小心的，是**人本來就不適合維護跨檔案的數字**。
@@ -92,6 +92,42 @@ def render(text, name="文件"):
     return text
 
 
+# ---------------------------------------------------------------------------
+# frontend/js/api.js 開頭的「後端契約」清單
+# ---------------------------------------------------------------------------
+API_JS = os.path.join("frontend", "js", "api.js")
+API_JS_START = "   後端契約"
+API_JS_END = "   ============================================================ */\n(function (global) {"
+
+
+def render_api_js(text):
+    """換掉 api.js 開頭的路由清單：路由與負責人照 ownership.py，說明取自各路由的 summary。"""
+    # 只是要讀路由的 summary，不會連資料庫；設定沒填的話給一組假的讓 app 載得起來
+    os.environ.setdefault("DATABASE_URL", "sqlite://")
+    os.environ.setdefault("JWT_SECRET", "sync-spec-only-not-a-real-secret-00000")
+    from app.main import app
+    from app.ownership import MEMBERS
+
+    summary = {}
+    for r in app.routes:
+        for v in getattr(r, "methods", None) or ():
+            summary[(v, getattr(r, "path", ""))] = getattr(r, "summary", "") or ""
+    lines = [
+        "   後端契約（由 backend/tools/sync_spec.py 從 ownership.py 產生，不要手改）\n",
+        "   每一支的完整形狀：docs/02-前後端串接契約.md；前端函式與路由的對照：本檔的 FN。\n",
+    ]
+    for m in MEMBERS:
+        lines.append("\n   %s · %s（%d 支）\n" % (m.label, m.domain, len(m.routes)))
+        width = max(7 + len(p) for _, p in m.routes)          # 方法欄固定 6 格 + 1 個空白
+        for v, p in m.routes:
+            head = "%-6s %s" % (v, p)
+            lines.append("   %-*s  %s\n" % (width + 1, head, summary.get((v, p), "")))
+    lines.append("\n   另外 GET /healthz（健康檢查）、GET /docs（自動文件）前端不會用到。\n")
+    a = text.index(API_JS_START)
+    b = text.index(API_JS_END)
+    return text[:a] + "".join(lines) + text[b:]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
@@ -109,8 +145,16 @@ def main():
         if not args.check:
             io.open(path, "w", encoding="utf-8", newline="").write(new)
 
+    path = os.path.join(REPO, API_JS)
+    old = io.open(path, encoding="utf-8").read()
+    new = render_api_js(old)
+    if old != new:
+        stale.append(API_JS)
+        if not args.check:
+            io.open(path, "w", encoding="utf-8", newline="").write(new)
+
     if not stale:
-        print("三份文件都跟 ownership.py 一致")
+        print("文件與 api.js 的路由清單都跟 ownership.py 一致")
         return 0
     if args.check:
         print("這些文件落後了，請跑 python backend/tools/sync_spec.py：\n  "

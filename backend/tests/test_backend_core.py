@@ -721,3 +721,34 @@ def test_alembic_ini_只能有英文():
     """Windows 的 alembic 用系統編碼（cp950）讀 .ini，裡面有中文就每個指令都壞。"""
     raw = io.open(os.path.join(BACKEND, "alembic.ini"), "rb").read()
     assert all(b < 128 for b in raw)
+
+
+def test_沒接住的錯誤回_JSON_正式環境不帶內部細節(monkeypatch):
+    """前端只讀 {"detail"}；正式環境不可以把例外訊息（可能有表名、SQL）送出去。"""
+    from app.main import unexpected_error
+    from app.toolkit.config import settings
+
+    a = FastAPI()
+    a.add_exception_handler(Exception, unexpected_error)
+
+    @a.get("/boom")
+    def boom():
+        raise KeyError("users.password_hash")
+
+    c = TestClient(a, raise_server_exceptions=False)
+    monkeypatch.setattr(settings, "app_env", "development")
+    r = c.get("/boom")
+    assert r.status_code == 500 and "KeyError" in r.json()["detail"]
+    monkeypatch.setattr(settings, "app_env", "production")
+    r = c.get("/boom")
+    assert r.status_code == 500 and r.json() == {"detail": "系統發生錯誤，請稍後再試"}
+
+
+def test_正式環境不印_SQL(monkeypatch):
+    from app.toolkit.config import settings
+
+    monkeypatch.setattr(settings, "db_echo", True)
+    monkeypatch.setattr(settings, "app_env", "production")
+    assert db.make_engine("sqlite://").echo is False
+    monkeypatch.setattr(settings, "app_env", "development")
+    assert db.make_engine("sqlite://").echo is True

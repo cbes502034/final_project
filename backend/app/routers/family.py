@@ -138,7 +138,7 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
 @router.post("/family/invites/{invite_id}/accept", summary="接受邀請")
 @protect(family=False, platform_admin=False)
 @stub
-def accept_invite(me: User, db: Session = Depends(get_db)):
+def accept_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
     """接受邀請
 
     POST /api/family/invites/{invite_id}/accept
@@ -151,7 +151,7 @@ def accept_invite(me: User, db: Session = Depends(get_db)):
 @router.delete("/family/invites/{invite_id}", summary="婉拒或取消邀請")
 @block_admin
 @stub
-def decline_invite(me: User, db: Session = Depends(get_db)):
+def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
     """婉拒或取消邀請
 
     DELETE /api/family/invites/{invite_id}
@@ -164,7 +164,7 @@ def decline_invite(me: User, db: Session = Depends(get_db)):
 @router.patch("/family/members/{user_id}", summary="改角色")
 @parent_required
 @stub
-def change_member_role(body: RolePatchIn, me: User, db: Session = Depends(get_db)):
+def change_member_role(user_id: str, body: RolePatchIn, me: User, db: Session = Depends(get_db)):
     """改角色
 
     PATCH /api/family/members/{user_id}
@@ -177,7 +177,7 @@ def change_member_role(body: RolePatchIn, me: User, db: Session = Depends(get_db
 @router.delete("/family/members/{user_id}", summary="家長移出子女；{user_id} 寫 me 是自己退出")
 @family_required
 @stub
-def remove_member(me: User, db: Session = Depends(get_db)):
+def remove_member(user_id: str, me: User, db: Session = Depends(get_db)):
     """家長移出子女；{user_id} 寫 me 是自己退出
 
     DELETE /api/family/members/{user_id}
@@ -216,7 +216,7 @@ def create_guardianship(body: GuardianshipIn, me: User, db: Session = Depends(ge
 @router.delete("/guardianships/{gid}", summary="解除監管")
 @family_required
 @stub
-def end_guardianship(me: User, db: Session = Depends(get_db)):
+def end_guardianship(gid: str, me: User, db: Session = Depends(get_db)):
     """解除監管
 
     DELETE /api/guardianships/{gid}

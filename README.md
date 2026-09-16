@@ -55,7 +55,7 @@ final_project/
 │   │       └── evaluation.py    評測指標
 │   ├── alembic/             資料庫遷移（第一版 = 20 張表）
 │   ├── tests/
-│   ├── tools/               文件從程式產生：sync_spec.py · sync_schema.py
+│   ├── tools/               文件從程式產生：sync_spec.py · sync_schema.py · sync_mindmap.py
 │   ├── .env.example         設定範本，依成員分段
 │   ├── requirements.txt
 │   ├── Dockerfile

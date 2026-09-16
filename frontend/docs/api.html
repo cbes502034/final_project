@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API 瀏覽</title>
-<meta name="description" content="家庭記帳系統的 37 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
+<meta name="description" content="家庭記帳系統的 70 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -58,7 +58,7 @@
       <li><b>找得快</b><span>上面可以搜尋路徑或說明，也可以只看某一位成員的</span></li>
       <li><b>方法</b><span>GET 讀、POST 新增、PUT 整份換、PATCH 改一部分、DELETE 刪除</span></li>
       <li><b>★ 標記</b><span>跟模型直接相關的路由</span></li>
-      <li><b>權限</b><span>公開、登入、本人、家長、監管者、平台</span></li>
+      <li><b>權限</b><span>公開、登入、本人、家長、監管者、建立者、平台管理員</span></li>
       <li><b>錯誤</b><span>沒權限回 403 而不是空陣列，前端才分得出「沒資料」和「不能看」</span></li>
       </ul>
     </section>
@@ -128,8 +128,9 @@
       res: '{\n  "accessToken": "eyJhbGciOi…",\n  "refreshToken": "eyJhbGciOi…",\n  "expiresIn": 1800\n}' },
     { n: 4, o: 'm1', m: 'POST', p: '/api/auth/logout', a: '登入',
       d: '撤銷目前的 refresh token',
-      body: '{ "refreshToken": null }',
-      note: '登出是設 <code>sessions.revoked_at</code>，不刪除紀錄——稽核要看得到歷史。' },
+      body: '{ "refreshToken": "eyJhbGciOi…" }',
+      res: '{ "ok": true }',
+      note: '登出是設 <code>sessions.revoked_at</code>，不刪除紀錄——稽核要看得到歷史。回 <code>204</code> 也可以，前端不看回應；重複登出、token 已經失效也要成功，不要噴 400。' },
     { n: 5, o: 'm1', m: 'POST', p: '/api/auth/logout-all', a: '登入',
       d: '撤銷所有裝置的 token',
       res: '{ "revoked": 1 }',
@@ -198,7 +199,7 @@
       body: '{ "wardId": "U2" }',
       res: '{\n  "id": "GS1",\n  "guardian": "U1",\n  "ward": "U2",\n  "since": "2026-09-14",\n  "scope": "全部明細",\n  "guardianName": "王大明",\n  "wardName": "王小華",\n  "mine": true\n}',
       note: '⚠️ 監管人一定是自己，不能替別的家長決定要看誰（主體帶別人的 guardianId 回 403）。只能照看同一個家庭的子女（家長之間本來就看得到）；已經在照看回 409。工具在 <code>toolkit/family.py</code> 的 <code>require_can_guard</code>。' },
-    { n: 54, o: 'm4', m: 'DELETE', p: '/api/guardianships/{gid}', a: '監管人／同家庭的家長',
+    { n: 54, o: 'm4', m: 'DELETE', p: '/api/guardianships/{gid}', a: '監管者／同家庭的家長',
       d: '停止照看（設 ended_at，不刪除）',
       res: '{ "id": "GS2", "ended": true }',
       note: '⚠️ 被照看的人自己不能解除——他可以退出家庭，但監管的意義就是「不是他說停就停」。零用金跟著結束。工具在 <code>toolkit/family.py</code> 的 <code>require_can_end_guard</code>。' },
@@ -371,7 +372,7 @@
       d: '我每月給每個照看的人多少零用金',
       res: '{\n  "allowances": [{ "wardId": "U2", "wardName": "王小華", "amount": 3000, "spent": 180 }]\n}',
       note: '只列我照看的人。<code>spent</code> = 他這個月的支出，從明細現算。' },
-    { n: 59, o: 'm4', m: 'PUT', p: '/api/allowance', a: '監管人',
+    { n: 59, o: 'm4', m: 'PUT', p: '/api/allowance', a: '監管者',
       d: '設定零用金。body: { wardId, amount }',
       body: '{ "wardId": "U2", "amount": 3000 }',
       res: '{ "wardId": "U2", "wardName": "王小華", "amount": 3000 }',

@@ -71,7 +71,7 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import Depends, Request
+from fastapi import Depends, Path, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -215,14 +215,30 @@ block_admin = _shortcut(platform_admin=False)             # MineMarket 的 block
 # ===========================================================================
 # 看資料本身的守衛：回傳那一筆，路由直接用
 # ===========================================================================
-def _path_id(request: Request, name: str) -> Any:
-    raw = request.path_params.get(name)
-    if raw is None:
-        raise errors.bad_request("路徑少了 {%s}" % name)
+def _path_id(raw: Any) -> Any:
     try:
         return int(raw)          # 契約：前端傳的是字串 id，資料庫是整數
     except (TypeError, ValueError):
         raise errors.not_found("找不到這筆資料") from None
+
+
+def _reads_path(param: str, **deps: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """讓依賴宣告它讀的路徑參數 {param}：/docs 上才看得到那一格、試打時填得進去。
+
+    被包的函式收 (raw, **deps)——raw 是路徑上的原始字串。
+    """
+    def wrap(fn: Callable[..., Any]) -> Callable[..., Any]:
+        def _dep(**kw: Any) -> Any:
+            raw = kw.pop(param)
+            return fn(raw, **kw)
+
+        params = [inspect.Parameter(param, inspect.Parameter.KEYWORD_ONLY, annotation=str,
+                                    default=Path(..., description="路徑上的 id（字串）"))]
+        params += [inspect.Parameter(k, inspect.Parameter.KEYWORD_ONLY, default=v) for k, v in deps.items()]
+        _dep.__signature__ = inspect.Signature(params)   # type: ignore[attr-defined]
+        _dep.__name__ = fn.__name__
+        return _dep
+    return wrap
 
 
 def own(model: Any, param: str = "id", field: str = "user_id", *, missing: str = "找不到這筆資料",
@@ -234,8 +250,9 @@ def own(model: Any, param: str = "id", field: str = "user_id", *, missing: str =
 
     ⚠️ 監管是唯讀的：家長看得到子女的紀錄，但改不動——所以這裡只認「本人」。
     """
-    def _dep(request: Request, me=Depends(current_user), db: Session = Depends(get_db)):
-        row = db.get(model, _path_id(request, param))
+    @_reads_path(param, me=Depends(current_user), db=Depends(get_db))
+    def _dep(raw: str, me: Any, db: Session):
+        row = db.get(model, _path_id(raw))
         if row is None:
             raise errors.not_found(missing)
         if getattr(row, field) != me.id:
@@ -246,9 +263,10 @@ def own(model: Any, param: str = "id", field: str = "user_id", *, missing: str =
 
 def in_group(param: str = "gid", *, owner: bool = False) -> Callable[..., Any]:
     """我在不在這本帳裡（owner=True：還要是建立的人）。回傳 Group。移除的帳本一律當作不存在。"""
-    def _dep(request: Request, me=Depends(current_user), db: Session = Depends(get_db)):
+    @_reads_path(param, me=Depends(current_user), db=Depends(get_db))
+    def _dep(raw: str, me: Any, db: Session):
         m = _models()
-        gid = _path_id(request, param)
+        gid = _path_id(raw)
         group = crud.get(m.Group, gid, db=db)
         if group is None or group.removed_at is not None:
             raise errors.not_found("找不到這本帳")
@@ -281,10 +299,10 @@ def visible_scope(me: Any, db: Session) -> tuple[set, set]:
 
 def can_see_user(param: str = "user_id") -> Callable[..., Any]:
     """我能不能查這個人的資料（監管、同家庭家長、或同帳本）。回傳那個 User。沒權限回 403，不回空的。"""
-    def _dep(request: Request, me=Depends(current_user), db: Session = Depends(get_db)):
-        from app.toolkit import scope
+    @_reads_path(param, me=Depends(current_user), db=Depends(get_db))
+    def _dep(raw: str, me: Any, db: Session):
         m = _models()
-        target_id = _path_id(request, param)
+        target_id = _path_id(raw)
         target = db.get(m.User, target_id)
         if target is None:
             raise errors.not_found("找不到這個人")

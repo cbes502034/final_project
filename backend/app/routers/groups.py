@@ -107,7 +107,7 @@ def add_group_member(
 
 @router.delete("/groups/{gid}/members/{user_id}", summary="把人移出這本帳")
 @stub
-def remove_group_member(group=Depends(in_group("gid", owner=True)), db: Session = Depends(get_db)):
+def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True)), db: Session = Depends(get_db)):
     """把人移出這本帳
 
     DELETE /api/groups/{gid}/members/{user_id}
