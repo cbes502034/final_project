@@ -137,6 +137,18 @@ Render 免費方案沒人用就會休眠，第一次請求要等 30～60 秒叫�
 
 ---
 
+## 踩過的坑
+
+**`secrets` 不可以寫在 `if:` 裡面。**
+GitHub 的 `if` 只認得 `github`、`needs`、`vars`、`env`、`steps` 這幾個 context。
+寫了 `if: ${{ secrets.X != '' }}` 的話，**整個 workflow 會被拒絕解析、一個 job 都不會建立**，
+Actions 分頁上只會看到一列紅的、點進去什麼都沒有。
+
+正確的寫法是先用一個步驟把「有沒有設定」轉成 output，再拿 output 去判斷——
+`ci.yml` 的 `deploy` job 裡那個 `看設定好了沒` 步驟就是在做這件事。
+
+---
+
 ## 相關檔案
 
 | 檔案 | 做什麼 |

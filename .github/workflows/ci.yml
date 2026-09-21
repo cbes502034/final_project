@@ -60,7 +60,11 @@ jobs:
         run: python -m app.ownership
 
   # ----------------------------------------------------------
-  # 部署：只有 main、只有測試過了、而且設定好 Deploy Hook 才會動
+  # 部署：只有 main、只有測試過了，才去打 Render 的 Deploy Hook
+  #
+  # ⚠️ secrets 不可以寫在 if: 裡面（GitHub 的 if 只認得 github／needs／vars／
+  #    env／steps 這幾個 context，寫了整個 workflow 會被拒絕解析、一個 job
+  #    都不會建立）。所以先用一個步驟把「有沒有設定」轉成 output 再判斷。
   # ----------------------------------------------------------
   deploy:
     name: 部署到 Render
@@ -68,21 +72,37 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: 後端
-        if: ${{ secrets.RENDER_BACKEND_HOOK != '' }}
-        run: curl -fsS -X POST "${{ secrets.RENDER_BACKEND_HOOK }}" -o /dev/null
+      - name: 看設定好了沒
+        id: cfg
+        env:
+          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_HOOK }}
+          WEB_HOOK: ${{ secrets.RENDER_WEB_HOOK }}
+        run: |
+          if [ -n "$BACKEND_HOOK" ]; then echo "backend=yes" >> "$GITHUB_OUTPUT"; else echo "backend=no" >> "$GITHUB_OUTPUT"; fi
+          if [ -n "$WEB_HOOK" ]; then echo "web=yes" >> "$GITHUB_OUTPUT"; else echo "web=no" >> "$GITHUB_OUTPUT"; fi
 
-      - name: 前端
-        if: ${{ secrets.RENDER_WEB_HOOK != '' }}
-        run: curl -fsS -X POST "${{ secrets.RENDER_WEB_HOOK }}" -o /dev/null
+      - name: 部署後端
+        if: steps.cfg.outputs.backend == 'yes'
+        env:
+          HOOK: ${{ secrets.RENDER_BACKEND_HOOK }}
+        run: curl -fsS -X POST "$HOOK" -o /dev/null
+
+      - name: 部署前端
+        if: steps.cfg.outputs.web == 'yes'
+        env:
+          HOOK: ${{ secrets.RENDER_WEB_HOOK }}
+        run: curl -fsS -X POST "$HOOK" -o /dev/null
 
       - name: 沒設定就講一聲
-        if: ${{ secrets.RENDER_BACKEND_HOOK == '' && secrets.RENDER_WEB_HOOK == '' }}
+        if: steps.cfg.outputs.backend == 'no' && steps.cfg.outputs.web == 'no'
         run: |
-          echo "### 部署跳過了" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "還沒設定 Deploy Hook。照 \`docs/03-CICD.md\` 設定好就會自動部署。" >> "$GITHUB_STEP_SUMMARY"
-          echo "（Render 後台如果還開著 Auto-Deploy，它會自己部署，只是不管測試有沒有過。）" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 部署跳過了"
+            echo ""
+            echo "還沒設定 Deploy Hook。照 \`docs/03-CICD.md\` 設定好就會自動部署。"
+            echo ""
+            echo "（Render 後台如果還開著 Auto-Deploy，它會自己部署，只是不管測試有沒有過。）"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ----------------------------------------------------------
   # 部署完等它活過來。Render 免費方案會休眠，第一次請求要等一下
@@ -90,26 +110,33 @@ jobs:
   smoke:
     name: 部署後確認
     needs: deploy
-    if: ${{ vars.BACKEND_URL != '' }}
+    if: vars.BACKEND_URL != ''
     runs-on: ubuntu-latest
     steps:
       - name: 等後端回 200
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          WEB_URL: ${{ vars.WEB_URL }}
         run: |
-          url="${{ vars.BACKEND_URL }}/healthz"
+          url="${BACKEND_URL%/}/healthz"
           echo "等 $url ..."
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo 000)
             echo "  第 $i 次：$code"
             if [ "$code" = "200" ]; then
-              echo "### 部署完成 ✅" >> "$GITHUB_STEP_SUMMARY"
-              echo "" >> "$GITHUB_STEP_SUMMARY"
-              echo "- 後端 $url 回 200" >> "$GITHUB_STEP_SUMMARY"
-              [ -n "${{ vars.WEB_URL }}" ] && echo "- 前端 ${{ vars.WEB_URL }}" >> "$GITHUB_STEP_SUMMARY"
+              {
+                echo "### 部署完成"
+                echo ""
+                echo "- 後端 $url 回 200"
+                if [ -n "$WEB_URL" ]; then echo "- 前端 $WEB_URL"; fi
+              } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             sleep 20
           done
-          echo "### 部署後叫不動 ❌" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "等了 10 分鐘 $url 還是沒有回 200。到 Render 後台看 Logs。" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### 部署後叫不動"
+            echo ""
+            echo "等了 10 分鐘 $url 還是沒有回 200。到 Render 後台看 Logs。"
+          } >> "$GITHUB_STEP_SUMMARY"
           exit 1
