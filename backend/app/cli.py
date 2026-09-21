@@ -5,6 +5,7 @@
     python -m app.cli check-config        列出每一段設定填了沒、沒填會怎樣
     python -m app.cli init-db             建表（本機、測試用）＋ 放入系統預設分類
     python -m app.cli make-admin [email]  把帳號設成平台管理員（不給 email 就用 ADMIN_EMAILS）
+    python -m app.cli db [SQL]            看資料庫：不給 SQL 就列出每張表有幾筆
 
 負責人：成員1（共用元件）
 
@@ -94,6 +95,48 @@ def make_admin(email: str | None) -> int:
     return 0
 
 
+def db(sql: str | None) -> int:
+    """看自己剛剛寫進去的資料長什麼樣子。
+
+    不裝任何工具、不離開終端機就看得到——做一支路由的過程裡，
+    「我到底有沒有寫進去、寫成什麼樣」是最常問的問題。
+
+    ⚠️ 只讓查（SELECT／PRAGMA／WITH）。這支是開發用的，
+       不想有人用它一行 DELETE 把自己的資料清掉。
+    """
+    from sqlalchemy import inspect, text
+
+    from app.toolkit.db import engine
+
+    if not sql:
+        names = sorted(inspect(engine).get_table_names())
+        with engine.connect() as conn:
+            rows = [(t, conn.execute(text("SELECT COUNT(*) FROM %s" % t)).scalar()) for t in names]
+        width = max(len(t) for t, _ in rows) if rows else 0
+        _say("\n".join("%-*s  %s 筆" % (width, t, n) for t, n in rows) or "一張表都還沒有，先跑 init-db")
+        return 0
+
+    if not sql.lstrip().lower().startswith(("select", "pragma", "with")):
+        _say("只能查（SELECT／PRAGMA／WITH）。要改資料請寫在路由或測試裡。")
+        return 1
+
+    with engine.connect() as conn:
+        result = conn.execute(text(sql))
+        cols = list(result.keys())
+        rows = [["" if v is None else str(v) for v in r] for r in result.fetchall()]
+    if not rows:
+        _say("查不到資料（0 筆）。")
+        return 0
+    width = [max(len(cols[i]), *(len(r[i]) for r in rows)) for i in range(len(cols))]
+    line = "  ".join("-" * w for w in width)
+    _say("  ".join("%-*s" % (width[i], c) for i, c in enumerate(cols)))
+    _say(line)
+    for r in rows:
+        _say("  ".join("%-*s" % (width[i], v) for i, v in enumerate(r)))
+    _say("%s\n%d 筆" % (line, len(rows)))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m app.cli", description="家庭記帳後端的小工具")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -103,6 +146,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("init-db", help="建表＋系統預設分類")
     p = sub.add_parser("make-admin", help="設定平台管理員")
     p.add_argument("email", nargs="?")
+    p = sub.add_parser("db", help="看資料庫（只能查）")
+    p.add_argument("sql", nargs="?", help='例如 "SELECT id, email FROM users"；不給就列出每張表幾筆')
     args = ap.parse_args(argv)
     if args.cmd == "init-env":
         return init_env(args.force)
@@ -110,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
         return check_config()
     if args.cmd == "init-db":
         return init_db()
+    if args.cmd == "db":
+        return db(args.sql)
     return make_admin(args.email)
 
 

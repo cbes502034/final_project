@@ -2,7 +2,8 @@
    api.js — 前端唯一的資料入口
    ------------------------------------------------------------
    畫面程式碼一律只呼叫 API.xxx()，永遠不要直接讀 window.DATA。
-   要接真後端，只要改 index.html 的 <meta name="api-base">。
+   要接真後端，改 index.html 的 <meta name="api-base">；
+   本機開發不要改那個檔案，用網址切就好（見下面的 BASE）。
 
    ------------------------------------------------------------
    後端契約（由 backend/tools/sync_spec.py 從 ownership.py 產生，不要手改）
@@ -91,9 +92,39 @@
 (function (global) {
   'use strict';
 
+  /* ---------------------------------------------------------
+     後端網址
+     ---------------------------------------------------------
+     正式的來源是 index.html 的 <meta name="api-base">。
+
+     但那個檔案會被 commit —— 四個人各自把它改成 http://localhost:8000
+     來開發的話，遲早有人推上去，線上的站就整個連不到後端。
+     所以**本機**多一個用網址切的開關，誰都不用動那個檔案：
+
+         http://localhost:5174/?api=http://localhost:8000   接自己的後端
+         http://localhost:5174/?api=                        切回 mock
+
+     切過之後記在這台瀏覽器裡，重新整理、關掉再開都算數。
+
+     ⚠️ 只有**頁面本身開在 localhost／127.0.0.1** 時才理這個參數。
+        線上網址也吃的話，別人寄一個 ?api=https://壞人的伺服器 給你，
+        你按下去之後所有請求（含權杖）都會送到那邊去。
+     --------------------------------------------------------- */
+  var API_KEY = 'fambudget.api';
+
   var BASE = (function () {
     var el = document.querySelector('meta[name="api-base"]');
-    return el && el.content ? el.content.trim().replace(/\/$/, '') : '';
+    var base = el && el.content ? el.content.trim() : '';
+    var host = (global.location && global.location.hostname) || '';
+    if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') {
+      try {
+        var q = /[?&]api=([^&#]*)/.exec(global.location.search || '');
+        if (q) localStorage.setItem(API_KEY, decodeURIComponent(q[1]).trim());
+        var saved = localStorage.getItem(API_KEY);
+        if (saved !== null) base = saved;
+      } catch (e) { /* 無痕視窗之類的拿不到 localStorage，照 meta 走 */ }
+    }
+    return base.replace(/\/$/, '');
   })();
 
   var MODE = BASE ? 'http' : 'mock';

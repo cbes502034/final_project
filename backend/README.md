@@ -26,6 +26,13 @@ uvicorn app.main:app --reload
 FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試打**，
 不需要寫前端，也不需要 Postman。70 支路由都在上面，還沒做的回 501。
 
+看自己剛剛寫進去的資料（不用裝任何工具）：
+
+```bash
+python -m app.cli db                                       # 每張表各幾筆
+python -m app.cli db "SELECT id, email FROM users"         # 只能查，不能改
+```
+
 跑測試：
 
 ```bash
@@ -41,7 +48,7 @@ backend/
 ├── app/
 │   ├── main.py            ← 入口。只負責組裝（CORS、錯誤處理、掛上 routers/ 的每一組）
 │   ├── guards.py          ← 路由守衛：沒登入、被停權、角色不對、不是自己的資料，路由裡一行都不會跑
-│   ├── cli.py             ← 小工具指令：init-env、check-config、init-db、make-admin
+│   ├── cli.py             ← 小工具指令：init-env、check-config、init-db、make-admin、db
 │   ├── ownership.py       ← 分工的單一事實來源
 │   ├── catalog.py         ← 固定清單：角色、權限表、理財選項、系統分類（正本是 frontend/js/data.js）
 │   │
@@ -522,7 +529,12 @@ alembic upgrade head
 → 有人在 `alembic.ini` 裡寫了中文。那個檔案只能有英文，說明寫在 `alembic/env.py`。
 
 **本機沒有 PostgreSQL**
-→ `DATABASE_URL=sqlite:///./dev.db` 就能跑（外鍵檢查已經打開，行為跟 PostgreSQL 一致）。測試用的是記憶體裡的 SQLite。
+→ 不用裝。`.env` 預設就是 `DATABASE_URL=sqlite:///./dev.db`（外鍵檢查已經打開，行為跟 PostgreSQL 一致）。
+測試用的是記憶體裡的 SQLite，正式環境（Render）才是 PostgreSQL。
+想在本機也用 PostgreSQL：`docker compose up`，再照 `.env.example` 裡註解的那一行改 `DATABASE_URL`。
+
+**想砍掉資料重來**
+→ 在專案最外層 `python run.py --reset`（只對 SQLite 有效）。
 
 **改了程式但沒生效**
 → 確認啟動時有加 `--reload`。

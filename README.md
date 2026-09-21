@@ -64,7 +64,8 @@ final_project/
 │   └── README.md          ← 後端的詳細說明在這
 │
 ├── docs/                  規格文件（Markdown / SVG）
-├── docker-compose.yml     本機一鍵起整套
+├── run.py                 ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
+├── docker-compose.yml     本機用 PostgreSQL 跑整套
 └── render.yaml            部署設定
 ```
 
@@ -75,47 +76,82 @@ final_project/
 
 ## 本機開發
 
-### 只跑前端（不需要後端也能完整操作）
+### 一鍵跑起來 ★
+
+在**專案最外層**（跟 `backend/`、`frontend/` 同一層）打：
 
 ```bash
-python -m http.server 5174 --directory frontend
+python run.py
 ```
 
-打開 <http://localhost:5174>。前端預設跑在 **mock 模式**：規則跟後端契約一樣、資料存在瀏覽器（`localStorage`），
-**沒有任何假資料或範例帳號**，從註冊開始，所有功能都能操作。
+第一次會自己做完這些：裝套件 → 建 `backend/.env`（含 JWT_SECRET）→ 建表 → 放入系統預設分類 →
+同時起前端與後端。需要的只有 **Python 3.10 以上**，資料庫用 SQLite（`backend/dev.db`），什麼都不用裝。
 
-### 只跑後端
+| 服務 | 網址 |
+|---|---|
+| 前端 | <http://localhost:5174/?api=http://localhost:8000> |
+| 後端 | <http://localhost:8000> |
+| API 文件（可以直接試打） | <http://localhost:8000/docs> |
+
+其他用法：
 
 ```bash
-cd backend
+python run.py --front-only     # 只跑前端（mock 模式，不需要後端）
+python run.py --reset          # 本機資料庫砍掉重建
+python run.py --port 5555      # 換前端的埠號（後端用 --api-port）
+```
+
+⚠️ 前端不要用 VS Code 的 Live Server，也不要直接點開 `index.html`：
+那樣後端的 CORS 會擋住，而且 `file://` 不算 localhost。一律用 `run.py` 起的 5174。
+
+### 分開跑（想自己控制的時候）
+
+```bash
+python run.py --front-only                       # 前端
+
+cd backend                                       # 後端
 pip install -r requirements.txt
-python -m app.cli init-env        # 建出 .env（順便產生 JWT_SECRET），再把自己那一段填一填
+python -m app.cli init-env        # 建出 .env（順便產生 JWT_SECRET）
 python -m app.cli check-config    # 看哪些還沒填、沒填會怎樣
 alembic upgrade head              # 建表
 python -m app.cli init-db         # 放入系統預設分類
 uvicorn app.main:app --reload
 ```
 
-打開 <http://localhost:8000/docs> 就是可以直接試打的 API 文件。
+### 看自己寫進去的資料
 
-### 一鍵起整套（資料庫 + 後端 + 前端）
+```bash
+cd backend
+python -m app.cli db                                   # 每張表各幾筆
+python -m app.cli db "SELECT id, email FROM users"     # 只能查，不能改
+```
+
+### 用 PostgreSQL（跟正式環境一樣）
 
 ```bash
 docker compose up
 ```
 
-| 服務 | 網址 |
-|---|---|
-| 前端 | <http://localhost:5174> |
-| 後端 | <http://localhost:8000> |
-| API 文件 | <http://localhost:8000/docs> |
-| PostgreSQL | `localhost:5432` |
+起一顆 PostgreSQL 16 ＋ 後端 ＋ 前端。本機開發不需要這一條，
+`run.py` 的 SQLite 已經把外鍵檢查打開，行為一致。
 
 ---
 
 ## 前端怎麼切換到真後端
 
-改 `frontend/index.html` 這一行就好：
+**本機開發用網址切就好，不要動任何檔案**（`frontend/index.html` 會被 commit，
+有人不小心把 localhost 推上去，線上整站就連不到後端）：
+
+```
+http://localhost:5174/?api=http://localhost:8000    接自己的後端
+http://localhost:5174/?api=                         切回 mock
+```
+
+切過一次就記在那台瀏覽器裡，之後開 <http://localhost:5174> 就好。
+⚠️ 這個開關**只有頁面開在 localhost 時才生效** —— 線上網址吃這個參數的話，
+別人寄一個 `?api=https://壞人的伺服器` 的連結過來就能把權杖騙走。
+
+正式環境（Render 上的前端要連哪個後端）改 `frontend/index.html` 這一行：
 
 ```html
 <meta name="api-base" content="https://fambudget-backend.onrender.com">

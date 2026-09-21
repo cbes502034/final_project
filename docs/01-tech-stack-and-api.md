@@ -128,6 +128,7 @@ Django 內建 admin 與 auth，聽起來很划算。但：
 
 ```
 final_project/
+├── run.py                       ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
 ├── frontend/                    前端（純靜態，可直接發布）
 │   ├── index.html               <meta name="api-base"> 留空 = mock、填網址 = 真後端
 │   ├── css/
@@ -168,7 +169,7 @@ final_project/
 │   └── .env.example             設定範本，依成員分段
 │
 ├── docs/                        規格文件
-├── docker-compose.yml           本機一鍵啟動
+├── docker-compose.yml           本機用 PostgreSQL 跑整套（一般開發用 run.py 就夠）
 ├── render.yaml                  部署設定
 └── README.md
 ```
