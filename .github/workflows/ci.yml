@@ -1,0 +1,115 @@
+# ============================================================
+# 推上去 → 跑測試 → 測試過了才部署
+# ------------------------------------------------------------
+# 結果看這裡：GitHub 上這個 repo 的 Actions 分頁。
+#
+# ⚠️ 部署那一段要先設定好才會動，怎麼設定寫在 docs/03-CICD.md。
+#    沒設定的話它會自己跳過（不會紅燈），測試照跑。
+# ============================================================
+name: CI
+
+on:
+  push:
+    branches: ["**"]          # 每個人的分支推上去也會跑，不用等合併才發現壞了
+  pull_request:
+    branches: [main]
+  workflow_dispatch:          # Actions 分頁上可以手動按一次
+
+# 同一個分支連續推好幾次，只留最後一次在跑，不要排隊浪費額度
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----------------------------------------------------------
+  # 測試：570 多個，包含前端 api.js 的保證（那幾個需要 node）
+  # ----------------------------------------------------------
+  test:
+    name: 測試
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 裝 Python
+        uses: actions/setup-python@v5
+        with:
+          # 版本跟著 backend/.python-version 走，不要在這裡再寫死一次
+          python-version-file: backend/.python-version
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # test_frontend_adapter.py 與 test_consistency.py 會用 node 把 frontend/js/api.js
+      # 載進來跑。沒有 node 的話那幾個測試會自己跳過——CI 上不可以讓它們跳過。
+      - name: 裝 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 裝套件
+        run: pip install -r backend/requirements.txt
+
+      - name: 跑測試
+        working-directory: backend
+        run: pytest -q
+
+      - name: 分工有沒有跟程式走散
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite://
+          JWT_SECRET: ci-only-not-a-real-secret-0123456789abcdef
+        run: python -m app.ownership
+
+  # ----------------------------------------------------------
+  # 部署：只有 main、只有測試過了、而且設定好 Deploy Hook 才會動
+  # ----------------------------------------------------------
+  deploy:
+    name: 部署到 Render
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 後端
+        if: ${{ secrets.RENDER_BACKEND_HOOK != '' }}
+        run: curl -fsS -X POST "${{ secrets.RENDER_BACKEND_HOOK }}" -o /dev/null
+
+      - name: 前端
+        if: ${{ secrets.RENDER_WEB_HOOK != '' }}
+        run: curl -fsS -X POST "${{ secrets.RENDER_WEB_HOOK }}" -o /dev/null
+
+      - name: 沒設定就講一聲
+        if: ${{ secrets.RENDER_BACKEND_HOOK == '' && secrets.RENDER_WEB_HOOK == '' }}
+        run: |
+          echo "### 部署跳過了" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "還沒設定 Deploy Hook。照 \`docs/03-CICD.md\` 設定好就會自動部署。" >> "$GITHUB_STEP_SUMMARY"
+          echo "（Render 後台如果還開著 Auto-Deploy，它會自己部署，只是不管測試有沒有過。）" >> "$GITHUB_STEP_SUMMARY"
+
+  # ----------------------------------------------------------
+  # 部署完等它活過來。Render 免費方案會休眠，第一次請求要等一下
+  # ----------------------------------------------------------
+  smoke:
+    name: 部署後確認
+    needs: deploy
+    if: ${{ vars.BACKEND_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 等後端回 200
+        run: |
+          url="${{ vars.BACKEND_URL }}/healthz"
+          echo "等 $url ..."
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo 000)
+            echo "  第 $i 次：$code"
+            if [ "$code" = "200" ]; then
+              echo "### 部署完成 ✅" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "- 後端 $url 回 200" >> "$GITHUB_STEP_SUMMARY"
+              [ -n "${{ vars.WEB_URL }}" ] && echo "- 前端 ${{ vars.WEB_URL }}" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "### 部署後叫不動 ❌" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "等了 10 分鐘 $url 還是沒有回 200。到 Render 後台看 Logs。" >> "$GITHUB_STEP_SUMMARY"
+          exit 1

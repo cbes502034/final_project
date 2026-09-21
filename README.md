@@ -1,5 +1,7 @@
 # 家庭記帳與財務控管系統
 
+[![CI](https://github.com/cbes502034/final_project/actions/workflows/ci.yml/badge.svg)](https://github.com/cbes502034/final_project/actions/workflows/ci.yml)
+
 四人 × 一個月的期末專題。以家庭為單位的記帳系統，用自然語言降低輸入摩擦，
 用月／年兩個時間準據做財務控管。
 
@@ -12,6 +14,7 @@
 | **檔案系統說明書** | <https://fambudget-web.onrender.com/docs/files.html> |
 | **API 瀏覽** | <https://fambudget-web.onrender.com/docs/api.html> |
 | **前後端串接契約** | `docs/02-前後端串接契約.md` ← 動工前一定要看 |
+| **CI/CD 怎麼設定** | `docs/03-CICD.md` ← 推上去自動測試、自動部署 |
 | **模型設計** | <https://fambudget-web.onrender.com/docs/model.html> |
 
 ---
@@ -68,6 +71,7 @@ final_project/
 │   └── README.md          ← 後端的詳細說明在這
 │
 ├── docs/                  規格文件（Markdown / SVG）
+├── .github/workflows/     CI/CD：推上去跑測試、測試過了才部署（見 docs/03）
 ├── run.py                 ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
 ├── docker-compose.yml     本機用 PostgreSQL 跑整套
 └── render.yaml            部署設定
