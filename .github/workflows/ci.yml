@@ -54,16 +54,23 @@ jobs:
           set -o pipefail
           pytest -q --tb=short | tee "$RUNNER_TEMP/pytest.log"
 
-      # ⚠️ Actions 的 log 要下載得有 admin 權限，網頁版又是虛擬捲動不好讀。
-      #    紅燈時把重點貼到 Summary——那一頁是公開的，四個人點進去就看得到。
-      - name: 測試沒過就把重點貼到 Summary
+      # ⚠️ Actions 的 log 要下載得有 admin 權限，網頁版又是虛擬捲動、Summary 在
+      #    run 頁面上也讀不到——組員看不到自己為什麼紅。annotation 不一樣：
+      #    它在 run 頁面最上面，而且公開就讀得到。
+      - name: 測試沒過就標出來
         if: failure()
+        shell: bash
         run: |
+          log="$RUNNER_TEMP/pytest.log"
+          [ -f "$log" ] || { echo "::error::沒有產生 pytest.log，看上面「跑測試」那一步"; exit 0; }
+          grep -E '^(FAILED|ERROR) ' "$log" | head -n 25 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
           {
             echo "### 測試沒過"
             echo ""
             echo '```'
-            tail -n 150 "$RUNNER_TEMP/pytest.log" || echo "（連 log 都沒產生，看上面「跑測試」那一步）"
+            tail -n 150 "$log"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
