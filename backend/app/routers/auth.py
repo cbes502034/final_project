@@ -1836,7 +1836,7 @@ def list_sessions(me: User, db: Session = Depends(get_db)):
     【前端怎麼打】
         frontend/js/api.js 的 API.sessions()
         個人資料頁「登入中的裝置」。前端檢查回應裡一定要有 sessions。
-        後端還沒做（501）時，前端只列這一台頂著。
+        服務暫時叫不動（503）時，前端只列這一台頂著。還沒做（501）不頂，照實壞掉。
 
     【誰能打】
         登入、沒被停權就能打（平台管理員也可以）。上面的 @login_required 已經擋好了：

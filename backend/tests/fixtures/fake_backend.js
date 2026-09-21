@@ -7,6 +7,8 @@ const path = require('path');
 const root = process.argv[2];
 const notReady = process.argv[3];
 let notifyMode = 'network';         // network → notReady → empty，見 /api/notifications
+let paraMode = 'notReady';         // notReady（501，不該備援）→ modelDown（503，該備援）
+let txMode = 'ok';                 // ok → badShape（故意少一欄，看檢查抓不抓得到）
 const store = new Map();
 global.localStorage = {
   getItem: k => (store.has(k) ? store.get(k) : null),
@@ -50,12 +52,18 @@ const ROUTES = [
     members: [{ id: '1', name: '王大同' }, { id: '2', name: '王小明' }], guardianships: [] })],
   ['GET', '/api/summary', () => res(200, { period: '2026-09', income: 50000, expense: 42000,
     byCat: [{ cat: '1', amount: 42000 }], monthly: [], yearly: [], savings: { goal: 10000 } })],
-  ['GET', '/api/transactions', () => res(200, { transactions: [{ id: '7', user: '2', cat: '1', amount: 120, kind: 'expense', date: '2026-09-14' }], total: 1 })],
+  // txMode = badShape 時故意把 amount 回成字串，看逐筆檢查抓不抓得到
+  ['GET', '/api/transactions', () => res(200, { transactions: [txMode === 'badShape'
+    ? { id: '7', user: '2', cat: '1', amount: '120', kind: 'expense', date: '2026-09-14', source: 'manual' }
+    : { id: '7', user: '2', cat: '1', amount: 120, kind: 'expense', date: '2026-09-14', source: 'manual' }], total: 1 })],
   ['GET', '/api/budgets', () => res(200, { budgets: [{ user: '1', cat: '1', limit: 40000, used: 42000, period: 'month' }] })],
-  ['POST', '/api/nlp/parse-batch', () => res(501, { detail: notReady })],
+  // 501 還沒做 → 不該備援；503 模型叫不動 → 該備援。同一支演兩次，見 paraMode
+  ['POST', '/api/nlp/parse-batch', () => (paraMode === 'notReady'
+    ? res(501, { detail: notReady })
+    : res(503, { detail: '模型服務還沒接上，先用前端的規則解析' }))],
   ['POST', '/api/nlp/parse', () => res(503, { detail: '模型服務還沒接上，先用前端的規則解析' })],
-  ['POST', '/api/advices/generate', () => res(501, { detail: notReady })],
-  ['GET', '/api/auth/sessions', () => res(404, { detail: 'Not Found' })],
+  ['POST', '/api/advices/generate', () => res(503, { detail: '模型服務叫不動' })],
+  ['GET', '/api/auth/sessions', () => res(503, { detail: '工作階段服務暫時不可用' })],
   ['GET', '/api/alerts', () => res(200, { wrong: [] })],
   ['GET', '/api/groups', () => res(500, { detail: 'relation "groups" does not exist' })],
   // 這一支要演三種狀況：斷線、那一支還沒做、真的沒有通知。見下面的 notifyMode
@@ -87,6 +95,12 @@ const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e
   out.tx = { catName: tx.transactions[0].catName, userName: tx.transactions[0].userName };
   const bd = await A.budgets({});
   out.budget = { pct: bd.budgets[0].pct, over: bd.budgets[0].over, catName: bd.budgets[0].catName };
+  out.txBadShape = await settle((async () => { txMode = 'badShape'; try { return await A.transactions({}); } finally { txMode = 'ok'; } })());
+
+  // 501 還沒做：就算這一支有備援，也不該頂——後端沒做，前端就該做不到
+  out.notReadyNoFallback = await settle(A.nlpParseBatch('早餐55，加油一千二'));
+
+  paraMode = 'modelDown';
   const para = await A.nlpParseBatch('早餐55，加油一千二');
   out.nlpFallback = { fallback: para.fallback, amounts: para.items.map(i => i.amount),
     cats: para.items.map(i => i.cat) };

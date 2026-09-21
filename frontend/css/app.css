@@ -448,6 +448,56 @@
 .err__m { margin-top: 4px; font-size: 12px; color: var(--ink-faint); }
 
 /* ============================================================
+   錯誤匣：這一輪操作裡，後端沒給出正確結果的每一支
+   ------------------------------------------------------------
+   只有 http 模式、而且真的有錯才會出現。給組員看的東西，所以
+   函式名、路由、狀態碼一律等寬字，要能直接框起來複製。
+   ============================================================ */
+/* 放左下角：右下角是浮動提示（.toasts）的位置，兩個疊在一起會互相蓋住 */
+.eb {
+  position: fixed; left: 24px; bottom: 24px; z-index: 85; width: 420px; max-width: calc(100vw - 24px);
+  background: var(--card-3); border: 1px solid var(--down); border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop); overflow: hidden;
+}
+.eb--min { width: auto; border-radius: var(--r-pill); border-color: var(--down); }
+.eb__pill {
+  display: block; padding: 9px 18px; font-size: 12.5px; color: var(--down);
+  background: var(--down-wash); border: 0; border-radius: var(--r-pill); cursor: pointer;
+}
+.eb__pill b { font-size: 13px; }
+.eb__h {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px;
+  background: var(--down-wash); border-bottom: 1px solid var(--down-wash);
+}
+/* 窄的時候讓按鈕整排換行，不要把「後端錯誤 8」拆成兩行 */
+.eb__t { flex: 1 1 auto; font-size: 13px; font-weight: 600; color: var(--down); white-space: nowrap; }
+.eb__b, .eb__x {
+  flex: 0 0 auto; font-size: 11.5px; color: var(--ink-soft); background: transparent;
+  border: 1px solid var(--line-2); border-radius: var(--r-pill); padding: 3px 11px; cursor: pointer;
+}
+.eb__b:hover, .eb__x:hover { border-color: var(--down); color: var(--down); }
+.eb__l { list-style: none; margin: 0; padding: 0; max-height: 44vh; overflow-y: auto; }
+.eb__i { padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.eb__i:last-child { border-bottom: 0; }
+.eb__top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.eb__fn, .eb__rt {
+  font-family: var(--code); font-size: 11.5px; padding: 1px 6px;
+  background: var(--sunk); border-radius: var(--r-xs); overflow-wrap: anywhere;
+}
+.eb__fn { color: var(--ink); }
+.eb__rt { color: var(--ink-soft); }
+.eb__st {
+  font-family: var(--code); font-size: 11.5px; padding: 1px 7px; border-radius: var(--r-xs);
+  background: var(--down); color: var(--card);
+}
+.eb__kd, .eb__ow, .eb__n, .eb__at { font-size: 11px; color: var(--ink-faint); }
+.eb__n { color: var(--down); }
+.eb__at { margin-left: auto; font-variant-numeric: tabular-nums; }
+.eb__msg { margin-top: 5px; font-size: 12.5px; color: var(--ink); line-height: 1.7; overflow-wrap: anywhere; }
+.eb__raw { margin-top: 3px; font-size: 11.5px; color: var(--ink-faint); overflow-wrap: anywhere; }
+.eb__f { padding: 8px 14px; font-size: 11px; color: var(--ink-faint); border-top: 1px solid var(--line); }
+
+/* ============================================================
    浮動提示
    ============================================================ */
 .toasts { position: fixed; right: 24px; bottom: 24px; z-index: 80; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
@@ -491,6 +541,10 @@
   .tx { grid-template-columns: 40px 1fr; row-gap: 10px; }
   .tx__a, .tx .btn { grid-column: 2; justify-self: start; }
   .toasts { right: 12px; left: 12px; bottom: 12px; }
+  .eb { right: 12px; left: 12px; width: auto; max-width: none; }
+  .eb--min { left: auto; }
+  .eb__l { max-height: 30vh; }
+  .eb__f { display: none; }              /* 手機上寸土寸金，這一句在文件裡有 */
   .toast { max-width: none; }
 }
 
@@ -3596,6 +3650,9 @@ body.is-admin .acctm__h { pointer-events: none; }
   .phead { padding-top: 16px; }
   #view .dash { grid-template-columns: minmax(0, 1fr); }
   #view .dtile--add { display: none; }      /* 底部分頁中間已經有記一筆 */
+  /* 底部有分頁列了，錯誤匣要讓開，不然蓋住中間的「記一筆」 */
+  .eb { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  body.is-out .eb, body.is-admin .eb { bottom: 24px; }   /* 這兩種情況沒有分頁列 */
   .appbar .bell__panel, .acctm__p { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; }
 
   .tabbar {
@@ -3626,7 +3683,9 @@ body.is-admin .acctm__h { pointer-events: none; }
   body.is-out .tabbar, body.is-admin .tabbar { display: none; }
   .main { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   body.is-out .main, body.is-admin .main { padding-bottom: 0; }
-  .toasts { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  /* 分頁列上面。錯誤匣在這個寬度是整排的，所以還要再讓開它
+     （--eb-clear = 從畫面底部到錯誤匣上緣的距離，由 errbox.js 量出來） */
+  .toasts { bottom: max(calc(80px + env(safe-area-inset-bottom, 0px)), var(--eb-clear, 0px)); }
 }
 @media (max-width: 560px) {
   .acctm__n { display: none; }

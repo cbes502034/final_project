@@ -3028,6 +3028,90 @@
     notifications: ['notifications', 'unread'], allowances: ['allowances'], lookupUser: ['user', 'status']
   };
 
+  /* 清單裡每一筆的欄位與型別。SHAPE 只看最上層的 key 在不在——
+     後端回 {"transactions": [...]}、裡面卻少了 date、或 amount 給的是字串 "320"，
+     一樣過得了 SHAPE，然後壞在畫面很後面的地方（排序排不出來、金額加起來變字串接龍），
+     看不出是哪一支害的。這裡逐筆檢查，直接指出是哪一支、第幾筆、哪一欄、應該是什麼。
+
+     型別代號：s 字串　n 數字　b true／false　d 日期 2026-09-17　t 時間 ISO 8601　a 陣列　o 物件
+     後面加 ? = 可以是 null（但那一欄一定要在）。
+     只列**畫面真的會讀**的欄位；後端多回欄位不算錯。 */
+  var ROWS = {
+    transactions: { transactions: { id: 's', user: 's', date: 'd', amount: 'n', kind: 's', cat: 's', source: 's' } },
+    deleteTransactions: { deleted: 's' },
+    nlpParseBatch: { items: { seq: 'n', span: 's', amount: 'n?', kind: 's', cat: 's?', conf: 'o', missing: 'a' } },
+    categories: { categories: { id: 's', name: 's', kind: 's', color: 's' } },
+    groups: { groups: { id: 's', name: 's', owner: 's', members: 'a', archived: 'b' } },
+    budgets: { budgets: { user: 's', cat: 's', limit: 'n', used: 'n' } },
+    savingsGoals: { goals: { groupId: 's?', groupName: 's', goal: 'n' } },
+    alerts: { alerts: { id: 's', percent: 'n', enabled: 'b', firedPeriod: 's?' } },
+    advices: { advices: { id: 's', scope: 's', level: 's', title: 's', body: 's', basis: 'a', suggest: 'a' } },
+    generateAdvices: { advices: { id: 's', scope: 's', level: 's', title: 's', body: 's', basis: 'a', suggest: 'a' } },
+    members: { members: { id: 's', name: 's', avatar: 's' }, guardianships: { id: 's', guardian: 's', ward: 's' } },
+    guardianships: { guardianships: { id: 's', guardian: 's', ward: 's' } },
+    allowances: { allowances: { wardId: 's', wardName: 's', amount: 'n', spent: 'n' } },
+    notifications: { notifications: { id: 's', type: 's', createdAt: 't', readAt: 't?' } },
+    sessions: { sessions: { id: 's', device: 's', current: 'b', lastActiveAt: 't' } },
+    adminUsers: { users: { id: 's', name: 's', email: 's', suspendedAt: 't?' } },
+    audit: { logs: { id: 's', at: 't', actorName: 's', action: 's' } }
+  };
+
+  var TYPE_TW = { s: '字串', n: '數字', b: 'true／false', d: '日期（2026-09-17）',
+    t: '時間（2026-09-17T13:20:05Z）', a: '陣列', o: '物件' };
+
+  function typeOk(v, code) {
+    if (v === null || v === undefined) return code.slice(-1) === '?';
+    switch (code.charAt(0)) {
+      case 's': return typeof v === 'string';
+      case 'n': return typeof v === 'number' && isFinite(v);
+      case 'b': return typeof v === 'boolean';
+      case 'd': return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+      case 't': return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}[T ]/.test(v);
+      case 'a': return Array.isArray(v);
+      case 'o': return !!v && typeof v === 'object' && !Array.isArray(v);
+    }
+    return true;
+  }
+
+  function say(v) {
+    if (v === undefined) return '沒有這一欄';
+    if (v === null) return 'null';
+    if (Array.isArray(v)) return '陣列';
+    if (typeof v === 'string') return '字串 "' + v.slice(0, 24) + '"';
+    if (typeof v === 'number') return '數字 ' + v;
+    if (typeof v === 'boolean') return String(v);
+    return '物件';
+  }
+
+  function wants(code) {
+    return TYPE_TW[code.charAt(0)] + (code.slice(-1) === '?' ? '或 null' : '');
+  }
+
+  /* 回傳第一個不對的地方（一句話），全部都對就回 null。 */
+  function checkRows(res, spec) {
+    for (var key in spec) {
+      if (!Object.prototype.hasOwnProperty.call(spec, key)) continue;
+      var list = res ? res[key] : undefined, want = spec[key];
+      if (!Array.isArray(list)) return key + ' 應該是陣列，收到' + say(list);
+      for (var i = 0; i < list.length; i++) {
+        var row = list[i], at = key + ' 第 ' + (i + 1) + ' 筆';
+        if (typeof want === 'string') {
+          if (!typeOk(row, want)) return at + '應該是' + wants(want) + '，收到' + say(row);
+          continue;
+        }
+        if (!row || typeof row !== 'object' || Array.isArray(row)) return at + '不是物件，收到' + say(row);
+        for (var f in want) {
+          if (!Object.prototype.hasOwnProperty.call(want, f)) continue;
+          if (!(f in row)) return at + '少了 ' + f;
+          if (!typeOk(row[f], want[f])) {
+            return at + '的 ' + f + ' 應該是' + wants(want[f]) + '，收到' + say(row[f]);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   /* ============================================================
      前端代勞
      ------------------------------------------------------------
@@ -3176,6 +3260,7 @@
     var info = FN[name] || [];
     e.fn = 'API.' + name; e.route = info[0] || null; e.owner = info[1] || null;
     var st = e.status || 0;
+    e.detail = e.detail || (st ? e.message : null);     // 後端的原話，錯誤匣要照原樣列出來
     if (e.kind === 'shape') {
       // 已經在下面組好訊息
     } else if (!st && (e.name === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(e.message))) {
@@ -3186,12 +3271,24 @@
       /* 後端 501 的訊息本身就是「後端還沒做這一支：路由（成員）」，路由與負責人 where() 會再講一次，不重複 */
       var detail = e.message && !/^HTTP \d+/.test(e.message) && !/^Not Found$/i.test(e.message) &&
         !(st === 501 && /^後端還沒做這一支/.test(e.message)) ? '：' + e.message : '';
-      e.message = (st === 501 ? '後端還沒做這一支' : '後端出錯（HTTP ' + st + '）') + detail +
+      e.message = (st === 501 ? '後端還沒做這一支（HTTP 501）' : '後端出錯（HTTP ' + st + '）') + detail +
         '｜出錯的函式：' + where(name);
     } else {
       e.kind = 'business';
     }
+    report(e);
     return e;
+  }
+
+  /* 錯誤匣：業務錯誤（403、409、422……）是後端**正確**的回答，不進去；
+     其餘三種（還沒做／出錯、連不上、形狀不對）都是「這一支的輸出不對」，一筆都不漏。 */
+  function report(e) {
+    if (e.kind === 'business' || e.logged) return;
+    e.logged = true;
+    if (global.ErrBox && global.ErrBox.push) {
+      global.ErrBox.push({ fn: e.fn, route: e.route, owner: e.owner, kind: e.kind,
+        status: e.status || 0, message: e.message, detail: e.detail });
+    }
   }
 
   function call(name, args) {
@@ -3204,11 +3301,11 @@
     var out;
     try { out = fn.apply(impl, args); } catch (e) { return Promise.reject(tag(e, name)); }
     return Promise.resolve(out).catch(function (e) {
-      /* 後端還沒做（501／404／405）、模型服務叫不動（503）或連不上：有備援的就先頂著 */
-      var st = e && e.status;
-      var notReady = st === 501 || st === 503 || st === 405 || (st === 404 && /^Not Found$/i.test(e.message)) ||
-        (!st && e && (e.name === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(e.message)));
-      if (notReady && FALLBACK[name]) return FALLBACK[name](args);
+      /* ⚠️ 只有 503（模型服務叫不動）才用前端的備援。
+         501 還沒做、405、404、連不上一律照實壞掉——後端沒做，前端就該做不到。
+         讓備援也頂 501 的話，畫面上看得到效果，驗收時分不出哪幾支真的接好了。
+         503 不一樣：模型那端掛掉是上線後真的會發生的事，這時候還能用規則記帳是對的。 */
+      if (e && e.status === 503 && FALLBACK[name]) return FALLBACK[name](args);
       throw e;
     }).then(function (res) {
       if (LOOKUP_STALE.indexOf(name) >= 0) { LOOKUP.cats = null; LOOKUP.people = null; }
@@ -3219,6 +3316,16 @@
           var bad = new Error('回應少了 ' + lack.join('、') + '｜出錯的函式：' + where(name));
           bad.kind = 'shape';
           throw bad;
+        }
+      }
+      /* 最上層的 key 都在了，再看清單裡每一筆對不對。⚠️ 要在 fillIn 之前——
+         fillIn 補的是 catName、userName 那些前端算得出來的，檢查的是後端回的原樣。 */
+      if (ROWS[name]) {
+        var wrong = checkRows(res, ROWS[name]);
+        if (wrong) {
+          var bad2 = new Error('回應形狀不對：' + wrong + '｜出錯的函式：' + where(name));
+          bad2.kind = 'shape';
+          throw bad2;
         }
       }
       return fillIn(name, res);

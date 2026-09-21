@@ -603,6 +603,7 @@ def test_前端沒有呼叫不存在的函式():
         "frontend/js/app.js",
         "frontend/js/api.js",
         "frontend/js/notify.js",
+        "frontend/js/errbox.js",
         "frontend/js/data.js",
         "frontend/js/stars.js",
     ):

@@ -55,16 +55,35 @@ def test_後端只給_id_名字由前端從分類與家庭成員補上(run):
     assert run["budget"] == {"pct": 1.05, "over": True, "catName": "餐飲"}
 
 
-def test_解析_建議_登入裝置在後端還沒做的時候由前端頂著(run):
+def test_只有_503_叫不動的時候由前端頂著(run):
+    """備援只保留「服務暫時叫不動」這一種，那是上線後真的會發生的事。"""
     # cats：規則解析出來的是 data.js 的代號，要對回後端的分類 id（1 = 餐飲、2 = 交通）
     assert run["nlpFallback"] == {"fallback": True, "amounts": [55, 1200], "cats": ["1", "2"]}
     assert run["adviceFallback"]["fallback"] is True and run["adviceFallback"]["count"] > 0
     assert run["sessionsFallback"] == {"fallback": True, "count": 1}
-
-
-def test_模型服務叫不動_503_也由前端頂著(run):
     assert run["modelDown"]["fallback"] is True and run["modelDown"]["amount"] == 120, run["modelDown"]
     assert run["modelDown"]["cat"] == "1", "備援的分類也要對回後端的 id"
+
+
+def test_那一支還沒做_501_就算有備援也不頂著(run):
+    """後端沒做，前端就該做不到。
+
+    以前 501 也會走備援，畫面上看得到效果——驗收時分不出哪幾支真的接好了。
+    現在只有 503 會頂，501 一律照實壞掉，而且講出是哪一支、誰負責。
+    """
+    e = run["notReadyNoFallback"]
+    assert e.get("fallback") is None, "501 不該回備援的結果：%s" % e
+    assert e["kind"] == "backend" and e["fn"] == "API.nlpParseBatch"
+    assert e["owner"] == owner_of("POST", "/api/nlp/parse-batch").label
+    assert "HTTP 501" in e["error"]
+
+
+def test_清單裡每一筆的型別不對_也要當成回應不正確(run):
+    """SHAPE 只看最上層的 key 在不在；裡面回錯型別要靠逐筆檢查抓。"""
+    e = run["txBadShape"]
+    assert e["kind"] == "shape" and e["fn"] == "API.transactions"
+    assert "transactions 第 1 筆的 amount 應該是數字" in e["error"]
+    assert "｜出錯的函式：API.transactions（GET /api/transactions" in e["error"]
 
 
 def test_沒有備援的_501_講出是哪一支_哪條路由_誰負責_而且不重複(run):
@@ -73,7 +92,7 @@ def test_沒有備援的_501_講出是哪一支_哪條路由_誰負責_而且不
     assert e["kind"] == "backend" and e["fn"] == "API.createCategory"
     assert e["route"] == "POST /api/categories" and e["owner"] == owner
     assert e["error"].count("後端還沒做這一支") == 1
-    assert e["error"] == "後端還沒做這一支｜出錯的函式：API.createCategory（POST /api/categories，%s）" % owner
+    assert e["error"] == "後端還沒做這一支（HTTP 501）｜出錯的函式：API.createCategory（POST /api/categories，%s）" % owner
 
 
 def test_形狀不對_伺服器錯誤_連不上_各自有自己的說法(run):
@@ -189,6 +208,33 @@ def test_前端送的主體與查詢參數_後端的模型都收得下(sent):
             if model.model_config.get("extra") == "forbid" and set(body) - set(model.model_fields):
                 problems.append("%s 多送了 %s，%s 不收多的欄位" % (key, sorted(set(body) - set(model.model_fields)), model.__name__))
     assert not problems, "\n".join(problems)
+
+
+def test_mock_回的每一筆都過得了逐筆檢查(sent):
+    """mock 是這份契約的參考實作：它過不了，就是 ROWS 寫錯了或 mock 少回欄位。
+
+    兩邊都由 api.js 的同一段 checkRows 檢查，所以這裡紅燈只有兩種可能——
+    ROWS 要求了契約沒有的欄位，或 mock 真的漏了。
+    """
+    shape_errors = []
+    lists = {}
+    for key, rows in sent.items():
+        for row in rows:
+            r = row.get("response")
+            if not isinstance(r, dict):
+                continue
+            if "ERROR" in r and "形狀" in str(r["ERROR"]):
+                shape_errors.append("API.%s：%s" % (row["fn"], r["ERROR"]))
+            for k, v in r.items():
+                if isinstance(v, list):
+                    lists[row["fn"]] = max(lists.get(row["fn"], 0), len(v))
+    assert not shape_errors, "\n".join(shape_errors)
+
+    # 清單都是空的話，檢查等於沒跑。這幾支一定要走到有資料的狀態。
+    must = ["transactions", "categories", "groups", "budgets", "members",
+            "advices", "notifications", "audit", "adminUsers", "nlpParseBatch"]
+    empty = [f for f in must if not lists.get(f)]
+    assert not empty, "這幾支在 mock 走過時清單是空的，逐筆檢查等於沒跑：%s" % empty
 
 
 def test_每一支的路徑參數都有宣告_文件頁試打得了():

@@ -28,6 +28,7 @@ final_project/
 │   │   ├── app.js           畫面繪製與互動
 │   │   ├── data.js          資料表草案與固定清單（分類、主題、角色）。沒有假資料
 │   │   ├── notify.js        通知鈴鐺
+│   │   ├── errbox.js        錯誤匣：後端沒給出正確結果的每一支
 │   │   └── stars.js         canvas 星空背景
 │   └── docs/                說明文件（也是靜態頁）
 │       ├── index.html       專題手冊

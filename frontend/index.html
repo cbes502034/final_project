@@ -30,9 +30,9 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/tokens.css?v=159">
-<link rel="stylesheet" href="css/app.css?v=159">
-<link rel="stylesheet" href="css/themes.css?v=159">
+<link rel="stylesheet" href="css/tokens.css?v=160">
+<link rel="stylesheet" href="css/app.css?v=160">
+<link rel="stylesheet" href="css/themes.css?v=160">
 </head>
 <body>
 
@@ -122,10 +122,15 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="js/stars.js?v=159"></script>
-<script src="js/data.js?v=159"></script>
-<script src="js/api.js?v=159"></script>
-<script src="js/notify.js?v=159"></script>
-<script src="js/app.js?v=159"></script>
+<!-- 錯誤匣：這一輪操作裡，後端沒給出正確結果的每一支（函式、路由、狀態碼、負責人）。
+     只有真的有錯才會出現；業務錯誤（403、409、422…）不算，見 js/errbox.js。 -->
+<div class="eb" id="errbox" hidden></div>
+
+<script src="js/stars.js?v=160"></script>
+<script src="js/data.js?v=160"></script>
+<script src="js/errbox.js?v=160"></script>
+<script src="js/api.js?v=160"></script>
+<script src="js/notify.js?v=160"></script>
+<script src="js/app.js?v=160"></script>
 </body>
 </html>
