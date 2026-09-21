@@ -18,6 +18,8 @@ from decimal import Decimal
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-at-least-32-bytes-long")
 
+import io
+
 import pytest  # noqa: E402
 
 from app.toolkit import (  # noqa: E402
@@ -125,6 +127,39 @@ def test_太弱的密碼會被擋():
         passwords.hash_password("123")            # 太短
     with pytest.raises(passwords.WeakPassword):
         passwords.hash_password("12345678")       # 全部都是數字
+    with pytest.raises(passwords.WeakPassword):
+        passwords.hash_password("a" * 73)         # 超過 bcrypt 的 72 位元組
+
+
+def test_不要再用_passlib():
+    """passlib 2020 年之後就沒更新了，而且跟新版 bcrypt 不相容。
+
+    它第一次使用時會拿一個超過 72 位元組的樣本去雜湊來偵測後端，
+    bcrypt 4.1 之後那會直接丟 ValueError——於是每一支碰到密碼的路由都 500。
+    討厭的是舊環境（bcrypt 3.x）完全正常，只有**全新安裝**的人才會踩到，
+    也就是每一位剛 clone 下來的組員，還有 CI。
+    """
+    import os
+
+    req = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "requirements.txt")
+    # 只看真的會裝的那些行，註解裡提到 passlib 是在說「不要用」，不算
+    installs = [ln.split("#")[0].strip() for ln in io.open(req, encoding="utf-8")]
+    assert not [ln for ln in installs if "passlib" in ln], "requirements.txt 又把 passlib 裝回來了"
+    code = io.open(passwords.__file__, encoding="utf-8").read()
+    assert "from passlib" not in code and "import passlib" not in code
+
+
+def test_匯入舊資料時超長密碼不會爆():
+    """check=False 是給匯入既有資料用的，那時候拿得到超長的密碼。
+
+    bcrypt 4.1 之後超過 72 位元組會丟例外，所以我們自己先切。
+    切了之後驗證也要切一樣，不然自己存進去的自己驗不過。
+    """
+    long_one = "a" * 200
+    h = passwords.hash_password(long_one, check=False)
+    assert passwords.verify_password(long_one, h) is True
+    assert passwords.verify_password("a" * 72, h) is True      # 切完是同一個
+    assert passwords.verify_password("b" * 200, h) is False
 
 
 # ===========================================================================

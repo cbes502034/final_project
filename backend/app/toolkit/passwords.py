@@ -1,5 +1,5 @@
 """
-密碼雜湊。包住 passlib，你不用讀它的文件。
+密碼雜湊。包住 bcrypt，你不用讀它的文件。
 
 ===========================================================================
 密碼為什麼不能直接存
@@ -27,14 +27,19 @@ bcrypt 還有兩個特性值得知道：
 
 from __future__ import annotations
 
-from passlib.context import CryptContext
+import bcrypt
 
 __all__ = ["WeakPassword", "hash_password", "verify_password", "check_strength"]
 
-# schemes 排最前面的是「新密碼用哪個演算法」，
-# 後面的是「舊密碼還認得，驗證通過後自動升級」。
-# 現在只有 bcrypt，之後要換演算法時這個機制會很有用。
-_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# ⚠️ 這裡刻意**直接用 bcrypt**，不透過 passlib。
+#
+# passlib 1.7.4（2020 年之後就沒再更新）在第一次使用時會做一次後端偵測：
+# 它拿一個超過 72 位元組的樣本去雜湊，藉此判斷這個後端會不會默默截斷。
+# bcrypt 4.1 之後改成**直接丟 ValueError**，那次偵測就會炸掉，
+# 於是每一支碰到密碼的路由都變成 500。
+#
+# 這個坑的討厭之處在於：舊環境（bcrypt 3.x）完全正常，只有**全新安裝**
+# 的人才會踩到——也就是每一位剛 clone 下來的組員，還有 CI。
 
 # bcrypt 只看密碼的前 72 個 byte，超過的部分會被默默忽略。
 # 不擋的話，使用者設了 100 個字的密碼，其實只有前 72 byte 有效——
@@ -119,7 +124,10 @@ def hash_password(password: str, *, check: bool = True) -> str:
     """
     if check:
         check_strength(password)
-    return _ctx.hash(password)
+    # check=False 時可能拿到超長的密碼（匯入舊資料）。bcrypt 4.1 之後超過 72
+    # 位元組會丟例外，所以自己先切——切在哪裡不重要，重要的是驗證時切一樣。
+    raw = password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+    return bcrypt.hashpw(raw, bcrypt.gensalt()).decode("ascii")
 
 
 def verify_password(password: str, hashed: str) -> bool:
@@ -145,7 +153,7 @@ def verify_password(password: str, hashed: str) -> bool:
         False
 
     注意
-        passlib 內部用的是**定時比較**，避免攻擊者從回應時間的
+        bcrypt.checkpw 內部用的是**定時比較**，避免攻擊者從回應時間的
         微小差異推測密碼。所以不要自己改成 `==`。
 
         ⚠️ 登入路由要記得：**帳號不存在和密碼錯誤要回一樣的訊息**
@@ -155,6 +163,7 @@ def verify_password(password: str, hashed: str) -> bool:
     if not password or not hashed:
         return False
     try:
-        return _ctx.verify(password, hashed)
+        return bcrypt.checkpw(password.encode("utf-8")[:_BCRYPT_MAX_BYTES],
+                              hashed.encode("utf-8"))
     except Exception:  # noqa: BLE001 — 雜湊格式壞掉一律當成驗證失敗
         return False

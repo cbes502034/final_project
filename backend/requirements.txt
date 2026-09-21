@@ -15,7 +15,9 @@ psycopg[binary]>=3.2,<4
 
 # --- 認證 ---
 pyjwt>=2.10,<3
-passlib[bcrypt]>=1.7,<2
+bcrypt>=4.1,<6                    # ⚠️ 不要換回 passlib：它 2020 年之後沒更新，
+                                  #    後端偵測會拿 >72 位元組的樣本去雜湊，
+                                  #    bcrypt 4.1 之後會丟例外，全新安裝的人都會踩到
 python-multipart>=0.0.20          # 表單登入用
 
 # --- 模型 ---
