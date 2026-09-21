@@ -6,6 +6,7 @@
     python -m app.cli init-db             建表（本機、測試用）＋ 放入系統預設分類
     python -m app.cli make-admin [email]  把帳號設成平台管理員（不給 email 就用 ADMIN_EMAILS）
     python -m app.cli db [SQL]            看資料庫：不給 SQL 就列出每張表有幾筆
+    python -m app.cli seed-team           建立四位成員的開發用帳號（只在本機，正式環境會拒絕）
 
 負責人：成員1（共用元件）
 
@@ -95,6 +96,67 @@ def make_admin(email: str | None) -> int:
     return 0
 
 
+#: 四位成員的開發用帳號。帳號＝路由資料夾的名字，四個人共用同一組密碼。
+#: ⚠️ 密碼不能是「12345678」：toolkit/passwords.check_strength 擋全部都是數字的密碼
+#:    （長度 ≥ 8 而且不可全數字）。那是產品規則，不為了測試帳號放寬。
+TEAM_PASSWORD = "abcd1234"
+
+TEAM: list[tuple[str, str, str]] = [
+    ("auth", "成員一", "成員1 · 認證"),
+    ("ledger", "成員二", "成員2 · 記帳"),
+    ("analytics", "成員三", "成員3 · 數字"),
+    ("access", "成員四", "成員4 · 家庭"),
+    ("admin", "管理員", "平台管理員（測 admin/ 那三支用）"),
+]
+TEAM_DOMAIN = "fambudget.tw"
+
+
+def seed_team() -> int:
+    """建立（或重設）四位成員的開發用帳號。
+
+    ⚠️ **只給本機開發用。** 密碼是公開寫在文件裡的，正式環境有這種帳號等於沒有密碼，
+       所以 APP_ENV=production 時直接拒絕。
+
+    可以重複跑：帳號已經在了就把密碼重設回來（有人改過密碼、忘了密碼時很好用）。
+    """
+    from datetime import datetime, timezone
+
+    from app.models import User
+    from app.toolkit import crud, passwords
+    from app.toolkit.config import settings
+
+    if settings.app_env == "production":
+        _say("APP_ENV=production，不建立開發用帳號。")
+        return 1
+
+    rows = []
+    for key, name, role in TEAM:
+        email = "%s@%s" % (key, TEAM_DOMAIN)
+        password = TEAM_PASSWORD
+        data = {
+            "display_name": name,
+            "password_hash": passwords.hash_password(password),
+            "theme": "paper",
+            "is_platform_admin": key == "admin",
+            "suspended_at": None,
+            "suspended_reason": None,
+            # 設過了就不用走註冊後的個人化設定，登入直接進總覽
+            "onboarded_at": datetime.now(timezone.utc),
+        }
+        before = crud.get(User, where={"email": email})
+        crud.save(User, dict(data, email=email), where={"email": email}, upsert=True)
+        rows.append((email, password, name, role, "已存在，重設密碼" if before else "新建"))
+
+    width = max(len(e) for e, *_ in rows)
+    _say("開發用帳號（只在你這台機器上）：\n")
+    _say("  %-*s  %-16s  %-6s  %s" % (width, "帳號", "密碼", "名字", "誰用"))
+    _say("  %s" % ("-" * (width + 46)))
+    for email, password, name, role, what in rows:
+        _say("  %-*s  %-16s  %-6s  %s（%s）" % (width, email, password, name, role, what))
+    _say("\n拿去登入前端，或在 /docs 上按 Authorize。密碼忘了就再跑一次這個指令。")
+    return 0
+
+
 def db(sql: str | None) -> int:
     """看自己剛剛寫進去的資料長什麼樣子。
 
@@ -146,6 +208,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("init-db", help="建表＋系統預設分類")
     p = sub.add_parser("make-admin", help="設定平台管理員")
     p.add_argument("email", nargs="?")
+    sub.add_parser("seed-team", help="建立四位成員的開發用帳號")
     p = sub.add_parser("db", help="看資料庫（只能查）")
     p.add_argument("sql", nargs="?", help='例如 "SELECT id, email FROM users"；不給就列出每張表幾筆')
     args = ap.parse_args(argv)
@@ -155,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         return check_config()
     if args.cmd == "init-db":
         return init_db()
+    if args.cmd == "seed-team":
+        return seed_team()
     if args.cmd == "db":
         return db(args.sql)
     return make_admin(args.email)

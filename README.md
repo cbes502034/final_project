@@ -50,7 +50,7 @@ final_project/
 │   │   ├── models/          20 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/         請求主體（Pydantic，一個檔案一個主人）
 │   │   ├── routers/         70 支路由，**一個領域一個資料夾**；還沒做的回 501
-│   │   │   ├── auth/        成員1 · 認證
+│   │   │   ├── auth/        成員1 · 認證（登入那幾支已經做好）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/      成員2 · 記帳
 │   │   │   ├── analytics/   成員3 · 數字
 │   │   │   └── access/      成員4 · 家庭
@@ -61,7 +61,7 @@ final_project/
 │   │       └── evaluation.py    評測指標
 │   ├── alembic/             資料庫遷移（第一版 = 20 張表）
 │   ├── tests/               含 routes/：每一支路由的驗收測試（說明裡的寫法也跑一遍）
-│   ├── tools/               文件從程式產生：sync_spec.py · sync_schema.py · sync_mindmap.py
+│   ├── tools/               文件從程式產生：sync_spec.py · sync_schema.py · sync_mindmap.py · sync_devguide.py
 │   ├── .env.example         設定範本，依成員分段
 │   ├── requirements.txt
 │   ├── Dockerfile
@@ -96,6 +96,19 @@ python run.py
 | 前端 | <http://localhost:5174/?api=http://localhost:8000> |
 | 後端 | <http://localhost:8000> |
 | API 文件（可以直接試打） | <http://localhost:8000/docs> |
+
+**開發用帳號**（`run.py` 會自動建好，密碼一律 `abcd1234`）：
+
+| 帳號 | 誰用 |
+|---|---|
+| `auth@fambudget.tw` | 成員1 · 認證 |
+| `ledger@fambudget.tw` | 成員2 · 記帳 |
+| `analytics@fambudget.tw` | 成員3 · 數字 |
+| `access@fambudget.tw` | 成員4 · 家庭 |
+| `admin@fambudget.tw` | 平台管理員 |
+
+密碼改壞了就 `cd backend && python -m app.cli seed-team` 重設。
+⚠️ 只在自己的電腦上：`APP_ENV=production` 時那個指令會直接拒絕。
 
 其他用法：
 

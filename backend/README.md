@@ -66,6 +66,7 @@ backend/
 │   ├── models/            ← 資料庫長什麼樣（SQLAlchemy，20 張表，跟 data.js 的 schema 逐欄對齊）
 │   ├── schemas/           ← API 收什麼（Pydantic），欄位名字跟前端送的一樣
 │   ├── routers/           ← 路由。**一個領域一個資料夾，開自己那一個就好**
+│   │                        每個資料夾裡都有 README.md，寫你那一塊怎麼開發
 │   │   ├── auth/            成員1 · 認證     auth.py、admin.py
 │   │   ├── ledger/          成員2 · 記帳     transactions.py、nlp.py、categories.py、groups.py
 │   │   ├── analytics/       成員3 · 數字     stats.py、budgets.py、alerts.py、advices.py
@@ -76,7 +77,7 @@ backend/
 ├── alembic/               ← 資料庫結構的版本控制（versions/ 第一版就是 20 張表）
 ├── alembic.ini            ← ⚠️ 只能有英文（Windows 的 alembic 用 cp950 讀它）
 ├── tests/                 ← pytest；fixtures/ 放測試用的一家人與假後端
-├── tools/                 ← sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生
+├── tools/                 ← sync_spec.py、sync_schema.py、sync_mindmap.py、sync_devguide.py：文件從程式產生
 ├── requirements.txt
 ├── Dockerfile             ← 啟動前先 alembic upgrade head
 └── .env.example           ← 設定範本，依成員分段，機密一律留空

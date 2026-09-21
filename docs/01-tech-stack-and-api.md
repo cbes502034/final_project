@@ -154,7 +154,7 @@ final_project/
 │   │   ├── models/              20 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
 │   │   ├── routers/             70 支路由，一個領域一個資料夾。還沒做的回 501
-│   │   │   ├── auth/            成員1 · 認證（auth.py、admin.py）
+│   │   │   ├── auth/            成員1 · 認證（auth.py、admin.py）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/          成員2 · 記帳（transactions、nlp、categories、groups）
 │   │   │   ├── analytics/       成員3 · 數字（stats、budgets、alerts、advices）
 │   │   │   ├── access/          成員4 · 家庭（family、notifications）
@@ -168,7 +168,7 @@ final_project/
 │   │       └── evaluation.py    模型評測指標
 │   ├── alembic/                 資料庫遷移（versions/ 第一版就是 20 張表）
 │   ├── tests/                   pytest（routes/：每一支路由的驗收測試；fixtures/：假後端）
-│   ├── tools/                   sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生
+│   ├── tools/                   sync_spec.py、sync_schema.py、sync_mindmap.py、sync_devguide.py：文件從程式產生
 │   ├── requirements.txt
 │   ├── Dockerfile               啟動前先 alembic upgrade head
 │   └── .env.example             設定範本，依成員分段

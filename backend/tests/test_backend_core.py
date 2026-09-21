@@ -607,12 +607,30 @@ def test_每一支還沒做的路由都寫著自己的路徑與負責人():
 
 
 def test_進度表把還沒做的算成待辦():
+    """待辦＝還標著 @stub 的那些，一支不多一支不少。
+
+    ⚠️ 這裡刻意**不**寫死「現在有幾支還沒做」——那個數字每做完一支就會變，
+       寫死的話每個人做完自己的路由都要回來改測試。
+       要檢查的是「算法對不對」：有 @stub 的算待辦、拿掉了就算完成。
+    """
+    from app.main import app
     from app.ownership import progress
+    from app.routers._stub import is_stub
 
     p = progress()
-    total = sum(len(v["done"]) + len(v["todo"]) for v in p.values())
-    assert total == 70
-    assert sum(len(v["todo"]) for v in p.values()) == 70     # 目前全部都還是 @stub
+    done = {r for v in p.values() for r in v["done"]}
+    todo = {r for v in p.values() for r in v["todo"]}
+    assert len(done) + len(todo) == 70
+    assert not (done & todo), "同一支不可以同時算完成又算待辦"
+
+    still_stub = set()
+    for route in app.routes:
+        endpoint = getattr(route, "endpoint", None)
+        if not getattr(route, "path", "").startswith("/api") or not is_stub(endpoint):
+            continue
+        for verb in (getattr(route, "methods", None) or set()) - {"HEAD", "OPTIONS"}:
+            still_stub.add((verb, route.path))
+    assert todo == still_stub, sorted(todo ^ still_stub)
 
 
 # ===========================================================================

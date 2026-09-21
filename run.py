@@ -13,8 +13,9 @@
     2. 套件沒裝好就 pip install -r backend/requirements.txt
     3. backend/.env 不存在就建出來（順便產生 JWT_SECRET）
     4. alembic upgrade head    建表
-    5. python -m app.cli init-db   放入系統預設分類
-    6. 同時起 uvicorn（後端）與一個靜態伺服器（前端），印出網址
+    5. python -m app.cli init-db     放入系統預設分類
+    6. python -m app.cli seed-team   建立四位成員的開發用帳號（密碼都是 abcd1234）
+    7. 同時起 uvicorn（後端）與一個靜態伺服器（前端），印出網址
 
 ⚠️ 前端不要用 VS Code 的 Live Server 或直接點開 index.html：
    那樣後端的 CORS 會擋住（來源對不上），而且 file:// 不算 localhost。
@@ -281,8 +282,9 @@ def main() -> None:
                 "  最常見的原因是 backend/.env 的 DATABASE_URL 指到一顆沒開的 PostgreSQL。\n"
                 "  本機不用 PostgreSQL 的話，把那一行改成：DATABASE_URL=sqlite:///./dev.db")
 
-    step(4, total, "放入系統預設分類")
+    step(4, total, "放入系統預設分類與開發用帳號")
     run_cli("-m", "app.cli", "init-db", why="建立預設分類 ")
+    run_cli("-m", "app.cli", "seed-team", why="建立開發用帳號 ")
 
     step(5, total, "啟動")
     httpd = serve_frontend(args.port)
@@ -302,6 +304,9 @@ def main() -> None:
     say("  第一次打開請用上面那一行**完整的**前端網址（帶 ?api=…）——")
     say("  它會把「要連哪個後端」記在這台瀏覽器裡，之後開 %s 就好。" % front_url)
     say("  要切回 mock（不連後端）：%s/?api=" % front_url)
+    say("")
+    say("  登入用上面印出來的那五個帳號，密碼都是 abcd1234。")
+    say("  忘記或改壞了：cd backend && python -m app.cli seed-team")
     say("")
     say("  停止：Ctrl+C")
     say("=" * 62)

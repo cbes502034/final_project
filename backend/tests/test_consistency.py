@@ -25,6 +25,7 @@ import glob
 import io
 import os
 import re
+import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -3009,6 +3010,21 @@ def test_RESTful_說明書逐支檢查的清單就是現在的路由():
     assert not dup, "出現不只一次：%s" % dup
     assert set(found) == set(own), "少了：%s" % sorted(set(own) - set(found))
     assert "誠實檢查我們自己的 %d 支" % len(own) in sec
+
+
+def test_四份開發說明跟_ownership_沒有走散():
+    """app/routers/<領域>/README.md 由 tools/sync_devguide.py 產生。
+
+    四份的「怎麼啟動、怎麼測試、怎麼看資料」是同一件事，手寫四份一定會走散：
+    有人改了啟動指令，只會記得改自己在看的那一份。所以改完 ownership.py 或那支工具，
+    要重跑一次把四份重新產生出來。
+    """
+    import subprocess
+
+    out = subprocess.run(
+        [sys.executable, os.path.join(REPO, "backend", "tools", "sync_devguide.py"), "--check"],
+        capture_output=True, cwd=REPO)
+    assert out.returncode == 0, out.stdout.decode("utf-8", "replace")
 
 
 def test_稽核動作都要有中文對照():
