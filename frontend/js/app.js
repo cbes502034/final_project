@@ -2548,12 +2548,16 @@
     });
   }
 
+  /* 稽核紀錄的動作 → 中文。⚠️ 後端寫進 audit_logs 的每一種 action 都要在這裡有一行，
+     漏了的話管理頁會直接顯示英文代號（例如 verify_password_failed），看的人不知道那是什麼。 */
   var AUDIT_TW = {
     suspend_user: '停權帳號', unsuspend_user: '解除停權',
     grant_guardianship: '建立監管關係', end_guardianship: '解除監管',
     change_role: '變更角色', create_family: '建立家庭', view_ward: '查看被監管者',
     invite_member: '邀請家人', join_family: '加入家庭',
-    remove_member: '移出家庭', leave_family: '退出家庭', remove_group: '移除帳本'
+    remove_member: '移出家庭', leave_family: '退出家庭', remove_group: '移除帳本',
+    dissolve_family: '解散家庭', change_password: '改密碼', reset_password: '重設密碼',
+    verify_password_failed: '密碼確認失敗', lookup_user: '用帳號找人'
   };
 
   /* ---------- 共用 ---------- */

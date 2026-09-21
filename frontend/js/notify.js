@@ -162,7 +162,8 @@
   }
 
   function line(n) {
-    /* 兩種通知：子女記帳、支出跨過門檻。
+    /* 三種通知：監管對象記帳（ward_transaction）、有開通知的帳本有人記帳（group_transaction）、
+       支出跨過門檻（budget_alert）。前兩種畫面上長一樣。
        ⚠️ 型別要用 type 判斷，不要靠「有沒有 actorName」猜——
        之後多一種通知，猜的那套就會壞。 */
     if (n.type === 'budget_alert') {
@@ -170,12 +171,14 @@
          ⚠️ 兩個一起顯示時要講清楚誰是誰——
          只寫門檻再附上金額，讀起來會像「12,800 是 5,000 的 90%」。 */
       var hit = n.reached != null ? n.reached : n.percent;
+      /* ⚠️ 可支配上限 = 收入 − 每月想存，**可能是 0 或負數**（這本帳還沒有收入、或目標訂得比收入高）。
+         直接寫「可支配 NT$ -5,000」讀起來像系統算錯，所以那種情況改講原因。 */
+      var money2 = n.allowance > 0
+        ? money(n.spent) + ' / 可支配 ' + money(n.allowance)
+        : money(n.spent) + '・這個月還沒有收入進來，可支配是 0';
       return esc(n.groupName || '整體') + ' 已用掉可支配額度的 <b>' + esc(hit) + '%</b>' +
         '（超過你設的 ' + esc(n.percent) + '%）' +
-        (n.spent != null
-          ? '<br><span class="bell__n2">' + money(n.spent) + ' / 可支配 ' +
-            money(n.allowance) + '</span>'
-          : '');
+        (n.spent != null ? '<br><span class="bell__n2">' + money2 + '</span>' : '');
     }
     var who = esc(n.actorName || '家人');
     var what = esc(n.catName || '一筆');

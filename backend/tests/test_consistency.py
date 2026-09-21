@@ -3008,3 +3008,19 @@ def test_RESTful_說明書逐支檢查的清單就是現在的路由():
     assert not dup, "出現不只一次：%s" % dup
     assert set(found) == set(own), "少了：%s" % sorted(set(own) - set(found))
     assert "誠實檢查我們自己的 %d 支" % len(own) in sec
+
+
+def test_稽核動作都要有中文對照():
+    """後端寫進 audit_logs 的每一種 action，平台管理頁都要顯示得出中文。
+
+    漏掉的話畫面會直接印英文代號（verify_password_failed 這種），看的人不知道那是什麼——
+    而且是「多做一支路由就多一種 action」的地方，靠人記得去補一定會漏。
+    """
+    actions = set()
+    for path in glob.glob(os.path.join(REPO, "backend", "app", "routers", "*.py")):
+        actions |= set(re.findall(r'"action": "([a-z_]+)"', io.open(path, encoding="utf-8").read()))
+    assert actions, "路由裡找不到任何 audit_logs 的 action"
+    block = re.search(r"var AUDIT_TW = \{(.*?)\};", read("frontend/js/app.js"), re.S).group(1)
+    known = set(re.findall(r"(\w+):", block))
+    missing = sorted(actions - known)
+    assert not missing, "frontend/js/app.js 的 AUDIT_TW 少了：%s" % missing
