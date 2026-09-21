@@ -1675,10 +1675,14 @@
     API.invites().then(function (inv) {
       box.innerHTML = inv.codes.length
         ? inv.codes.map(function (c) {
+            /* ⚠️ 真後端只存邀請碼的雜湊，拿不回明碼（code 是 null）：
+               這裡顯示遮起來的樣子、不給複製鈕，明碼只在產生的當下出現一次。 */
+            var open = !!c.code;
             return '<div class="code">' +
-              '<div class="code__v" aria-label="邀請碼">' + esc(c.code) + '</div>' +
-              '<div class="code__m">' + roleTW(c.role) + '　·　' + shortDate(c.expiresAt) + '前有效　·　只能用一次</div>' +
-              '<button class="btn btn--sm" data-copy="' + esc(c.code) + '">複製</button>' +
+              '<div class="code__v" aria-label="邀請碼">' + (open ? esc(c.code) : '••••-••••') + '</div>' +
+              '<div class="code__m">' + roleTW(c.role) + '　·　' + shortDate(c.expiresAt) + '前有效　·　只能用一次' +
+                (open ? '' : '　·　碼只在產生當下顯示，忘了就重新產生一組') + '</div>' +
+              (open ? '<button class="btn btn--sm" data-copy="' + esc(c.code) + '">複製</button>' : '') +
             '</div>';
           }).join('')
         : '<p class="invp__hint">產生之後傳給家人，他在「家庭」頁輸入就能加入。</p>';

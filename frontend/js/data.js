@@ -377,7 +377,7 @@ window.DATA = {
       cols: [['id', 'BIGSERIAL', 'PK'],
              ['recipient_id', 'BIGINT', 'FK → users，收件人。查詢一律 WHERE recipient_id = 我'],
              ['actor_id', 'BIGINT', 'FK → users，做這件事的人。系統發的為 NULL'],
-             ['type', 'TEXT', "'ward_transaction' / 'budget_alert'"],
+             ['type', 'TEXT', "'ward_transaction'（監管對象記帳）/ 'group_transaction'（帳本有開通知）/ 'budget_alert'（跨過提醒門檻）"],
              ['transaction_id', 'BIGINT', 'FK → transactions，非記帳類通知為 NULL。⚠️ UNIQUE (recipient_id, transaction_id)：同一筆對同一個人只發一則'],
              ['payload_json', 'JSONB', '提醒類通知放門檻百分比、帳本、金額'],
              ['read_at', 'TIMESTAMPTZ', 'NULL = 未讀。紅點數字就是數這個'],

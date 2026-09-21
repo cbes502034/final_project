@@ -1918,7 +1918,8 @@
         var keys = Object.keys(p);
         if (!keys.length) throw oops('沒有要改的欄位', 400);
         var unknown = keys.filter(function (k) { return TX_EDITABLE.indexOf(k) < 0; });
-        if (unknown.length) throw oops('不認得的欄位：' + unknown.join('、'), 400);
+        // 真後端由 TransactionPatchIn 的 extra="forbid" 擋，FastAPI 回 422——這裡跟它一致
+        if (unknown.length) throw oops('不認得的欄位：' + unknown.join('、'), 422);
 
         var next = {};
         if ('amount' in p) {
@@ -3057,6 +3058,19 @@
     return Promise.all(jobs);
   }
   function catName(id) { return ((LOOKUP.cats || []).filter(function (c) { return c.id === id; })[0] || {}); }
+
+  /* 前端規則解析出來的分類是 data.js 的代號（C01…），真後端的分類 id 不一樣（1、2…）。
+     ⚠️ 不對回去的話，記帳頁那一格的下拉選單找不到值，會停在第一個分類——
+        使用者以為選好了，送出去的卻是別的分類，而且不會有任何錯誤訊息。
+     用「名稱＋收支」對回後端的 id；對不到就留著原樣（mock 模式本來就是同一組代號）。 */
+  function toBackendCat(id) {
+    var local = (global.DATA.categories || []).filter(function (c) { return c.id === id; })[0];
+    if (!local) return id;
+    var hit = (LOOKUP.cats || []).filter(function (c) {
+      return c.name === local.name && c.kind === local.kind;
+    })[0];
+    return hit ? hit.id : id;
+  }
   function personName(id) { return ((LOOKUP.people || []).filter(function (m) { return m.id === id; })[0] || {}).name || ''; }
 
   function needsNames(list, keys) {
@@ -3115,18 +3129,25 @@
 
   /* 後端還沒做這一支（或連不上）時，前端先頂著。回傳 null = 這一支沒有備援，照常報錯 */
   var FALLBACK = {
+    /* ⚠️ 規則解析出來的 cat 要先對回後端的分類 id（toBackendCat），所以這兩支都先 lookups() */
     nlpParse: function (args) {
       var t = String(args[0] || '').trim(), it = parseLine(t);
-      return { raw: t, matched: false, fallback: true,
-        out: { date: it.date, amount: it.amount || 0, kind: it.kind, cat: it.cat, merchant: it.merchant, conf: it.conf.amount, catConf: it.conf.cat },
-        note: '後端的解析還沒接上，先用前端的規則解析。確認寫入還是存到後端。' };
+      return lookups().then(function () {
+        return { raw: t, matched: false, fallback: true,
+          out: { date: it.date, amount: it.amount || 0, kind: it.kind, cat: toBackendCat(it.cat),
+                 merchant: it.merchant, conf: it.conf.amount, catConf: it.conf.cat },
+          note: '後端的解析還沒接上，先用前端的規則解析。確認寫入還是存到後端。' };
+      });
     },
     nlpParseBatch: function (args) {
       var t = String(args[0] || '').trim();
       var items = t.split(/[，,。；;、\n]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 1; })
         .map(function (part, i) { return Object.assign({ seq: i + 1, span: part }, parseLine(part)); });
-      return { raw: t, matched: false, fallback: true, items: items,
-        note: '後端的解析還沒接上，先用前端的規則切分。確認寫入還是存到後端。' };
+      return lookups().then(function () {
+        items.forEach(function (it) { it.cat = toBackendCat(it.cat); });
+        return { raw: t, matched: false, fallback: true, items: items,
+          note: '後端的解析還沒接上，先用前端的規則切分。確認寫入還是存到後端。' };
+      });
     },
     generateAdvices: function (args) {
       var scope = (args[0] || {}).scope === 'family' ? 'family' : 'me';

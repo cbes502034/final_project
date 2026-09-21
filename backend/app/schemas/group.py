@@ -23,10 +23,12 @@ class GroupIn(BaseModel):
 
 
 class GroupPatchIn(BaseModel):
+    """只送要改的。archived 只收 false（復原封存）；封存本身走 DELETE。"""
     model_config = ConfigDict(extra="forbid")
     name: str | None = Field(default=None, min_length=1, max_length=20)
     color: str | None = None
     note: str | None = None
+    archived: bool | None = Field(default=None, description="只收 false：復原封存")
 
 
 class GroupMemberIn(BaseModel):

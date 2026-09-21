@@ -24,14 +24,18 @@ const res = (status, body) => Promise.resolve({
 const ROUTES = [
   ['POST', '/api/auth/login', () => res(200, { accessToken: 'a', refreshToken: 'r', user: { id: '1', name: '王大同' } })],
   ['GET', '/api/auth/me', () => res(200, { user: { id: '1', name: '王大同' } })],
-  ['GET', '/api/categories', () => res(200, { categories: [{ id: 'C01', name: '餐飲', kind: 'expense', color: 'cat-food' }] })],
+  // ⚠️ id 故意用真後端的樣子（1、2），不是 data.js 的 C01——
+  //    前端規則解析（備援）回來的 cat 要對得回這裡的 id，不然記帳頁那一格會選錯分類
+  ['GET', '/api/categories', () => res(200, { categories: [
+    { id: '1', name: '餐飲', kind: 'expense', color: 'cat-food' },
+    { id: '2', name: '交通', kind: 'expense', color: 'cat-transit' }] })],
   ['POST', '/api/categories', () => res(501, { detail: notReady })],
   ['GET', '/api/family', () => res(200, { me: '1', family: { id: '9', name: '王家' },
     members: [{ id: '1', name: '王大同' }, { id: '2', name: '王小明' }], guardianships: [] })],
   ['GET', '/api/summary', () => res(200, { period: '2026-09', income: 50000, expense: 42000,
-    byCat: [{ cat: 'C01', amount: 42000 }], monthly: [], yearly: [], savings: { goal: 10000 } })],
-  ['GET', '/api/transactions', () => res(200, { transactions: [{ id: '7', user: '2', cat: 'C01', amount: 120, kind: 'expense', date: '2026-09-14' }], total: 1 })],
-  ['GET', '/api/budgets', () => res(200, { budgets: [{ user: '1', cat: 'C01', limit: 40000, used: 42000, period: 'month' }] })],
+    byCat: [{ cat: '1', amount: 42000 }], monthly: [], yearly: [], savings: { goal: 10000 } })],
+  ['GET', '/api/transactions', () => res(200, { transactions: [{ id: '7', user: '2', cat: '1', amount: 120, kind: 'expense', date: '2026-09-14' }], total: 1 })],
+  ['GET', '/api/budgets', () => res(200, { budgets: [{ user: '1', cat: '1', limit: 40000, used: 42000, period: 'month' }] })],
   ['POST', '/api/nlp/parse-batch', () => res(501, { detail: notReady })],
   ['POST', '/api/nlp/parse', () => res(503, { detail: '模型服務還沒接上，先用前端的規則解析' })],
   ['POST', '/api/advices/generate', () => res(501, { detail: notReady })],
@@ -63,9 +67,11 @@ const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e
   const bd = await A.budgets({});
   out.budget = { pct: bd.budgets[0].pct, over: bd.budgets[0].over, catName: bd.budgets[0].catName };
   const para = await A.nlpParseBatch('早餐55，加油一千二');
-  out.nlpFallback = { fallback: para.fallback, amounts: para.items.map(i => i.amount) };
+  out.nlpFallback = { fallback: para.fallback, amounts: para.items.map(i => i.amount),
+    cats: para.items.map(i => i.cat) };
   const one = await settle(A.nlpParse('午餐120'));
-  out.modelDown = { fallback: one.fallback, amount: one.out && one.out.amount, error: one.error };
+  out.modelDown = { fallback: one.fallback, amount: one.out && one.out.amount,
+    cat: one.out && one.out.cat, error: one.error };
   const adv = await settle(A.generateAdvices({ scope: 'me' }));
   out.adviceFallback = { fallback: adv.fallback, count: (adv.advices || []).length, error: adv.error };
   const ss = await A.sessions();

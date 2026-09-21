@@ -19,17 +19,13 @@ import os
 import secrets
 import sys
 
+from app import catalog
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 BACKEND = os.path.dirname(HERE)
 
-#: 系統預設分類。⚠️ 跟 frontend/js/data.js 的 categories 名稱、收支、顏色一致（測試會比對）
-SYSTEM_CATEGORIES = [
-    ("餐飲", "expense", "cat-food"), ("交通", "expense", "cat-transit"), ("居住", "expense", "cat-home"),
-    ("日用品", "expense", "cat-daily"), ("娛樂", "expense", "cat-fun"), ("教育", "expense", "cat-study"),
-    ("醫療", "expense", "cat-health"), ("其他", "expense", "cat-other"),
-    ("薪資", "income", "cat-daily"), ("獎金", "income", "cat-bonus"), ("零用金", "income", "cat-transit"),
-    ("其他收入", "income", "cat-other"),
-]
+#: 系統預設分類：(名稱, 收支, 顏色)。正本在 app/catalog.py（跟 frontend/js/data.js 的 categories 一致，測試會比對）
+SYSTEM_CATEGORIES = [(name, kind, color) for name, kind, color, _icon in catalog.SYSTEM_CATEGORIES]
 
 
 def _say(text: str) -> None:

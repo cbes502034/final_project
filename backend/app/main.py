@@ -30,6 +30,7 @@ FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試�
     ├── routers/     路由，一組一個檔案——每一支都先回 501，守衛與主體模型已經接好
     ├── services/    商業邏輯（analytics 算錢、permission 可見範圍、llm 呼叫模型）
     ├── guards.py    路由守衛（仿 MineMarket 的 AuthDecorator）
+    ├── catalog.py   固定清單（角色、權限表、理財選項、系統分類），正本是 frontend/js/data.js
     ├── cli.py       python -m app.cli：init-env、check-config、init-db、make-admin
     └── toolkit/     已經寫好的工具：config、db、crud（增刪改查）、scope、ledger…
 

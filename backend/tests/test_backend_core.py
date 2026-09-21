@@ -167,13 +167,39 @@ def test_關聯圖上的每一條線都真的有外鍵():
     assert not missing, "關聯圖有畫、models 沒有外鍵：%s" % sorted(missing)
 
 
+def _data_js(name: str):
+    """讀 data.js 裡的一份清單（node 跑一次，拿 JSON 回來）。"""
+    out = subprocess.run(["node", "-e", "global.window={};require(process.argv[1]);"
+                          "process.stdout.write(JSON.stringify(window.DATA[process.argv[2]]))",
+                          os.path.join(REPO, "frontend", "js", "data.js"), name],
+                         capture_output=True, check=True)
+    return json.loads(out.stdout.decode("utf-8"))
+
+
 def test_系統預設分類跟_data_js_一致():
     from app.cli import SYSTEM_CATEGORIES
-    out = subprocess.run(["node", "-e", "global.window={};require(process.argv[1]);"
-                          "process.stdout.write(JSON.stringify(window.DATA.categories))",
-                          os.path.join(REPO, "frontend", "js", "data.js")], capture_output=True, check=True)
-    front = [(c["name"], c["kind"], c["color"]) for c in json.loads(out.stdout.decode("utf-8"))]
+    front = [(c["name"], c["kind"], c["color"]) for c in _data_js("categories")]
     assert [tuple(c) for c in SYSTEM_CATEGORIES] == front
+
+
+def test_固定清單跟_data_js_一致():
+    """app/catalog.py 是後端要回給前端的那幾份固定清單，正本是 data.js——走散了畫面就對不上。
+
+    ⚠️ 分類的圖示字（icon）資料表沒有欄位，GET /api/categories 從 catalog 補，所以也要一起比。
+    """
+    from app import catalog
+
+    assert catalog.FINANCE_STYLES == _data_js("financeStyles")
+    assert catalog.FINANCE_GOALS == _data_js("financeGoals")
+    assert catalog.FINANCE_HABITS == _data_js("financeHabits")
+    assert catalog.ROLES == _data_js("roles")
+    assert catalog.PERMISSIONS == _data_js("permissions")
+    assert catalog.ADVICE_RULES == _data_js("adviceRules")
+    assert list(catalog.GROUP_COLORS) == [c["id"] for c in _data_js("groupColors")]
+    assert catalog.SAVINGS_RULE_NOTE == _data_js("savingsRule")["note"]
+    assert [(c["name"], c["kind"], c["color"], c["icon"]) for c in _data_js("categories")] == \
+        [tuple(row) for row in catalog.SYSTEM_CATEGORIES]
+    assert catalog.CATEGORY_ICONS["餐飲"] == "食"
 
 
 # ===========================================================================

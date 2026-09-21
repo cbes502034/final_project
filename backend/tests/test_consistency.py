@@ -2641,7 +2641,9 @@ def test_修改與多筆刪除_只有本人_結算過的不行_刪除是全有�
     assert out["editKindOnly"]["kind"] == "income" and out["editKindOnly"]["cat"] == "I04", \
         "只改收支方向時，分類要換到那一邊，不能留一個「支出分類的收入」"
     assert out["others"]["status"] == 403, "監管是唯讀的，家長不能改子女的紀錄"
-    for k in ("unknown", "empty", "zero", "badDate", "catMismatch"):
+    # 不認得的欄位是 422（真後端由 TransactionPatchIn 的 extra="forbid" 擋，mock 跟著一致）；其他是 400
+    assert out["unknown"]["status"] == 422, "不認得的欄位應該回 422"
+    for k in ("empty", "zero", "badDate", "catMismatch"):
         assert out[k]["status"] == 400, k + " 應該回 400"
     assert "source" in out["unknown"]["error"], "不認得的欄位要講出是哪一個，不要默默忽略"
     assert out["notMine"]["status"] == 403

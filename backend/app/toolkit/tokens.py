@@ -38,6 +38,7 @@ refresh token 存在 `sessions` 表，登出時把它標記成作廢就好。
 from __future__ import annotations
 
 import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -139,10 +140,15 @@ def make_refresh_token(user_id) -> tuple[str, datetime]:
 
     注意
         存進資料庫的要用 `fingerprint(token)` 算出來的雜湊值，**不是 token 原文**。
+
+        ⚠️ 每一張都帶一個隨機的 `jti`。JWT 的時間只精確到秒，沒有它的話，
+        同一秒發給同一個人的兩張 refresh token 會一模一樣——
+        兩台裝置的 sessions 分不開，/api/auth/refresh 輪替時也可能換回同一張，舊的就沒作廢。
     """
     now = datetime.now(UTC)
     expires = now + timedelta(days=settings.refresh_token_days)
-    token = _encode({"sub": str(user_id), "type": "refresh", "iat": now, "exp": expires})
+    token = _encode({"sub": str(user_id), "type": "refresh", "iat": now, "exp": expires,
+                     "jti": secrets.token_urlsafe(12)})
     return token, expires
 
 

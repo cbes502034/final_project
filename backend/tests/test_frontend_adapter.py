@@ -56,13 +56,15 @@ def test_後端只給_id_名字由前端從分類與家庭成員補上(run):
 
 
 def test_解析_建議_登入裝置在後端還沒做的時候由前端頂著(run):
-    assert run["nlpFallback"] == {"fallback": True, "amounts": [55, 1200]}
+    # cats：規則解析出來的是 data.js 的代號，要對回後端的分類 id（1 = 餐飲、2 = 交通）
+    assert run["nlpFallback"] == {"fallback": True, "amounts": [55, 1200], "cats": ["1", "2"]}
     assert run["adviceFallback"]["fallback"] is True and run["adviceFallback"]["count"] > 0
     assert run["sessionsFallback"] == {"fallback": True, "count": 1}
 
 
 def test_模型服務叫不動_503_也由前端頂著(run):
     assert run["modelDown"]["fallback"] is True and run["modelDown"]["amount"] == 120, run["modelDown"]
+    assert run["modelDown"]["cat"] == "1", "備援的分類也要對回後端的 id"
 
 
 def test_沒有備援的_501_講出是哪一支_哪條路由_誰負責_而且不重複(run):

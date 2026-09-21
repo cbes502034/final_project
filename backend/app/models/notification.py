@@ -38,7 +38,7 @@ class Notification(Base):
     recipient_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     # FK → users，做這件事的人。系統發的為 NULL
     actor_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
-    # 'ward_transaction' / 'budget_alert'
+    # 'ward_transaction'（監管對象記帳）/ 'group_transaction'（帳本有開通知）/ 'budget_alert'（跨過提醒門檻）
     type: Mapped[str] = mapped_column(Text, nullable=False)
     # FK → transactions，非記帳類通知為 NULL。⚠️ UNIQUE (recipient_id, transaction_id)：同一筆對同一個人只發一則
     transaction_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("transactions.id"), nullable=True)

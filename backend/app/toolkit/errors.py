@@ -176,7 +176,7 @@ def unprocessable(detail: str = "資料內容不正確") -> HTTPException:
             except period.InvalidPeriod as exc:
                 raise errors.unprocessable(str(exc)) from exc
     """
-    return HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail)
+    return HTTPException(422, detail)
 
 
 def service_unavailable(detail: str = "服務暫時無法使用，請稍後再試") -> HTTPException:

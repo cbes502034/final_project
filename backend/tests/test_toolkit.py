@@ -144,6 +144,13 @@ def test_refresh不能當成access用():
         tokens.read_access_token(t)
 
 
+def test_同一秒發的兩張refresh也不一樣():
+    """JWT 的時間只精確到秒：沒有 jti 的話，輪替時可能換回同一張，舊的就沒作廢。"""
+    a, _ = tokens.make_refresh_token(1)
+    b, _ = tokens.make_refresh_token(1)
+    assert a != b and tokens.fingerprint(a) != tokens.fingerprint(b)
+
+
 def test_亂打的權杖會被擋下來():
     with pytest.raises(tokens.TokenError):
         tokens.read_token("這不是 JWT")

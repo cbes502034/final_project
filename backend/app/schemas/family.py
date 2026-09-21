@@ -37,8 +37,13 @@ class RolePatchIn(BaseModel):
 
 
 class GuardianshipIn(BaseModel):
-    """監管人一定是自己；guardianId 不收（替別的家長建立監管等於替他決定要看誰）。"""
+    """監管人一定是自己。
+
+    ⚠️ guardianId 留著欄位只是為了**路由能回 403 講清楚原因**——帶了別人的 id，
+       等於替別的家長決定他要看誰，不要讓它默默被吃掉。
+    """
     wardId: str
+    guardianId: str | None = Field(default=None, description="不收：帶了別人的 id 回 403")
 
 
 class AllowanceIn(BaseModel):

@@ -44,6 +44,7 @@ final_project/
 │   │   ├── ownership.py ★   分工的單一事實來源，pytest 會檢查它
 │   │   ├── guards.py    ★   路由守衛（@login_required、own()、in_group()…）
 │   │   ├── cli.py           python -m app.cli：init-env · check-config · init-db · make-admin
+│   │   ├── catalog.py       固定清單（角色 · 權限表 · 理財選項 · 系統分類），正本是 data.js
 │   │   ├── toolkit/     ★   寫好的工具：config · db · crud · tokens · passwords · scope · family …
 │   │   ├── models/          20 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/         請求主體（Pydantic，一個檔案一個主人）
@@ -54,7 +55,7 @@ final_project/
 │   │       ├── analytics.py     成員3
 │   │       └── evaluation.py    評測指標
 │   ├── alembic/             資料庫遷移（第一版 = 20 張表）
-│   ├── tests/
+│   ├── tests/               含 routes/：每一支路由的驗收測試（說明裡的寫法也跑一遍）
 │   ├── tools/               文件從程式產生：sync_spec.py · sync_schema.py · sync_mindmap.py
 │   ├── .env.example         設定範本，依成員分段
 │   ├── requirements.txt
@@ -124,7 +125,7 @@ docker compose up
 `frontend/js/api.js` 裡 `mock` 與 `http` 兩個轉接器的**簽章完全一致**，所以可以**一支一支路由慢慢接**：
 後端還沒做的回 501，畫面會直接講「是哪一支、哪條路由、誰負責」，其他頁照常能用；
 名稱、結餘、比例這些前端補得出來，後端可以不帶。這是四個人能平行動工的關鍵。
-細節在 `docs/02-前後端串接契約.md` 的「已經定案的四件事」。
+細節在 `docs/02-前後端串接契約.md` 的「已經定案的五件事」。
 
 ⚠️ 千萬不要填 `fambudget-api.onrender.com`——那個子網域是別人的服務。
 
@@ -445,8 +446,15 @@ cd backend && python -m app.ownership
 
 **70 支路由已經全部掛好了**（`app/routers/`）：守衛、請求主體、說明字串都寫好，函式裡只有
 `raise not_ready(...)`（回 501）。做一支 = 換成真的實作、拿掉 `@stub`。
+
+**先讀那一支的說明字串**——它就是那一支的規格書，十一個段落：這支做什麼、前端怎麼打、誰能打、
+請求、成功回應、錯誤回應、會用到的資料表、每一步用的工具與資料庫方法、寫法步驟、
+**完整寫法**（可以直接貼上去的整段程式：import ＋ 整個函式）、做完怎麼確認。
+照著改完，跑 `pytest tests/routes -k "函式名 and 你的"` 就知道對不對
+（同一組測試也會拿說明裡的程式跑一遍，所以說明不會跟實作走散）。
+
 增刪改查用 `app/toolkit/crud.py`、身分與權限用 `app/guards.py`、規則用 `app/toolkit/` 對應的模組——
-都是測好的工具，直接用，不用重寫。每支路由的輸入輸出寫在 `docs/02-前後端串接契約.md`。
+都是測好的工具，直接用，不用重寫。每支路由的輸入輸出也寫在 `docs/02-前後端串接契約.md`。
 
 ### 誰都不可以實作的路由
 

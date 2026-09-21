@@ -43,6 +43,7 @@ backend/
 │   ├── guards.py          ← 路由守衛：沒登入、被停權、角色不對、不是自己的資料，路由裡一行都不會跑
 │   ├── cli.py             ← 小工具指令：init-env、check-config、init-db、make-admin
 │   ├── ownership.py       ← 分工的單一事實來源
+│   ├── catalog.py         ← 固定清單：角色、權限表、理財選項、系統分類（正本是 frontend/js/data.js）
 │   │
 │   ├── toolkit/           ← 寫好、測好的工具，直接用
 │   │   ├── config.py        設定（依成員分段）
@@ -95,7 +96,8 @@ backend/
 
 ## 寫一支路由的完整樣子
 
-打開自己的檔案，找到那一支，把 `raise not_ready(...)` 換掉、拿掉 `@stub`：
+打開自己的檔案，找到那一支，**先讀它的說明字串**（那是這一支的規格書，最後兩段是「完整寫法」與「做完怎麼確認」），
+再把 `raise not_ready(...)` 換掉、拿掉 `@stub`：
 
 ```python
 from app.guards import parent_required
@@ -405,8 +407,15 @@ cd backend && python -m app.ownership
 
 **70 支路由已經全部掛好了**（`app/routers/`）：守衛、請求主體、說明字串都寫好，函式裡只有
 `raise not_ready(...)`（回 501）。做一支 = 換成真的實作、拿掉 `@stub`。
+
+**先讀那一支的說明字串**——它就是那一支的規格書，十一個段落：這支做什麼、前端怎麼打、誰能打、
+請求、成功回應、錯誤回應、會用到的資料表、每一步用的工具與資料庫方法、寫法步驟、
+**完整寫法**（可以直接貼上去的整段程式：import ＋ 整個函式）、做完怎麼確認。
+照著改完，跑 `pytest tests/routes -k "函式名 and 你的"` 就知道對不對
+（同一組測試也會拿說明裡的程式跑一遍，所以說明不會跟實作走散）。
+
 增刪改查用 `app/toolkit/crud.py`、身分與權限用 `app/guards.py`、規則用 `app/toolkit/` 對應的模組——
-都是測好的工具，直接用，不用重寫。每支路由的輸入輸出寫在 `docs/02-前後端串接契約.md`。
+都是測好的工具，直接用，不用重寫。每支路由的輸入輸出也寫在 `docs/02-前後端串接契約.md`。
 
 ### 誰都不可以實作的路由
 

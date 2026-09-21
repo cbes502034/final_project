@@ -147,6 +147,7 @@ final_project/
 │   │   ├── guards.py        ★   路由守衛：@login_required、@parent_required、own()、in_group()…
 │   │   ├── cli.py               python -m app.cli：init-env、check-config、init-db、make-admin
 │   │   ├── ownership.py         分工的單一事實來源（誰負責哪支路由、哪些檔案）
+│   │   ├── catalog.py           固定清單（角色、權限表、理財選項、系統分類…），正本是 data.js
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
 │   │   ├── models/              20 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
@@ -159,7 +160,7 @@ final_project/
 │   │       ├── permission.py    可見範圍（成員4）
 │   │       └── evaluation.py    模型評測指標
 │   ├── alembic/                 資料庫遷移（versions/ 第一版就是 20 張表）
-│   ├── tests/                   pytest（含 fixtures/：測試用的一家人、假後端）
+│   ├── tests/                   pytest（routes/：每一支路由的驗收測試；fixtures/：假後端）
 │   ├── tools/                   sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生
 │   ├── requirements.txt
 │   ├── Dockerfile               啟動前先 alembic upgrade head
@@ -413,7 +414,22 @@ final_project/
 切到 http 之後，後端還沒做的路由回 501，**畫面會直接講是哪一支、哪條路由、誰負責**，其他頁照常能用；
 有四支（`nlp/parse`、`nlp/parse-batch`、`advices/generate`、`auth/sessions`）前端還會先頂著。
 所以可以一支一支慢慢接，不必等全部完成。名稱、結餘、比例、預算百分比這些前端補得出來，後端可以不帶——
-細節在 `02-前後端串接契約.md` 的「已經定案的四件事」。
+細節在 `02-前後端串接契約.md` 的「已經定案的五件事」。
+
+## 5-1　每一支路由的規格，寫在那一支的說明字串裡
+
+`backend/app/routers/` 的 70 支路由，每一支的說明字串都有同樣的十一個段落：
+
+```
+【這支做什麼】【前端怎麼打】【誰能打】【請求主體／查詢參數】【成功回應】【錯誤回應】
+【會用到的資料表】【每一步用的工具與資料庫方法】【寫法步驟】【完整寫法】【做完怎麼確認】
+```
+
+【完整寫法】是**可以直接貼上去的整段程式**（import ＋ 整個函式，有的還有第三步：要一起換掉的服務函式），
+照著改完那一支就做好了；【做完怎麼確認】列出要在 `/docs` 上試哪幾種情況、結果應該是什麼。
+
+這不是「文件另外寫一份」：`backend/tests/routes/` 會把說明字串裡的程式抓出來實際跑一遍
+（每個測試跑兩次：**[說明]** 與 **[你的]**），所以說明跟實作不會走散——走散了 `pytest` 就紅燈。
 
 ---
 
