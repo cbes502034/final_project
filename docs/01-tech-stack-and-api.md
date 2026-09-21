@@ -128,7 +128,6 @@ Django 內建 admin 與 auth，聽起來很划算。但：
 
 ```
 final_project/
-├── .github/workflows/ci.yml     CI/CD：推上去跑測試、測試過了才部署（見 docs/03-CICD.md）
 ├── run.py                       ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
 ├── frontend/                    前端（純靜態，可直接發布）
 │   ├── index.html               <meta name="api-base"> 留空 = mock、填網址 = 真後端
