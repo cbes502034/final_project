@@ -84,6 +84,24 @@ def test_形狀不對_伺服器錯誤_連不上_各自有自己的說法(run):
         assert "｜出錯的函式：API." in run[key]["error"]
 
 
+def test_通知那一支還沒做的時候_鈴鐺要講出來_不能說沒有通知(run):
+    """鈴鐺是唯一「拿不到就一片空白」的地方，所以它得自己講。
+
+    沒有監管對象的人看不到鈴鐺（`bell__wrap[hidden]`），這是對的；
+    但「那一支還沒做」也被當成「沒有通知」收起來的話，通知就整個無聲無息地
+    不見了——做的人不會發現，用的人以為真的沒有通知。
+    """
+    owner = owner_of("GET", "/api/notifications").label
+    down = run["bellNotReady"]
+    assert down["wrapHidden"] is False, "那一支還沒做的時候，鈴鐺不能收起來"
+    assert "後端還沒做這一支" in down["text"] and "API.notifications" in down["text"]
+    assert owner in down["text"] and "目前沒有通知" not in down["text"]
+
+    empty = run["bellEmpty"]
+    assert empty["wrapHidden"] is True, "真的沒有通知的時候，鈴鐺照舊收起來"
+    assert "目前沒有通知" in empty["text"] and "後端還沒做" not in empty["text"]
+
+
 def test_業務錯誤照後端的原話_不加技術資訊(run):
     b = run["business"]
     assert b["kind"] == "business" and b["error"] == "你已經在一個家庭裡了"

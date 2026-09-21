@@ -3074,12 +3074,17 @@
 
     var habit = document.getElementById('acctHabit'), fam = document.getElementById('acctFam');
     if (!habit || !fam) return;
+    /* 這兩列是附加的。先收起來，拿到資料才打開——拿不到（那一支還沒做、
+       或是斷線）就讓它維持收起來，而不是在卡片中間留一塊空白。
+       是哪一支還沒做，頁面上的錯誤卡已經講了，這裡不再講一次。 */
+    habit.hidden = true;
+    fam.hidden = true;
     API.me().then(function (m) {
       if (m.user.isPlatformAdmin) return;          // 平台管理員沒有帳，也不屬於任何家庭
       var day = todayKey(), first = day.slice(0, 8) + '01';
       return Promise.all([
         API.transactions({ userId: m.user.id, from: first, to: day }),
-        API.members().catch(function () { return { members: [], family: null }; })
+        API.members().catch(function () { return null; })
       ]).then(function (r) {
         var seen = {};
         r[0].transactions.forEach(function (t) { seen[t.date] = true; });
@@ -3092,13 +3097,18 @@
         }
         habit.innerHTML = '<div class="acctm__k">這個月記帳 <b>' + got + '</b><span> / ' + n + ' 天</span></div>' +
           '<div class="acctm__cal" aria-hidden="true">' + cells + '</div>';
+        habit.hidden = false;
 
         var fm = r[1];
+        /* fm 是 null = 家庭那一支拿不到。寧可不顯示，也不要寫「還沒有加入
+           家庭」——他可能是有家庭的，只是我們問不到。 */
+        if (!fm) return;
         fam.innerHTML = fm.family
           ? '<span class="acctm__fm"><span class="acctm__k">' + esc(fm.family.name) + '</span>' +
               '<small>' + fm.members.length + ' 位家人</small></span>' +
             '<span class="acctm__avs">' + fm.members.slice(0, 5).map(function (u) { return ava(u); }).join('') + '</span>'
           : '<span class="acctm__fm"><span class="acctm__k">還沒有加入家庭</span><small>建立一個，或輸入邀請碼</small></span>';
+        fam.hidden = false;
       });
     }).catch(function () {});
   }

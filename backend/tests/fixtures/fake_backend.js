@@ -6,15 +6,31 @@
 const path = require('path');
 const root = process.argv[2];
 const notReady = process.argv[3];
+let notifyMode = 'network';         // network → notReady → empty，見 /api/notifications
 const store = new Map();
 global.localStorage = {
   getItem: k => (store.has(k) ? store.get(k) : null),
   setItem: (k, v) => store.set(k, String(v)),
   removeItem: k => store.delete(k),
 };
-global.document = { querySelector: sel => (sel.indexOf('api-base') >= 0 ? { content: 'http://api.test' } : null) };
 global.setTimeout = f => setImmediate(f);
 global.window = { __FAMBUDGET_TODAY__: '2026-09-14' };
+
+// 假 DOM：只做到 notify.js 的鈴鐺跑得起來（api.js 只要 querySelector 找得到 api-base）。
+const listeners = {};
+const mkEl = id => ({ id, hidden: false, innerHTML: '', textContent: '', classList: { toggle() {} } });
+const bellEls = { bell: mkEl('bell'), bellDot: mkEl('bellDot'), bellPanel: mkEl('bellPanel') };
+const bellWrap = { hidden: false };
+bellEls.bell.parentNode = bellWrap;
+const clickBell = () => (listeners.click || []).forEach(
+  f => f({ target: { closest: sel => (sel === '#bell' ? bellEls.bell : null) } }));
+global.document = {
+  querySelector: sel => (sel.indexOf('api-base') >= 0 ? { content: 'http://api.test' } : null),
+  getElementById: id => bellEls[id] || null,
+  addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+  removeEventListener: () => {},
+  visibilityState: 'visible',
+};
 
 const res = (status, body) => Promise.resolve({
   ok: status < 400, status,
@@ -42,7 +58,11 @@ const ROUTES = [
   ['GET', '/api/auth/sessions', () => res(404, { detail: 'Not Found' })],
   ['GET', '/api/alerts', () => res(200, { wrong: [] })],
   ['GET', '/api/groups', () => res(500, { detail: 'relation "groups" does not exist' })],
-  ['GET', '/api/notifications', () => Promise.reject(new TypeError('Failed to fetch'))],
+  // 這一支要演三種狀況：斷線、那一支還沒做、真的沒有通知。見下面的 notifyMode
+  ['GET', '/api/notifications', () => (
+    notifyMode === 'notReady' ? res(501, { detail: notReady })
+      : notifyMode === 'empty' ? res(200, { notifications: [], unread: 0, maxId: null })
+        : Promise.reject(new TypeError('Failed to fetch')))],
   ['POST', '/api/family/join', () => res(409, { detail: '你已經在一個家庭裡了' })],
 ];
 global.fetch = (url, opt) => {
@@ -54,6 +74,7 @@ global.fetch = (url, opt) => {
 
 require(path.join(root, 'frontend/js/data.js'));
 require(path.join(root, 'frontend/js/api.js'));
+require(path.join(root, 'frontend/js/notify.js'));
 const A = window.API;
 const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e.fn, route: e.route, owner: e.owner }));
 
@@ -81,5 +102,22 @@ const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e
   out.server = await settle(A.groups({}));
   out.network = await settle(A.notifications({}));
   out.business = await settle(A.joinFamily({ code: 'ABCD1234' }));
+
+  // 鈴鐺：「那一支還沒做」跟「真的沒有通知」在畫面上要分得出來。
+  // 分不出來的話，通知那一支還沒接的時候，鈴鐺會說「目前沒有通知」——看的人會信。
+  notifyMode = 'notReady';
+  window.Notify.reset();
+  await window.Notify.refresh();
+  clickBell();
+  out.bellNotReady = { wrapHidden: bellWrap.hidden, text: bellEls.bellPanel.innerHTML };
+  clickBell();
+
+  notifyMode = 'empty';
+  window.Notify.reset();
+  await window.Notify.refresh();
+  clickBell();
+  out.bellEmpty = { wrapHidden: bellWrap.hidden, text: bellEls.bellPanel.innerHTML };
+  window.Notify.stop();
+
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { console.error('CRASH', e); process.exit(1); });

@@ -29,7 +29,8 @@
     timer: null,
     audio: null,
     unlocked: false,
-    busy: false                 // 同時只跑一次輪詢，見 poll()
+    busy: false,                // 同時只跑一次輪詢，見 poll()
+    down: null                  // 這支路由還沒做的話，鈴鐺裡要講出來，見 poll()
   };
 
   /* ---------------------------------------------------------
@@ -105,9 +106,17 @@
             try { ding(); toastNew(fresh[0], fresh.length); } catch (e) {}
           }
         }
+        state.down = null;
         render();
       })
-      .catch(function () { /* 輪詢失敗就安靜地等下一次 */ })
+      .catch(function (e) {
+        /* 連不上、逾時 —— 安靜地等下一次，不要每 20 秒吵一次。
+           但「後端還沒做這一支」不一樣：不講的話，鈴鐺會顯示
+           「目前沒有通知」，看的人會以為真的沒有通知。 */
+        var was = state.down;
+        state.down = (e && e.kind === 'backend') ? e.message : null;
+        if (state.open || was !== state.down) render();
+      })
       .then(function () { state.busy = false; });
   }
 
@@ -119,6 +128,7 @@
     state.unread = 0;
     state.maxId = null;
     state.open = false;
+    state.down = null;
     render();
   }
 
@@ -201,9 +211,11 @@
     if (!btn || !dot || !panel) return;
 
     /* 沒有監管對象的人（例如子女）不該看到一個永遠空的鈴鐺。
-       這裡用「一則都沒有」當作判斷：監管者一旦有人記帳就會出現。 */
+       這裡用「一則都沒有」當作判斷：監管者一旦有人記帳就會出現。
+       ⚠️ state.down（那一支還沒做）要例外：鈴鐺收起來的話，
+          「收不到通知」這件事就沒有地方講了。 */
     var wrap = btn.parentNode;
-    if (wrap) wrap.hidden = !state.items.length && !state.unread;
+    if (wrap) wrap.hidden = !state.items.length && !state.unread && !state.down;
 
     dot.textContent = state.unread > 99 ? '99+' : state.unread;
     dot.hidden = state.unread === 0;
@@ -229,7 +241,10 @@
       (state.unread ? '<button class="bell__all" id="bellAll">全部已讀</button>' : '') +
       '</div>';
 
-    if (!state.items.length) {
+    if (!state.items.length && state.down) {
+      h += '<div class="bell__empty">' + esc(state.down) + '<br>' +
+        '<span>這一支做好之前，通知都收不到。</span></div>';
+    } else if (!state.items.length) {
       h += '<div class="bell__empty">目前沒有通知。<br>' +
         '<span>被你監管的成員新增記帳時，這裡會即時跳出來。</span></div>';
     } else {
