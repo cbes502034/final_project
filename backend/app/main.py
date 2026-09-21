@@ -27,7 +27,8 @@ FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試�
     app/
     ├── models/      SQLAlchemy 資料表（20 張，欄位跟 frontend/js/data.js 的 schema 對齊）
     ├── schemas/     Pydantic 請求主體（欄位名字跟前端送的一樣）
-    ├── routers/     路由，一組一個檔案——每一支都先回 501，守衛與主體模型已經接好
+    ├── routers/     路由，一個領域一個資料夾（auth／ledger／analytics／access）——
+    │                每一支都先回 501，守衛與主體模型已經接好
     ├── services/    商業邏輯（analytics 算錢、permission 可見範圍、llm 呼叫模型）
     ├── guards.py    路由守衛（仿 MineMarket 的 AuthDecorator）
     ├── catalog.py   固定清單（角色、權限表、理財選項、系統分類），正本是 frontend/js/data.js
@@ -39,7 +40,7 @@ FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試�
 ===========================================================================
 做完一支路由
 ===========================================================================
-在 app/routers/ 找到那個函式，把 `raise not_ready(...)` 換成實作，拿掉 `@stub`。
+在 app/routers/<你的資料夾>/ 找到那個函式，把 `raise not_ready(...)` 換成實作，拿掉 `@stub`。
 這個檔案不用動——所有 router 已經掛上了（下面的 include_router）。
 """
 

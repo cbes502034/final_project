@@ -3018,7 +3018,7 @@ def test_稽核動作都要有中文對照():
     而且是「多做一支路由就多一種 action」的地方，靠人記得去補一定會漏。
     """
     actions = set()
-    for path in glob.glob(os.path.join(REPO, "backend", "app", "routers", "*.py")):
+    for path in glob.glob(os.path.join(REPO, "backend", "app", "routers", "**", "*.py"), recursive=True):
         actions |= set(re.findall(r'"action": "([a-z_]+)"', io.open(path, encoding="utf-8").read()))
     assert actions, "路由裡找不到任何 audit_logs 的 action"
     block = re.search(r"var AUDIT_TW = \{(.*?)\};", read("frontend/js/app.js"), re.S).group(1)

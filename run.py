@@ -43,8 +43,20 @@ PY = sys.executable                      # 用「現在這一支」python，不�
 # ======================================================================
 # 印字
 # ======================================================================
+# Windows 的主控台預設是 cp950，印不出「✗」「█」這類字元會直接 UnicodeEncodeError，
+# 而且是在**報錯的那條路徑上**爆掉 —— 使用者看到的會是一串 traceback，不是我們寫的說明。
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
+
 def say(msg: str = "") -> None:
-    sys.stdout.write(msg + "\n")
+    try:
+        sys.stdout.write(msg + "\n")
+    except UnicodeEncodeError:           # 真的還是印不出來，就退成 ASCII，訊息至少看得到
+        sys.stdout.write(msg.encode("ascii", "replace").decode("ascii") + "\n")
     sys.stdout.flush()
 
 
@@ -54,7 +66,7 @@ def step(n: int, total: int, msg: str) -> None:
 
 def die(msg: str) -> "None":
     say("")
-    say("✗ " + msg)
+    say("[停下來了] " + msg)
     sys.exit(1)
 
 
@@ -104,22 +116,68 @@ def ensure_env() -> None:
     run_cli("-m", "app.cli", "init-env", why="建立 .env ")
 
 
-def sqlite_file() -> str | None:
-    """.env 用的是 SQLite 的話，回傳那個檔案的路徑；用 PostgreSQL 回 None。"""
+def env_line(key: str) -> str | None:
+    """讀 backend/.env 裡某一行的值（沒有就回 None）。"""
     env = os.path.join(BACKEND, ".env")
     if not os.path.exists(env):
         return None
     for line in open(env, encoding="utf-8"):
         line = line.strip()
-        if line.startswith("DATABASE_URL=") and "sqlite" in line:
-            name = line.split("///")[-1].strip()
-            return os.path.join(BACKEND, name.lstrip("./"))
+        if line.startswith(key + "="):
+            return line.split("=", 1)[1].strip()
     return None
+
+
+def sqlite_file() -> str | None:
+    """.env 用的是 SQLite 的話，回傳那個檔案的路徑；用 PostgreSQL 回 None。"""
+    url = env_line("DATABASE_URL")
+    if not url or "sqlite" not in url:
+        return None
+    return os.path.join(BACKEND, url.split("///")[-1].strip().lstrip("./"))
+
+
+def api_env(front_port: int) -> dict:
+    """給 uvicorn 的環境變數。
+
+    ⚠️ 只為了一件事：**把前端實際用的埠號加進 ALLOWED_ORIGINS**。
+    .env 裡寫死的是 5174，`python run.py --port 5555` 的話瀏覽器就會被 CORS 擋住，
+    而畫面上只會說「連不上後端」—— 很難看出是埠號的問題。
+    環境變數的優先權高於 .env，所以這裡不用去動使用者的檔案。
+    """
+    env = dict(os.environ)
+    origins = [o for o in (env_line("ALLOWED_ORIGINS") or "").split(",") if o.strip()]
+    for host in ("localhost", "127.0.0.1"):
+        origin = "http://%s:%d" % (host, front_port)
+        if origin not in origins:
+            origins.append(origin)
+    env["ALLOWED_ORIGINS"] = ",".join(origins)
+    return env
 
 
 # ======================================================================
 # 埠號
 # ======================================================================
+def stop_tree(proc: subprocess.Popen) -> None:
+    """把 uvicorn 整棵關掉。
+
+    ⚠️ `uvicorn --reload` 是**兩個行程**：監看檔案的 reloader，加上真正跑 app 的 worker。
+       只 terminate() 外面那個的話，worker 會活下來繼續占著 8000 埠 ——
+       下次再跑 run.py 就會說「埠被占用」，但工作管理員裡看起來什麼都沒開。
+    """
+    if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        # /T 連子行程一起，/F 強制。Windows 沒有 process group 可以用
+        subprocess.call(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
 def port_busy(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.4)
@@ -132,8 +190,13 @@ def check_ports(front: int, api: int, front_only: bool) -> None:
             continue
         if port_busy(port):
             die("%s要用的 %d 埠已經有別的程式在用了。\n"
-                "  先把上一次開的視窗關掉，或換一個埠：python run.py %s %d"
-                % (what, port, "--port" if what == "前端" else "--api-port", port + 1))
+                "  1. 先把上一次跑 run.py 的視窗關掉（Ctrl+C）\n"
+                "  2. 還是不行的話，找出是誰在用：\n"
+                "       Windows    netstat -ano | findstr :%d\n"
+                "       Mac／Linux lsof -i :%d\n"
+                "  3. 或直接換一個埠：python run.py %s %d"
+                % (what, port, port, port,
+                   "--port" if what == "前端" else "--api-port", port + 1))
 
 
 # ======================================================================
@@ -227,6 +290,7 @@ def main() -> None:
         [PY, "-m", "uvicorn", "app.main:app", "--reload",
          "--host", "127.0.0.1", "--port", str(args.api_port)],
         cwd=BACKEND,
+        env=api_env(args.port),
     )
 
     say("")
@@ -248,12 +312,7 @@ def main() -> None:
         pass
     finally:
         httpd.shutdown()
-        if api.poll() is None:
-            api.terminate()
-            try:
-                api.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                api.kill()
+        stop_tree(api)
         say("\n關掉了。")
 
 

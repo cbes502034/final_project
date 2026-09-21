@@ -153,7 +153,12 @@ final_project/
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
 │   │   ├── models/              20 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
-│   │   ├── routers/             70 支路由，一人一組檔案。還沒做的回 501
+│   │   ├── routers/             70 支路由，一個領域一個資料夾。還沒做的回 501
+│   │   │   ├── auth/            成員1 · 認證（auth.py、admin.py）
+│   │   │   ├── ledger/          成員2 · 記帳（transactions、nlp、categories、groups）
+│   │   │   ├── analytics/       成員3 · 數字（stats、budgets、alerts、advices）
+│   │   │   ├── access/          成員4 · 家庭（family、notifications）
+│   │   │   └── _stub.py         共用：@stub 與 not_ready()
 │   │   └── services/
 │   │       ├── llm/client.py    模型呼叫層（已完成）
 │   │       ├── llm/parse.py     記帳解析（成員2）
@@ -420,7 +425,7 @@ final_project/
 
 ## 5-1　每一支路由的規格，寫在那一支的說明字串裡
 
-`backend/app/routers/` 的 70 支路由，每一支的說明字串都有同樣的十一個段落：
+`backend/app/routers/` 底下（一個領域一個資料夾）的 70 支路由，每一支的說明字串都有同樣的十一個段落：
 
 ```
 【這支做什麼】【前端怎麼打】【誰能打】【請求主體／查詢參數】【成功回應】【錯誤回應】

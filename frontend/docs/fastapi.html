@@ -693,7 +693,7 @@ db.refresh(tx)      <span class="tk-cm"># 把資料庫產生的 id 讀回來</sp
         FastAPI 用 <code>APIRouter</code> 解決這件事。
       </p>
 
-      <div class="codelabel">routers/auth.py — 各自的檔案</div>
+      <div class="codelabel">routers/auth/auth.py — 各自的檔案</div>
       <pre class="py"><span class="tk-kw">from</span> fastapi <span class="tk-kw">import</span> APIRouter
 
 <b class="hi">router = APIRouter()</b>
@@ -707,7 +707,7 @@ db.refresh(tx)      <span class="tk-cm"># 把資料庫產生的 id 讀回來</sp
 
 app.include_router(auth.router, <b class="hi">prefix=<span class="tk-st">"/api/auth"</span></b>, tags=[<span class="tk-st">"身分認證"</span>])
 
-<span class="tk-cm"># 結果：routers/auth.py 裡的 "/login"</span>
+<span class="tk-cm"># 結果：routers/auth/auth.py 裡的 "/login"</span>
 <span class="tk-cm">#       實際網址變成 /api/auth/login</span></pre>
 
       <p style="color:var(--ink-soft);max-width:64ch;margin-top:14px">
@@ -763,25 +763,25 @@ grep -rn <span class="tk-st">"TODO(成員2)"</span> app/services/   <span class=
             <tr>
               <td><b style="color:var(--m1)">成員1</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m1-auth</span></td>
               <td>認證</td>
-              <td><span class="fname">routers/auth.py</span>、<span class="fname">routers/admin.py</span>、<span class="fname">models/user.py</span>、<span class="fname">schemas/auth.py</span></td>
+              <td><span class="fname">routers/auth/auth.py</span>、<span class="fname">routers/auth/admin.py</span>、<span class="fname">models/user.py</span>、<span class="fname">schemas/auth.py</span></td>
               <td class="tight">19 支</td>
             </tr>
             <tr>
               <td><b style="color:var(--m2)">成員2</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m2-ledger</span></td>
               <td>記帳 ★ 核心</td>
-              <td><span class="fname">routers/transactions.py</span>、<span class="fname">routers/nlp.py</span>、<span class="fname">routers/categories.py</span>、<span class="fname">routers/groups.py</span>、<span class="fname">models/category.py</span>、<span class="fname">models/group.py</span>、<span class="fname">schemas/group.py</span>、<span class="fname">services/evaluation.py</span>、<span class="fname">models/transaction.py</span>、<span class="fname">models/nlp.py</span>、<span class="fname">schemas/transaction.py</span>、<span class="fname">schemas/nlp.py</span>、<span class="fname">services/llm/parse.py</span></td>
+              <td><span class="fname">routers/ledger/transactions.py</span>、<span class="fname">routers/ledger/nlp.py</span>、<span class="fname">routers/ledger/categories.py</span>、<span class="fname">routers/ledger/groups.py</span>、<span class="fname">models/category.py</span>、<span class="fname">models/group.py</span>、<span class="fname">schemas/group.py</span>、<span class="fname">services/evaluation.py</span>、<span class="fname">models/transaction.py</span>、<span class="fname">models/nlp.py</span>、<span class="fname">schemas/transaction.py</span>、<span class="fname">schemas/nlp.py</span>、<span class="fname">services/llm/parse.py</span></td>
               <td class="tight">19 支</td>
             </tr>
             <tr>
               <td><b style="color:var(--m3)">成員3</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m3-analytics</span></td>
               <td>數字與建議</td>
-              <td><span class="fname">routers/stats.py</span>、<span class="fname">routers/alerts.py</span>、<span class="fname">models/alert.py</span>、<span class="fname">routers/budgets.py</span>、<span class="fname">routers/advices.py</span>、<span class="fname">models/budget.py</span>、<span class="fname">models/advice.py</span>、<span class="fname">schemas/stats.py</span>、<span class="fname">schemas/advice.py</span>、<span class="fname">services/llm/advice.py</span></td>
+              <td><span class="fname">routers/analytics/stats.py</span>、<span class="fname">routers/analytics/alerts.py</span>、<span class="fname">models/alert.py</span>、<span class="fname">routers/analytics/budgets.py</span>、<span class="fname">routers/analytics/advices.py</span>、<span class="fname">models/budget.py</span>、<span class="fname">models/advice.py</span>、<span class="fname">schemas/stats.py</span>、<span class="fname">schemas/advice.py</span>、<span class="fname">services/llm/advice.py</span></td>
               <td class="tight">11 支</td>
             </tr>
             <tr>
               <td><b style="color:var(--m4)">成員4</b><br><span class="mono" style="font-size:11px;color:var(--ink-dim)">m4-access</span></td>
               <td>家庭與可見範圍</td>
-              <td><span class="fname">routers/family.py</span>、<span class="fname">routers/notifications.py</span>、<span class="fname">models/family.py</span>、<span class="fname">models/guardianship.py</span>、<span class="fname">models/notification.py</span>、<span class="fname">models/audit.py</span>、<span class="fname">schemas/family.py</span></td>
+              <td><span class="fname">routers/access/family.py</span>、<span class="fname">routers/access/notifications.py</span>、<span class="fname">models/family.py</span>、<span class="fname">models/guardianship.py</span>、<span class="fname">models/notification.py</span>、<span class="fname">models/audit.py</span>、<span class="fname">schemas/family.py</span></td>
               <td class="tight">21 支</td>
             </tr>
           </tbody>

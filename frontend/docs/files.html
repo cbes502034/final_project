@@ -207,11 +207,15 @@ PostgreSQL
 │   │   ├── main.py           <i>入口，只負責組裝（掛上 routers/ 的每一組）</i>
 │   │   ├── <u>ownership.py</u>  ★    <i>分工的單一事實來源，pytest 會檢查它</i>
 │   │   ├── <em>guards.py</em>         <em>路由守衛：@login_required、own()、in_group()…</em>
-│   │   ├── <em>cli.py</em>            <em>python -m app.cli：init-env · check-config · init-db · make-admin</em>
+│   │   ├── <em>cli.py</em>            <em>python -m app.cli：init-env · check-config · init-db · make-admin · db</em>
 │   │   ├── <em>toolkit/</em>          <em>已經寫好的工具（見 03）</em>
 │   │   ├── <em>models/</em>           <em>20 張表，跟 data.js 的 schema 逐欄對齊</em>
 │   │   ├── <em>schemas/</em>          <em>請求主體，欄位名字跟前端送的一樣</em>
-│   │   ├── <s>routers/</s>          <s>70 支路由：守衛與說明寫好，內容要做（還回 501）</s>
+│   │   ├── <s>routers/</s>          <s>70 支路由：一個領域一個資料夾，守衛與說明寫好，內容要做（還回 501）</s>
+│   │   │   ├── <s>auth/</s>         <s>成員1 · 認證</s>
+│   │   │   ├── <s>ledger/</s>       <s>成員2 · 記帳</s>
+│   │   │   ├── <s>analytics/</s>    <s>成員3 · 數字</s>
+│   │   │   └── <s>access/</s>       <s>成員4 · 家庭</s>
 │   │   └── <s>services/</s>         <s>llm/client 已完成；parse、advice、analytics 要做</s>
 │   ├── alembic/              <i>資料庫遷移（versions/ 第一版 = 20 張表）</i>
 │   ├── alembic.ini           <i>⚠️ 只能有英文</i>
@@ -252,7 +256,7 @@ PostgreSQL
             <tr><td><span class="fname">backend/app/cli.py</span></td><td>小工具指令：建 .env、檢查設定、建表放系統分類、設定平台管理員</td><td class="tight">已交付</td></tr>
             <tr><td><span class="fname">backend/app/models/</span></td><td>20 張表。<b>資料庫裡存什麼</b>。改欄位三處一起改：data.js → models → Alembic</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/schemas/</span></td><td>請求主體的形狀。<b>API 收什麼</b>——回應用 <code>crud.to_dict</code>，密碼雜湊預設就不會送出去</td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/app/routers/</span></td><td>70 支路由，一人一組檔案。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/routers/</span></td><td>70 支路由，<b>一個領域一個資料夾</b>（<code>auth/</code> 成員1、<code>ledger/</code> 成員2、<code>analytics/</code> 成員3、<code>access/</code> 成員4）。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/services/</span></td><td>加總與模型。<code>llm/client.py</code> 已完成；<code>parse</code>、<code>advice</code>、<code>analytics.summary</code> 要做。<b>不碰 HTTP</b>，所以可以直接測</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/alembic/</span></td><td>資料庫結構的版本。部署時啟動前自動 <code>alembic upgrade head</code></td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">backend/.env.example</span></td><td>設定範本，依「共用／成員1～4」分段；<code>python -m app.cli init-env</code> 從它建出 .env</td><td class="tight">共同</td></tr>

@@ -49,7 +49,11 @@ final_project/
 │   │   ├── toolkit/     ★   寫好的工具：config · db · crud · tokens · passwords · scope · family …
 │   │   ├── models/          20 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/         請求主體（Pydantic，一個檔案一個主人）
-│   │   ├── routers/         70 支路由，一組一個檔案；還沒做的回 501
+│   │   ├── routers/         70 支路由，**一個領域一個資料夾**；還沒做的回 501
+│   │   │   ├── auth/        成員1 · 認證
+│   │   │   ├── ledger/      成員2 · 記帳
+│   │   │   ├── analytics/   成員3 · 數字
+│   │   │   └── access/      成員4 · 家庭
 │   │   └── services/
 │   │       ├── llm/         client 已完成 · parse 成員2 · advice 成員3
 │   │       ├── permission.py    成員4
@@ -263,10 +267,10 @@ python -m app.ownership      # 印出分工表並檢查一致性
 
 | 成員 | 領域 | 分支 | 路由 | 獨佔檔案 | 共用元件（要最先完成） |
 |---|---|---|---|---|---|
-| **成員1** | **認證** | `m1-auth` | 19 支 | `routers/auth.py`<br>`routers/admin.py`<br>`models/user.py`<br>`schemas/auth.py` | `services/llm/client.py`<br>`guards.py`<br>`cli.py`<br>`routers/_stub.py`<br>`models/_types.py` |
-| **成員2** | **記帳** | `m2-ledger` | 19 支 | `routers/transactions.py`<br>`routers/nlp.py`<br>`routers/categories.py`<br>`routers/groups.py`<br>`models/category.py`<br>`models/group.py`<br>`schemas/group.py`<br>`services/evaluation.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
-| **成員3** | **數字** | `m3-analytics` | 11 支 | `routers/stats.py`<br>`routers/alerts.py`<br>`models/alert.py`<br>`routers/budgets.py`<br>`routers/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
-| **成員4** | **家庭** | `m4-access` | 21 支 | `routers/family.py`<br>`routers/notifications.py`<br>`models/family.py`<br>`models/guardianship.py`<br>`models/notification.py`<br>`models/audit.py`<br>`schemas/family.py` | `services/permission.py` |
+| **成員1** | **認證** | `m1-auth` | 19 支 | `routers/auth/auth.py`<br>`routers/auth/admin.py`<br>`models/user.py`<br>`schemas/auth.py` | `services/llm/client.py`<br>`guards.py`<br>`cli.py`<br>`routers/_stub.py`<br>`models/_types.py` |
+| **成員2** | **記帳** | `m2-ledger` | 19 支 | `routers/ledger/transactions.py`<br>`routers/ledger/nlp.py`<br>`routers/ledger/categories.py`<br>`routers/ledger/groups.py`<br>`models/category.py`<br>`models/group.py`<br>`schemas/group.py`<br>`services/evaluation.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
+| **成員3** | **數字** | `m3-analytics` | 11 支 | `routers/analytics/stats.py`<br>`routers/analytics/alerts.py`<br>`models/alert.py`<br>`routers/analytics/budgets.py`<br>`routers/analytics/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
+| **成員4** | **家庭** | `m4-access` | 21 支 | `routers/access/family.py`<br>`routers/access/notifications.py`<br>`models/family.py`<br>`models/guardianship.py`<br>`models/notification.py`<br>`models/audit.py`<br>`schemas/family.py` | `services/permission.py` |
 
 ### 切分原則
 
@@ -481,7 +485,7 @@ cd backend && python -m app.ownership
 `app/ownership.py` 是分工的**唯一事實來源**——路由歸屬、分支名稱、
 共用檔案、時程，全部在那一個檔案裡，`pytest` 會拿它去對文件。
 
-**70 支路由已經全部掛好了**（`app/routers/`）：守衛、請求主體、說明字串都寫好，函式裡只有
+**70 支路由已經全部掛好了**（`app/routers/` 底下，一個領域一個資料夾）：守衛、請求主體、說明字串都寫好，函式裡只有
 `raise not_ready(...)`（回 501）。做一支 = 換成真的實作、拿掉 `@stub`。
 
 **先讀那一支的說明字串**——它就是那一支的規格書，十一個段落：這支做什麼、前端怎麼打、誰能打、
