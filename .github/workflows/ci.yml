@@ -48,6 +48,32 @@ jobs:
       - name: 裝套件
         run: pip install -r backend/requirements.txt
 
+      - name: 環境對照（暫時：查 CI 與本機的差別）
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite://
+          JWT_SECRET: ci-only-not-a-real-secret-0123456789abcdef
+        run: |
+          pip list | grep -Ei '^(fastapi|starlette|pydantic|sqlalchemy|bcrypt|httpx|pytest) ' || true
+          python - <<'PYEOF'
+          from app.main import app
+          from app.routers._stub import is_stub
+          n = s = 0
+          bad = []
+          for r in app.routes:
+              p = getattr(r, "path", "")
+              if not p.startswith("/api"):
+                  continue
+              for m in (getattr(r, "methods", None) or set()) - {"HEAD", "OPTIONS"}:
+                  n += 1
+                  if is_stub(r.endpoint):
+                      s += 1
+                  elif p.startswith(("/api/summary", "/api/budgets", "/api/alerts", "/api/savings")):
+                      bad.append(m + " " + p)
+          print("路由", n, "還是 stub 的", s)
+          print("成員3 的路由卻沒有 stub 標記：", bad)
+          PYEOF
+
       - name: 跑測試
         working-directory: backend
         run: |
