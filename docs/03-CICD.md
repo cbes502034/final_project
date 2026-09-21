@@ -59,32 +59,69 @@ Render 後台 → **New** → **Blueprint** → 選這個 repo。
 
 兩個服務都要：**Settings** → **Build & Deploy** → **Auto-Deploy** → 改成 **No**。
 
-### 第 3 步　拿 Deploy Hook
+### 第 3 步　拿 API 金鑰與服務 ID
 
-一樣在 **Settings** → **Build & Deploy** → **Deploy Hook**，複製那個網址
-（長得像 `https://api.render.com/deploy/srv-xxxx?key=yyyy`）。兩個服務各一個。
+**API 金鑰**：右上角頭像 → **Account Settings** → **API Keys** → **Create API Key**。
+⚠️ 那把金鑰等同你的 Render 帳號權限，只能放進 GitHub Secrets，不要貼進 repo 或群組。
 
-> 那個網址**等同部署權限**，不要貼進 repo、不要貼進群組。
+**服務 ID**：打開那個服務，看網址最後一段：
+
+```
+https://dashboard.render.com/web/srv-d1abc2de3fg4h5i6j7k0
+                                  ^^^^^^^^^^^^^^^^^^^^^^^ 這一段
+```
+
+前端、後端各一個。
 
 ### 第 4 步　放進 GitHub
 
 repo → **Settings** → **Secrets and variables** → **Actions**
 
-**Secrets** 分頁按 **New repository secret**，加兩個：
+**Secrets** 分頁按 **New repository secret**，加一個：
 
 | 名字 | 值 |
 |---|---|
-| `RENDER_BACKEND_HOOK` | `fambudget-backend` 的 Deploy Hook |
-| `RENDER_WEB_HOOK` | `fambudget-web` 的 Deploy Hook |
+| `RENDER_API_KEY` | 第 3 步那把金鑰 |
 
-**Variables** 分頁按 **New repository variable**，加兩個（這兩個不是機密）：
+**Variables** 分頁按 **New repository variable**，加四個（這四個不是機密）：
 
 | 名字 | 值 |
 |---|---|
+| `RENDER_BACKEND_SERVICE_ID` | 後端的 `srv-...` |
+| `RENDER_WEB_SERVICE_ID` | 前端的 `srv-...` |
 | `BACKEND_URL` | `https://fambudget-backend.onrender.com` |
 | `WEB_URL` | `https://fambudget-web.onrender.com` |
 
 設完就好了。下一次推 `main` 就會自己跑完整套。
+
+---
+
+## 四個人都看得到 Render 的 log
+
+Render 後台的 log **只有那個 workspace 的成員進得去**——四個人裡只有一個人有
+Render 帳號的話，另外三個人等於看不到部署結果。
+
+所以部署不是用 Deploy Hook（打完就結束、什麼都看不到），而是走 Render 的 API：
+[`.github/scripts/render_deploy.py`](../.github/scripts/render_deploy.py)
+一邊等一邊把 Render 的 log 抓下來印出來，**原封不動、不加前綴、不改字**：
+
+```
+==> Cloning from https://github.com/cbes502034/final_project
+==> Checking out commit a15ced4 in branch main
+==> Running build command 'pip install -r requirements.txt'...
+...
+==> Build successful 🎉
+==> Deploying...
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001
+INFO:     Uvicorn running on http://0.0.0.0:10000
+==> Your service is live 🎉
+```
+
+這些字會進 GitHub Actions 的 log 與 Summary，**那兩個地方是公開的**，
+所以不用 Render 帳號也看得到同一份 log。
+
+> 如果那個方案的 API 不開放 `/v1/logs`，程式會印一行「拿不到 log」然後繼續，
+> 部署狀態照樣會有，完整的 log 就得進 Render 後台看。
 
 ---
 
@@ -103,8 +140,8 @@ repo → **Settings** → **Secrets and variables** → **Actions**
 | Job | 紅了代表 |
 |---|---|
 | **測試** | 程式壞了。點進去看是哪一個測試，**線上沒有被動到** |
-| **部署到 Render** | Deploy Hook 打不出去（secret 填錯、或 Render 那邊刪掉了） |
-| **部署後確認** | 部署上去了但站台叫不動。到 Render 後台看 **Logs** |
+| **部署到 Render** | Render 那邊建置或上線失敗。**Render 的 log 就印在那個 job 裡面**，直接往下看 |
+| **部署後確認** | Render 說上線了，但我們的 `/healthz` 叫不動。看上一個 job 的 Render log |
 
 每次跑完，Actions 頁面下面的 **Summary** 會直接寫結果與網址。
 
@@ -154,6 +191,7 @@ Actions 分頁上只會看到一列紅的、點進去什麼都沒有。
 | 檔案 | 做什麼 |
 |---|---|
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | 這一整套 |
+| [`.github/scripts/render_deploy.py`](../.github/scripts/render_deploy.py) | 叫 Render 部署，並把它的 log 原樣印出來 |
 | [`render.yaml`](../render.yaml) | Render 上三個服務長什麼樣 |
 | [`backend/.python-version`](../backend/.python-version) | CI 與 Render 用哪個 Python（同一個來源） |
 | [`backend/requirements.txt`](../backend/requirements.txt) | CI 與 Render 裝的套件 |

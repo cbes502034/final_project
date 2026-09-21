@@ -83,11 +83,15 @@ jobs:
         run: python -m app.ownership
 
   # ----------------------------------------------------------
-  # 部署：只有 main、只有測試過了，才去打 Render 的 Deploy Hook
+  # 部署：只有 main、只有測試過了才跑
+  #
+  # 用 Render 的 API（不是 Deploy Hook），因為 Hook 打完就結束——
+  # 部署成功沒成功、為什麼失敗，都只有 Render workspace 的成員進後台才看得到。
+  # 走 API 的話，狀態與失敗時的 log 會印在這裡，**四個人都看得到**。
   #
   # ⚠️ secrets 不可以寫在 if: 裡面（GitHub 的 if 只認得 github／needs／vars／
   #    env／steps 這幾個 context，寫了整個 workflow 會被拒絕解析、一個 job
-  #    都不會建立）。所以先用一個步驟把「有沒有設定」轉成 output 再判斷。
+  #    都不會建立）。所以服務 ID 用 vars（不是機密），只有金鑰放 secrets。
   # ----------------------------------------------------------
   deploy:
     name: 部署到 Render
@@ -95,40 +99,37 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: 看設定好了沒
-        id: cfg
-        env:
-          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_HOOK }}
-          WEB_HOOK: ${{ secrets.RENDER_WEB_HOOK }}
-        run: |
-          if [ -n "$BACKEND_HOOK" ]; then echo "backend=yes" >> "$GITHUB_OUTPUT"; else echo "backend=no" >> "$GITHUB_OUTPUT"; fi
-          if [ -n "$WEB_HOOK" ]; then echo "web=yes" >> "$GITHUB_OUTPUT"; else echo "web=no" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
 
-      - name: 部署後端
-        if: steps.cfg.outputs.backend == 'yes'
-        env:
-          HOOK: ${{ secrets.RENDER_BACKEND_HOOK }}
-        run: curl -fsS -X POST "$HOOK" -o /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: backend/.python-version
 
-      - name: 部署前端
-        if: steps.cfg.outputs.web == 'yes'
-        env:
-          HOOK: ${{ secrets.RENDER_WEB_HOOK }}
-        run: curl -fsS -X POST "$HOOK" -o /dev/null
-
-      - name: 沒設定就講一聲
-        if: steps.cfg.outputs.backend == 'no' && steps.cfg.outputs.web == 'no'
+      - name: 還沒設定就講一聲
+        if: vars.RENDER_BACKEND_SERVICE_ID == '' && vars.RENDER_WEB_SERVICE_ID == ''
         run: |
           {
             echo "### 部署跳過了"
             echo ""
-            echo "還沒設定 Deploy Hook。照 \`docs/03-CICD.md\` 設定好就會自動部署。"
-            echo ""
-            echo "（Render 後台如果還開著 Auto-Deploy，它會自己部署，只是不管測試有沒有過。）"
+            echo "還沒設定 Render 的服務 ID 與 API 金鑰。照 \`docs/03-CICD.md\` 設定好就會自動部署，"
+            echo "而且部署的狀態與失敗時的 log 會直接印在這一頁——不用 Render 帳號也看得到。"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: 後端
+        if: vars.RENDER_BACKEND_SERVICE_ID != ''
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: python .github/scripts/render_deploy.py 後端 "${{ vars.RENDER_BACKEND_SERVICE_ID }}"
+
+      - name: 前端
+        if: vars.RENDER_WEB_SERVICE_ID != ''
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: python .github/scripts/render_deploy.py 前端 "${{ vars.RENDER_WEB_SERVICE_ID }}"
+
   # ----------------------------------------------------------
-  # 部署完等它活過來。Render 免費方案會休眠，第一次請求要等一下
+  # 部署完再從外面打一次，確認站台真的活著
+  # （Render 說 live 了，不代表我們的 /healthz 回得出 200）
   # ----------------------------------------------------------
   smoke:
     name: 部署後確認
@@ -148,7 +149,7 @@ jobs:
             echo "  第 $i 次：$code"
             if [ "$code" = "200" ]; then
               {
-                echo "### 部署完成"
+                echo "### 站台活著"
                 echo ""
                 echo "- 後端 $url 回 200"
                 if [ -n "$WEB_URL" ]; then echo "- 前端 $WEB_URL"; fi
@@ -158,8 +159,8 @@ jobs:
             sleep 20
           done
           {
-            echo "### 部署後叫不動"
+            echo "### 部署完卻叫不動"
             echo ""
-            echo "等了 10 分鐘 $url 還是沒有回 200。到 Render 後台看 Logs。"
+            echo "等了 10 分鐘 $url 還是沒有回 200。上面「部署到 Render」那個 job 有 Render 的 log。"
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
