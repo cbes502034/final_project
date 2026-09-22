@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,13 +19,16 @@
 
 from __future__ import annotations
 
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.guards import block_admin, own
-from app.models import AlertRule, User
+from app.models import AlertRule, Group, GroupMember, User
 from app.routers._stub import not_ready, stub
 from app.schemas.stats import AlertIn, AlertPatchIn
+from app.toolkit import alerts, crud, errors
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["提醒"])
@@ -87,7 +91,7 @@ def list_alerts(me: User, db: Session = Depends(get_db)):
         ⚠️ 只讀不寫，不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from fastapi import APIRouter, Depends
             from sqlalchemy.orm import Session
@@ -99,31 +103,28 @@ def list_alerts(me: User, db: Session = Depends(get_db)):
             from app.toolkit import alerts, crud, errors
             from app.toolkit.db import get_db
 
-        第二步：把整個 list_alerts（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/alerts", summary="我設的提醒門檻")
-            @block_admin
-            def list_alerts(me: User, db: Session = Depends(get_db)):
-                # 1. 我的門檻，百分比由小到大
-                rows = crud.find(AlertRule, {"user_id": me.id}, order_by=("percent", "id"), db=db)
+            # 1. 我的門檻，百分比由小到大
+            rows = crud.find(AlertRule, {"user_id": me.id}, order_by=("percent", "id"), db=db)
 
-                # 2. 針對帳本的門檻，一次查出帳本名字
-                group_ids = {r.group_id for r in rows if r.group_id}
-                names = {g.id: g.name for g in crud.find(Group, {"id__in": group_ids}, db=db)}
+            # 2. 針對帳本的門檻，一次查出帳本名字
+            group_ids = {r.group_id for r in rows if r.group_id}
+            names = {g.id: g.name for g in crud.find(Group, {"id__in": group_ids}, db=db)}
 
-                # 3. 轉成前端要的樣子
-                out = []
-                for r in rows:
-                    out.append({
-                        "id": str(r.id),
-                        "percent": r.percent,
-                        "groupId": str(r.group_id) if r.group_id else None,
-                        "groupName": names.get(r.group_id, "") if r.group_id else "整體",
-                        "enabled": r.enabled,
-                        "firedPeriod": r.fired_period,
-                    })
-                return {"alerts": out}
+            # 3. 轉成前端要的樣子
+            out = []
+            for r in rows:
+                out.append({
+                    "id": str(r.id),
+                    "percent": r.percent,
+                    "groupId": str(r.group_id) if r.group_id else None,
+                    "groupName": names.get(r.group_id, "") if r.group_id else "整體",
+                    "enabled": r.enabled,
+                    "firedPeriod": r.fired_period,
+                })
+            return {"alerts": out}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -138,7 +139,7 @@ def list_alerts(me: User, db: Session = Depends(get_db)):
     raise not_ready("GET /api/alerts", OWNER)
 
 
-@router.post("/alerts", summary="新增門檻")
+@router.post("/alerts", status_code=201, summary="新增門檻")
 @block_admin
 @stub
 def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
@@ -200,7 +201,7 @@ def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
         4. 新增一列，db.commit()，回傳
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from fastapi import APIRouter, Depends
             from sqlalchemy.orm import Session
@@ -212,43 +213,40 @@ def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit import alerts, crud, errors
             from app.toolkit.db import get_db
 
-        第二步：把整個 create_alert（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 status_code=201；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/alerts", status_code=201, summary="新增門檻")
-            @block_admin
-            def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
-                # 1. 門檻要是 1～200 的整數
-                try:
-                    percent = alerts.validate_percent(body.percent)
-                except alerts.InvalidThreshold as exc:
-                    raise errors.unprocessable(str(exc)) from None
+            # 1. 門檻要是 1～200 的整數
+            try:
+                percent = alerts.validate_percent(body.percent)
+            except alerts.InvalidThreshold as exc:
+                raise errors.unprocessable(str(exc)) from None
 
-                # 2. 帶了 groupId：針對那本帳，要是我加入、沒移除的
-                group = None
-                if body.groupId:
-                    group_id = int(body.groupId) if body.groupId.isdigit() else 0
-                    if crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db):
-                        group = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
-                    if group is None:
-                        raise errors.forbidden("你不在這本帳裡")
-                group_id = group.id if group else None
+            # 2. 帶了 groupId：針對那本帳，要是我加入、沒移除的
+            group = None
+            if body.groupId:
+                group_id = int(body.groupId) if body.groupId.isdigit() else 0
+                if crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db):
+                    group = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
+                if group is None:
+                    raise errors.forbidden("你不在這本帳裡")
+            group_id = group.id if group else None
 
-                # 3. 同一個（人、帳本、百分比）只能有一筆
-                if crud.exists(AlertRule, {"user_id": me.id, "group_id": group_id, "percent": percent}, db=db):
-                    raise errors.conflict("這個門檻已經設過了")
+            # 3. 同一個（人、帳本、百分比）只能有一筆
+            if crud.exists(AlertRule, {"user_id": me.id, "group_id": group_id, "percent": percent}, db=db):
+                raise errors.conflict("這個門檻已經設過了")
 
-                # 4. 新增
-                row = crud.save(AlertRule, {"user_id": me.id, "group_id": group_id, "percent": percent}, db=db)
-                db.commit()
-                return {
-                    "id": str(row.id),
-                    "percent": row.percent,
-                    "groupId": str(group_id) if group_id else None,
-                    "groupName": group.name if group else "整體",
-                    "enabled": row.enabled,
-                    "firedPeriod": None,
-                }
+            # 4. 新增
+            row = crud.save(AlertRule, {"user_id": me.id, "group_id": group_id, "percent": percent}, db=db)
+            db.commit()
+            return {
+                "id": str(row.id),
+                "percent": row.percent,
+                "groupId": str(group_id) if group_id else None,
+                "groupName": group.name if group else "整體",
+                "enabled": row.enabled,
+                "firedPeriod": None,
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -330,7 +328,7 @@ def update_alert(
         4. 有改到才寫回、db.commit()；回傳改完的樣子
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from fastapi import APIRouter, Depends
             from sqlalchemy.orm import Session
@@ -342,46 +340,40 @@ def update_alert(
             from app.toolkit import alerts, crud, errors
             from app.toolkit.db import get_db
 
-        第二步：把整個 update_alert（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/alerts/{aid}", summary="改門檻或暫停")
-            def update_alert(
-                body: AlertPatchIn,
-                row=Depends(own(AlertRule, "aid")),
-                db: Session = Depends(get_db),
-            ):
-                if body.percent is None and body.enabled is None:
-                    raise errors.bad_request("沒有要改的欄位")
-                changes = {}
+            if body.percent is None and body.enabled is None:
+                raise errors.bad_request("沒有要改的欄位")
+            changes = {}
 
-                # 1. 改百分比：不能跟自己的其他門檻重複；換了門檻就當作這個月還沒響過
-                if body.percent is not None and body.percent != row.percent:
-                    if crud.exists(AlertRule, {"user_id": row.user_id, "group_id": row.group_id,
-                                               "percent": body.percent, "id__ne": row.id}, db=db):
-                        raise errors.conflict("這個門檻已經設過了")
-                    changes["percent"] = body.percent
-                    changes["fired_period"] = None
+            # 1. 改百分比：不能跟自己的其他門檻重複；換了門檻就當作這個月還沒響過
+            if body.percent is not None and body.percent != row.percent:
+                if crud.exists(AlertRule, {"user_id": row.user_id, "group_id": row.group_id,
+                                           "percent": body.percent, "id__ne": row.id}, db=db):
+                    raise errors.conflict("這個門檻已經設過了")
+                changes["percent"] = body.percent
+                changes["fired_period"] = None
 
-                # 2. 暫停／恢復（關掉不刪）
-                if body.enabled is not None:
-                    changes["enabled"] = body.enabled
+            # 2. 暫停／恢復（關掉不刪）
+            if body.enabled is not None:
+                changes["enabled"] = body.enabled
 
-                # 3. 寫回去
-                if changes:
-                    crud.save(AlertRule, {"id": row.id, **changes}, db=db)
-                    db.commit()
+            # 3. 寫回去
+            if changes:
+                crud.save(AlertRule, {"id": row.id, **changes}, db=db)
+                db.commit()
 
-                # 4. 回傳改完的樣子
-                group = crud.get(Group, row.group_id, db=db) if row.group_id else None
-                return {
-                    "id": str(row.id),
-                    "percent": row.percent,
-                    "groupId": str(row.group_id) if row.group_id else None,
-                    "groupName": group.name if group else "整體",
-                    "enabled": row.enabled,
-                    "firedPeriod": row.fired_period,
-                }
+            # 4. 回傳改完的樣子
+            group = crud.get(Group, row.group_id, db=db) if row.group_id else None
+            return {
+                "id": str(row.id),
+                "percent": row.percent,
+                "groupId": str(row.group_id) if row.group_id else None,
+                "groupName": group.name if group else "整體",
+                "enabled": row.enabled,
+                "firedPeriod": row.fired_period,
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -446,7 +438,7 @@ def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_d
         2. 回 {"id", "deleted": true}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from fastapi import APIRouter, Depends
             from sqlalchemy.orm import Session
@@ -458,15 +450,13 @@ def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_d
             from app.toolkit import alerts, crud, errors
             from app.toolkit.db import get_db
 
-        第二步：把整個 delete_alert（從 @router.delete 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.delete("/alerts/{aid}", summary="刪門檻")
-            def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_db)):
-                alert_id = row.id
-                crud.remove(AlertRule, id=alert_id, db=db)
-                db.commit()
-                return {"id": str(alert_id), "deleted": True}
+            alert_id = row.id
+            crud.remove(AlertRule, id=alert_id, db=db)
+            db.commit()
+            return {"id": str(alert_id), "deleted": True}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

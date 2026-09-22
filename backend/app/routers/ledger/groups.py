@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,13 +19,20 @@
 
 from __future__ import annotations
 
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+from collections import Counter
+from datetime import date, datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.guards import block_admin, in_group
-from app.models import User
+from app import catalog
+from app.guards import block_admin, current_user, in_group
+from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+from app.toolkit import crud, errors, ledger
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["帳本"])
@@ -107,7 +115,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
         ⚠️ 這支只讀不寫，不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -123,58 +131,55 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 list_groups（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/groups", summary="我加入的帳本")
-            @block_admin
-            def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(get_db)):
-                # 1. 我加入的帳本（移除的一律不列；沒帶 includeArchived 也不列封存的）
-                mine = crud.find(GroupMember, {"user_id": me.id}, db=db)
-                where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True}
-                if not includeArchived:
-                    where["archived_at__isnull"] = True
-                groups = crud.find(Group, where, order_by="id", db=db)
-                if not groups:
-                    return {"me": str(me.id), "groups": []}
-                ids = [g.id for g in groups]
+            # 1. 我加入的帳本（移除的一律不列；沒帶 includeArchived 也不列封存的）
+            mine = crud.find(GroupMember, {"user_id": me.id}, db=db)
+            where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True}
+            if not includeArchived:
+                where["archived_at__isnull"] = True
+            groups = crud.find(Group, where, order_by="id", db=db)
+            if not groups:
+                return {"me": str(me.id), "groups": []}
+            ids = [g.id for g in groups]
 
-                # 2. 一次查完：成員與名字、每本幾筆、我的存款目標、我的通知開關
-                members = crud.find(GroupMember, {"group_id__in": ids}, order_by=("joined_at", "user_id"), db=db)
-                names = {u.id: u.display_name for u in crud.find(User, {"id__in": {m.user_id for m in members}}, db=db)}
-                counts = Counter(crud.find(Transaction, {"group_id__in": ids}, fields="group_id", db=db))
-                goals = {}
-                for row in crud.find(SavingsGoal, {"user_id": me.id, "group_id__in": ids}, order_by="id", db=db):
-                    goals[row.group_id] = row.goal_amount              # 後面的蓋掉前面的，留下最新的
-                notify_on = {m.group_id: m.notify for m in mine}
-                today = datetime.now(timezone(timedelta(hours=8))).date()
+            # 2. 一次查完：成員與名字、每本幾筆、我的存款目標、我的通知開關
+            members = crud.find(GroupMember, {"group_id__in": ids}, order_by=("joined_at", "user_id"), db=db)
+            names = {u.id: u.display_name for u in crud.find(User, {"id__in": {m.user_id for m in members}}, db=db)}
+            counts = Counter(crud.find(Transaction, {"group_id__in": ids}, fields="group_id", db=db))
+            goals = {}
+            for row in crud.find(SavingsGoal, {"user_id": me.id, "group_id__in": ids}, order_by="id", db=db):
+                goals[row.group_id] = row.goal_amount              # 後面的蓋掉前面的，留下最新的
+            notify_on = {m.group_id: m.notify for m in mine}
+            today = datetime.now(timezone(timedelta(hours=8))).date()
 
-                # 3. 一本一本組成前端要的樣子
-                out = []
-                for g in groups:
-                    inside = [m.user_id for m in members if m.group_id == g.id]
-                    out.append({
-                        "id": str(g.id),
-                        "name": g.name,
-                        "icon": g.name[-1:],
-                        "color": g.color or catalog.GROUP_COLORS[0],
-                        "owner": str(g.created_by),
-                        "note": g.note or "",
-                        "created": g.created_at.date().isoformat(),
-                        "kind": g.kind,
-                        "endsOn": g.ends_on.isoformat() if g.ends_on else None,
-                        "settledAt": g.settled_at.isoformat() if g.settled_at else None,
-                        "archived": g.archived_at is not None,
-                        "settled": g.settled_at is not None,
-                        "overdue": g.kind == "temp" and g.settled_at is None and g.ends_on is not None and g.ends_on < today,
-                        "members": [str(u) for u in inside],
-                        "memberNames": [names.get(u, "") for u in inside],
-                        "count": counts[g.id],
-                        "goal": goals.get(g.id, 0),
-                        "canEdit": g.created_by == me.id,
-                        "notify": notify_on.get(g.id, False),
-                    })
-                return {"me": str(me.id), "groups": out}
+            # 3. 一本一本組成前端要的樣子
+            out = []
+            for g in groups:
+                inside = [m.user_id for m in members if m.group_id == g.id]
+                out.append({
+                    "id": str(g.id),
+                    "name": g.name,
+                    "icon": g.name[-1:],
+                    "color": g.color or catalog.GROUP_COLORS[0],
+                    "owner": str(g.created_by),
+                    "note": g.note or "",
+                    "created": g.created_at.date().isoformat(),
+                    "kind": g.kind,
+                    "endsOn": g.ends_on.isoformat() if g.ends_on else None,
+                    "settledAt": g.settled_at.isoformat() if g.settled_at else None,
+                    "archived": g.archived_at is not None,
+                    "settled": g.settled_at is not None,
+                    "overdue": g.kind == "temp" and g.settled_at is None and g.ends_on is not None and g.ends_on < today,
+                    "members": [str(u) for u in inside],
+                    "memberNames": [names.get(u, "") for u in inside],
+                    "count": counts[g.id],
+                    "goal": goals.get(g.id, 0),
+                    "canEdit": g.created_by == me.id,
+                    "notify": notify_on.get(g.id, False),
+                })
+            return {"me": str(me.id), "groups": out}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -191,7 +196,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
     raise not_ready("GET /api/groups", OWNER)
 
 
-@router.post("/groups", summary="開一本帳")
+@router.post("/groups", status_code=201, summary="開一本帳")
 @block_admin
 @stub
 def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
@@ -262,7 +267,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         4. 回傳剛建好的帳本
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -278,67 +283,64 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 create_group（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 status_code=201；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/groups", status_code=201, summary="開一本帳")
-            @block_admin
-            def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
-                # 1. 名稱、顏色、結束日
-                name = " ".join(body.name.split())
-                if not name:
-                    raise errors.unprocessable("帳本要有名字")
-                color = body.color or catalog.GROUP_COLORS[0]
-                if color not in catalog.GROUP_COLORS:
-                    raise errors.unprocessable("沒有這個顏色")
-                ends_on = None
-                if body.kind == "temp":
-                    if not body.endsOn:
-                        raise errors.bad_request("活動帳本要有結束日")
-                    try:
-                        ends_on = date.fromisoformat(body.endsOn)
-                    except ValueError:
-                        raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
+            # 1. 名稱、顏色、結束日
+            name = " ".join(body.name.split())
+            if not name:
+                raise errors.unprocessable("帳本要有名字")
+            color = body.color or catalog.GROUP_COLORS[0]
+            if color not in catalog.GROUP_COLORS:
+                raise errors.unprocessable("沒有這個顏色")
+            ends_on = None
+            if body.kind == "temp":
+                if not body.endsOn:
+                    raise errors.bad_request("活動帳本要有結束日")
+                try:
+                    ends_on = date.fromisoformat(body.endsOn)
+                except ValueError:
+                    raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
 
-                # 2. 同一個家庭裡不能重名（含封存的）；沒有家庭就只跟自己開的比
-                if me.family_id:
-                    people = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"}, fields="user_id", db=db)
-                else:
-                    people = [me.id]
-                if crud.exists(Group, {"name": name, "created_by__in": people, "removed_at__isnull": True}, db=db):
-                    raise errors.conflict("家裡已經有一本叫「%s」的帳了" % name)
+            # 2. 同一個家庭裡不能重名（含封存的）；沒有家庭就只跟自己開的比
+            if me.family_id:
+                people = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"}, fields="user_id", db=db)
+            else:
+                people = [me.id]
+            if crud.exists(Group, {"name": name, "created_by__in": people, "removed_at__isnull": True}, db=db):
+                raise errors.conflict("家裡已經有一本叫「%s」的帳了" % name)
 
-                # 3. 新增帳本，建立的人自動加進去
-                group = crud.save(Group, {
-                    "family_id": me.family_id,
-                    "name": name,
-                    "color": color,
-                    "note": body.note.strip() or None,
-                    "created_by": me.id,
-                    "kind": body.kind,
-                    "ends_on": ends_on,
-                }, db=db)
-                crud.save(GroupMember, {"group_id": group.id, "user_id": me.id}, db=db)
-                db.commit()
+            # 3. 新增帳本，建立的人自動加進去
+            group = crud.save(Group, {
+                "family_id": me.family_id,
+                "name": name,
+                "color": color,
+                "note": body.note.strip() or None,
+                "created_by": me.id,
+                "kind": body.kind,
+                "ends_on": ends_on,
+            }, db=db)
+            crud.save(GroupMember, {"group_id": group.id, "user_id": me.id}, db=db)
+            db.commit()
 
-                # 4. 回傳剛建好的帳本
-                return {
-                    "id": str(group.id),
-                    "name": group.name,
-                    "icon": group.name[-1:],
-                    "color": group.color,
-                    "owner": str(me.id),
-                    "note": group.note or "",
-                    "created": group.created_at.date().isoformat(),
-                    "kind": group.kind,
-                    "endsOn": ends_on.isoformat() if ends_on else None,
-                    "settledAt": None,
-                    "archived": False,
-                    "settled": False,
-                    "members": [str(me.id)],
-                    "canEdit": True,
-                    "notify": False,
-                }
+            # 4. 回傳剛建好的帳本
+            return {
+                "id": str(group.id),
+                "name": group.name,
+                "icon": group.name[-1:],
+                "color": group.color,
+                "owner": str(me.id),
+                "note": group.note or "",
+                "created": group.created_at.date().isoformat(),
+                "kind": group.kind,
+                "endsOn": ends_on.isoformat() if ends_on else None,
+                "settledAt": None,
+                "archived": False,
+                "settled": False,
+                "members": [str(me.id)],
+                "canEdit": True,
+                "notify": False,
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -361,6 +363,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
 def update_group(
     body: GroupPatchIn,
     group=Depends(in_group("gid", owner=True)),
+    me: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """改名稱、顏色、說明
@@ -429,7 +432,7 @@ def update_group(
         5. 什麼都沒改到 → 400；有的話 crud.save、db.commit()，回傳改完的帳本
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -445,70 +448,63 @@ def update_group(
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 update_group（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 me=Depends(current_user)；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/groups/{gid}", summary="改名稱、顏色、說明")
-            def update_group(
-                body: GroupPatchIn,
-                group=Depends(in_group("gid", owner=True)),
-                me: User = Depends(current_user),
-                db: Session = Depends(get_db),
-            ):
-                sent = body.model_fields_set
-                changes = {}
+            sent = body.model_fields_set
+            changes = {}
 
-                # 1. 名稱：不能空白；同一個家庭裡不能跟別本重名
-                if "name" in sent:
-                    name = " ".join((body.name or "").split())
-                    if not name:
-                        raise errors.unprocessable("帳本要有名字")
-                    if name != group.name:
-                        if me.family_id:
-                            people = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"},
-                                               fields="user_id", db=db)
-                        else:
-                            people = [me.id]
-                        if crud.exists(Group, {"name": name, "created_by__in": people, "removed_at__isnull": True,
-                                               "id__ne": group.id}, db=db):
-                            raise errors.conflict("家裡已經有一本叫「%s」的帳了" % name)
-                    changes["name"] = name
+            # 1. 名稱：不能空白；同一個家庭裡不能跟別本重名
+            if "name" in sent:
+                name = " ".join((body.name or "").split())
+                if not name:
+                    raise errors.unprocessable("帳本要有名字")
+                if name != group.name:
+                    if me.family_id:
+                        people = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"},
+                                           fields="user_id", db=db)
+                    else:
+                        people = [me.id]
+                    if crud.exists(Group, {"name": name, "created_by__in": people, "removed_at__isnull": True,
+                                           "id__ne": group.id}, db=db):
+                        raise errors.conflict("家裡已經有一本叫「%s」的帳了" % name)
+                changes["name"] = name
 
-                # 2. 顏色只收清單裡的代號
-                if "color" in sent:
-                    if body.color not in catalog.GROUP_COLORS:
-                        raise errors.unprocessable("沒有這個顏色")
-                    changes["color"] = body.color
+            # 2. 顏色只收清單裡的代號
+            if "color" in sent:
+                if body.color not in catalog.GROUP_COLORS:
+                    raise errors.unprocessable("沒有這個顏色")
+                changes["color"] = body.color
 
-                # 3. 說明
-                if "note" in sent:
-                    changes["note"] = (body.note or "").strip() or None
+            # 3. 說明
+            if "note" in sent:
+                changes["note"] = (body.note or "").strip() or None
 
-                # 4. 復原封存：只收 false
-                if "archived" in sent:
-                    if body.archived is not False:
-                        raise errors.unprocessable("封存請用 DELETE；這裡的 archived 只收 false（復原）")
-                    changes["archived_at"] = None
+            # 4. 復原封存：只收 false
+            if "archived" in sent:
+                if body.archived is not False:
+                    raise errors.unprocessable("封存請用 DELETE；這裡的 archived 只收 false（復原）")
+                changes["archived_at"] = None
 
-                if not changes:
-                    raise errors.bad_request("沒有要改的欄位")
-                crud.save(Group, {"id": group.id, **changes}, db=db)
-                db.commit()
-                return {
-                    "id": str(group.id),
-                    "name": group.name,
-                    "icon": group.name[-1:],
-                    "color": group.color or catalog.GROUP_COLORS[0],
-                    "owner": str(group.created_by),
-                    "note": group.note or "",
-                    "created": group.created_at.date().isoformat(),
-                    "kind": group.kind,
-                    "endsOn": group.ends_on.isoformat() if group.ends_on else None,
-                    "settledAt": group.settled_at.isoformat() if group.settled_at else None,
-                    "archived": group.archived_at is not None,
-                    "settled": group.settled_at is not None,
-                    "canEdit": True,
-                }
+            if not changes:
+                raise errors.bad_request("沒有要改的欄位")
+            crud.save(Group, {"id": group.id, **changes}, db=db)
+            db.commit()
+            return {
+                "id": str(group.id),
+                "name": group.name,
+                "icon": group.name[-1:],
+                "color": group.color or catalog.GROUP_COLORS[0],
+                "owner": str(group.created_by),
+                "note": group.note or "",
+                "created": group.created_at.date().isoformat(),
+                "kind": group.kind,
+                "endsOn": group.ends_on.isoformat() if group.ends_on else None,
+                "settledAt": group.settled_at.isoformat() if group.settled_at else None,
+                "archived": group.archived_at is not None,
+                "settled": group.settled_at is not None,
+                "canEdit": True,
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -589,7 +585,7 @@ def archive_or_remove_group(
         3. 回 {"id", "removed": true}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -605,39 +601,33 @@ def archive_or_remove_group(
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 archive_or_remove_group（從 @router.delete 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.delete("/groups/{gid}", summary="封存；permanent=true 是移除")
-            def archive_or_remove_group(
-                permanent: bool = False,
-                group=Depends(in_group("gid", owner=True)),
-                db: Session = Depends(get_db),
-            ):
-                now = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc)
 
-                # 1. 沒帶 permanent：封存（只設時間，任何紀錄都不動，之後可以復原）
-                if not permanent:
-                    if group.archived_at is None:
-                        crud.save(Group, {"id": group.id, "archived_at": now}, db=db)
-                        db.commit()
-                    return {"id": str(group.id), "archived": True}
+            # 1. 沒帶 permanent：封存（只設時間，任何紀錄都不動，之後可以復原）
+            if not permanent:
+                if group.archived_at is None:
+                    crud.save(Group, {"id": group.id, "archived_at": now}, db=db)
+                    db.commit()
+                return {"id": str(group.id), "archived": True}
 
-                # 2. permanent=true：移除。只有結算過的活動帳本可以
-                try:
-                    ledger.require_removable(group.created_by, group.created_by, group.settled_at, group.removed_at)
-                except ValueError as exc:
-                    raise errors.conflict(str(exc)) from None
-                crud.save(Group, {"id": group.id, "removed_at": now}, db=db)
-                crud.save(AuditLog, {
-                    "actor_id": group.created_by,
-                    "action": "remove_group",
-                    "target_type": "group",
-                    "target_id": group.id,
-                    "meta_json": {"note": "移除已結算的「%s」" % group.name},
-                }, db=db)
-                db.commit()
-                return {"id": str(group.id), "removed": True}
+            # 2. permanent=true：移除。只有結算過的活動帳本可以
+            try:
+                ledger.require_removable(group.created_by, group.created_by, group.settled_at, group.removed_at)
+            except ValueError as exc:
+                raise errors.conflict(str(exc)) from None
+            crud.save(Group, {"id": group.id, "removed_at": now}, db=db)
+            crud.save(AuditLog, {
+                "actor_id": group.created_by,
+                "action": "remove_group",
+                "target_type": "group",
+                "target_id": group.id,
+                "meta_json": {"note": "移除已結算的「%s」" % group.name},
+            }, db=db)
+            db.commit()
+            return {"id": str(group.id), "removed": True}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -654,11 +644,12 @@ def archive_or_remove_group(
     raise not_ready("DELETE /api/groups/{gid}", OWNER)
 
 
-@router.post("/groups/{gid}/members", summary="把家人加進這本帳")
+@router.post("/groups/{gid}/members", status_code=201, summary="把家人加進這本帳")
 @stub
 def add_group_member(
     body: GroupMemberIn,
     group=Depends(in_group("gid", owner=True)),
+    me: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """把家人加進這本帳
@@ -716,7 +707,7 @@ def add_group_member(
         3. 新增 group_members（notify 預設 false），db.commit()，回 {"group", "user"}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -732,31 +723,24 @@ def add_group_member(
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 add_group_member（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 status_code=201、me=Depends(current_user)；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/groups/{gid}/members", status_code=201, summary="把家人加進這本帳")
-            def add_group_member(
-                body: GroupMemberIn,
-                group=Depends(in_group("gid", owner=True)),
-                me: User = Depends(current_user),
-                db: Session = Depends(get_db),
-            ):
-                # 1. 只能加同一個家庭的人（平台管理員不屬於任何家庭，也加不進來）
-                user_id = int(body.userId) if body.userId.isdigit() else 0
-                same_family = me.family_id is not None and crud.exists(
-                    FamilyMember, {"family_id": me.family_id, "user_id": user_id, "status": "active"}, db=db)
-                if not same_family or crud.get(User, user_id, db=db).is_platform_admin:
-                    raise errors.not_found("這個家庭裡沒有這個人")
+            # 1. 只能加同一個家庭的人（平台管理員不屬於任何家庭，也加不進來）
+            user_id = int(body.userId) if body.userId.isdigit() else 0
+            same_family = me.family_id is not None and crud.exists(
+                FamilyMember, {"family_id": me.family_id, "user_id": user_id, "status": "active"}, db=db)
+            if not same_family or crud.get(User, user_id, db=db).is_platform_admin:
+                raise errors.not_found("這個家庭裡沒有這個人")
 
-                # 2. 已經在裡面就不用再加
-                if crud.exists(GroupMember, {"group_id": group.id, "user_id": user_id}, db=db):
-                    raise errors.conflict("他已經在這本帳裡了")
+            # 2. 已經在裡面就不用再加
+            if crud.exists(GroupMember, {"group_id": group.id, "user_id": user_id}, db=db):
+                raise errors.conflict("他已經在這本帳裡了")
 
-                # 3. 加進去
-                crud.save(GroupMember, {"group_id": group.id, "user_id": user_id}, db=db)
-                db.commit()
-                return {"group": str(group.id), "user": str(user_id)}
+            # 3. 加進去
+            crud.save(GroupMember, {"group_id": group.id, "user_id": user_id}, db=db)
+            db.commit()
+            return {"group": str(group.id), "user": str(user_id)}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -824,7 +808,7 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
         3. db.commit()，回 {"group", "user", "removed": true}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -840,22 +824,20 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 remove_group_member（從 @router.delete 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.delete("/groups/{gid}/members/{user_id}", summary="把人移出這本帳")
-            def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True)), db: Session = Depends(get_db)):
-                # 1. 建立者不能把自己移出去，不然這本帳沒人管得動
-                uid = int(user_id) if user_id.isdigit() else 0
-                if uid == group.created_by:
-                    raise errors.bad_request("建立者不能把自己移出去")
+            # 1. 建立者不能把自己移出去，不然這本帳沒人管得動
+            uid = int(user_id) if user_id.isdigit() else 0
+            if uid == group.created_by:
+                raise errors.bad_request("建立者不能把自己移出去")
 
-                # 2. 刪掉他的成員關係（他自己記過的紀錄不動）
-                removed = crud.remove(GroupMember, {"group_id": group.id, "user_id": uid}, db=db)
-                if not removed:
-                    raise errors.not_found("他不在這本帳裡")
-                db.commit()
-                return {"group": str(group.id), "user": str(uid), "removed": True}
+            # 2. 刪掉他的成員關係（他自己記過的紀錄不動）
+            removed = crud.remove(GroupMember, {"group_id": group.id, "user_id": uid}, db=db)
+            if not removed:
+                raise errors.not_found("他不在這本帳裡")
+            db.commit()
+            return {"group": str(group.id), "user": str(uid), "removed": True}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -922,7 +904,7 @@ def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depen
         3. 回 {"id", "settledAt"}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -938,22 +920,20 @@ def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depen
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 settle_group（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/groups/{gid}/settle", summary="結算活動帳本")
-            def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depends(get_db)):
-                # 1. 只有活動帳本、而且還沒結算的才能結算
-                if group.kind != "temp":
-                    raise errors.bad_request("只有活動帳本需要結算")
-                if group.settled_at is not None:
-                    raise errors.conflict("這本帳已經結算過了")
+            # 1. 只有活動帳本、而且還沒結算的才能結算
+            if group.kind != "temp":
+                raise errors.bad_request("只有活動帳本需要結算")
+            if group.settled_at is not None:
+                raise errors.conflict("這本帳已經結算過了")
 
-                # 2. 標記結算時間（之後這本帳唯讀；紀錄一筆都不動）
-                now = datetime.now(timezone.utc)
-                crud.save(Group, {"id": group.id, "settled_at": now}, db=db)
-                db.commit()
-                return {"id": str(group.id), "settledAt": now.isoformat()}
+            # 2. 標記結算時間（之後這本帳唯讀；紀錄一筆都不動）
+            now = datetime.now(timezone.utc)
+            crud.save(Group, {"id": group.id, "settled_at": now}, db=db)
+            db.commit()
+            return {"id": str(group.id), "settledAt": now.isoformat()}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -972,7 +952,12 @@ def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depen
 
 @router.patch("/groups/{gid}/notify", summary="這本帳有動靜要不要通知我")
 @stub
-def set_group_notify(body: NotifyIn, group=Depends(in_group("gid")), db: Session = Depends(get_db)):
+def set_group_notify(
+    body: NotifyIn,
+    group=Depends(in_group("gid")),
+    me: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
     """這本帳有動靜要不要通知我
 
     PATCH /api/groups/{gid}/notify
@@ -1022,7 +1007,7 @@ def set_group_notify(body: NotifyIn, group=Depends(in_group("gid")), db: Session
         2. db.commit()，回 {"group", "notify"}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -1038,20 +1023,13 @@ def set_group_notify(body: NotifyIn, group=Depends(in_group("gid")), db: Session
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：把整個 set_group_notify（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 me=Depends(current_user)；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/groups/{gid}/notify", summary="這本帳有動靜要不要通知我")
-            def set_group_notify(
-                body: NotifyIn,
-                group=Depends(in_group("gid")),
-                me: User = Depends(current_user),
-                db: Session = Depends(get_db),
-            ):
-                # 只改我自己那一列，不影響別人
-                crud.save(GroupMember, {"notify": body.notify}, where={"group_id": group.id, "user_id": me.id}, db=db)
-                db.commit()
-                return {"group": str(group.id), "notify": body.notify}
+            # 只改我自己那一列，不影響別人
+            crud.save(GroupMember, {"notify": body.notify}, where={"group_id": group.id, "user_id": me.id}, db=db)
+            db.commit()
+            return {"group": str(group.id), "notify": body.notify}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

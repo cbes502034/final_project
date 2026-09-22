@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,13 +19,18 @@
 
 from __future__ import annotations
 
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.guards import block_admin, own
-from app.models import Notification, User
+from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.family import ReadAllIn, ReadOneIn
+from app.toolkit import alerts, crud, errors, money, period
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["通知"])
@@ -124,7 +130,7 @@ def list_notifications(
         5. 回傳 {notifications, unread, maxId}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import datetime, timedelta, timezone
 
@@ -138,90 +144,82 @@ def list_notifications(
             from app.toolkit import alerts, crud, errors, money, period
             from app.toolkit.db import get_db
 
-        第二步：把整個 list_notifications（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/notifications", summary="通知清單（輪詢）")
-            @block_admin
-            def list_notifications(
-                me: User,
-                since: str | None = None,
-                unreadOnly: bool = False,
-                db: Session = Depends(get_db),
-            ):
-                # 1. 我的提醒門檻：這個月跨過、還沒響過的，寫一則 budget_alert
-                this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
-                rules = crud.find(AlertRule, {
-                    "user_id": me.id,
-                    "enabled": True,
-                    "or": [{"fired_period__isnull": True}, {"fired_period__ne": this_month}],
-                }, db=db)
-                if rules:
-                    start, end = period.month_range(this_month)
-                    mine = crud.find(Transaction, {"user_id": me.id, "kind__in": ["income", "expense"],
-                                                   "occurred_on__between": (start, end)},
-                                     fields=("group_id", "kind", "amount"), db=db)
-                    goals = {}
-                    for g in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
-                        goals[g.group_id] = g.goal_amount                    # 整體目標的鍵是 None
-                    names = {g.id: g.name for g in crud.find(Group, {"id__in": {r.group_id for r in rules if r.group_id}}, db=db)}
-                    for rule in rules:
-                        rows = [t for t in mine if rule.group_id is None or t["group_id"] == rule.group_id]
-                        income = money.add(*[t["amount"] for t in rows if t["kind"] == "income"])
-                        spent = money.add(*[t["amount"] for t in rows if t["kind"] == "expense"])
-                        allowance = income - goals.get(rule.group_id, money.ZERO)
-                        reached = alerts.usage_percent(spent, allowance)
-                        if not alerts.should_fire(rule.percent, 0, reached, rule.fired_period, this_month):
-                            continue
-                        crud.save(Notification, {"recipient_id": me.id, "type": "budget_alert", "payload_json": {
-                            "percent": rule.percent,
-                            "reached": reached,
-                            "groupId": str(rule.group_id) if rule.group_id else None,
-                            "groupName": names.get(rule.group_id, "") if rule.group_id else "整體",
-                            "spent": float(spent),
-                            "allowance": float(allowance),
-                        }}, db=db)
-                        crud.save(AlertRule, {"id": rule.id, "fired_period": this_month}, db=db)
-                    db.commit()
+            # 1. 我的提醒門檻：這個月跨過、還沒響過的，寫一則 budget_alert
+            this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
+            rules = crud.find(AlertRule, {
+                "user_id": me.id,
+                "enabled": True,
+                "or": [{"fired_period__isnull": True}, {"fired_period__ne": this_month}],
+            }, db=db)
+            if rules:
+                start, end = period.month_range(this_month)
+                mine = crud.find(Transaction, {"user_id": me.id, "kind__in": ["income", "expense"],
+                                               "occurred_on__between": (start, end)},
+                                 fields=("group_id", "kind", "amount"), db=db)
+                goals = {}
+                for g in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
+                    goals[g.group_id] = g.goal_amount                    # 整體目標的鍵是 None
+                names = {g.id: g.name for g in crud.find(Group, {"id__in": {r.group_id for r in rules if r.group_id}}, db=db)}
+                for rule in rules:
+                    rows = [t for t in mine if rule.group_id is None or t["group_id"] == rule.group_id]
+                    income = money.add(*[t["amount"] for t in rows if t["kind"] == "income"])
+                    spent = money.add(*[t["amount"] for t in rows if t["kind"] == "expense"])
+                    allowance = income - goals.get(rule.group_id, money.ZERO)
+                    reached = alerts.usage_percent(spent, allowance)
+                    if not alerts.should_fire(rule.percent, 0, reached, rule.fired_period, this_month):
+                        continue
+                    crud.save(Notification, {"recipient_id": me.id, "type": "budget_alert", "payload_json": {
+                        "percent": rule.percent,
+                        "reached": reached,
+                        "groupId": str(rule.group_id) if rule.group_id else None,
+                        "groupName": names.get(rule.group_id, "") if rule.group_id else "整體",
+                        "spent": float(spent),
+                        "allowance": float(allowance),
+                    }}, db=db)
+                    crud.save(AlertRule, {"id": rule.id, "fired_period": this_month}, db=db)
+                db.commit()
 
-                # 2. 我的通知：比 since 新的，由新到舊，一次最多 20 則
-                where = {"recipient_id": me.id}
-                if since:
-                    where["id__gt"] = int(since) if since.isdigit() else 0
-                if unreadOnly:
-                    where["read_at__isnull"] = True
-                rows = crud.find(Notification, where, order_by="-id", limit=20, db=db)
+            # 2. 我的通知：比 since 新的，由新到舊，一次最多 20 則
+            where = {"recipient_id": me.id}
+            if since:
+                where["id__gt"] = int(since) if since.isdigit() else 0
+            if unreadOnly:
+                where["read_at__isnull"] = True
+            rows = crud.find(Notification, where, order_by="-id", limit=20, db=db)
 
-                # 3. 未讀總數、最大的 id 另外查（不受 since 影響）
-                unread = crud.count(Notification, {"recipient_id": me.id, "read_at__isnull": True}, db=db)
-                newest = crud.get(Notification, where={"recipient_id": me.id}, fields="id", order_by="-id", db=db)
+            # 3. 未讀總數、最大的 id 另外查（不受 since 影響）
+            unread = crud.count(Notification, {"recipient_id": me.id, "read_at__isnull": True}, db=db)
+            newest = crud.get(Notification, where={"recipient_id": me.id}, fields="id", order_by="-id", db=db)
 
-                # 4. 記帳類補上那一筆的金額、分類、店家；提醒類把 payload 攤開
-                tx_ids = [n.transaction_id for n in rows if n.transaction_id]
-                txs = {t.id: t for t in crud.find(Transaction, {"id__in": tx_ids}, db=db)}
-                out = []
-                for n in rows:
-                    stamps = []
-                    for value in (n.created_at, n.read_at):
-                        if value is not None and value.tzinfo is None:
-                            value = value.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
-                        stamps.append(value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if value else None)
-                    item = {
-                        "id": str(n.id),
-                        "type": n.type,
-                        "actorId": str(n.actor_id) if n.actor_id else None,
-                        "createdAt": stamps[0],
-                        "readAt": stamps[1],
-                    }
-                    item.update(n.payload_json or {})
-                    t = txs.get(n.transaction_id)
-                    if t is not None:
-                        item.update({"txId": str(t.id), "amount": t.amount, "cat": str(t.category_id),
-                                     "merchant": t.merchant or "", "groupId": str(t.group_id)})
-                    out.append(item)
+            # 4. 記帳類補上那一筆的金額、分類、店家；提醒類把 payload 攤開
+            tx_ids = [n.transaction_id for n in rows if n.transaction_id]
+            txs = {t.id: t for t in crud.find(Transaction, {"id__in": tx_ids}, db=db)}
+            out = []
+            for n in rows:
+                stamps = []
+                for value in (n.created_at, n.read_at):
+                    if value is not None and value.tzinfo is None:
+                        value = value.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
+                    stamps.append(value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if value else None)
+                item = {
+                    "id": str(n.id),
+                    "type": n.type,
+                    "actorId": str(n.actor_id) if n.actor_id else None,
+                    "createdAt": stamps[0],
+                    "readAt": stamps[1],
+                }
+                item.update(n.payload_json or {})
+                t = txs.get(n.transaction_id)
+                if t is not None:
+                    item.update({"txId": str(t.id), "amount": t.amount, "cat": str(t.category_id),
+                                 "merchant": t.merchant or "", "groupId": str(t.group_id)})
+                out.append(item)
 
-                # 5. 回傳
-                return {"notifications": out, "unread": unread, "maxId": str(newest) if newest else None}
+            # 5. 回傳
+            return {"notifications": out, "unread": unread, "maxId": str(newest) if newest else None}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -293,7 +291,7 @@ def read_notification(
         3. 回 {"id", "readAt"}（UTC、結尾 Z）
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import datetime, timedelta, timezone
 
@@ -307,25 +305,19 @@ def read_notification(
             from app.toolkit import alerts, crud, errors, money, period
             from app.toolkit.db import get_db
 
-        第二步：把整個 read_notification（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/notifications/{nid}", summary="一則標記已讀")
-            def read_notification(
-                body: ReadOneIn,
-                row=Depends(own(Notification, "nid", "recipient_id")),
-                db: Session = Depends(get_db),
-            ):
-                # 1. 標已讀（讀過的保留原本的時間）；read: false 是改回未讀
-                read_at = (row.read_at or datetime.now(timezone.utc)) if body.read else None
-                crud.save(Notification, {"id": row.id, "read_at": read_at}, db=db)
-                db.commit()
+            # 1. 標已讀（讀過的保留原本的時間）；read: false 是改回未讀
+            read_at = (row.read_at or datetime.now(timezone.utc)) if body.read else None
+            crud.save(Notification, {"id": row.id, "read_at": read_at}, db=db)
+            db.commit()
 
-                # 2. 回傳（UTC、結尾 Z）
-                if read_at is not None and read_at.tzinfo is None:
-                    read_at = read_at.replace(tzinfo=timezone.utc)              # SQLite 讀回來沒有時區
-                stamp = read_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if read_at else None
-                return {"id": str(row.id), "readAt": stamp}
+            # 2. 回傳（UTC、結尾 Z）
+            if read_at is not None and read_at.tzinfo is None:
+                read_at = read_at.replace(tzinfo=timezone.utc)              # SQLite 讀回來沒有時區
+            stamp = read_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if read_at else None
+            return {"id": str(row.id), "readAt": stamp}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -396,7 +388,7 @@ def read_notifications(body: ReadAllIn, me: User, db: Session = Depends(get_db))
         3. 查剩下的未讀數，回 {updated, unread}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import datetime, timedelta, timezone
 
@@ -410,25 +402,22 @@ def read_notifications(body: ReadAllIn, me: User, db: Session = Depends(get_db))
             from app.toolkit import alerts, crud, errors, money, period
             from app.toolkit.db import get_db
 
-        第二步：把整個 read_notifications（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/notifications", summary="整批標記已讀")
-            @block_admin
-            def read_notifications(body: ReadAllIn, me: User, db: Session = Depends(get_db)):
-                # 1. 一定要帶 readUntil：只標到使用者按下去當時看得到的那一則
-                if not body.readUntil:
-                    raise errors.bad_request("要帶 readUntil（按下去當時最新的那一則）")
-                until = int(body.readUntil) if body.readUntil.isdigit() else 0
+            # 1. 一定要帶 readUntil：只標到使用者按下去當時看得到的那一則
+            if not body.readUntil:
+                raise errors.bad_request("要帶 readUntil（按下去當時最新的那一則）")
+            until = int(body.readUntil) if body.readUntil.isdigit() else 0
 
-                # 2. 我的、還沒讀、不比 readUntil 新的，一次標掉
-                updated = crud.save(Notification, {"read_at": datetime.now(timezone.utc)},
-                                    where={"recipient_id": me.id, "read_at__isnull": True, "id__lte": until}, db=db)
-                db.commit()
+            # 2. 我的、還沒讀、不比 readUntil 新的，一次標掉
+            updated = crud.save(Notification, {"read_at": datetime.now(timezone.utc)},
+                                where={"recipient_id": me.id, "read_at__isnull": True, "id__lte": until}, db=db)
+            db.commit()
 
-                # 3. 剩下的未讀（之後才進來的還是未讀）
-                unread = crud.count(Notification, {"recipient_id": me.id, "read_at__isnull": True}, db=db)
-                return {"updated": updated, "unread": unread}
+            # 3. 剩下的未讀（之後才進來的還是未讀）
+            unread = crud.count(Notification, {"recipient_id": me.id, "read_at__isnull": True}, db=db)
+            return {"updated": updated, "unread": unread}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

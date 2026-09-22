@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,13 +19,18 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+from datetime import date, datetime, timezone
+
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from app.guards import block_admin, own
-from app.models import Transaction, User
+from app.guards import block_admin, current_user, own, visible_scope
+from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.transaction import TransactionIn, TransactionPatchIn
+from app.toolkit import crud, errors, ledger, money, notify
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["記帳"])
@@ -36,6 +42,7 @@ OWNER = "成員2"
 @stub
 def list_transactions(
     me: User,
+    request: Request,
     userId: str | None = None,
     groupId: str | None = None,
     from_: str | None = Query(None, alias="from"),
@@ -142,7 +149,7 @@ def list_transactions(
         ⚠️ 這支只讀不寫，不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import date, datetime, timezone
 
@@ -156,100 +163,84 @@ def list_transactions(
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：把整個 list_transactions（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 request（檢查怪參數用）；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/transactions", summary="收支明細")
-            @block_admin
-            def list_transactions(
-                me: User,
-                request: Request,
-                userId: str | None = None,
-                groupId: str | None = None,
-                from_: str | None = Query(None, alias="from"),
-                to: str | None = None,
-                categoryId: str | None = None,
-                kind: str | None = None,
-                source: str | None = None,
-                q: str | None = None,
-                page: int = Query(1, ge=1),
-                db: Session = Depends(get_db),
-            ):
-                # 1. 不認得的查詢參數直接擋（默默忽略的話，篩選沒生效也看不出來）
-                allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page"}
-                unknown = sorted(set(request.query_params) - allowed)
-                if unknown:
-                    raise errors.unprocessable("不認得的篩選參數：" + "、".join(unknown))
+            # 1. 不認得的查詢參數直接擋（默默忽略的話，篩選沒生效也看不出來）
+            allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page"}
+            unknown = sorted(set(request.query_params) - allowed)
+            if unknown:
+                raise errors.unprocessable("不認得的篩選參數：" + "、".join(unknown))
 
-                # 2. 我看得到的人、看得到的帳本；兩條路一定是「或」
-                users, groups = visible_scope(me, db)
-                where = {"and": [{"or": [{"user_id__in": users}, {"group_id__in": groups}]}]}
+            # 2. 我看得到的人、看得到的帳本；兩條路一定是「或」
+            users, groups = visible_scope(me, db)
+            where = {"and": [{"or": [{"user_id__in": users}, {"group_id__in": groups}]}]}
 
-                # 3. 帶了 userId：要是我查得到的人，不然 403（不要回空陣列）
-                if userId and userId != "all":
-                    target = int(userId) if userId.isdigit() else 0
-                    members = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
-                    if target not in users and target not in members:
-                        raise errors.forbidden("你沒有權限看這個人的紀錄")
-                    where["user_id"] = target
+            # 3. 帶了 userId：要是我查得到的人，不然 403（不要回空陣列）
+            if userId and userId != "all":
+                target = int(userId) if userId.isdigit() else 0
+                members = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
+                if target not in users and target not in members:
+                    raise errors.forbidden("你沒有權限看這個人的紀錄")
+                where["user_id"] = target
 
-                # 4. 帶了 groupId：要是我加入的帳本
-                if groupId and groupId != "all":
-                    group_id = int(groupId) if groupId.isdigit() else 0
-                    if group_id not in groups:
-                        raise errors.forbidden("你不在這本帳裡")
-                    where["group_id"] = group_id
+            # 4. 帶了 groupId：要是我加入的帳本
+            if groupId and groupId != "all":
+                group_id = int(groupId) if groupId.isdigit() else 0
+                if group_id not in groups:
+                    raise errors.forbidden("你不在這本帳裡")
+                where["group_id"] = group_id
 
-                # 5. 其他篩選
-                try:
-                    if from_:
-                        where["occurred_on__gte"] = date.fromisoformat(from_)
-                    if to:
-                        where["occurred_on__lte"] = date.fromisoformat(to)
-                except ValueError:
-                    raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
-                if categoryId:
-                    where["category_id"] = int(categoryId) if categoryId.isdigit() else 0
-                if kind and kind != "all":
-                    if kind not in ("income", "expense", "transfer"):
-                        raise errors.unprocessable("kind 只能是 income、expense 或 transfer")
-                    where["kind"] = kind
-                if source and source != "all":
-                    if source not in ("manual", "nlp", "import"):
-                        raise errors.unprocessable("source 只能是 manual、nlp 或 import")
-                    where["source"] = source
-                if q and q.strip():
-                    word = q.strip()
-                    where["and"].append({"or": [{"merchant__icontains": word}, {"note__icontains": word}]})
+            # 5. 其他篩選
+            try:
+                if from_:
+                    where["occurred_on__gte"] = date.fromisoformat(from_)
+                if to:
+                    where["occurred_on__lte"] = date.fromisoformat(to)
+            except ValueError:
+                raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
+            if categoryId:
+                where["category_id"] = int(categoryId) if categoryId.isdigit() else 0
+            if kind and kind != "all":
+                if kind not in ("income", "expense", "transfer"):
+                    raise errors.unprocessable("kind 只能是 income、expense 或 transfer")
+                where["kind"] = kind
+            if source and source != "all":
+                if source not in ("manual", "nlp", "import"):
+                    raise errors.unprocessable("source 只能是 manual、nlp 或 import")
+                where["source"] = source
+            if q and q.strip():
+                word = q.strip()
+                where["and"].append({"or": [{"merchant__icontains": word}, {"note__icontains": word}]})
 
-                # 6. 查一頁：新的在前，一頁 200 筆
-                result = crud.find(Transaction, where, order_by=("-occurred_on", "-id"), page=page, size=200, db=db)
-                rows = result["items"]
+            # 6. 查一頁：新的在前，一頁 200 筆
+            result = crud.find(Transaction, where, order_by=("-occurred_on", "-id"), page=page, size=200, db=db)
+            rows = result["items"]
 
-                # 7. 段落記帳的那幾筆，一次把原句與信心度查回來
-                parses = {}
-                if rows:
-                    for p in crud.find(NlpParse, {"transaction_id__in": [t.id for t in rows]}, db=db):
-                        parses[p.transaction_id] = p
+            # 7. 段落記帳的那幾筆，一次把原句與信心度查回來
+            parses = {}
+            if rows:
+                for p in crud.find(NlpParse, {"transaction_id__in": [t.id for t in rows]}, db=db):
+                    parses[p.transaction_id] = p
 
-                # 8. 轉成前端要的樣子
-                out = []
-                for t in rows:
-                    item = crud.to_dict(
-                        t,
-                        fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
-                        rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
-                    )
-                    item["merchant"] = t.merchant or ""
-                    item["note"] = t.note or ""
-                    p = parses.get(t.id)
-                    item["raw"] = p.raw_text if p else ""
-                    if p:
-                        item["parsed"] = {"conf": float(p.confidence or 0), "catConf": float(p.cat_confidence or 0)}
-                    else:
-                        item["parsed"] = {"conf": 1, "catConf": 1}
-                    out.append(item)
-                return {"transactions": out, "total": result["total"]}
+            # 8. 轉成前端要的樣子
+            out = []
+            for t in rows:
+                item = crud.to_dict(
+                    t,
+                    fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
+                    rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
+                )
+                item["merchant"] = t.merchant or ""
+                item["note"] = t.note or ""
+                p = parses.get(t.id)
+                item["raw"] = p.raw_text if p else ""
+                if p:
+                    item["parsed"] = {"conf": float(p.confidence or 0), "catConf": float(p.cat_confidence or 0)}
+                else:
+                    item["parsed"] = {"conf": 1, "catConf": 1}
+                out.append(item)
+            return {"transactions": out, "total": result["total"]}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -268,7 +259,7 @@ def list_transactions(
     raise not_ready("GET /api/transactions", OWNER)
 
 
-@router.post("/transactions", summary="手動新增一筆")
+@router.post("/transactions", status_code=201, summary="手動新增一筆")
 @block_admin
 @stub
 def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_db)):
@@ -366,7 +357,7 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
            中間任何一步出錯，這一筆和通知都不會留下，不會出現「帳記了、通知沒發」的半套狀態。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import date, datetime, timezone
 
@@ -380,89 +371,86 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：把整個 create_transaction（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 status_code=201；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/transactions", status_code=201, summary="手動新增一筆")
-            @block_admin
-            def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_db)):
-                # 1. 檢查日期格式
+            # 1. 檢查日期格式
+            try:
+                occurred_on = date.fromisoformat(body.date)
+            except ValueError:
+                raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
+
+            # 2. 決定這筆記在哪本帳
+            my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
+            if body.groupId:
+                group_id = int(body.groupId) if body.groupId.isdigit() else 0
+                group = crud.get(Group, where={"id": group_id, "id__in": my_groups,
+                                               "removed_at__isnull": True}, db=db)
+                if group is None:
+                    raise errors.not_found("找不到這本帳")
                 try:
-                    occurred_on = date.fromisoformat(body.date)
-                except ValueError:
-                    raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
+                    ledger.require_open(group.settled_at)
+                except ValueError as exc:
+                    raise errors.conflict(str(exc) + "。請換一本帳本") from None
+            else:
+                group = crud.get(Group, where={"id__in": my_groups, "removed_at__isnull": True,
+                                               "archived_at__isnull": True, "settled_at__isnull": True},
+                                 order_by="id", db=db)
+                if group is None:
+                    raise errors.conflict("你還沒有可以記帳的帳本，先到「帳本」開一本")
 
-                # 2. 決定這筆記在哪本帳
-                my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
-                if body.groupId:
-                    group_id = int(body.groupId) if body.groupId.isdigit() else 0
-                    group = crud.get(Group, where={"id": group_id, "id__in": my_groups,
-                                                   "removed_at__isnull": True}, db=db)
-                    if group is None:
-                        raise errors.not_found("找不到這本帳")
-                    try:
-                        ledger.require_open(group.settled_at)
-                    except ValueError as exc:
-                        raise errors.conflict(str(exc) + "。請換一本帳本") from None
-                else:
-                    group = crud.get(Group, where={"id__in": my_groups, "removed_at__isnull": True,
-                                                   "archived_at__isnull": True, "settled_at__isnull": True},
-                                     order_by="id", db=db)
-                    if group is None:
-                        raise errors.conflict("你還沒有可以記帳的帳本，先到「帳本」開一本")
+            # 3. 檢查分類
+            category_id = int(body.cat) if body.cat.isdigit() else 0
+            category = crud.get(Category, where={
+                "id": category_id,
+                "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+            }, db=db)
+            if category is None:
+                raise errors.bad_request("找不到這個分類")
+            if category.kind != body.kind:
+                side = "收入" if category.kind == "income" else "支出"
+                raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
 
-                # 3. 檢查分類
-                category_id = int(body.cat) if body.cat.isdigit() else 0
-                category = crud.get(Category, where={
-                    "id": category_id,
-                    "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
-                }, db=db)
-                if category is None:
-                    raise errors.bad_request("找不到這個分類")
-                if category.kind != body.kind:
-                    side = "收入" if category.kind == "income" else "支出"
-                    raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
+            # 4. 新增一列 transactions（source 一定是 manual）
+            tx = crud.save(Transaction, {
+                "user_id": me.id,
+                "group_id": group.id,
+                "family_id": me.family_id,
+                "category_id": category.id,
+                "kind": body.kind,
+                "amount": money.quantize(body.amount),
+                "occurred_on": occurred_on,
+                "merchant": body.merchant.strip() or None,
+                "note": body.note.strip() or None,
+                "source": "manual",
+            }, db=db)
 
-                # 4. 新增一列 transactions（source 一定是 manual）
-                tx = crud.save(Transaction, {
-                    "user_id": me.id,
-                    "group_id": group.id,
-                    "family_id": me.family_id,
-                    "category_id": category.id,
-                    "kind": body.kind,
-                    "amount": money.quantize(body.amount),
-                    "occurred_on": occurred_on,
-                    "merchant": body.merchant.strip() or None,
-                    "note": body.note.strip() or None,
-                    "source": "manual",
-                }, db=db)
+            # 5. 新增通知
+            guardians = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, db=db)
+            members = crud.find(GroupMember, {"group_id": group.id}, db=db)
+            rows = []
+            for user_id, reason in notify.recipients_for(tx, guardians, members):
+                rows.append({
+                    "recipient_id": user_id,
+                    "actor_id": me.id,
+                    "transaction_id": tx.id,
+                    "type": "ward_transaction" if reason == notify.GUARDIAN else "group_transaction",
+                    "payload_json": {"reason": reason},
+                })
+            if rows:
+                crud.save(Notification, rows, db=db)
 
-                # 5. 新增通知
-                guardians = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, db=db)
-                members = crud.find(GroupMember, {"group_id": group.id}, db=db)
-                rows = []
-                for user_id, reason in notify.recipients_for(tx, guardians, members):
-                    rows.append({
-                        "recipient_id": user_id,
-                        "actor_id": me.id,
-                        "transaction_id": tx.id,
-                        "type": "ward_transaction" if reason == notify.GUARDIAN else "group_transaction",
-                        "payload_json": {"reason": reason},
-                    })
-                if rows:
-                    crud.save(Notification, rows, db=db)
-
-                # 6. 一起寫進資料庫，回傳成功回應
-                db.commit()
-                out = crud.to_dict(
-                    tx,
-                    fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
-                    rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
-                )
-                out["merchant"] = tx.merchant or ""
-                out["note"] = tx.note or ""
-                out["raw"] = ""
-                return out
+            # 6. 一起寫進資料庫，回傳成功回應
+            db.commit()
+            out = crud.to_dict(
+                tx,
+                fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
+                rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
+            )
+            out["merchant"] = tx.merchant or ""
+            out["note"] = tx.note or ""
+            out["raw"] = ""
+            return out
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -486,6 +474,7 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
 def update_transaction(
     body: TransactionPatchIn,
     row=Depends(own(Transaction, "tx_id")),
+    me: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     """修改一筆
@@ -577,7 +566,7 @@ def update_transaction(
         7. db.commit()，回傳改完的那一筆
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import date, datetime, timezone
 
@@ -591,102 +580,95 @@ def update_transaction(
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：把整個 update_transaction（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 me=Depends(current_user)；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/transactions/{tx_id}", summary="修改一筆")
-            def update_transaction(
-                body: TransactionPatchIn,
-                row=Depends(own(Transaction, "tx_id")),
-                me: User = Depends(current_user),
-                db: Session = Depends(get_db),
-            ):
-                # 1. 整理要改的欄位：只拿有送來的，空的、格式不對的回 400
-                try:
-                    patch = ledger.clean_patch(body.model_dump(exclude_unset=True))
-                except ValueError as exc:
-                    raise errors.bad_request(str(exc)) from None
+            # 1. 整理要改的欄位：只拿有送來的，空的、格式不對的回 400
+            try:
+                patch = ledger.clean_patch(body.model_dump(exclude_unset=True))
+            except ValueError as exc:
+                raise errors.bad_request(str(exc)) from None
 
-                # 2. 這筆所在的帳本結算過就不能改
-                group = crud.get(Group, row.group_id, db=db)
-                try:
-                    ledger.require_editable(me.id, row.user_id, group.settled_at)
-                except ValueError as exc:
-                    raise errors.conflict(str(exc)) from None
+            # 2. 這筆所在的帳本結算過就不能改
+            group = crud.get(Group, row.group_id, db=db)
+            try:
+                ledger.require_editable(me.id, row.user_id, group.settled_at)
+            except ValueError as exc:
+                raise errors.conflict(str(exc)) from None
 
-                changes = {}
+            changes = {}
 
-                # 3. 換帳本：要是我加入的、沒移除、沒結算的
-                if "groupId" in patch:
-                    group_id = int(patch["groupId"]) if str(patch["groupId"]).isdigit() else 0
-                    if group_id != row.group_id:
-                        target = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
-                        joined = crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db)
-                        if target is None or not joined:
-                            raise errors.forbidden("你沒有加入這本帳")
-                        try:
-                            ledger.require_open(target.settled_at)
-                        except ValueError as exc:
-                            raise errors.conflict(str(exc) + "。請換一本帳本") from None
-                        changes["group_id"] = group_id
+            # 3. 換帳本：要是我加入的、沒移除、沒結算的
+            if "groupId" in patch:
+                group_id = int(patch["groupId"]) if str(patch["groupId"]).isdigit() else 0
+                if group_id != row.group_id:
+                    target = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
+                    joined = crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db)
+                    if target is None or not joined:
+                        raise errors.forbidden("你沒有加入這本帳")
+                    try:
+                        ledger.require_open(target.settled_at)
+                    except ValueError as exc:
+                        raise errors.conflict(str(exc) + "。請換一本帳本") from None
+                    changes["group_id"] = group_id
 
-                # 4. 分類要跟收支對得上
-                kind = patch.get("kind", row.kind)
-                if "cat" in patch:
-                    category_id = int(patch["cat"]) if str(patch["cat"]).isdigit() else 0
-                    category = crud.get(Category, where={
-                        "id": category_id,
-                        "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
-                    }, db=db)
-                    if category is None:
-                        raise errors.bad_request("找不到這個分類")
-                    if category.kind != kind:
-                        side = "收入" if category.kind == "income" else "支出"
-                        raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
-                    changes["category_id"] = category.id
-                elif kind != row.kind:
-                    # 只改了收支、沒帶分類：換成那一邊的「其他」，不要留一個對不上的分類
-                    other = crud.get(Category, where={"family_id__isnull": True, "kind": kind,
-                                                      "name": "其他" if kind == "expense" else "其他收入"}, db=db)
-                    if other is None:
-                        raise errors.bad_request("改收支的時候請一起選分類")
-                    changes["category_id"] = other.id
+            # 4. 分類要跟收支對得上
+            kind = patch.get("kind", row.kind)
+            if "cat" in patch:
+                category_id = int(patch["cat"]) if str(patch["cat"]).isdigit() else 0
+                category = crud.get(Category, where={
+                    "id": category_id,
+                    "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+                }, db=db)
+                if category is None:
+                    raise errors.bad_request("找不到這個分類")
+                if category.kind != kind:
+                    side = "收入" if category.kind == "income" else "支出"
+                    raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
+                changes["category_id"] = category.id
+            elif kind != row.kind:
+                # 只改了收支、沒帶分類：換成那一邊的「其他」，不要留一個對不上的分類
+                other = crud.get(Category, where={"family_id__isnull": True, "kind": kind,
+                                                  "name": "其他" if kind == "expense" else "其他收入"}, db=db)
+                if other is None:
+                    raise errors.bad_request("改收支的時候請一起選分類")
+                changes["category_id"] = other.id
 
-                # 5. 其他欄位照改，寫回去
-                if "date" in patch:
-                    changes["occurred_on"] = date.fromisoformat(patch["date"])
-                if "amount" in patch:
-                    changes["amount"] = money.quantize(patch["amount"])
-                if "kind" in patch:
-                    changes["kind"] = kind
-                if "merchant" in patch:
-                    changes["merchant"] = patch["merchant"] or None
-                if "note" in patch:
-                    changes["note"] = patch["note"] or None
-                changes["updated_at"] = datetime.now(timezone.utc)
-                crud.save(Transaction, {"id": row.id, **changes}, db=db)
+            # 5. 其他欄位照改，寫回去
+            if "date" in patch:
+                changes["occurred_on"] = date.fromisoformat(patch["date"])
+            if "amount" in patch:
+                changes["amount"] = money.quantize(patch["amount"])
+            if "kind" in patch:
+                changes["kind"] = kind
+            if "merchant" in patch:
+                changes["merchant"] = patch["merchant"] or None
+            if "note" in patch:
+                changes["note"] = patch["note"] or None
+            changes["updated_at"] = datetime.now(timezone.utc)
+            crud.save(Transaction, {"id": row.id, **changes}, db=db)
 
-                # 6. 段落記帳的那筆：改過的值記進 nlp_parses.user_corrected（模型抓錯的標註）
-                parse = crud.get(NlpParse, where={"transaction_id": row.id}, db=db) if row.source == "nlp" else None
-                if parse is not None:
-                    corrected = dict(parse.user_corrected or {})
-                    for key, value in patch.items():
-                        if key != "groupId":
-                            corrected[key] = float(value) if key == "amount" else value
-                    crud.save(NlpParse, {"id": parse.id, "user_corrected": corrected}, db=db)
+            # 6. 段落記帳的那筆：改過的值記進 nlp_parses.user_corrected（模型抓錯的標註）
+            parse = crud.get(NlpParse, where={"transaction_id": row.id}, db=db) if row.source == "nlp" else None
+            if parse is not None:
+                corrected = dict(parse.user_corrected or {})
+                for key, value in patch.items():
+                    if key != "groupId":
+                        corrected[key] = float(value) if key == "amount" else value
+                crud.save(NlpParse, {"id": parse.id, "user_corrected": corrected}, db=db)
 
-                # 7. 一起寫進資料庫，回傳改完的那一筆
-                db.commit()
-                out = crud.to_dict(
-                    row,
-                    fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source", "updated_at"),
-                    rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat",
-                            "updated_at": "updatedAt"},
-                )
-                out["merchant"] = row.merchant or ""
-                out["note"] = row.note or ""
-                out["raw"] = parse.raw_text if parse else ""
-                return out
+            # 7. 一起寫進資料庫，回傳改完的那一筆
+            db.commit()
+            out = crud.to_dict(
+                row,
+                fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source", "updated_at"),
+                rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat",
+                        "updated_at": "updatedAt"},
+            )
+            out["merchant"] = row.merchant or ""
+            out["note"] = row.note or ""
+            out["raw"] = parse.raw_text if parse else ""
+            return out
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -766,7 +748,7 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
         3. 刪這一筆，db.commit()，回傳 {"deleted": id}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import date, datetime, timezone
 
@@ -780,27 +762,25 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：把整個 delete_transaction（從 @router.delete 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.delete("/transactions/{tx_id}", summary="刪除一筆")
-            def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Depends(get_db)):
-                # 1. 結算過的帳本裡的紀錄不能刪
-                group = crud.get(Group, row.group_id, db=db)
-                try:
-                    ledger.require_editable(row.user_id, row.user_id, group.settled_at)
-                except ValueError as exc:
-                    raise errors.conflict(str(exc)) from None
+            # 1. 結算過的帳本裡的紀錄不能刪
+            group = crud.get(Group, row.group_id, db=db)
+            try:
+                ledger.require_editable(row.user_id, row.user_id, group.settled_at)
+            except ValueError as exc:
+                raise errors.conflict(str(exc)) from None
 
-                # 2. 先處理指向這一筆的資料（外鍵）：通知刪掉；解析紀錄留著當評測資料，只拿掉連結
-                tx_id = row.id
-                crud.remove(Notification, {"transaction_id": tx_id}, db=db)
-                crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id": tx_id}, db=db)
+            # 2. 先處理指向這一筆的資料（外鍵）：通知刪掉；解析紀錄留著當評測資料，只拿掉連結
+            tx_id = row.id
+            crud.remove(Notification, {"transaction_id": tx_id}, db=db)
+            crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id": tx_id}, db=db)
 
-                # 3. 刪這一筆，一起寫進資料庫
-                crud.remove(Transaction, id=tx_id, db=db)
-                db.commit()
-                return {"deleted": str(tx_id)}
+            # 3. 刪這一筆，一起寫進資料庫
+            crud.remove(Transaction, id=tx_id, db=db)
+            db.commit()
+            return {"deleted": str(tx_id)}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -889,7 +869,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
         5. 回傳 {"deleted": [...]}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import date, datetime, timezone
 
@@ -903,43 +883,40 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：把整個 delete_transactions（從 @router.delete 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.delete("/transactions", summary="一次刪多筆")
-            @block_admin
-            def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(get_db)):
-                # 1. 整理要刪的 id：去空白、去重複；空的或太多回 400
+            # 1. 整理要刪的 id：去空白、去重複；空的或太多回 400
+            try:
+                wanted = ledger.clean_ids(ids or "")
+            except ValueError as exc:
+                raise errors.bad_request(str(exc)) from None
+            numbers = [int(x) if x.isdigit() else 0 for x in wanted]
+
+            # 2. 一次查出這些筆，以及哪幾本帳已經結算
+            rows = {t.id: t for t in crud.find(Transaction, {"id__in": numbers}, db=db)}
+            group_ids = {t.group_id for t in rows.values()}
+            settled = set(crud.find(Group, {"id__in": group_ids, "settled_at__isnull": False}, fields="id", db=db))
+
+            # 3. 每一筆都檢查過；有一筆不行就整批不刪
+            for raw, number in zip(wanted, numbers):
+                t = rows.get(number)
+                if t is None:
+                    raise errors.not_found("找不到這筆紀錄：" + raw)
                 try:
-                    wanted = ledger.clean_ids(ids or "")
+                    ledger.require_editable(me.id, t.user_id, t.group_id in settled)
+                except PermissionError as exc:
+                    raise errors.forbidden(str(exc) + "。這次一筆都沒有刪") from None
                 except ValueError as exc:
-                    raise errors.bad_request(str(exc)) from None
-                numbers = [int(x) if x.isdigit() else 0 for x in wanted]
+                    raise errors.conflict(str(exc) + "。這次一筆都沒有刪") from None
 
-                # 2. 一次查出這些筆，以及哪幾本帳已經結算
-                rows = {t.id: t for t in crud.find(Transaction, {"id__in": numbers}, db=db)}
-                group_ids = {t.group_id for t in rows.values()}
-                settled = set(crud.find(Group, {"id__in": group_ids, "settled_at__isnull": False}, fields="id", db=db))
-
-                # 3. 每一筆都檢查過；有一筆不行就整批不刪
-                for raw, number in zip(wanted, numbers):
-                    t = rows.get(number)
-                    if t is None:
-                        raise errors.not_found("找不到這筆紀錄：" + raw)
-                    try:
-                        ledger.require_editable(me.id, t.user_id, t.group_id in settled)
-                    except PermissionError as exc:
-                        raise errors.forbidden(str(exc) + "。這次一筆都沒有刪") from None
-                    except ValueError as exc:
-                        raise errors.conflict(str(exc) + "。這次一筆都沒有刪") from None
-
-                # 4. 全部通過，才在同一個交易裡刪
-                tx_ids = list(rows)
-                crud.remove(Notification, {"transaction_id__in": tx_ids}, db=db)
-                crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id__in": tx_ids}, db=db)
-                crud.remove(Transaction, {"id__in": tx_ids, "user_id": me.id}, db=db)
-                db.commit()
-                return {"deleted": wanted}
+            # 4. 全部通過，才在同一個交易裡刪
+            tx_ids = list(rows)
+            crud.remove(Notification, {"transaction_id__in": tx_ids}, db=db)
+            crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id__in": tx_ids}, db=db)
+            crud.remove(Transaction, {"id__in": tx_ids, "user_id": me.id}, db=db)
+            db.commit()
+            return {"deleted": wanted}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

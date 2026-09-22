@@ -128,7 +128,7 @@ td .fname { font-family: var(--code); font-size: 12px; color: var(--up); }
       <li><b>收資料</b><span>路徑參數指定哪一個、查詢參數做篩選、請求主體送整包</span></li>
       <li><b>Pydantic</b><span>型別標註變成真的會執行的驗證，輸入輸出都擋</span></li>
       <li><b>依賴注入</b><span>宣告需要什麼（資料庫、目前使用者），FastAPI 幫你準備</span></li>
-      <li><b>你要改哪裡</b><span>70 支路由已經掛好（回 501）：換成真的實作、拿掉 @stub。增刪改查用 toolkit/crud.py，權限用 guards.py</span></li>
+      <li><b>你要改哪裡</b><span>70 支路由已經掛好（回 501）：刪掉 @stub、把 raise not_ready 那一行換成說明字串的第二步。增刪改查用 toolkit/crud.py，權限用 guards.py</span></li>
       </ul>
     </section>
 
@@ -747,7 +747,7 @@ app.include_router(auth.router, <b class="hi">prefix=<span class="tk-st">"/api/a
       <div class="sec__h"><span class="sec__n">11</span><h2>在我們的專案裡，你要改哪個檔案</h2></div>
       <p class="sec__lead">
         骨架已經搭好了：70 支路由都掛好、守衛和請求主體接好、說明字串寫好，函式裡只有一行 <code>raise not_ready(...)</code>（回 501）。
-        你的工作是把那一行換成真的實作，然後拿掉 <code>@stub</code>。
+        你的工作是刪掉 <code>@stub</code>，再把那一行換成說明字串裡的第二步（裝飾器、參數、import 都已經放好了）。
       </p>
 
       <h3 class="sub">先找到自己的工作</h3>

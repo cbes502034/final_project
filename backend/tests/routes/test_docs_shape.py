@@ -8,7 +8,7 @@
 
 所以這裡把格式釘死：
     · 十一個段落一個都不能少，而且順序固定
-    · 【完整寫法】的程式要真的能解析、函式名字與路由要對得上、不能留著 @stub
+    · 【完整寫法】的第二步只放函式內容（換掉 raise not_ready 那一行用），要真的能解析
     · 同一個檔案裡每一支的「第一步（import）」要一模一樣（不然照做會互相覆蓋）
 
 「程式真的跑得起來嗎」由 tests/routes/ 其他檔案的 [說明] 那一輪負責。
@@ -16,6 +16,7 @@
 
 import ast
 import inspect
+import textwrap
 
 import pytest
 
@@ -59,18 +60,23 @@ def test_說明字串有十一個段落而且順序固定(module, method, route)
 
 @pytest.mark.parametrize("module, method, route", ROUTES)
 def test_完整寫法的程式解析得動而且對得上這一支(module, method, route):
+    """第二步只放「函式內容」：組員刪掉 @stub、把 raise not_ready 那一行換成它，就做完了。
+
+    ⚠️ 不可以在第二步放裝飾器或 def 那一行。以前是放整個函式，說明寫「從 @router 到
+       raise not_ready 整段換掉」——那個範圍中間包著說明字串，照字面做就把說明字串刪了，
+       這個檔案的兩個測試跟著紅燈。現在函式頭已經是最終版本，只要換一行。
+    """
     doc = inspect.getdoc(route.endpoint) or ""
     parsed = parse_doc(doc)
     assert parsed, "%s %s 的說明少了【完整寫法】" % (method, route.path)
-    tree = ast.parse(parsed["code"])
-    fn = tree.body[-1]
-    assert isinstance(fn, ast.FunctionDef), "第二步的最後要是一個函式"
-    assert fn.name == route.endpoint.__name__, "函式名字要跟這一支一樣"
-    decorators = [ast.unparse(d) for d in fn.decorator_list]
-    assert any(d.startswith("router.%s(%r" % (method.lower(), route.path)) for d in decorators), \
-        "第一個裝飾器要是 @router.%s(%r, …)：%s" % (method.lower(), route.path, decorators)
-    assert "stub" not in decorators, "第二步不要留著 @stub"
-    assert "not_ready" not in parsed["code"], "第二步不要留著 raise not_ready"
+    code = parsed["code"]
+    # 函式內容裡可能有 return，包成一個函式才解析得動
+    body = ast.parse("def _():\n" + textwrap.indent(code, "    ")).body[0].body
+    assert not code.lstrip().startswith(("@", "def ", "async def ")), \
+        "第二步只放函式內容，不要放裝飾器或 def 那一行"
+    assert not (isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)), "第二步不要再放說明字串（原本那段會留著）"
+    assert "not_ready" not in code, "第二步不要留著 raise not_ready"
     assert "import " not in parsed["imports"].split("from")[0] or parsed["imports"], "第一步要是 import 區"
     ast.parse(parsed["imports"])
     for path, func, code in parsed["extra"]:
