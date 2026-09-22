@@ -149,6 +149,26 @@ def test_不要再用_passlib():
     assert "from passlib" not in code and "import passlib" not in code
 
 
+def test_requirements_只能有英文():
+    """中文 Windows 上的 pip（Python 內建的那一版）用 cp950 讀 requirements.txt，不是 UTF-8。
+
+    裡面只要有一個中文字，`pip install -r requirements.txt` 就會
+    UnicodeDecodeError: 'cp950' codec can't decode byte …
+    ——run.py 第一步就停下來，整組都啟動不了。
+
+    討厭的是新版 pip 讀得懂 UTF-8，所以升級過 pip 的人（包括寫這個專案的人）看不出來。
+    跟 alembic.ini 只能有英文是同一件事。
+    """
+    import os
+
+    req = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "requirements.txt")
+    raw = io.open(req, "rb").read()
+    bad = [(i + 1, line.decode("utf-8", "replace").rstrip())
+           for i, line in enumerate(raw.splitlines()) if any(b > 127 for b in line)]
+    assert not bad, "requirements.txt 有非 ASCII 字元（中文 Windows 的 pip 會讀不動）：%s" % bad
+    raw.decode("cp950")                     # 用組員電腦上 pip 的讀法再確認一次
+
+
 def test_匯入舊資料時超長密碼不會爆():
     """check=False 是給匯入既有資料用的，那時候拿得到超長的密碼。
 
