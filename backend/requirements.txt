@@ -3,7 +3,9 @@
 # ============================================================
 
 # --- Web 框架 ---
-fastapi>=0.115,<0.200
+fastapi>=0.115,<0.137              # ⚠️ 0.137 起 app.routes 看不到 include_router 掛上去的路由，
+                                   #    進度表（app.ownership）與 tests/routes 判斷「做完沒」全部讀不到
+                                   #    （全新安裝會變成 0/70、85 個測試紅燈）。要升級先改那兩處再放寬
 uvicorn[standard]>=0.34,<0.40
 pydantic>=2.10,<3
 pydantic-settings>=2.6,<3
