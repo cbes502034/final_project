@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import functools
 import http.server
+import io
 import os
 import shutil
 import socket
@@ -115,12 +116,38 @@ def run_cli(*args: str, why: str = "") -> None:
             % (why, " ".join(["python"] + list(args))))
 
 
+#: 以前 .env.example 的預設值。那段時間跑過 run.py 的人，.env 裡還留著這一行
+OLD_SQLITE_DEFAULT = "sqlite:///./dev.db"
+POSTGRES_DEFAULT = "postgresql+psycopg://fambudget:devpassword@localhost:5432/fambudget"
+
+
 def ensure_env() -> None:
     env = os.path.join(BACKEND, ".env")
-    if os.path.exists(env):
+    if not os.path.exists(env):
+        say("    backend/.env 還沒有，先建一份（JWT_SECRET 會自動產生）")
+        run_cli("-m", "app.cli", "init-env", why="建立 .env ")
         return
-    say("    backend/.env 還沒有，先建一份（JWT_SECRET 會自動產生）")
-    run_cli("-m", "app.cli", "init-env", why="建立 .env ")
+    upgrade_old_database_url(env)
+
+
+def upgrade_old_database_url(env: str) -> None:
+    """舊的 .env 還指著 SQLite 的話，換成 Docker 裡的 PostgreSQL。
+
+    ⚠️ 為什麼要自己換：.env 不會被 commit，git pull 更新不到它，run.py 也不覆蓋已經存在的 .env。
+       不換的話，之前跑過 run.py 的人會一直默默用 SQLite——連 Docker 都沒裝也跑得起來，
+       看不出來自己跟大家、跟正式環境用的不是同一種資料庫。
+    只換「完全等於舊預設值」的那一行；自己改過的設定不動。
+    """
+    import re
+
+    text = io.open(env, encoding="utf-8", newline="").read()
+    pattern = r"(?m)^DATABASE_URL=%s[ \t]*(\r?)$" % re.escape(OLD_SQLITE_DEFAULT)
+    if not re.search(pattern, text):
+        return
+    text = re.sub(pattern, lambda m: "DATABASE_URL=%s%s" % (POSTGRES_DEFAULT, m.group(1)), text)
+    io.open(env, "w", encoding="utf-8", newline="").write(text)
+    say("    你的 backend/.env 還是舊的 SQLite 設定。全組現在都用 PostgreSQL（跟正式環境一樣），\n"
+        "    已經幫你換過去了；之後需要 Docker Desktop。舊資料在 backend/dev.db，沒有刪，但不會再用到。")
 
 
 def env_line(key: str) -> str | None:

@@ -138,6 +138,7 @@ python run.py --port 5555      # 換前端的埠號（後端用 --api-port）
 | **之後每次**，Docker 開著 | 沿用同一顆資料庫，**不會重建**，上次的資料都還在。十幾秒就起來 |
 | 裝了 Docker，**但沒打開** | 停在第 3 步，提醒你先打開 Docker Desktop |
 | **沒裝 Docker** | 停在第 3 步，給你 Docker Desktop 的下載網址 |
+| **以前跑過 `run.py`**（`backend/.env` 還寫著舊的 SQLite） | 自動換成 PostgreSQL 並印出說明，之後就需要 Docker。舊資料留在 `backend/dev.db`，不會再用到 |
 
 每個人的資料庫只在自己的電腦上，跟其他組員、跟線上網站都無關。
 
