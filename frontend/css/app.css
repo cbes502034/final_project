@@ -497,6 +497,25 @@
 .eb__raw { margin-top: 3px; font-size: 11.5px; color: var(--ink-faint); overflow-wrap: anywhere; }
 .eb__f { padding: 8px 14px; font-size: 11px; color: var(--ink-faint); border-top: 1px solid var(--line); }
 
+/* 燈號：每一列最前面的 ✓ ／ ✗ */
+.eb__lamp {
+  flex: 0 0 auto; display: inline-grid; place-items: center; width: 18px; height: 18px;
+  font-size: 11px; font-weight: 700; border-radius: var(--r-pill);
+  background: var(--down); color: var(--card);
+}
+.eb__i--ok .eb__lamp { background: var(--up); }
+.eb__i--ok { padding-block: 7px; }                     /* 綠的只有一行，不用那麼高 */
+.eb__ok { color: var(--up); }
+.eb__ng { color: var(--down); }
+
+/* 全部都是綠燈：外框、標題列、膠囊整個換成綠色 */
+.eb--allok { border-color: var(--up); }
+.eb--allok .eb__h { background: var(--up-wash); border-bottom-color: var(--up-wash); }
+.eb--allok .eb__t { color: var(--up); }
+.eb--allok .eb__b:hover, .eb--allok .eb__x:hover { border-color: var(--up); color: var(--up); }
+.eb--min.eb--allok { border-color: var(--up); }
+.eb--allok .eb__pill { color: var(--up); background: var(--up-wash); }
+
 /* ============================================================
    浮動提示
    ============================================================ */

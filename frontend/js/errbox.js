@@ -1,37 +1,40 @@
 /* ============================================================
-   errbox.js — 錯誤匣：這一輪操作裡，後端沒給出正確結果的每一支
+   errbox.js — 左下角那張表：這一頁打過的每一支後端，現在是綠燈還是紅燈
 
    ★ 這個檔案做的事
    ------------------------------------------------------------
-   api.js 每次拿到「不是正確結果」的回應，就往這裡丟一筆。
-   畫面左下角固定一塊紅色面板（右下角讓給浮出訊息），一支一列：
+   api.js 每打完一支就往這裡丟一筆結果。一個前端函式一列，只留最新的那一次：
 
-       API.summary   GET /api/summary   501   成員3        ×3
-       後端還沒做這一支：GET /api/summary（成員3）
+       ✓  API.transactions   GET /api/transactions   成員2        ← 回了，形狀也對
+       ✗  API.summary        GET /api/summary   501  成員3        ← 還沒做／出錯
+          後端還沒做這一支（HTTP 501）
 
-   要按才關、可以整個複製，方便貼到群組裡問「這是你的嗎」。
+   組員做完一支、重新整理頁面，就會看到自己那一支從紅變綠。
+   全部都是綠的時候收成一顆小膠囊不擋畫面；一出現紅的就自動展開。
 
-   ★ 什麼會進來、什麼不會
+   ★ 綠燈的意思
    ------------------------------------------------------------
-   進來的是 api.js 的三種：backend（還沒做／出錯）、network（連不上）、
-   shape（回應形狀不對）。
+   **後端回了，而且回應的形狀通過前端的檢查**（api.js 的 SHAPE 與 ROWS）。
+   也就是「照說明字串做對了，前端就一定接得住」——畫面會有反應。
 
-   **業務錯誤（400／401／403／409／422）不進來** —— 那是後端**正確**地
-   回答「你不能這樣做」，畫面上照它的原話講就好，不是誰寫壞了。
+   ★ 什麼不會進來
+   ------------------------------------------------------------
+   · 業務錯誤（400／401／403／409／422）：那是後端**正確地**拒絕這次操作
+   · mock 模式：前端自己演的，沒有後端可以亮燈
+   · 模型叫不動時前端頂出來的備援結果：那不是後端做出來的
 
    ★ 為什麼不用 window.alert
    ------------------------------------------------------------
    · 通知每 20 秒輪詢一次：那一支沒做的話，每 20 秒彈一次，頁面沒辦法用
    · 總覽一次打好幾支：一口氣疊好幾個對話框，要按好幾次才看得到畫面
-   · 瀏覽器會長出「不要再顯示此對話框」，勾下去整個分頁再也不彈 ——
-     最該看到的時候看不到
+   · 瀏覽器會長出「不要再顯示此對話框」，勾下去整個分頁再也不彈
    · alert 的字沒辦法複製，手機上整個畫面被鎖住
    ============================================================ */
 (function (global) {
   'use strict';
 
-  var MAX = 30;                 // 只留最近 30 支，再多就把最舊的擠掉
-  var state = { items: [], open: true, dismissed: false };
+  var MAX = 60;                 // 一頁最多會打到的函式數量遠小於這個
+  var state = { rows: {}, order: [], open: false, dismissed: false };
 
   function esc(s) {
     return String(s === null || s === undefined ? '' : s)
@@ -48,20 +51,34 @@
     return String(msg || '').split('｜出錯的函式：')[0];
   }
 
-  /* api.js 呼叫這一支。同一支重複失敗（例如鈴鐺每 20 秒輪詢一次）只累加次數，不新增一列。 */
+  function list() {
+    return state.order.map(function (k) { return state.rows[k]; });
+  }
+
+  function bad() {
+    return list().filter(function (r) { return r.kind !== 'ok'; });
+  }
+
+  /* api.js 呼叫這一支。同一個函式只留最新的結果——紅了又綠，就是修好了。 */
   function push(rec) {
     if (!rec || !rec.fn) return;
-    var key = rec.fn + '|' + (rec.status || 0) + '|' + short(rec.message);
-    var hit = state.items.filter(function (x) { return x.key === key; })[0];
-    if (hit) {
-      hit.n++;
-      hit.at = new Date();
-    } else {
-      state.items.unshift({ key: key, n: 1, at: new Date(), fn: rec.fn, route: rec.route,
-        owner: rec.owner, kind: rec.kind, status: rec.status, message: rec.message, detail: rec.detail });
-      state.items = state.items.slice(0, MAX);
-      /* 收起來之後又出現**新的**一支，再打開一次 —— 使用者收的是「已經看過的那些」。
-         同一支重複失敗不會把它重新打開，不然鈴鐺的輪詢會一直彈回來。 */
+    var prev = state.rows[rec.fn];
+    var wasBad = prev && prev.kind !== 'ok';
+    var nowBad = rec.kind !== 'ok';
+    var same = prev && prev.kind === rec.kind && short(prev.message) === short(rec.message);
+
+    state.rows[rec.fn] = {
+      fn: rec.fn, route: rec.route, owner: rec.owner, kind: rec.kind,
+      status: rec.status, message: rec.message, detail: rec.detail, at: new Date(),
+      n: same ? prev.n + 1 : 1
+    };
+    if (!prev) {
+      state.order.unshift(rec.fn);
+      if (state.order.length > MAX) delete state.rows[state.order.pop()];
+    }
+    /* 新冒出一支紅的（或原本綠的變紅）才自動展開。
+       同一支重複失敗（例如鈴鐺每 20 秒輪詢一次）不會一直把它彈回來。 */
+    if (nowBad && (!prev || !wasBad)) {
       state.dismissed = false;
       state.open = true;
     }
@@ -69,40 +86,46 @@
   }
 
   function clear() {
-    state.items = [];
+    state.rows = {};
+    state.order = [];
     state.dismissed = false;
+    state.open = false;
     render();
   }
 
   /* 貼到群組裡問人用的純文字 */
   function text() {
-    return state.items.map(function (it) {
-      return [hhmm(it.at), it.fn, it.route || '', it.status || '', it.owner || '',
-        it.n > 1 ? '×' + it.n : ''].filter(Boolean).join('　') +
-        '\n    ' + short(it.message) + (it.detail && it.detail !== short(it.message) ? '\n    後端原話：' + it.detail : '');
+    return list().map(function (r) {
+      var head = [r.kind === 'ok' ? 'OK' : 'NG', hhmm(r.at), r.fn, r.route || '',
+        r.status || '', r.owner || '', r.n > 1 ? '×' + r.n : ''].filter(Boolean).join('　');
+      if (r.kind === 'ok') return head;
+      return head + '\n    ' + short(r.message) +
+        (r.detail && r.detail !== short(r.message) ? '\n    後端原話：' + r.detail : '');
     }).join('\n');
   }
 
-  var KIND_TW = { backend: '後端', network: '連不上', shape: '形狀' };
+  var KIND_TW = { ok: '正常', backend: '後端', network: '連不上', shape: '形狀' };
 
-  function row(it) {
-    var det = it.detail && it.detail !== short(it.message);
-    return '<li class="eb__i">' +
+  function row(r) {
+    var ok = r.kind === 'ok';
+    var det = !ok && r.detail && r.detail !== short(r.message);
+    return '<li class="eb__i' + (ok ? ' eb__i--ok' : '') + '">' +
       '<div class="eb__top">' +
-        '<code class="eb__fn">' + esc(it.fn) + '</code>' +
-        (it.route ? '<code class="eb__rt">' + esc(it.route) + '</code>' : '') +
-        (it.status ? '<span class="eb__st">' + esc(it.status) + '</span>' : '') +
-        '<span class="eb__kd">' + esc(KIND_TW[it.kind] || it.kind) + '</span>' +
-        (it.owner ? '<span class="eb__ow">' + esc(it.owner) + '</span>' : '') +
-        (it.n > 1 ? '<span class="eb__n">×' + it.n + '</span>' : '') +
-        '<span class="eb__at">' + hhmm(it.at) + '</span>' +
+        '<span class="eb__lamp" aria-label="' + (ok ? '正常' : '有問題') + '">' + (ok ? '✓' : '✗') + '</span>' +
+        '<code class="eb__fn">' + esc(r.fn) + '</code>' +
+        (r.route ? '<code class="eb__rt">' + esc(r.route) + '</code>' : '') +
+        (r.status ? '<span class="eb__st">' + esc(r.status) + '</span>' : '') +
+        '<span class="eb__kd">' + esc(KIND_TW[r.kind] || r.kind) + '</span>' +
+        (r.owner ? '<span class="eb__ow">' + esc(r.owner) + '</span>' : '') +
+        (r.n > 1 ? '<span class="eb__n">×' + r.n + '</span>' : '') +
+        '<span class="eb__at">' + hhmm(r.at) + '</span>' +
       '</div>' +
-      '<div class="eb__msg">' + esc(short(it.message)) + '</div>' +
-      (det ? '<div class="eb__raw">後端原話：' + esc(it.detail) + '</div>' : '') +
+      (ok ? '' : '<div class="eb__msg">' + esc(short(r.message)) + '</div>') +
+      (det ? '<div class="eb__raw">後端原話：' + esc(r.detail) + '</div>' : '') +
       '</li>';
   }
 
-  /* 手機上錯誤匣是整排的，會蓋住右下角的浮出訊息。
+  /* 手機上這張表是整排的，會蓋住右下角的浮出訊息。
      把「浮出訊息至少要離底部多遠」算出來交給 CSS（見 app.css 的 --eb-clear）。 */
   function measure(box) {
     var css = document.documentElement.style;
@@ -114,28 +137,35 @@
   function render() {
     var box = document.getElementById('errbox');
     if (!box) return;
-    var n = state.items.length;
-    if (!n) { box.hidden = true; box.innerHTML = ''; measure(box); return; }
+    var rows = list();
+    if (!rows.length) { box.hidden = true; box.innerHTML = ''; measure(box); return; }
     box.hidden = false;
 
+    var nBad = bad().length, nOk = rows.length - nBad;
+    var allOk = nBad === 0;
+    var tally = '<b class="eb__ok">✓ ' + nOk + '</b>' + (nBad ? '　<b class="eb__ng">✗ ' + nBad + '</b>' : '');
+
+    // 全綠的時候預設收起來；有紅的時候看使用者有沒有按「收起」
     if (state.dismissed || !state.open) {
-      box.className = 'eb eb--min';
+      box.className = 'eb eb--min' + (allOk ? ' eb--allok' : '');
       box.innerHTML = '<button type="button" class="eb__pill" id="ebOpen">' +
-        '後端錯誤 <b>' + n + '</b></button>';
+        (allOk ? '後端全部正常　' : '後端　') + tally + '</button>';
       measure(box);
       return;
     }
 
-    box.className = 'eb';
+    // 紅的排前面，綠的排後面；同一種依時間新的在前
+    var sorted = bad().concat(rows.filter(function (r) { return r.kind === 'ok'; }));
+    box.className = 'eb' + (allOk ? ' eb--allok' : '');
     box.innerHTML =
       '<div class="eb__h">' +
-        '<span class="eb__t">後端錯誤 <b>' + n + '</b></span>' +
+        '<span class="eb__t">' + (allOk ? '後端全部正常　' : '後端　') + tally + '</span>' +
         '<button type="button" class="eb__b" id="ebCopy">複製全部</button>' +
         '<button type="button" class="eb__b" id="ebClear">清空</button>' +
         '<button type="button" class="eb__x" id="ebMin" aria-label="收起來">收起</button>' +
       '</div>' +
-      '<ul class="eb__l">' + state.items.map(row).join('') + '</ul>' +
-      '<div class="eb__f">業務錯誤（403、409、422…）不算，那是後端正確地回答「不能這樣做」。</div>';
+      '<ul class="eb__l">' + sorted.map(row).join('') + '</ul>' +
+      '<div class="eb__f">綠燈＝後端回了、形狀也對，前端接得住。業務錯誤（403、409、422…）不列，那是後端正確地拒絕。</div>';
     measure(box);
   }
 
@@ -143,11 +173,11 @@
     var t = e.target;
     if (!t || !t.closest) return;
     if (t.closest('#ebOpen')) { state.dismissed = false; state.open = true; render(); return; }
-    if (t.closest('#ebMin')) { state.dismissed = true; render(); return; }
+    if (t.closest('#ebMin')) { state.dismissed = true; state.open = false; render(); return; }
     if (t.closest('#ebClear')) { clear(); return; }
     if (t.closest('#ebCopy')) {
       var txt = text();
-      var done = function () { if (global.toast) global.toast('已複製 ' + state.items.length + ' 支', 'ok'); };
+      var done = function () { if (global.toast) global.toast('已複製 ' + state.order.length + ' 支', 'ok'); };
       if (global.navigator && navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt, done); });
       } else fallbackCopy(txt, done);
@@ -166,6 +196,9 @@
     document.body.removeChild(ta);
   }
 
-  global.ErrBox = { push: push, clear: clear, text: text, render: render,
-    items: function () { return state.items.slice(); } };
+  global.ErrBox = {
+    push: push, clear: clear, text: text, render: render,
+    items: function () { return bad(); },          // 只回紅的（舊的呼叫端都是拿它判斷「有沒有錯」）
+    all: function () { return list(); }             // 綠的紅的都要
+  };
 })(window);
