@@ -5,7 +5,9 @@
     python -m app.cli check-config        列出每一段設定填了沒、沒填會怎樣
     python -m app.cli init-db             建表（本機、測試用）＋ 放入系統預設分類
     python -m app.cli make-admin [email]  把帳號設成平台管理員（不給 email 就用 ADMIN_EMAILS）
-    python -m app.cli db [SQL]            看資料庫：不給 SQL 就列出每張表有幾筆
+    python -m app.cli db                  看資料庫：每張表各幾筆
+    python -m app.cli db transactions     那張表最新的 10 筆
+    python -m app.cli db "SELECT …"       自己寫查詢（只能查，不能改）
     python -m app.cli seed-team           建立四位成員的開發用帳號（只在本機，正式環境會拒絕）
 
 負責人：成員1（共用元件）
@@ -163,20 +165,29 @@ def db(sql: str | None) -> int:
     不裝任何工具、不離開終端機就看得到——做一支路由的過程裡，
     「我到底有沒有寫進去、寫成什麼樣」是最常問的問題。
 
-    ⚠️ 只讓查（SELECT／PRAGMA／WITH）。這支是開發用的，
+    三種用法：
+        python -m app.cli db                    每張表各幾筆
+        python -m app.cli db transactions       那張表最新的 10 筆（第一行就是欄位名稱）
+        python -m app.cli db "SELECT …"         自己寫查詢
+
+    ⚠️ 只讓查（SELECT／WITH，SQLite 另外可以 PRAGMA）。這支是開發用的，
        不想有人用它一行 DELETE 把自己的資料清掉。
+    ⚠️ 表名一律加雙引號：PostgreSQL 對 groups 這種也是 SQL 關鍵字的名字比較嚴格。
     """
     from sqlalchemy import inspect, text
 
     from app.toolkit.db import engine
 
+    names = sorted(inspect(engine).get_table_names())
     if not sql:
-        names = sorted(inspect(engine).get_table_names())
         with engine.connect() as conn:
-            rows = [(t, conn.execute(text("SELECT COUNT(*) FROM %s" % t)).scalar()) for t in names]
+            rows = [(t, conn.execute(text('SELECT COUNT(*) FROM "%s"' % t)).scalar()) for t in names]
         width = max(len(t) for t, _ in rows) if rows else 0
         _say("\n".join("%-*s  %s 筆" % (width, t, n) for t, n in rows) or "一張表都還沒有，先跑 init-db")
         return 0
+
+    if sql.strip() in names:                   # 只給表名：看最新的 10 筆
+        sql = 'SELECT * FROM "%s" ORDER BY 1 DESC LIMIT 10' % sql.strip()
 
     if not sql.lstrip().lower().startswith(("select", "pragma", "with")):
         _say("只能查（SELECT／PRAGMA／WITH）。要改資料請寫在路由或測試裡。")
@@ -210,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("email", nargs="?")
     sub.add_parser("seed-team", help="建立四位成員的開發用帳號")
     p = sub.add_parser("db", help="看資料庫（只能查）")
-    p.add_argument("sql", nargs="?", help='例如 "SELECT id, email FROM users"；不給就列出每張表幾筆')
+    p.add_argument("sql", nargs="?", help='表名（看最新 10 筆）或 "SELECT …"；不給就列出每張表幾筆')
     args = ap.parse_args(argv)
     if args.cmd == "init-env":
         return init_env(args.force)

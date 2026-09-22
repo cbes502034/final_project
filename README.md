@@ -69,7 +69,7 @@ final_project/
 │
 ├── docs/                  規格文件（Markdown / SVG）
 ├── run.py                 ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
-├── docker-compose.yml     本機用 PostgreSQL 跑整套
+├── docker-compose.yml     本機的 PostgreSQL（db）；run.py 會自己開
 └── render.yaml            部署設定
 ```
 
@@ -82,14 +82,21 @@ final_project/
 
 ### 一鍵跑起來 ★
 
-在**專案最外層**（跟 `backend/`、`frontend/` 同一層）打：
+需要先裝好兩樣東西：
+
+| | |
+|---|---|
+| **Python 3.10 以上** | <https://www.python.org/downloads/>，安裝時勾 Add python.exe to PATH |
+| **Docker Desktop** | <https://www.docker.com/products/docker-desktop/>。本機的資料庫跟正式環境一樣是 **PostgreSQL**，跑在 Docker 裡。**每次開發前先把 Docker Desktop 打開** |
+
+然後在**專案最外層**（跟 `backend/`、`frontend/` 同一層）打：
 
 ```bash
 python run.py
 ```
 
-第一次會自己做完這些：裝套件 → 建 `backend/.env`（含 JWT_SECRET）→ 建表 → 放入系統預設分類 →
-同時起前端與後端。需要的只有 **Python 3.10 以上**，資料庫用 SQLite（`backend/dev.db`），什麼都不用裝。
+第一次會自己做完這些：裝套件 → 建 `backend/.env`（含 JWT_SECRET）→ 用 Docker 開 PostgreSQL →
+建表 → 放入系統預設分類與開發用帳號 → 同時起前端與後端。
 
 | 服務 | 網址 |
 |---|---|
@@ -113,19 +120,22 @@ python run.py
 其他用法：
 
 ```bash
-python run.py --front-only     # 只跑前端（mock 模式，不需要後端）
-python run.py --reset          # 本機資料庫砍掉重建
+python run.py --front-only     # 只跑前端（mock 模式，不需要後端，也不需要 Docker）
+python run.py --reset          # 本機資料庫砍掉重建（docker compose down -v）
 python run.py --port 5555      # 換前端的埠號（後端用 --api-port）
 ```
 
 ⚠️ 前端不要用 VS Code 的 Live Server，也不要直接點開 `index.html`：
 那樣後端的 CORS 會擋住，而且 `file://` 不算 localhost。一律用 `run.py` 起的 5174。
 
+關掉 `run.py`（Ctrl+C）不會關掉 PostgreSQL，資料也都還在，下次開很快。要關它：`docker compose stop db`。
+
 ### 分開跑（想自己控制的時候）
 
 ```bash
 python run.py --front-only                       # 前端
 
+docker compose up -d --wait db                   # 資料庫（PostgreSQL）
 cd backend                                       # 後端
 pip install -r requirements.txt
 python -m app.cli init-env        # 建出 .env（順便產生 JWT_SECRET）
@@ -140,17 +150,34 @@ uvicorn app.main:app --reload
 ```bash
 cd backend
 python -m app.cli db                                   # 每張表各幾筆
-python -m app.cli db "SELECT id, email FROM users"     # 只能查，不能改
+python -m app.cli db transactions                      # 那張表最新的 10 筆
+python -m app.cli db "SELECT id, email FROM users"     # 自己寫查詢（只能查，不能改）
 ```
 
-### 用 PostgreSQL（跟正式環境一樣）
+### 資料庫：本機跟正式環境都是 PostgreSQL
 
-```bash
-docker compose up
-```
+| | 用什麼 |
+|---|---|
+| 本機開發 | PostgreSQL 16，Docker 裡的 `db`（`docker-compose.yml`），`run.py` 會自己開 |
+| 正式環境（Render） | PostgreSQL，`render.yaml` 自動接上 |
+| `pytest` | 記憶體裡的 SQLite：每個測試一份、跑得快、不需要 Docker |
 
-起一顆 PostgreSQL 16 ＋ 後端 ＋ 前端。本機開發不需要這一條，
-`run.py` 的 SQLite 已經把外鍵檢查打開，行為一致。
+本機跟線上用同一種資料庫，本機寫得對，部署上去就一樣對。
+（70 支照說明字串做好的參考後端，接 PostgreSQL 跑過 70 支路由的完整掃描，0 個問題。）
+
+⚠️ 不要直接打 `docker compose up`（不加 `db`）：那會連同 compose 裡的後端、前端一起起來，
+跟 `run.py` 搶 8000 與 5174 埠。
+
+### Docker Desktop 一打開就跳「An unexpected error occurred」
+
+錯誤訊息裡有 `initializing Inference manager` 或 `dockerInference` 的話，是 Docker 內建的 AI 功能
+（Docker AI／Model Runner）在這台電腦上建不了它要用的通訊檔。我們的專案用不到這個功能，把它關掉就好：
+
+1. 按 **Quit** 關掉 Docker Desktop（**不要**按 Reset to factory defaults，那會清掉所有 Docker 資料）
+2. 用記事本打開 `%APPDATA%\Docker\settings-store.json`
+3. 把 `"EnableDockerAI": true` 改成 `"EnableDockerAI": false`，存檔
+4. 把 `%LOCALAPPDATA%\Docker\run` 這個資料夾改名（例如 `run.old`），Docker 會自己建新的
+5. 重新打開 Docker Desktop
 
 ---
 

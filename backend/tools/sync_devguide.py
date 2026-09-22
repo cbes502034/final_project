@@ -150,13 +150,15 @@ HEAD = """# %(label)s · %(domain)s — 開發說明
 
 ## 1. 第一次：把環境跑起來
 
-在**專案最外層**（跟 `backend/`、`frontend/` 同一層）：
+先裝好兩樣東西：**Python 3.10 以上**、**Docker Desktop**（本機的資料庫跟正式環境一樣是 PostgreSQL，跑在 Docker 裡）。
+每次開發前先把 Docker Desktop 打開，然後在**專案最外層**（跟 `backend/`、`frontend/` 同一層）：
 
 ```bash
 python run.py
 ```
 
-第一次會自己裝套件、建 `backend/.env`、建資料表、放入系統預設分類，然後把前後端一起起來：
+第一次會自己裝套件、建 `backend/.env`、用 Docker 開 PostgreSQL、建資料表、放入系統預設分類與開發用帳號，
+然後把前後端一起起來：
 
 | | 網址 |
 |---|---|
@@ -250,11 +252,11 @@ python -m app.ownership        # 看自己還差哪幾支
 ```bash
 cd backend
 python -m app.cli db                                        # 每張表各幾筆
-python -m app.cli db "SELECT id, email FROM users"
-python -m app.cli db "SELECT * FROM transactions ORDER BY id DESC LIMIT 5"
+python -m app.cli db transactions                           # 那張表最新的 10 筆（第一行就是欄位名稱）
+python -m app.cli db "SELECT id, email FROM users"          # 自己寫查詢
 ```
 
-只能查（`SELECT` / `PRAGMA` / `WITH`），不能改——免得一行 `DELETE` 把自己的資料清掉。
+只能查（`SELECT` / `WITH`），不能改——免得一行 `DELETE` 把自己的資料清掉。
 
 **② API 文件頁試打** <http://localhost:8000/docs>
 
@@ -271,16 +273,22 @@ python -m app.cli db "SELECT * FROM transactions ORDER BY id DESC LIMIT 5"
 
 | | |
 |---|---|
-| 你本機的 | SQLite，就是 `backend/dev.db` 這個檔案 |
+| 你本機的 | **PostgreSQL 16**，跑在 Docker 裡（`docker-compose.yml` 的 `db`），`python run.py` 會自己開 |
 | 正式環境 | PostgreSQL（Render 上的 `fambudget-db`） |
-| 跑測試時 | 記憶體裡的 SQLite，每個測試一份，不會污染你的 dev.db |
+| 跑測試時 | 記憶體裡的 SQLite，每個測試一份、跑得快、不需要 Docker，也不會動到你的資料 |
 
-兩種資料庫的差異都吃在 `app/toolkit/db.py`（SQLite 的外鍵檢查已經打開），
-所以本機寫得對，上去也會對。
+本機跟正式環境是同一種資料庫，所以本機寫得對，上去也會對。
+**開發前先把 Docker Desktop 打開**，不然 `python run.py` 會停在「啟動資料庫」那一步並告訴你。
+
+資料存在 Docker 的 volume 裡，關掉 `run.py`、甚至重開機都還在。
 
 ```bash
-python run.py --reset      # 資料亂了，砍掉重建（只影響你本機）
+python run.py --reset      # 資料亂了，清空重建（只影響你本機）
+docker compose stop db     # 不寫程式的時候想把 PostgreSQL 關掉（在專案最外層跑）
 ```
+
+想用圖形介面看資料的話：DBeaver、pgAdmin、VS Code 的 PostgreSQL 擴充套件都可以，連線資訊是
+`localhost:5432`，資料庫 `fambudget`，帳號 `fambudget`，密碼 `devpassword`（只在你電腦上，不是機密）。
 
 **改資料表結構**要走 Alembic，不可以手動改資料庫：
 

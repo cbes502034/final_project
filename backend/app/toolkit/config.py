@@ -62,8 +62,8 @@ class Settings(BaseSettings):
     database_url: str = Field(
         description=(
             "PostgreSQL 連線字串。格式：postgresql+psycopg://使用者:密碼@主機:埠號/資料庫名稱\n"
-            "本機沒有 PostgreSQL 時可以先用 sqlite:///./dev.db（toolkit/db.py 兩種都支援），"
-            "但正式環境一定是 PostgreSQL。"
+            "本機是 Docker 裡的那一顆（python run.py 會自己開），正式環境由 render.yaml 自動接上。"
+            "測試用記憶體裡的 SQLite（toolkit/db.py 兩種都支援）。"
         )
     )
     db_echo: bool = Field(default=False, description="True 會把送出的 SQL 印出來，除錯用。正式環境不要開。")

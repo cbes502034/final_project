@@ -17,7 +17,8 @@ cd backend
 pip install -r requirements.txt
 python -m app.cli init-env        # 從 .env.example 建出 .env，順便產生 JWT_SECRET
 python -m app.cli check-config    # 列出每一段設定填了沒、沒填會怎樣
-alembic upgrade head              # 建表（本機沒有 PostgreSQL：DATABASE_URL 先填 sqlite:///./dev.db）
+docker compose up -d --wait db    # 開 PostgreSQL（在專案最外層跑；要先打開 Docker Desktop）
+alembic upgrade head              # 建表
 python -m app.cli init-db         # 放入系統預設分類
 uvicorn app.main:app --reload
 ```
@@ -535,13 +536,17 @@ alembic upgrade head
 **`alembic` 指令噴 `UnicodeDecodeError: 'cp950'`**
 → 有人在 `alembic.ini` 裡寫了中文。那個檔案只能有英文，說明寫在 `alembic/env.py`。
 
-**本機沒有 PostgreSQL**
-→ 不用裝。`.env` 預設就是 `DATABASE_URL=sqlite:///./dev.db`（外鍵檢查已經打開，行為跟 PostgreSQL 一致）。
-測試用的是記憶體裡的 SQLite，正式環境（Render）才是 PostgreSQL。
-想在本機也用 PostgreSQL：`docker compose up`，再照 `.env.example` 裡註解的那一行改 `DATABASE_URL`。
+**本機的資料庫是什麼**
+→ 跟正式環境一樣是 PostgreSQL 16，跑在 Docker 裡（專案最外層 `docker-compose.yml` 的 `db`）。
+不用另外裝 PostgreSQL，只要裝 Docker Desktop、開發前先打開它，`python run.py` 會自己把資料庫開起來。
+`pytest` 例外：用的是記憶體裡的 SQLite，每個測試一份、跑得快、不需要 Docker（`toolkit/db.py` 兩種都支援）。
+
+**`python run.py` 說 Docker 沒有在執行**
+→ 打開 Docker Desktop，等它顯示「Engine running」再跑一次。
+Docker Desktop 一打開就跳 `Inference manager` 的錯誤：看最外層 README 的「Docker Desktop 一打開就跳錯誤」。
 
 **想砍掉資料重來**
-→ 在專案最外層 `python run.py --reset`（只對 SQLite 有效）。
+→ 在專案最外層 `python run.py --reset`（會 `docker compose down -v` 把資料庫清空重建）。
 
 **改了程式但沒生效**
 → 確認啟動時有加 `--reload`。

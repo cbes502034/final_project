@@ -174,7 +174,7 @@ final_project/
 │   └── .env.example             設定範本，依成員分段
 │
 ├── docs/                        規格文件
-├── docker-compose.yml           本機用 PostgreSQL 跑整套（一般開發用 run.py 就夠）
+├── docker-compose.yml           本機的 PostgreSQL（db）；run.py 會自己開
 ├── render.yaml                  部署設定
 └── README.md
 ```
