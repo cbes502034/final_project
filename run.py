@@ -162,7 +162,8 @@ def ensure_postgres(reset: bool) -> None:
     if subprocess.call(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
         die("Docker 沒有在執行。請先打開 Docker Desktop，等它顯示「Engine running」，\n"
             "  再跑一次 python run.py。\n"
-            "  （Docker Desktop 一打開就跳「Inference manager」的錯誤的話，看 README 的常見問題。）")
+            "  （Docker Desktop 一打開就跳錯誤、訊息裡有 Inference manager 的話，\n"
+            "    看 README 的「Docker Desktop 一打開就跳「An unexpected error occurred」」那一段。）")
     if reset:
         say("    砍掉本機資料庫重建（docker compose down -v）")
         subprocess.call(["docker", "compose", "down", "-v"], cwd=ROOT)
