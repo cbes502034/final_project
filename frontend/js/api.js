@@ -3359,7 +3359,18 @@
           throw bad2;
         }
       }
-      return fillIn(name, res);
+      var done = fillIn(name, res);
+      /* 走到這裡 = 後端回了、形狀也對（SHAPE、ROWS 都過了）→ 錯誤匣那張表亮綠燈。
+         只在接真後端時記：mock 是前端自己演的，亮綠燈沒有意義。
+         備援頂出來的結果（503 時的 fallback）不算——那不是後端做出來的。 */
+      // ⚠️ 要看 res（後端原樣），不能看 done——fillIn 重新組物件時會把 fallback 那個欄位弄丟
+      // authState、reset 這種 FN 登記成 [null, '前端'] 的沒有打後端，不亮燈
+      var info = FN[name] || [];
+      if (MODE === 'http' && info[0] && !(res && res.fallback) && global.ErrBox && global.ErrBox.push) {
+        global.ErrBox.push({ fn: 'API.' + name, route: info[0] || null, owner: info[1] || null,
+          kind: 'ok', status: 0, message: '', detail: null });
+      }
+      return done;
     }).catch(function (e) { throw tag(e, name); });
   }
 

@@ -1,4 +1,12 @@
-# 本機一鍵起整套：docker compose up
+# 本機的資料庫：python run.py 會自己跑 docker compose up -d --wait db
+#
+# ⚠️ 平常只開 db 就好。直接打 docker compose up（不加 db）會連同下面的 api、web 一起起來，
+#    跟 run.py 搶 8000 與 5174 埠。
+#
+# 專案名稱固定成 fambudget：不然 Docker 會拿資料夾名稱當名字，同一台電腦 clone 兩份
+# 就會開出兩顆 PostgreSQL 搶 5432。固定之後容器名稱一律是 fambudget-db-1。
+name: fambudget
+
 services:
   db:
     image: postgres:16-alpine

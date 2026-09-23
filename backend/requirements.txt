@@ -1,34 +1,47 @@
 # ============================================================
-# 版本以 .python-version 鎖在 3.12，確保都有預編譯輪檔
+# ASCII ONLY. Do not write Chinese (or any non-ASCII) in this file.
+#
+# pip on Traditional Chinese Windows reads this file as cp950, not UTF-8.
+# One Chinese character here makes `pip install -r requirements.txt` fail with
+#   UnicodeDecodeError: 'cp950' codec can't decode byte ...
+# and nobody on the team can start the project. tests/test_toolkit.py checks this.
+#
+# Python version is pinned in .python-version (3.12) so every package has a wheel.
 # ============================================================
 
-# --- Web 框架 ---
-fastapi>=0.115,<0.200
+# --- Web framework ---
+# fastapi 0.137+ no longer lists routes added by include_router in app.routes.
+# app/ownership.py (progress table) and tests/routes (the "is it done yet" check)
+# both read app.routes, so a fresh install would show 0/70 and 85 failing tests.
+# Fix those two places before raising this upper bound.
+fastapi>=0.115,<0.137
 uvicorn[standard]>=0.34,<0.40
 pydantic>=2.10,<3
 pydantic-settings>=2.6,<3
 
-# --- 資料庫 ---
+# --- Database ---
 sqlalchemy>=2.0,<3
 alembic>=1.14,<2
 psycopg[binary]>=3.2,<4
 
-# --- 認證 ---
+# --- Auth ---
 pyjwt>=2.10,<3
-bcrypt>=4.1,<6                    # ⚠️ 不要換回 passlib：它 2020 年之後沒更新，
-                                  #    後端偵測會拿 >72 位元組的樣本去雜湊，
-                                  #    bcrypt 4.1 之後會丟例外，全新安裝的人都會踩到
-python-multipart>=0.0.20          # 表單登入用
+# Do not switch back to passlib. It has not been updated since 2020, and its
+# backend self-test hashes a sample longer than 72 bytes; bcrypt 4.1+ raises on
+# that, so every route that touches a password returns 500 on a fresh install.
+bcrypt>=4.1,<6
+python-multipart>=0.0.20          # form login
 
-# --- 模型 ---
-# 我們的模型是自己微調的 Qwen2.5-1.5B，轉成 GGUF 後用 llama.cpp 架在
-# Hugging Face Space 上，後端只是用 HTTP 去打它 —— 所以這裡不需要任何
-# 模型套件，httpx 就夠了（在下面的測試區塊裡）。
+# --- Model ---
+# Our model is a fine-tuned Qwen2.5-1.5B (GGUF + llama.cpp on a Hugging Face
+# Space). The backend only calls it over HTTP, so no model packages are needed
+# here; httpx (in the test section below) is enough.
 #
-# 訓練用的套件（transformers / peft / bitsandbytes / trl）刻意不放進來：
-# 那些只在 Colab 的訓練 notebook 裡用得到，裝進後端只會讓映像檔大好幾 GB。
+# Training packages (transformers / peft / bitsandbytes / trl) are left out on
+# purpose: they are only used in the Colab training notebook, and installing them
+# here would make the image several GB larger.
 
-# --- 開發與測試 ---
+# --- Development and tests ---
 pytest>=8.3,<9
 pytest-asyncio>=0.25,<1
 httpx>=0.28,<1

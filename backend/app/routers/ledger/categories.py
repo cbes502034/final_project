@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,13 +19,17 @@
 
 from __future__ import annotations
 
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app import catalog
 from app.guards import block_admin, parent_required
-from app.models import User
+from app.models import Category, User
 from app.routers._stub import not_ready, stub
 from app.schemas.transaction import CategoryIn
+from app.toolkit import crud, errors
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["分類體系"])
@@ -86,7 +91,7 @@ def list_categories(me: User, db: Session = Depends(get_db)):
         3. 回傳 {"categories": [...]}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from fastapi import APIRouter, Depends
             from sqlalchemy.orm import Session
@@ -99,32 +104,29 @@ def list_categories(me: User, db: Session = Depends(get_db)):
             from app.toolkit import crud, errors
             from app.toolkit.db import get_db
 
-        第二步：把整個 list_categories（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/categories", summary="分類（系統預設＋我們家自訂）")
-            @block_admin
-            def list_categories(me: User, db: Session = Depends(get_db)):
-                # 1. 系統預設（family_id 是 NULL）＋ 我們家自訂的
-                rows = crud.find(Category, {"or": [{"family_id__isnull": True}, {"family_id": me.family_id}]},
-                                 order_by="id", db=db)
+            # 1. 系統預設（family_id 是 NULL）＋ 我們家自訂的
+            rows = crud.find(Category, {"or": [{"family_id__isnull": True}, {"family_id": me.family_id}]},
+                             order_by="id", db=db)
 
-                # 2. 轉成前端要的樣子；圖示字：系統分類查表，自訂分類取第一個字
-                out = []
-                for c in rows:
-                    custom = c.family_id is not None
-                    item = {
-                        "id": str(c.id),
-                        "name": c.name,
-                        "kind": c.kind,
-                        "color": c.color or "cat-other",
-                        "icon": c.name[:1] if custom else catalog.CATEGORY_ICONS.get(c.name, c.name[:1]),
-                        "custom": custom,
-                    }
-                    if custom:
-                        item["familyId"] = str(c.family_id)
-                    out.append(item)
-                return {"categories": out}
+            # 2. 轉成前端要的樣子；圖示字：系統分類查表，自訂分類取第一個字
+            out = []
+            for c in rows:
+                custom = c.family_id is not None
+                item = {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "kind": c.kind,
+                    "color": c.color or "cat-other",
+                    "icon": c.name[:1] if custom else catalog.CATEGORY_ICONS.get(c.name, c.name[:1]),
+                    "custom": custom,
+                }
+                if custom:
+                    item["familyId"] = str(c.family_id)
+                out.append(item)
+            return {"categories": out}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -140,7 +142,7 @@ def list_categories(me: User, db: Session = Depends(get_db)):
     raise not_ready("GET /api/categories", OWNER)
 
 
-@router.post("/categories", summary="新增家庭自訂分類")
+@router.post("/categories", status_code=201, summary="新增家庭自訂分類")
 @parent_required
 @stub
 def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
@@ -201,7 +203,7 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
         4. db.commit()，回傳新的分類
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from fastapi import APIRouter, Depends
             from sqlalchemy.orm import Session
@@ -214,31 +216,28 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit import crud, errors
             from app.toolkit.db import get_db
 
-        第二步：把整個 create_category（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 status_code=201；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/categories", status_code=201, summary="新增家庭自訂分類")
-            @parent_required
-            def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
-                # 1. 整理名稱：去頭尾空白、壓掉連續空白
-                name = " ".join(body.name.split())
-                if not name or len(name) > 10:
-                    raise errors.unprocessable("分類名稱要 1～10 個字")
+            # 1. 整理名稱：去頭尾空白、壓掉連續空白
+            name = " ".join(body.name.split())
+            if not name or len(name) > 10:
+                raise errors.unprocessable("分類名稱要 1～10 個字")
 
-                # 2. 同一個收支裡，系統或我們家已經有同名的就擋
-                if crud.exists(Category, {
-                    "kind": body.kind,
-                    "name": name,
-                    "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
-                }, db=db):
-                    raise errors.conflict("已經有「%s」這個分類了" % name)
+            # 2. 同一個收支裡，系統或我們家已經有同名的就擋
+            if crud.exists(Category, {
+                "kind": body.kind,
+                "name": name,
+                "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+            }, db=db):
+                raise errors.conflict("已經有「%s」這個分類了" % name)
 
-                # 3. 新增一列：我們家的分類，顏色一律 cat-other
-                c = crud.save(Category, {"family_id": me.family_id, "name": name, "kind": body.kind,
-                                         "color": "cat-other"}, db=db)
-                db.commit()
-                return {"id": str(c.id), "name": c.name, "kind": c.kind, "color": c.color, "icon": name[:1],
-                        "custom": True, "familyId": str(me.family_id)}
+            # 3. 新增一列：我們家的分類，顏色一律 cat-other
+            c = crud.save(Category, {"family_id": me.family_id, "name": name, "kind": body.kind,
+                                     "color": "cat-other"}, db=db)
+            db.commit()
+            return {"id": str(c.id), "name": c.name, "kind": c.kind, "color": c.color, "icon": name[:1],
+                    "custom": True, "familyId": str(me.family_id)}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

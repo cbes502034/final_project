@@ -66,13 +66,15 @@
 
 ## 1. 第一次：把環境跑起來
 
-在**專案最外層**（跟 `backend/`、`frontend/` 同一層）：
+先裝好兩樣東西：**Python 3.10 以上**、**Docker Desktop**（本機的資料庫跟正式環境一樣是 PostgreSQL，跑在 Docker 裡）。
+每次開發前先把 Docker Desktop 打開，然後在**專案最外層**（跟 `backend/`、`frontend/` 同一層）：
 
 ```bash
 python run.py
 ```
 
-第一次會自己裝套件、建 `backend/.env`、建資料表、放入系統預設分類，然後把前後端一起起來：
+第一次會自己裝套件、建 `backend/.env`、用 Docker 開 PostgreSQL、建資料表、放入系統預設分類與開發用帳號，
+然後把前後端一起起來：
 
 | | 網址 |
 |---|---|
@@ -84,6 +86,21 @@ python run.py
 
 停掉：在那個視窗按 `Ctrl+C`。
 
+### 資料庫會自動建好嗎
+
+會，只要 **Docker Desktop 是打開的**。不用自己裝 PostgreSQL，也不用設定任何東西：
+
+| 你的狀況 | `python run.py` 會怎麼做 |
+|---|---|
+| **第一次**，Docker 開著 | 下載 PostgreSQL → 建好資料庫（容器 `fambudget-db-1`）→ 建資料表 → 放入預設分類與開發帳號。大約 1～2 分鐘，要有網路 |
+| **之後每次**，Docker 開著 | 沿用同一顆資料庫，**不會重建**，上次的資料都還在。十幾秒就起來 |
+| 裝了 Docker，**但沒打開** | 停在第 3 步，提醒你先打開 Docker Desktop |
+| **沒裝 Docker** | 停在第 3 步，給你 Docker Desktop 的下載網址 |
+| **以前跑過 `run.py`**（`backend/.env` 還寫著舊的 SQLite） | 自動換成 PostgreSQL 並印出說明，之後就需要 Docker。舊資料留在 `backend/dev.db`，不會再用到 |
+
+這顆資料庫只在你自己的電腦上，跟其他組員、跟線上網站都無關。
+關掉 `run.py` 不會關掉它，資料也都還在；想清空重來就 `python run.py --reset`。
+
 ### 你的帳號
 
 `run.py` 會自動建好五個開發用帳號，**你的是這一個**：
@@ -93,10 +110,22 @@ python run.py
 | 帳號 | `access@fambudget.tw` |
 | 密碼 | `abcd1234` |
 
-另外四個是 `auth@` `ledger@` `analytics@` `access@` `admin@`（密碼一樣），
-要測家庭、監管、權限的時候就拿它們互相加成一家人。
+五個帳號全組都一樣，每個人的電腦上都有同樣這五個，密碼都是 `abcd1234`：
 
-密碼忘了、或自己改壞了，重跑一次就會重設回來：
+| 帳號 | 誰用 |
+|---|---|
+| `auth@fambudget.tw` | 成員1 · 認證 |
+| `ledger@fambudget.tw` | 成員2 · 記帳 |
+| `analytics@fambudget.tw` | 成員3 · 數字 |
+| `access@fambudget.tw` | 成員4 · 家庭 |
+| `admin@fambudget.tw` | 平台管理員（測 admin/ 那三支用） |
+
+要測家庭、監管、權限的時候，就拿它們在自己的資料庫裡互相加成一家人。
+
+⚠️ **每次 `python run.py`，這五個帳號都會被重設回原樣**：密碼、名字、主題、平台管理員身分、停權狀態。
+所以你在測「改密碼」「停權」這類功能時改到它們，下次啟動就會恢復——這是刻意的，
+免得帳號被測壞之後登不進去。它們身上的其他資料（記的帳、家庭、帳本）不會被動到。
+不想重啟、只想馬上把帳號重設回來的話：
 
 ```bash
 cd backend
@@ -136,13 +165,15 @@ python -m app.ownership        # 看自己還差哪幾支
 ```
 【這支做什麼】【前端怎麼打】【誰能打】【請求】【成功回應】【錯誤回應】
 【會用到的資料表】【每一步用的工具與資料庫方法】【寫法步驟】
-【完整寫法】  ← 可以直接貼上去的整段程式（import ＋ 整個函式）
+【完整寫法】  ← 第二步就是要貼上去的程式
 【做完怎麼確認】
 ```
 
-**③ 把 `raise not_ready(...)` 換成【完整寫法】的第二步，然後拿掉 `@stub`。**
+**③ 刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成【完整寫法】的第二步。**
 
-第一步是這個檔案最上面的 import 區塊（同一個檔案裡每一支都一樣，貼一次就好）。
+就這兩個動作。裝飾器、函式名稱、參數、說明字串、檔案最上面的 import **都已經是最終版本，不用動**
+（第一步只是讓你對照 import 長什麼樣，已經放好了）。
+⚠️ 說明字串不要刪：測試會檢查每一支都要有它，刪了會紅燈。
 有第三步的話，那是要換掉的 service 函式，照著換。
 
 **④ 存檔。** uvicorn 會自己重載，不用重開。
@@ -164,11 +195,11 @@ python -m app.ownership        # 看自己還差哪幾支
 ```bash
 cd backend
 python -m app.cli db                                        # 每張表各幾筆
-python -m app.cli db "SELECT id, email FROM users"
-python -m app.cli db "SELECT * FROM transactions ORDER BY id DESC LIMIT 5"
+python -m app.cli db transactions                           # 那張表最新的 10 筆（第一行就是欄位名稱）
+python -m app.cli db "SELECT id, email FROM users"          # 自己寫查詢
 ```
 
-只能查（`SELECT` / `PRAGMA` / `WITH`），不能改——免得一行 `DELETE` 把自己的資料清掉。
+只能查（`SELECT` / `WITH`），不能改——免得一行 `DELETE` 把自己的資料清掉。
 
 **② API 文件頁試打** <http://localhost:8000/docs>
 
@@ -178,22 +209,29 @@ python -m app.cli db "SELECT * FROM transactions ORDER BY id DESC LIMIT 5"
 **③ 前端畫面** <http://localhost:5174/?api=http://localhost:8000>
 
 真的長什麼樣。你那一支還沒做的時候，畫面會直接說「後端還沒做這一支（HTTP 501）」
-和負責人，左下角的錯誤匣還會把這一輪所有出錯的呼叫列出來（可以整個複製）。
+和負責人。左下角那張表會列出這一頁打過的每一支：**你那一支做對了就亮綠燈**，
+還沒做或出錯是紅燈（可以整個複製）。做完一支、重新整理，看它有沒有變綠。
 
 ### 資料庫本身
 
 | | |
 |---|---|
-| 你本機的 | SQLite，就是 `backend/dev.db` 這個檔案 |
+| 你本機的 | **PostgreSQL 16**，跑在 Docker 裡（`docker-compose.yml` 的 `db`），`python run.py` 會自己開 |
 | 正式環境 | PostgreSQL（Render 上的 `fambudget-db`） |
-| 跑測試時 | 記憶體裡的 SQLite，每個測試一份，不會污染你的 dev.db |
+| 跑測試時 | 記憶體裡的 SQLite，每個測試一份、跑得快、不需要 Docker，也不會動到你的資料 |
 
-兩種資料庫的差異都吃在 `app/toolkit/db.py`（SQLite 的外鍵檢查已經打開），
-所以本機寫得對，上去也會對。
+本機跟正式環境是同一種資料庫，所以本機寫得對，上去也會對。
+**開發前先把 Docker Desktop 打開**，不然 `python run.py` 會停在「啟動資料庫」那一步並告訴你。
+
+資料存在 Docker 的 volume 裡，關掉 `run.py`、甚至重開機都還在。
 
 ```bash
-python run.py --reset      # 資料亂了，砍掉重建（只影響你本機）
+python run.py --reset      # 資料亂了，清空重建（只影響你本機）
+docker compose stop db     # 不寫程式的時候想把 PostgreSQL 關掉（在專案最外層跑）
 ```
+
+想用圖形介面看資料的話：DBeaver、pgAdmin、VS Code 的 PostgreSQL 擴充套件都可以，連線資訊是
+`localhost:5432`，資料庫 `fambudget`，帳號 `fambudget`，密碼 `devpassword`（只在你電腦上，不是機密）。
 
 **改資料表結構**要走 Alembic，不可以手動改資料庫：
 
@@ -276,7 +314,7 @@ pytest tests/routes -k "你的" -q
 | `alembic` 噴 `UnicodeDecodeError: 'cp950'` | 有人在 `alembic.ini` 裡寫了中文。那個檔案只能有英文 |
 | 改了程式沒生效 | `run.py` 起的 uvicorn 有 `--reload`，存檔就會重載；沒反應就看那個視窗有沒有錯誤 |
 
-**還是卡住**：把左下角錯誤匣的「複製全部」貼到群組，裡面有函式、路由、狀態碼、負責人。
+**還是卡住**：把左下角那張表的「複製全部」貼到群組，裡面有函式、路由、狀態碼、負責人。
 
 ---
 

@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,13 +19,18 @@
 
 from __future__ import annotations
 
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.guards import block_admin
-from app.models import User
+from app.guards import block_admin, visible_scope
+from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.stats import BudgetIn, SavingsGoalIn
+from app.toolkit import crud, errors, money, period, roles
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["預算與存款目標"])
@@ -98,7 +104,7 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
         ⚠️ 只讀不寫，不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import datetime, timedelta, timezone
 
@@ -112,54 +118,51 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：把整個 list_budgets（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/budgets", summary="預算與已花")
-            @block_admin
-            def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get_db)):
-                # 1. 這個月的起訖（台灣時間）
-                this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
-                start, end = period.month_range(this_month)
+            # 1. 這個月的起訖（台灣時間）
+            this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
+            start, end = period.month_range(this_month)
 
-                # 2. 我看得到的人的每月分類預算
-                users, groups = visible_scope(me, db)
-                budgets = crud.find(Budget, {"user_id__in": users, "period_type": "month", "category_id__isnull": False},
-                                    order_by="id", db=db)
+            # 2. 我看得到的人的每月分類預算
+            users, groups = visible_scope(me, db)
+            budgets = crud.find(Budget, {"user_id__in": users, "period_type": "month", "category_id__isnull": False},
+                                order_by="id", db=db)
 
-                # 3. 只算某一本帳：要是我加入的
-                group_id = None
-                if groupId and groupId != "all":
-                    group_id = int(groupId) if groupId.isdigit() else 0
-                    if group_id not in groups:
-                        raise errors.forbidden("你不在這本帳裡")
+            # 3. 只算某一本帳：要是我加入的
+            group_id = None
+            if groupId and groupId != "all":
+                group_id = int(groupId) if groupId.isdigit() else 0
+                if group_id not in groups:
+                    raise errors.forbidden("你不在這本帳裡")
 
-                # 4. 已花多少：這個月、這個人、這個分類的支出，從明細現算
-                spent = {}
-                if budgets:
-                    where = {"user_id__in": {b.user_id for b in budgets}, "kind": "expense",
-                             "occurred_on__between": (start, end)}
-                    if group_id is not None:
-                        where["group_id"] = group_id
-                    for t in crud.find(Transaction, where, fields=("user_id", "category_id", "amount"), db=db):
-                        key = (t["user_id"], t["category_id"])
-                        spent[key] = money.add(spent.get(key), t["amount"])
+            # 4. 已花多少：這個月、這個人、這個分類的支出，從明細現算
+            spent = {}
+            if budgets:
+                where = {"user_id__in": {b.user_id for b in budgets}, "kind": "expense",
+                         "occurred_on__between": (start, end)}
+                if group_id is not None:
+                    where["group_id"] = group_id
+                for t in crud.find(Transaction, where, fields=("user_id", "category_id", "amount"), db=db):
+                    key = (t["user_id"], t["category_id"])
+                    spent[key] = money.add(spent.get(key), t["amount"])
 
-                # 5. 配上已花、有沒有超過、用掉幾成；用掉比例高的排前面
-                out = []
-                for b in budgets:
-                    used = spent.get((b.user_id, b.category_id), money.ZERO)
-                    out.append({
-                        "user": str(b.user_id),
-                        "period": b.period_type,
-                        "cat": str(b.category_id),
-                        "limit": b.limit_amount,
-                        "used": used,
-                        "over": used > b.limit_amount,
-                        "pct": money.quantize(money.ratio(used, b.limit_amount), 4),
-                    })
-                out.sort(key=lambda row: row["pct"], reverse=True)
-                return {"budgets": out}
+            # 5. 配上已花、有沒有超過、用掉幾成；用掉比例高的排前面
+            out = []
+            for b in budgets:
+                used = spent.get((b.user_id, b.category_id), money.ZERO)
+                out.append({
+                    "user": str(b.user_id),
+                    "period": b.period_type,
+                    "cat": str(b.category_id),
+                    "limit": b.limit_amount,
+                    "used": used,
+                    "over": used > b.limit_amount,
+                    "pct": money.quantize(money.ratio(used, b.limit_amount), 4),
+                })
+            out.sort(key=lambda row: row["pct"], reverse=True)
+            return {"budgets": out}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -236,7 +239,7 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
         4. 不是 0：upsert（有就改、沒有就新增），db.commit()，回傳設定
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import datetime, timedelta, timezone
 
@@ -250,37 +253,34 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：把整個 set_budget（從 @router.put 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.put("/budgets", summary="設定預算（limit 0 = 拿掉）")
-            @block_admin
-            def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
-                # 1. 只能設在支出分類（系統的或我們家的）
-                category_id = int(body.cat) if body.cat.isdigit() else 0
-                category = crud.get(Category, where={
-                    "id": category_id,
-                    "kind": "expense",
-                    "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
-                }, db=db)
-                if category is None:
-                    raise errors.bad_request("預算只能設在支出分類")
+            # 1. 只能設在支出分類（系統的或我們家的）
+            category_id = int(body.cat) if body.cat.isdigit() else 0
+            category = crud.get(Category, where={
+                "id": category_id,
+                "kind": "expense",
+                "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+            }, db=db)
+            if category is None:
+                raise errors.bad_request("預算只能設在支出分類")
 
-                # 2. 同一個人、分類、週期只有一列
-                where = {"user_id": me.id, "category_id": category.id, "period_type": body.period}
-                out = {"user": str(me.id), "period": body.period, "cat": str(category.id), "catName": category.name}
+            # 2. 同一個人、分類、週期只有一列
+            where = {"user_id": me.id, "category_id": category.id, "period_type": body.period}
+            out = {"user": str(me.id), "period": body.period, "cat": str(category.id), "catName": category.name}
 
-                # 3. limit 0 = 拿掉這個分類的預算（刪掉那一列，不是存一個 0）
-                if body.limit == 0:
-                    crud.remove(Budget, where, db=db)
-                    db.commit()
-                    return {**out, "limit": 0, "deleted": True}
-
-                # 4. 有就改、沒有就新增
-                crud.save(Budget, {"limit_amount": money.quantize(body.limit), "family_id": me.family_id,
-                                   "created_by": me.id}, where=where, upsert=True, db=db)
+            # 3. limit 0 = 拿掉這個分類的預算（刪掉那一列，不是存一個 0）
+            if body.limit == 0:
+                crud.remove(Budget, where, db=db)
                 db.commit()
-                return {**out, "limit": body.limit}
+                return {**out, "limit": 0, "deleted": True}
+
+            # 4. 有就改、沒有就新增
+            crud.save(Budget, {"limit_amount": money.quantize(body.limit), "family_id": me.family_id,
+                               "created_by": me.id}, where=where, upsert=True, db=db)
+            db.commit()
+            return {**out, "limit": body.limit}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -363,7 +363,7 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
         4. 回傳：整體的帶 name 與 savingsGoal，帳本的帶 groupId 與 groupName
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import datetime, timedelta, timezone
 
@@ -377,41 +377,38 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：把整個 set_savings_goal（從 @router.put 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.put("/savings-goal", summary="設定每月存款目標")
-            @block_admin
-            def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db)):
-                # 1. 只有本人能設（userId 不帶 = 自己）
-                try:
-                    roles.require_set_goal(str(me.id), body.userId or str(me.id))
-                except PermissionError as exc:
-                    raise errors.forbidden(str(exc)) from None
+            # 1. 只有本人能設（userId 不帶 = 自己）
+            try:
+                roles.require_set_goal(str(me.id), body.userId or str(me.id))
+            except PermissionError as exc:
+                raise errors.forbidden(str(exc)) from None
 
-                # 2. 帶了 groupId：那本帳的目標，要是我加入、沒移除的帳本
-                group = None
-                if body.groupId:
-                    group_id = int(body.groupId) if body.groupId.isdigit() else 0
-                    if crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db):
-                        group = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
-                    if group is None:
-                        raise errors.forbidden("你不在這本帳裡")
+            # 2. 帶了 groupId：那本帳的目標，要是我加入、沒移除的帳本
+            group = None
+            if body.groupId:
+                group_id = int(body.groupId) if body.groupId.isdigit() else 0
+                if crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db):
+                    group = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
+                if group is None:
+                    raise errors.forbidden("你不在這本帳裡")
 
-                # 3. 一個月一列：這個月改好幾次只改同一列，以前月份的不動
-                this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
-                crud.save(SavingsGoal, {"goal_amount": money.quantize(body.goal), "created_by": me.id},
-                          where={"user_id": me.id, "group_id": group.id if group else None, "period_key": this_month},
-                          upsert=True, db=db)
-                db.commit()
+            # 3. 一個月一列：這個月改好幾次只改同一列，以前月份的不動
+            this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
+            crud.save(SavingsGoal, {"goal_amount": money.quantize(body.goal), "created_by": me.id},
+                      where={"user_id": me.id, "group_id": group.id if group else None, "period_key": this_month},
+                      upsert=True, db=db)
+            db.commit()
 
-                # 4. 回傳：整體目標前端讀 name，帳本目標讀 groupName
-                out = {"id": str(me.id), "name": me.display_name, "userId": str(me.id), "goal": body.goal}
-                if group:
-                    out.update({"groupId": str(group.id), "groupName": group.name})
-                else:
-                    out.update({"groupId": None, "savingsGoal": body.goal})
-                return out
+            # 4. 回傳：整體目標前端讀 name，帳本目標讀 groupName
+            out = {"id": str(me.id), "name": me.display_name, "userId": str(me.id), "goal": body.goal}
+            if group:
+                out.update({"groupId": str(group.id), "groupName": group.name})
+            else:
+                out.update({"groupId": None, "savingsGoal": body.goal})
+            return out
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -482,7 +479,7 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
         ⚠️ 只讀不寫，不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             from datetime import datetime, timedelta, timezone
 
@@ -496,27 +493,24 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：把整個 list_savings_goals（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/savings-goals", summary="整體＋各帳本的存款目標")
-            @block_admin
-            def list_savings_goals(me: User, db: Session = Depends(get_db)):
-                # 1. 我的每一筆目標由舊到新：後面的蓋掉前面的，每本帳留下最新的（整體的鍵是 None）
-                latest = {}
-                for row in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
-                    latest[row.group_id] = row.goal_amount
+            # 1. 我的每一筆目標由舊到新：後面的蓋掉前面的，每本帳留下最新的（整體的鍵是 None）
+            latest = {}
+            for row in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
+                latest[row.group_id] = row.goal_amount
 
-                # 2. 我加入、還在用的帳本
-                my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
-                groups = crud.find(Group, {"id__in": my_groups, "removed_at__isnull": True, "archived_at__isnull": True},
-                                   order_by="id", db=db)
+            # 2. 我加入、還在用的帳本
+            my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
+            groups = crud.find(Group, {"id__in": my_groups, "removed_at__isnull": True, "archived_at__isnull": True},
+                               order_by="id", db=db)
 
-                # 3. 第一列是整體，後面一本一列
-                goals = [{"groupId": None, "groupName": "整體", "goal": latest.get(None, 0)}]
-                for g in groups:
-                    goals.append({"groupId": str(g.id), "groupName": g.name, "goal": latest.get(g.id, 0)})
-                return {"goals": goals}
+            # 3. 第一列是整體，後面一本一列
+            goals = [{"groupId": None, "groupName": "整體", "goal": latest.get(None, 0)}]
+            for g in groups:
+                goals.append({"groupId": str(g.id), "groupName": g.name, "goal": latest.get(g.id, 0)})
+            return {"goals": goals}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

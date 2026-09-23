@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,6 +19,8 @@
 
 from __future__ import annotations
 
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -118,7 +121,7 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
         6. 回傳 token 與 user（新帳號的欄位都是固定的：沒有家庭、沒有大頭貼、目標 0）
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -139,73 +142,70 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 register（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 status_code=201、request；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/register", status_code=201, summary="註冊：名字、email、密碼")
-            @guest_only
-            def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
-                # 1. 存款目標不在註冊時問：帶了就講清楚，不要默默吃掉
-                if body.savingsGoal is not None:
-                    raise errors.bad_request("存款目標不在註冊時設定，註冊完的個人化設定會問")
+            # 1. 存款目標不在註冊時問：帶了就講清楚，不要默默吃掉
+            if body.savingsGoal is not None:
+                raise errors.bad_request("存款目標不在註冊時設定，註冊完的個人化設定會問")
 
-                # 2. 名字、email（一律小寫）、有沒有註冊過
-                name = " ".join(body.name.split())
-                if not name:
-                    raise errors.unprocessable("請填名字")
-                try:
-                    email = password_reset.normalize_email(body.email)
-                except ValueError as exc:
-                    raise errors.unprocessable(str(exc)) from None
-                if crud.exists(User, {"email": email}, db=db):
-                    raise errors.conflict("這個 email 已經註冊過了")
+            # 2. 名字、email（一律小寫）、有沒有註冊過
+            name = " ".join(body.name.split())
+            if not name:
+                raise errors.unprocessable("請填名字")
+            try:
+                email = password_reset.normalize_email(body.email)
+            except ValueError as exc:
+                raise errors.unprocessable(str(exc)) from None
+            if crud.exists(User, {"email": email}, db=db):
+                raise errors.conflict("這個 email 已經註冊過了")
 
-                # 3. 密碼：檢查強度，只存雜湊
-                try:
-                    hashed = passwords.hash_password(body.password)
-                except passwords.WeakPassword as exc:
-                    raise errors.unprocessable(str(exc)) from None
+            # 3. 密碼：檢查強度，只存雜湊
+            try:
+                hashed = passwords.hash_password(body.password)
+            except passwords.WeakPassword as exc:
+                raise errors.unprocessable(str(exc)) from None
 
-                # 4. 新增帳號（onboarded_at 是 NULL：登入後前端會帶去個人化設定）
-                now = datetime.now(timezone.utc)
-                user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
-                                        "theme": "paper", "last_login_at": now}, db=db)
+            # 4. 新增帳號（onboarded_at 是 NULL：登入後前端會帶去個人化設定）
+            now = datetime.now(timezone.utc)
+            user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
+                                    "theme": "paper", "last_login_at": now}, db=db)
 
-                # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
-                refresh, expires = tokens.make_refresh_token(user.id)
-                ip = request.client.host if request.client else ""
-                session = crud.save(UserSession, {
-                    "user_id": user.id,
-                    "refresh_token_hash": tokens.fingerprint(refresh),
-                    "user_agent": request.headers.get("user-agent", "")[:300],
-                    "ip_hash": tokens.fingerprint(ip) if ip else None,
-                    "expires_at": expires,
-                    "last_seen_at": now,
-                }, db=db)
-                db.commit()
+            # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
+            refresh, expires = tokens.make_refresh_token(user.id)
+            ip = request.client.host if request.client else ""
+            session = crud.save(UserSession, {
+                "user_id": user.id,
+                "refresh_token_hash": tokens.fingerprint(refresh),
+                "user_agent": request.headers.get("user-agent", "")[:300],
+                "ip_hash": tokens.fingerprint(ip) if ip else None,
+                "expires_at": expires,
+                "last_seen_at": now,
+            }, db=db)
+            db.commit()
 
-                # 6. 回傳 token 與使用者（新帳號：沒有家庭、沒有大頭貼、還沒走個人化設定）
-                return {
-                    "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
-                    "refreshToken": refresh,
-                    "expiresIn": settings.access_token_minutes * 60,
-                    "user": {
-                        "id": str(user.id),
-                        "name": user.display_name,
-                        "email": user.email,
-                        "role": None,
-                        "familyId": None,
-                        "avatar": name[-1:],
-                        "avatarUrl": None,
-                        "age": None,
-                        "birthYear": None,
-                        "joined": user.created_at.date().isoformat(),
-                        "theme": "paper",
-                        "onboardedAt": None,
-                        "savingsGoal": 0,
-                        "isPlatformAdmin": False,
-                    },
-                }
+            # 6. 回傳 token 與使用者（新帳號：沒有家庭、沒有大頭貼、還沒走個人化設定）
+            return {
+                "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
+                "refreshToken": refresh,
+                "expiresIn": settings.access_token_minutes * 60,
+                "user": {
+                    "id": str(user.id),
+                    "name": user.display_name,
+                    "email": user.email,
+                    "role": None,
+                    "familyId": None,
+                    "avatar": name[-1:],
+                    "avatarUrl": None,
+                    "age": None,
+                    "birthYear": None,
+                    "joined": user.created_at.date().isoformat(),
+                    "theme": "paper",
+                    "onboardedAt": None,
+                    "savingsGoal": 0,
+                    "isPlatformAdmin": False,
+                },
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -350,7 +350,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         5. 查角色、家庭、存款目標，組成 user，跟兩張 token 一起回傳
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -371,70 +371,68 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 login（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 request；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/login", summary="登入")
-            def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
-                # 1. 找人（email 一律小寫比對）
-                user = crud.get(User, where={"email": body.email.strip().lower()}, db=db)
+            # 1. 找人（email 一律小寫比對）
+            user = crud.get(User, where={"email": body.email.strip().lower()}, db=db)
 
-                # 2. 比對密碼。查無此人也跑一次（拿一組沒有人用的雜湊），兩種情況花的時間才會一樣
-                dummy = "$2b$12$CXOgrZ2hWSUTEYKsghc3uuIaM/ekXB01qlBO04c4x/4cP9.xYOr3G"
-                ok = passwords.verify_password(body.password, user.password_hash if user else dummy)
-                if user is None or not ok:
-                    raise errors.unauthorized("email 或密碼不對")
+            # 2. 比對密碼。查無此人也跑一次（拿一組沒有人用的雜湊），兩種情況花的時間才會一樣
+            dummy = "$2b$12$CXOgrZ2hWSUTEYKsghc3uuIaM/ekXB01qlBO04c4x/4cP9.xYOr3G"
+            ok = passwords.verify_password(body.password, user.password_hash if user else dummy)
+            if user is None or not ok:
+                raise errors.unauthorized("email 或密碼不對")
 
-                # 3. 密碼對了才看停權
-                try:
-                    roles.require_active(user.suspended_at)
-                except PermissionError:
-                    raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範")) from None
+            # 3. 密碼對了才看停權
+            try:
+                roles.require_active(user.suspended_at)
+            except PermissionError:
+                raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範")) from None
 
-                # 4. 寫一列 sessions（只存 refresh token 的指紋），記最後登入時間
-                now = datetime.now(timezone.utc)
-                refresh, expires = tokens.make_refresh_token(user.id)
-                ip = request.client.host if request.client else ""
-                session = crud.save(UserSession, {
-                    "user_id": user.id,
-                    "refresh_token_hash": tokens.fingerprint(refresh),
-                    "user_agent": request.headers.get("user-agent", "")[:300],
-                    "ip_hash": tokens.fingerprint(ip) if ip else None,
-                    "expires_at": expires,
-                    "last_seen_at": now,
-                }, db=db)
-                crud.save(User, {"id": user.id, "last_login_at": now}, db=db)
-                db.commit()
+            # 4. 寫一列 sessions（只存 refresh token 的指紋），記最後登入時間
+            now = datetime.now(timezone.utc)
+            refresh, expires = tokens.make_refresh_token(user.id)
+            ip = request.client.host if request.client else ""
+            session = crud.save(UserSession, {
+                "user_id": user.id,
+                "refresh_token_hash": tokens.fingerprint(refresh),
+                "user_agent": request.headers.get("user-agent", "")[:300],
+                "ip_hash": tokens.fingerprint(ip) if ip else None,
+                "expires_at": expires,
+                "last_seen_at": now,
+            }, db=db)
+            crud.save(User, {"id": user.id, "last_login_at": now}, db=db)
+            db.commit()
 
-                # 5. 回傳 token 與使用者（形狀同 GET /api/auth/me 的 user）
-                fm = crud.get(FamilyMember, where={"user_id": user.id, "status": "active"}, db=db)
-                goal = crud.get(SavingsGoal, where={"user_id": user.id, "group_id__isnull": True},
-                                fields="goal_amount", order_by="-id", db=db)
-                this_year = datetime.now(timezone(timedelta(hours=8))).year
-                onboarded = user.onboarded_at
-                if onboarded is not None and onboarded.tzinfo is None:
-                    onboarded = onboarded.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
-                return {
-                    "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
-                    "refreshToken": refresh,
-                    "expiresIn": settings.access_token_minutes * 60,
-                    "user": {
-                        "id": str(user.id),
-                        "name": user.display_name,
-                        "email": user.email,
-                        "role": fm.role if fm else None,
-                        "familyId": str(fm.family_id) if fm else None,
-                        "avatar": user.display_name[-1:],
-                        "avatarUrl": images.to_data_uri(user.avatar_bytes, user.avatar_mime) if user.avatar_bytes else None,
-                        "age": this_year - user.birth_year if user.birth_year else None,
-                        "birthYear": user.birth_year,
-                        "joined": user.created_at.date().isoformat(),
-                        "theme": user.theme or "paper",
-                        "onboardedAt": onboarded.isoformat() if onboarded else None,
-                        "savingsGoal": goal or 0,
-                        "isPlatformAdmin": user.is_platform_admin,
-                    },
-                }
+            # 5. 回傳 token 與使用者（形狀同 GET /api/auth/me 的 user）
+            fm = crud.get(FamilyMember, where={"user_id": user.id, "status": "active"}, db=db)
+            goal = crud.get(SavingsGoal, where={"user_id": user.id, "group_id__isnull": True},
+                            fields="goal_amount", order_by="-id", db=db)
+            this_year = datetime.now(timezone(timedelta(hours=8))).year
+            onboarded = user.onboarded_at
+            if onboarded is not None and onboarded.tzinfo is None:
+                onboarded = onboarded.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
+            return {
+                "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
+                "refreshToken": refresh,
+                "expiresIn": settings.access_token_minutes * 60,
+                "user": {
+                    "id": str(user.id),
+                    "name": user.display_name,
+                    "email": user.email,
+                    "role": fm.role if fm else None,
+                    "familyId": str(fm.family_id) if fm else None,
+                    "avatar": user.display_name[-1:],
+                    "avatarUrl": images.to_data_uri(user.avatar_bytes, user.avatar_mime) if user.avatar_bytes else None,
+                    "age": this_year - user.birth_year if user.birth_year else None,
+                    "birthYear": user.birth_year,
+                    "joined": user.created_at.date().isoformat(),
+                    "theme": user.theme or "paper",
+                    "onboardedAt": onboarded.isoformat() if onboarded else None,
+                    "savingsGoal": goal or 0,
+                    "isPlatformAdmin": user.is_platform_admin,
+                },
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -567,7 +565,7 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
         5. 回傳新的兩張 token（access token 一樣帶 sid）
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -588,48 +586,46 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 refresh（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/refresh", summary="用 refresh token 換新的 access token")
-            def refresh(body: RefreshIn, db: Session = Depends(get_db)):
-                expired = errors.unauthorized("登入已經過期，請重新登入")
+            expired = errors.unauthorized("登入已經過期，請重新登入")
 
-                # 1. 驗 refresh token 的簽名、型別、期限
-                try:
-                    payload = tokens.read_refresh_token(body.refreshToken)
-                except tokens.TokenError:
-                    raise expired from None
+            # 1. 驗 refresh token 的簽名、型別、期限
+            try:
+                payload = tokens.read_refresh_token(body.refreshToken)
+            except tokens.TokenError:
+                raise expired from None
 
-                # 2. 用指紋找還有效的那一台（先鎖住，兩個請求同時換只有一個會成功）
-                now = datetime.now(timezone.utc)
-                session = crud.get(UserSession, where={
-                    "refresh_token_hash": tokens.fingerprint(body.refreshToken),
-                    "revoked_at__isnull": True,
-                    "expires_at__gt": now,
-                }, for_update=True, db=db)
-                if session is None or str(session.user_id) != payload["sub"]:
-                    raise expired
+            # 2. 用指紋找還有效的那一台（先鎖住，兩個請求同時換只有一個會成功）
+            now = datetime.now(timezone.utc)
+            session = crud.get(UserSession, where={
+                "refresh_token_hash": tokens.fingerprint(body.refreshToken),
+                "revoked_at__isnull": True,
+                "expires_at__gt": now,
+            }, for_update=True, db=db)
+            if session is None or str(session.user_id) != payload["sub"]:
+                raise expired
 
-                # 3. 人還在、沒被停權
-                user = crud.get(User, session.user_id, db=db)
-                if user is None:
-                    raise expired
-                if user.suspended_at is not None:
-                    raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範"))
+            # 3. 人還在、沒被停權
+            user = crud.get(User, session.user_id, db=db)
+            if user is None:
+                raise expired
+            if user.suspended_at is not None:
+                raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範"))
 
-                # 4. 輪替：同一台沿用同一列，換成新的指紋（舊的 token 就此作廢）
-                new_refresh, expires = tokens.make_refresh_token(user.id)
-                crud.save(UserSession, {"id": session.id, "refresh_token_hash": tokens.fingerprint(new_refresh),
-                                        "expires_at": expires, "last_seen_at": now}, db=db)
-                db.commit()
+            # 4. 輪替：同一台沿用同一列，換成新的指紋（舊的 token 就此作廢）
+            new_refresh, expires = tokens.make_refresh_token(user.id)
+            crud.save(UserSession, {"id": session.id, "refresh_token_hash": tokens.fingerprint(new_refresh),
+                                    "expires_at": expires, "last_seen_at": now}, db=db)
+            db.commit()
 
-                # 5. 回傳新的兩張 token
-                return {
-                    "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
-                    "refreshToken": new_refresh,
-                    "expiresIn": settings.access_token_minutes * 60,
-                }
+            # 5. 回傳新的兩張 token
+            return {
+                "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
+                "refreshToken": new_refresh,
+                "expiresIn": settings.access_token_minutes * 60,
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -742,7 +738,7 @@ def logout(
         3. 設 revoked_at，db.commit()，回 {"ok": true}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -763,30 +759,22 @@ def logout(
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 logout（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 payload=Depends(current_token_payload)；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/logout", summary="登出（撤銷這一台的 refresh token）")
-            @login_required
-            def logout(
-                body: LogoutIn,
-                me: User,
-                payload: dict = Depends(current_token_payload),
-                db: Session = Depends(get_db),
-            ):
-                # 1. 要撤銷哪一台：帶了 refreshToken 用它的指紋，沒帶用 access token 裡的 sid
-                where = {"user_id": me.id, "revoked_at__isnull": True}
-                if body.refreshToken:
-                    where["refresh_token_hash"] = tokens.fingerprint(body.refreshToken)
-                elif payload.get("sid"):
-                    where["id"] = uuid.UUID(payload["sid"])
-                else:
-                    return {"ok": True}
-
-                # 2. 設 revoked_at（不刪列）；找不到也當作成功，重複登出不要噴錯
-                crud.save(UserSession, {"revoked_at": datetime.now(timezone.utc)}, where=where, db=db)
-                db.commit()
+            # 1. 要撤銷哪一台：帶了 refreshToken 用它的指紋，沒帶用 access token 裡的 sid
+            where = {"user_id": me.id, "revoked_at__isnull": True}
+            if body.refreshToken:
+                where["refresh_token_hash"] = tokens.fingerprint(body.refreshToken)
+            elif payload.get("sid"):
+                where["id"] = uuid.UUID(payload["sid"])
+            else:
                 return {"ok": True}
+
+            # 2. 設 revoked_at（不刪列）；找不到也當作成功，重複登出不要噴錯
+            crud.save(UserSession, {"revoked_at": datetime.now(timezone.utc)}, where=where, db=db)
+            db.commit()
+            return {"ok": True}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -859,7 +847,7 @@ def logout_all(me: User, db: Session = Depends(get_db)):
         2. db.commit()，回 {"revoked": 幾列}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -880,17 +868,14 @@ def logout_all(me: User, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 logout_all（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/logout-all", summary="登出所有裝置")
-            @login_required
-            def logout_all(me: User, db: Session = Depends(get_db)):
-                # 這個人所有還沒撤銷的 sessions 一起撤銷（包含這一台）
-                revoked = crud.save(UserSession, {"revoked_at": datetime.now(timezone.utc)},
-                                    where={"user_id": me.id, "revoked_at__isnull": True}, db=db)
-                db.commit()
-                return {"revoked": revoked}
+            # 這個人所有還沒撤銷的 sessions 一起撤銷（包含這一台）
+            revoked = crud.save(UserSession, {"revoked_at": datetime.now(timezone.utc)},
+                                where={"user_id": me.id, "revoked_at__isnull": True}, db=db)
+            db.commit()
+            return {"revoked": revoked}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -981,7 +966,7 @@ def get_me(me: User, db: Session = Depends(get_db)):
         ⚠️ 只讀不寫，不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -1002,58 +987,55 @@ def get_me(me: User, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 get_me（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/auth/me", summary="我是誰")
-            @login_required
-            def get_me(me: User, db: Session = Depends(get_db)):
-                # 1. 我看得到誰、查得到誰（平台管理員讀不到任何人的帳：都是空的）
-                if me.is_platform_admin:
-                    users, sharing = set(), []
-                else:
-                    users, groups = visible_scope(me, db)
-                    sharing = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
-                queryable = users.union(sharing)
+            # 1. 我看得到誰、查得到誰（平台管理員讀不到任何人的帳：都是空的）
+            if me.is_platform_admin:
+                users, sharing = set(), []
+            else:
+                users, groups = visible_scope(me, db)
+                sharing = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
+            queryable = users.union(sharing)
 
-                # 2. 誰在照看我（被照看的人自己一定看得到）
-                guardian_ids = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, fields="guardian_id", db=db)
-                guardians = crud.find(User, {"id__in": guardian_ids}, order_by="id", db=db)
+            # 2. 誰在照看我（被照看的人自己一定看得到）
+            guardian_ids = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, fields="guardian_id", db=db)
+            guardians = crud.find(User, {"id__in": guardian_ids}, order_by="id", db=db)
 
-                # 3. 我的家庭、目前的整體存款目標
-                tw = timezone(timedelta(hours=8))
-                fam = crud.get(Family, me.family_id, db=db) if me.family_id else None
-                goal = crud.get(SavingsGoal, where={"user_id": me.id, "group_id__isnull": True},
-                                fields="goal_amount", order_by="-id", db=db)
-                this_year = datetime.now(tw).year
-                onboarded = me.onboarded_at
-                if onboarded is not None and onboarded.tzinfo is None:
-                    onboarded = onboarded.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
+            # 3. 我的家庭、目前的整體存款目標
+            tw = timezone(timedelta(hours=8))
+            fam = crud.get(Family, me.family_id, db=db) if me.family_id else None
+            goal = crud.get(SavingsGoal, where={"user_id": me.id, "group_id__isnull": True},
+                            fields="goal_amount", order_by="-id", db=db)
+            this_year = datetime.now(tw).year
+            onboarded = me.onboarded_at
+            if onboarded is not None and onboarded.tzinfo is None:
+                onboarded = onboarded.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
 
-                # 4. 組起來
-                return {
-                    "user": {
-                        "id": str(me.id),
-                        "name": me.display_name,
-                        "email": me.email,
-                        "role": me.family_role,
-                        "familyId": str(me.family_id) if me.family_id else None,
-                        "avatar": me.display_name[-1:],
-                        "avatarUrl": images.to_data_uri(me.avatar_bytes, me.avatar_mime) if me.avatar_bytes else None,
-                        "age": this_year - me.birth_year if me.birth_year else None,
-                        "birthYear": me.birth_year,
-                        "joined": me.created_at.date().isoformat(),
-                        "theme": me.theme or "paper",
-                        "onboardedAt": onboarded.isoformat() if onboarded else None,
-                        "savingsGoal": goal or 0,
-                        "isPlatformAdmin": me.is_platform_admin,
-                    },
-                    "family": {"id": str(fam.id), "name": fam.name,
-                               "period": period.current_month(datetime.now(tw).date())} if fam else None,
-                    "visible": [str(u) for u in sorted(users, key=lambda u: (u != me.id, u))],
-                    "queryable": [str(u) for u in sorted(queryable, key=lambda u: (u != me.id, u))],
-                    "guardedBy": [{"id": str(u.id), "name": u.display_name} for u in guardians],
-                }
+            # 4. 組起來
+            return {
+                "user": {
+                    "id": str(me.id),
+                    "name": me.display_name,
+                    "email": me.email,
+                    "role": me.family_role,
+                    "familyId": str(me.family_id) if me.family_id else None,
+                    "avatar": me.display_name[-1:],
+                    "avatarUrl": images.to_data_uri(me.avatar_bytes, me.avatar_mime) if me.avatar_bytes else None,
+                    "age": this_year - me.birth_year if me.birth_year else None,
+                    "birthYear": me.birth_year,
+                    "joined": me.created_at.date().isoformat(),
+                    "theme": me.theme or "paper",
+                    "onboardedAt": onboarded.isoformat() if onboarded else None,
+                    "savingsGoal": goal or 0,
+                    "isPlatformAdmin": me.is_platform_admin,
+                },
+                "family": {"id": str(fam.id), "name": fam.name,
+                           "period": period.current_month(datetime.now(tw).date())} if fam else None,
+                "visible": [str(u) for u in sorted(users, key=lambda u: (u != me.id, u))],
+                "queryable": [str(u) for u in sorted(queryable, key=lambda u: (u != me.id, u))],
+                "guardedBy": [{"id": str(u.id), "name": u.display_name} for u in guardians],
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -1185,7 +1167,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         6. 回傳改完的 user
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -1206,72 +1188,69 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 update_me（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/auth/me", summary="改個人資料、主題、個人化設定走完")
-            @login_required
-            def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
-                sent = body.model_fields_set
-                changes = {}
-                this_year = datetime.now(timezone(timedelta(hours=8))).year
+            sent = body.model_fields_set
+            changes = {}
+            this_year = datetime.now(timezone(timedelta(hours=8))).year
 
-                # 1. 名字
-                if "displayName" in sent:
-                    name = " ".join((body.displayName or "").split())
-                    if not name:
-                        raise errors.unprocessable("名字不能空白")
-                    if len(name) > 30:
-                        raise errors.unprocessable("名字最多 30 個字")
-                    changes["display_name"] = name
+            # 1. 名字
+            if "displayName" in sent:
+                name = " ".join((body.displayName or "").split())
+                if not name:
+                    raise errors.unprocessable("名字不能空白")
+                if len(name) > 30:
+                    raise errors.unprocessable("名字最多 30 個字")
+                changes["display_name"] = name
 
-                # 2. 出生年（null = 清掉）。只是個人資料，任何權限判斷都不讀它
-                if "birthYear" in sent:
-                    if body.birthYear is not None and not 1900 <= body.birthYear <= this_year:
-                        raise errors.unprocessable("出生年份不合理")
-                    changes["birth_year"] = body.birthYear
+            # 2. 出生年（null = 清掉）。只是個人資料，任何權限判斷都不讀它
+            if "birthYear" in sent:
+                if body.birthYear is not None and not 1900 <= body.birthYear <= this_year:
+                    raise errors.unprocessable("出生年份不合理")
+                changes["birth_year"] = body.birthYear
 
-                # 3. 主題只收清單裡的
-                if "theme" in sent:
-                    try:
-                        changes["theme"] = theme.clean_theme(body.theme)
-                    except ValueError as exc:
-                        raise errors.unprocessable(str(exc)) from None
+            # 3. 主題只收清單裡的
+            if "theme" in sent:
+                try:
+                    changes["theme"] = theme.clean_theme(body.theme)
+                except ValueError as exc:
+                    raise errors.unprocessable(str(exc)) from None
 
-                # 4. 個人化設定走完：只收 true，已經設過的不蓋掉時間
-                if "onboarded" in sent:
-                    if body.onboarded is not True:
-                        raise errors.unprocessable("onboarded 只能是 true")
-                    if me.onboarded_at is None:
-                        changes["onboarded_at"] = datetime.now(timezone.utc)
+            # 4. 個人化設定走完：只收 true，已經設過的不蓋掉時間
+            if "onboarded" in sent:
+                if body.onboarded is not True:
+                    raise errors.unprocessable("onboarded 只能是 true")
+                if me.onboarded_at is None:
+                    changes["onboarded_at"] = datetime.now(timezone.utc)
 
-                # 5. 寫回去
-                if changes:
-                    crud.save(User, {"id": me.id, **changes}, db=db)
-                    db.commit()
+            # 5. 寫回去
+            if changes:
+                crud.save(User, {"id": me.id, **changes}, db=db)
+                db.commit()
 
-                # 6. 回傳改完的 user（形狀同 GET /api/auth/me）
-                goal = crud.get(SavingsGoal, where={"user_id": me.id, "group_id__isnull": True},
-                                fields="goal_amount", order_by="-id", db=db)
-                onboarded = me.onboarded_at
-                if onboarded is not None and onboarded.tzinfo is None:
-                    onboarded = onboarded.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
-                return {
-                    "id": str(me.id),
-                    "name": me.display_name,
-                    "email": me.email,
-                    "role": me.family_role,
-                    "familyId": str(me.family_id) if me.family_id else None,
-                    "avatar": me.display_name[-1:],
-                    "avatarUrl": images.to_data_uri(me.avatar_bytes, me.avatar_mime) if me.avatar_bytes else None,
-                    "age": this_year - me.birth_year if me.birth_year else None,
-                    "birthYear": me.birth_year,
-                    "joined": me.created_at.date().isoformat(),
-                    "theme": me.theme or "paper",
-                    "onboardedAt": onboarded.isoformat() if onboarded else None,
-                    "savingsGoal": goal or 0,
-                    "isPlatformAdmin": me.is_platform_admin,
-                }
+            # 6. 回傳改完的 user（形狀同 GET /api/auth/me）
+            goal = crud.get(SavingsGoal, where={"user_id": me.id, "group_id__isnull": True},
+                            fields="goal_amount", order_by="-id", db=db)
+            onboarded = me.onboarded_at
+            if onboarded is not None and onboarded.tzinfo is None:
+                onboarded = onboarded.replace(tzinfo=timezone.utc)          # SQLite 讀回來沒有時區
+            return {
+                "id": str(me.id),
+                "name": me.display_name,
+                "email": me.email,
+                "role": me.family_role,
+                "familyId": str(me.family_id) if me.family_id else None,
+                "avatar": me.display_name[-1:],
+                "avatarUrl": images.to_data_uri(me.avatar_bytes, me.avatar_mime) if me.avatar_bytes else None,
+                "age": this_year - me.birth_year if me.birth_year else None,
+                "birthYear": me.birth_year,
+                "joined": me.created_at.date().isoformat(),
+                "theme": me.theme or "paper",
+                "onboardedAt": onboarded.isoformat() if onboarded else None,
+                "savingsGoal": goal or 0,
+                "isPlatformAdmin": me.is_platform_admin,
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -1414,7 +1393,7 @@ def change_password(
         4. 寫稽核，db.commit()，回 {"ok": true}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -1435,42 +1414,34 @@ def change_password(
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 change_password（從 @router.patch 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 payload=Depends(current_token_payload)；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.patch("/auth/password", summary="改密碼")
-            @login_required
-            def change_password(
-                body: PasswordChangeIn,
-                me: User,
-                payload: dict = Depends(current_token_payload),
-                db: Session = Depends(get_db),
-            ):
-                # 1. 舊密碼不對回 400（不是 401）
-                if not passwords.verify_password(body.oldPassword, me.password_hash):
-                    raise errors.bad_request("目前的密碼不對")
-                if body.oldPassword == body.newPassword:
-                    raise errors.bad_request("新密碼不能跟舊的一樣")
+            # 1. 舊密碼不對回 400（不是 401）
+            if not passwords.verify_password(body.oldPassword, me.password_hash):
+                raise errors.bad_request("目前的密碼不對")
+            if body.oldPassword == body.newPassword:
+                raise errors.bad_request("新密碼不能跟舊的一樣")
 
-                # 2. 新密碼：檢查強度，只存雜湊
-                try:
-                    hashed = passwords.hash_password(body.newPassword)
-                except passwords.WeakPassword as exc:
-                    raise errors.unprocessable(str(exc)) from None
-                now = datetime.now(timezone.utc)
-                crud.save(User, {"id": me.id, "password_hash": hashed}, db=db)
+            # 2. 新密碼：檢查強度，只存雜湊
+            try:
+                hashed = passwords.hash_password(body.newPassword)
+            except passwords.WeakPassword as exc:
+                raise errors.unprocessable(str(exc)) from None
+            now = datetime.now(timezone.utc)
+            crud.save(User, {"id": me.id, "password_hash": hashed}, db=db)
 
-                # 3. 其他裝置全部登出（這一台留著）
-                where = {"user_id": me.id, "revoked_at__isnull": True}
-                if payload.get("sid"):
-                    where["id__ne"] = uuid.UUID(payload["sid"])
-                crud.save(UserSession, {"revoked_at": now}, where=where, db=db)
+            # 3. 其他裝置全部登出（這一台留著）
+            where = {"user_id": me.id, "revoked_at__isnull": True}
+            if payload.get("sid"):
+                where["id__ne"] = uuid.UUID(payload["sid"])
+            crud.save(UserSession, {"revoked_at": now}, where=where, db=db)
 
-                # 4. 寫稽核
-                crud.save(AuditLog, {"actor_id": me.id, "action": "change_password", "target_type": "user",
-                                     "target_id": me.id}, db=db)
-                db.commit()
-                return {"ok": True}
+            # 4. 寫稽核
+            crud.save(AuditLog, {"actor_id": me.id, "action": "change_password", "target_type": "user",
+                                 "target_id": me.id}, db=db)
+            db.commit()
+            return {"ok": True}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -1578,7 +1549,7 @@ def request_password_reset(body: PasswordResetIn, background: BackgroundTasks, d
         6. 回固定的回應
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -1599,46 +1570,44 @@ def request_password_reset(body: PasswordResetIn, background: BackgroundTasks, d
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 request_password_reset（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 background；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/password-reset", summary="忘記密碼：寄重設信")
-            def request_password_reset(body: PasswordResetIn, background: BackgroundTasks, db: Session = Depends(get_db)):
-                # 1. 只有 email 格式不對會回錯；之後不管怎樣，回應都一模一樣
-                try:
-                    email = password_reset.normalize_email(body.email)
-                except ValueError as exc:
-                    raise errors.bad_request(str(exc)) from None
-                answer = {"ok": True, "message": password_reset.GENERIC_MESSAGE}
+            # 1. 只有 email 格式不對會回錯；之後不管怎樣，回應都一模一樣
+            try:
+                email = password_reset.normalize_email(body.email)
+            except ValueError as exc:
+                raise errors.bad_request(str(exc)) from None
+            answer = {"ok": True, "message": password_reset.GENERIC_MESSAGE}
 
-                # 2. 找不到人：不講
-                user = crud.get(User, where={"email": email}, db=db)
-                if user is None:
-                    return answer
-
-                # 3. 60 秒內寄過就不寄（不然任何人都能轟炸別人的信箱）
-                last = crud.get(PasswordReset, where={"user_id": user.id}, fields="created_at", order_by="-created_at", db=db)
-                if not password_reset.should_send(last):
-                    return answer
-
-                # 4. 產生 token：資料庫只存雜湊
-                token = password_reset.new_token()
-                crud.save(PasswordReset, {"user_id": user.id, "token_hash": password_reset.hash_token(token),
-                                          "expires_at": password_reset.expires_at()}, db=db)
-                db.commit()
-
-                # 5. 回應送出去之後才寄信；寄不出去只記 log
-                to, who = user.email, user.display_name
-                subject, text, html = password_reset.mail_content(who, password_reset.reset_link(settings.app_base_url, token))
-
-                def send():
-                    try:
-                        mailer.send_mail(to, subject, text, html, to_name=who)
-                    except (mailer.MailNotConfigured, mailer.MailError) as exc:
-                        logging.getLogger("fambudget").warning("重設密碼信寄不出去：%s", exc)
-
-                background.add_task(send)
+            # 2. 找不到人：不講
+            user = crud.get(User, where={"email": email}, db=db)
+            if user is None:
                 return answer
+
+            # 3. 60 秒內寄過就不寄（不然任何人都能轟炸別人的信箱）
+            last = crud.get(PasswordReset, where={"user_id": user.id}, fields="created_at", order_by="-created_at", db=db)
+            if not password_reset.should_send(last):
+                return answer
+
+            # 4. 產生 token：資料庫只存雜湊
+            token = password_reset.new_token()
+            crud.save(PasswordReset, {"user_id": user.id, "token_hash": password_reset.hash_token(token),
+                                      "expires_at": password_reset.expires_at()}, db=db)
+            db.commit()
+
+            # 5. 回應送出去之後才寄信；寄不出去只記 log
+            to, who = user.email, user.display_name
+            subject, text, html = password_reset.mail_content(who, password_reset.reset_link(settings.app_base_url, token))
+
+            def send():
+                try:
+                    mailer.send_mail(to, subject, text, html, to_name=who)
+                except (mailer.MailNotConfigured, mailer.MailError) as exc:
+                    logging.getLogger("fambudget").warning("重設密碼信寄不出去：%s", exc)
+
+            background.add_task(send)
+            return answer
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -1751,7 +1720,7 @@ def confirm_password_reset(
         3. db.commit()，回 {"ok": true}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -1772,31 +1741,25 @@ def confirm_password_reset(
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 confirm_password_reset（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/password-reset/confirm", summary="用信裡的 token 設新密碼")
-            def confirm_password_reset(
-                body: PasswordResetConfirmIn,
-                reset_row=Depends(token_required()),
-                db: Session = Depends(get_db),
-            ):
-                # 1. 新密碼：檢查強度，只存雜湊
-                try:
-                    hashed = passwords.hash_password(body.password)
-                except passwords.WeakPassword as exc:
-                    raise errors.unprocessable(str(exc)) from None
+            # 1. 新密碼：檢查強度，只存雜湊
+            try:
+                hashed = passwords.hash_password(body.password)
+            except passwords.WeakPassword as exc:
+                raise errors.unprocessable(str(exc)) from None
 
-                # 2. 同一個交易：換密碼、連結作廢、這個人所有裝置登出
-                now = datetime.now(timezone.utc)
-                crud.save(User, {"id": reset_row.user_id, "password_hash": hashed}, db=db)
-                crud.save(PasswordReset, {"id": reset_row.id, "used_at": now}, db=db)
-                crud.save(UserSession, {"revoked_at": now},
-                          where={"user_id": reset_row.user_id, "revoked_at__isnull": True}, db=db)
-                crud.save(AuditLog, {"actor_id": reset_row.user_id, "action": "reset_password", "target_type": "user",
-                                     "target_id": reset_row.user_id}, db=db)
-                db.commit()
-                return {"ok": True}
+            # 2. 同一個交易：換密碼、連結作廢、這個人所有裝置登出
+            now = datetime.now(timezone.utc)
+            crud.save(User, {"id": reset_row.user_id, "password_hash": hashed}, db=db)
+            crud.save(PasswordReset, {"id": reset_row.id, "used_at": now}, db=db)
+            crud.save(UserSession, {"revoked_at": now},
+                      where={"user_id": reset_row.user_id, "revoked_at__isnull": True}, db=db)
+            crud.save(AuditLog, {"actor_id": reset_row.user_id, "action": "reset_password", "target_type": "user",
+                                 "target_id": reset_row.user_id}, db=db)
+            db.commit()
+            return {"ok": True}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -1881,7 +1844,7 @@ def get_finance(me: User, db: Session = Depends(get_db)):
         ⚠️ 不用查資料庫，也不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -1902,30 +1865,27 @@ def get_finance(me: User, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 get_finance（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/auth/me/finance", summary="我的理財習慣")
-            @login_required
-            def get_finance(me: User, db: Session = Depends(get_db)):
-                # 1. 存過一次就有值（PUT 一定會寫 goals，空的也是 []）；從來沒存過是 null
-                fields = (me.finance_style, me.finance_goals, me.finance_habits, me.finance_note)
-                finance = None
-                if any(value is not None for value in fields):
-                    finance = {
-                        "style": me.finance_style,
-                        "goals": me.finance_goals or [],
-                        "habits": me.finance_habits or [],
-                        "note": me.finance_note or "",
-                    }
-
-                # 2. 連同三份選項清單一起回
-                return {
-                    "finance": finance,
-                    "styles": catalog.FINANCE_STYLES,
-                    "goals": catalog.FINANCE_GOALS,
-                    "habits": catalog.FINANCE_HABITS,
+            # 1. 存過一次就有值（PUT 一定會寫 goals，空的也是 []）；從來沒存過是 null
+            fields = (me.finance_style, me.finance_goals, me.finance_habits, me.finance_note)
+            finance = None
+            if any(value is not None for value in fields):
+                finance = {
+                    "style": me.finance_style,
+                    "goals": me.finance_goals or [],
+                    "habits": me.finance_habits or [],
+                    "note": me.finance_note or "",
                 }
+
+            # 2. 連同三份選項清單一起回
+            return {
+                "finance": finance,
+                "styles": catalog.FINANCE_STYLES,
+                "goals": catalog.FINANCE_GOALS,
+                "habits": catalog.FINANCE_HABITS,
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -2015,7 +1975,7 @@ def set_finance(body: FinanceIn, me: User, db: Session = Depends(get_db)):
         3. 回傳存好的那一份
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -2036,31 +1996,28 @@ def set_finance(body: FinanceIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 set_finance（從 @router.put 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.put("/auth/me/finance", summary="改理財習慣")
-            @login_required
-            def set_finance(body: FinanceIn, me: User, db: Session = Depends(get_db)):
-                # 1. 只收清單裡的 id（從清單出發挑，不認得的自然進不來）；說明洗過
-                styles = [s["id"] for s in catalog.FINANCE_STYLES]
-                finance = {
-                    "style": body.style if body.style in styles else None,
-                    "goals": [g["id"] for g in catalog.FINANCE_GOALS if g["id"] in body.goals],
-                    "habits": [h["id"] for h in catalog.FINANCE_HABITS if h["id"] in body.habits],
-                    "note": profile.clean_note(body.note),
-                }
+            # 1. 只收清單裡的 id（從清單出發挑，不認得的自然進不來）；說明洗過
+            styles = [s["id"] for s in catalog.FINANCE_STYLES]
+            finance = {
+                "style": body.style if body.style in styles else None,
+                "goals": [g["id"] for g in catalog.FINANCE_GOALS if g["id"] in body.goals],
+                "habits": [h["id"] for h in catalog.FINANCE_HABITS if h["id"] in body.habits],
+                "note": profile.clean_note(body.note),
+            }
 
-                # 2. 寫回去
-                crud.save(User, {
-                    "id": me.id,
-                    "finance_style": finance["style"],
-                    "finance_goals": finance["goals"],
-                    "finance_habits": finance["habits"],
-                    "finance_note": finance["note"] or None,
-                }, db=db)
-                db.commit()
-                return finance
+            # 2. 寫回去
+            crud.save(User, {
+                "id": me.id,
+                "finance_style": finance["style"],
+                "finance_goals": finance["goals"],
+                "finance_habits": finance["habits"],
+                "finance_note": finance["note"] or None,
+            }, db=db)
+            db.commit()
+            return finance
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -2152,7 +2109,7 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
         3. 密碼錯 → 記一筆、commit，回 400
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -2173,28 +2130,25 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 verify_password（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.post("/auth/verify-password", summary="重大操作前再確認一次密碼")
-            @login_required
-            def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_db)):
-                # 1. 速率限制：15 分鐘內錯 5 次就先停
-                since = datetime.now(timezone.utc) - timedelta(minutes=15)
-                failures = crud.count(AuditLog, {"actor_id": me.id, "action": "verify_password_failed",
-                                                 "created_at__gte": since}, db=db)
-                if failures >= 5:
-                    raise HTTPException(status_code=429, detail="密碼錯太多次了，請 15 分鐘後再試")
+            # 1. 速率限制：15 分鐘內錯 5 次就先停
+            since = datetime.now(timezone.utc) - timedelta(minutes=15)
+            failures = crud.count(AuditLog, {"actor_id": me.id, "action": "verify_password_failed",
+                                             "created_at__gte": since}, db=db)
+            if failures >= 5:
+                raise HTTPException(status_code=429, detail="密碼錯太多次了，請 15 分鐘後再試")
 
-                # 2. 對了只回 ok（不發新 token、不改任何狀態）
-                if passwords.verify_password(body.password, me.password_hash):
-                    return {"ok": True}
+            # 2. 對了只回 ok（不發新 token、不改任何狀態）
+            if passwords.verify_password(body.password, me.password_hash):
+                return {"ok": True}
 
-                # 3. 錯了記一筆（先存起來才算得到），回 400（不是 401）
-                crud.save(AuditLog, {"actor_id": me.id, "action": "verify_password_failed", "target_type": "user",
-                                     "target_id": me.id}, db=db)
-                db.commit()
-                raise errors.bad_request("密碼不正確")
+            # 3. 錯了記一筆（先存起來才算得到），回 400（不是 401）
+            crud.save(AuditLog, {"actor_id": me.id, "action": "verify_password_failed", "target_type": "user",
+                                 "target_id": me.id}, db=db)
+            db.commit()
+            raise errors.bad_request("密碼不正確")
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -2277,7 +2231,7 @@ def list_sessions(me: User, payload: dict = Depends(current_token_payload), db: 
         ⚠️ 只讀不寫，不用 db.commit()。
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -2298,36 +2252,33 @@ def list_sessions(me: User, payload: dict = Depends(current_token_payload), db: 
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 list_sessions（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了、多了 payload=Depends(current_token_payload)；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.get("/auth/sessions", summary="登入中的裝置")
-            @login_required
-            def list_sessions(me: User, payload: dict = Depends(current_token_payload), db: Session = Depends(get_db)):
-                # 1. 還有效的登入（沒撤銷、沒過期），新的在前
-                rows = crud.find(UserSession, {"user_id": me.id, "revoked_at__isnull": True,
-                                               "expires_at__gt": datetime.now(timezone.utc)}, order_by="-issued_at", db=db)
+            # 1. 還有效的登入（沒撤銷、沒過期），新的在前
+            rows = crud.find(UserSession, {"user_id": me.id, "revoked_at__isnull": True,
+                                           "expires_at__gt": datetime.now(timezone.utc)}, order_by="-issued_at", db=db)
 
-                # 2. 一台一台轉成前端要的樣子（不回 IP）
-                out = []
-                for s in rows:
-                    agent = s.user_agent or ""
-                    if any(k in agent for k in ("iPhone", "iPad", "Android")):
-                        device = "手機瀏覽器"
-                    elif agent:
-                        device = "電腦瀏覽器"
-                    else:
-                        device = "不明裝置"
-                    seen = s.last_seen_at or s.issued_at
-                    if seen.tzinfo is None:
-                        seen = seen.replace(tzinfo=timezone.utc)                 # SQLite 讀回來沒有時區
-                    out.append({
-                        "id": str(s.id),
-                        "device": device,
-                        "current": str(s.id) == payload.get("sid"),
-                        "lastActiveAt": seen.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-                    })
-                return {"sessions": out}
+            # 2. 一台一台轉成前端要的樣子（不回 IP）
+            out = []
+            for s in rows:
+                agent = s.user_agent or ""
+                if any(k in agent for k in ("iPhone", "iPad", "Android")):
+                    device = "手機瀏覽器"
+                elif agent:
+                    device = "電腦瀏覽器"
+                else:
+                    device = "不明裝置"
+                seen = s.last_seen_at or s.issued_at
+                if seen.tzinfo is None:
+                    seen = seen.replace(tzinfo=timezone.utc)                 # SQLite 讀回來沒有時區
+                out.append({
+                    "id": str(s.id),
+                    "device": device,
+                    "current": str(s.id) == payload.get("sid"),
+                    "lastActiveAt": seen.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                })
+            return {"sessions": out}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -2423,7 +2374,7 @@ def upload_avatar(body: AvatarIn, me: User, db: Session = Depends(get_db)):
         3. 回 {avatarUrl, avatar}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -2444,22 +2395,19 @@ def upload_avatar(body: AvatarIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 upload_avatar（從 @router.put 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.put("/auth/me/avatar", summary="上傳大頭貼")
-            @login_required
-            def upload_avatar(body: AvatarIn, me: User, db: Session = Depends(get_db)):
-                # 1. 拆開並驗證：看檔案開頭的位元組，不信宣告的型別；超過 200 KB 擋掉
-                try:
-                    data, mime = images.from_data_uri(body.image)
-                except images.InvalidImage as exc:
-                    raise errors.unprocessable(str(exc)) from None
+            # 1. 拆開並驗證：看檔案開頭的位元組，不信宣告的型別；超過 200 KB 擋掉
+            try:
+                data, mime = images.from_data_uri(body.image)
+            except images.InvalidImage as exc:
+                raise errors.unprocessable(str(exc)) from None
 
-                # 2. 存進資料庫（不存檔案系統）
-                crud.save(User, {"id": me.id, "avatar_bytes": data, "avatar_mime": mime}, db=db)
-                db.commit()
-                return {"avatarUrl": images.to_data_uri(data, mime), "avatar": me.display_name[-1:]}
+            # 2. 存進資料庫（不存檔案系統）
+            crud.save(User, {"id": me.id, "avatar_bytes": data, "avatar_mime": mime}, db=db)
+            db.commit()
+            return {"avatarUrl": images.to_data_uri(data, mime), "avatar": me.display_name[-1:]}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -2530,7 +2478,7 @@ def delete_avatar(me: User, db: Session = Depends(get_db)):
         2. 回 {"avatarUrl": null, "avatar": 名字最後一個字}
 
     【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
 
             import logging
             import uuid
@@ -2551,16 +2499,13 @@ def delete_avatar(me: User, db: Session = Depends(get_db)):
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
 
-        第二步：把整個 delete_avatar（從 @router.delete 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            @router.delete("/auth/me/avatar", summary="移除大頭貼")
-            @login_required
-            def delete_avatar(me: User, db: Session = Depends(get_db)):
-                # 沒有大頭貼也是合法狀態：照樣清掉、照樣回成功
-                crud.save(User, {"id": me.id, "avatar_bytes": None, "avatar_mime": None}, db=db)
-                db.commit()
-                return {"avatarUrl": None, "avatar": me.display_name[-1:]}
+            # 沒有大頭貼也是合法狀態：照樣清掉、照樣回成功
+            crud.save(User, {"id": me.id, "avatar_bytes": None, "avatar_mime": None}, db=db)
+            db.commit()
+            return {"avatarUrl": None, "avatar": me.display_name[-1:]}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

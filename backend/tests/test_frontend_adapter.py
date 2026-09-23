@@ -121,6 +121,34 @@ def test_通知那一支還沒做的時候_鈴鐺要講出來_不能說沒有通
     assert "目前沒有通知" in empty["text"] and "後端還沒做" not in empty["text"]
 
 
+def test_左下角那張表_後端輸出正確就亮綠燈(run):
+    """這是給組員的保證：**照說明字串做對了，前端就一定接得住**，而且那張表會亮綠燈。
+
+    綠燈的條件是「後端回了、而且形狀過了 SHAPE 與 ROWS 的檢查」——也就是畫面會有反應。
+    每一支只留最新一次的結果（紅了又綠就是修好了）。
+    """
+    lamps = run["lamps"]
+
+    # 回應正確的 → 綠燈
+    for fn in ("API.login", "API.me", "API.summary", "API.budgets", "API.notifications"):
+        assert lamps.get(fn) == "ok", "%s 回應正確卻沒有亮綠燈：%s" % (fn, lamps.get(fn))
+
+    # 還沒做（501）、後端出錯（500）、形狀不對 → 紅燈，而且標得出是哪一種
+    assert lamps["API.createCategory"] == "backend"     # 501
+    assert lamps["API.groups"] == "backend"             # 500
+    assert lamps["API.alerts"] == "shape"               # 少了 alerts
+    assert lamps["API.transactions"] == "shape"         # 最後一次是 amount 回成字串那次
+
+    # 501 的那一次亮紅燈；之後模型叫不動（503）時前端頂出來的結果不是後端做的，不可以把它蓋成綠燈
+    assert lamps["API.nlpParseBatch"] == "backend"
+    # 只有備援結果、後端從來沒正確回過的 → 表上不出現
+    for fn in ("API.nlpParse", "API.generateAdvices", "API.sessions"):
+        assert fn not in lamps, "%s 只有備援結果，不該亮燈：%s" % (fn, lamps.get(fn))
+
+    # 業務錯誤（409）是後端正確地拒絕，不列
+    assert "API.joinFamily" not in lamps
+
+
 def test_業務錯誤照後端的原話_不加技術資訊(run):
     b = run["business"]
     assert b["kind"] == "business" and b["error"] == "你已經在一個家庭裡了"

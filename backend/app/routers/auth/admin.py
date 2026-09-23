@@ -6,7 +6,8 @@
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
 ===========================================================================
-要做的事：把函式裡的 `raise not_ready(...)` 換成真的實作，然後拿掉 `@stub`。
+要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
+裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -18,13 +19,18 @@
 
 from __future__ import annotations
 
+# 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+# 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.guards import admin_required
-from app.models import User
+from app.models import AuditLog, FamilyMember, User, UserSession
 from app.routers._stub import not_ready, stub
 from app.schemas.auth import SuspendIn
+from app.toolkit import crud, errors, roles
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["平台管理"])
@@ -33,7 +39,6 @@ OWNER = "成員1"
 
 @router.get("/admin/users", summary="帳號清單（停權用）")
 @admin_required
-@stub
 def admin_list_users(me: User, db: Session = Depends(get_db)):
     """帳號清單（停權用）
 
@@ -82,46 +87,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
         3. 一個人一列，只放身分欄位，回傳
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
 
-            from datetime import datetime, timezone
-
-            from fastapi import APIRouter, Depends
-            from sqlalchemy.orm import Session
-
-            from app.guards import admin_required
-            from app.models import AuditLog, FamilyMember, User, UserSession
-            from app.routers._stub import not_ready, stub
-            from app.schemas.auth import SuspendIn
-            from app.toolkit import crud, errors, roles
-            from app.toolkit.db import get_db
-
-        第二步：把整個 admin_list_users（從 @router.get 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
-
-            @router.get("/admin/users", summary="帳號清單（停權用）")
-            @admin_required
-            def admin_list_users(me: User, db: Session = Depends(get_db)):
-                # 1. 所有一般帳號（其他平台管理員不列）
-                users = crud.find(User, {"is_platform_admin": False}, order_by="id", db=db)
-
-                # 2. 每個人的家庭角色
-                role_of = {m.user_id: m.role for m in crud.find(FamilyMember, {"status": "active"}, db=db)}
-
-                # 3. 只放身分欄位，任何金額都不給
-                out = []
-                for u in users:
-                    out.append({
-                        "id": str(u.id),
-                        "name": u.display_name,
-                        "email": u.email,
-                        "role": role_of.get(u.id),
-                        "joined": u.created_at.date().isoformat(),
-                        "suspendedAt": u.suspended_at.isoformat() if u.suspended_at else None,
-                        "suspendedReason": u.suspended_reason,
-                    })
-                return {"users": out}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -133,12 +99,29 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
         5. 前端改成連你的後端（frontend/index.html 的 api-base），平台管理頁列出所有帳號與停權狀態
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "admin_list_users and 你的"，要全部通過
     """
-    raise not_ready("GET /api/admin/users", OWNER)
+    # 1. 所有一般帳號（其他平台管理員不列）
+    users = crud.find(User, {"is_platform_admin": False}, order_by="id", db=db)
+
+    # 2. 每個人的家庭角色
+    role_of = {m.user_id: m.role for m in crud.find(FamilyMember, {"status": "active"}, db=db)}
+
+    # 3. 只放身分欄位，任何金額都不給
+    out = []
+    for u in users:
+        out.append({
+            "id": str(u.id),
+            "name": u.display_name,
+            "email": u.email,
+            "role": role_of.get(u.id),
+            "joined": u.created_at.date().isoformat(),
+            "suspendedAt": u.suspended_at.isoformat() if u.suspended_at else None,
+            "suspendedReason": u.suspended_reason,
+        })
+    return {"users": out}
 
 
 @router.post("/admin/users/{user_id}/suspend", summary="停權")
 @admin_required
-@stub
 def suspend_user(user_id: str, body: SuspendIn, me: User, db: Session = Depends(get_db)):
     """停權
 
@@ -195,52 +178,7 @@ def suspend_user(user_id: str, body: SuspendIn, me: User, db: Session = Depends(
         4. 設停權、撤銷所有 sessions、寫稽核，db.commit()
         5. 回 {"id", "suspendedAt"}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
 
-            from datetime import datetime, timezone
-
-            from fastapi import APIRouter, Depends
-            from sqlalchemy.orm import Session
-
-            from app.guards import admin_required
-            from app.models import AuditLog, FamilyMember, User, UserSession
-            from app.routers._stub import not_ready, stub
-            from app.schemas.auth import SuspendIn
-            from app.toolkit import crud, errors, roles
-            from app.toolkit.db import get_db
-
-        第二步：把整個 suspend_user（從 @router.post 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
-
-            @router.post("/admin/users/{user_id}/suspend", summary="停權")
-            @admin_required
-            def suspend_user(user_id: str, body: SuspendIn, me: User, db: Session = Depends(get_db)):
-                # 1. 找人
-                target = crud.get(User, int(user_id) if user_id.isdigit() else 0, db=db)
-                if target is None:
-                    raise errors.not_found("找不到這個帳號")
-
-                # 2. 一定要有理由
-                try:
-                    why = roles.clean_suspend_reason(body.reason)
-                except ValueError as exc:
-                    raise errors.unprocessable(str(exc)) from None
-
-                # 3. 平台管理員不能停（停掉最後一個就沒有人能解除了）
-                try:
-                    roles.require_suspendable(target.is_platform_admin)
-                except PermissionError as exc:
-                    raise errors.forbidden(str(exc)) from None
-
-                # 4. 停權（不刪任何資料）、所有登入撤銷、寫稽核
-                now = datetime.now(timezone.utc)
-                crud.save(User, {"id": target.id, "suspended_at": now, "suspended_reason": why}, db=db)
-                crud.save(UserSession, {"revoked_at": now}, where={"user_id": target.id, "revoked_at__isnull": True}, db=db)
-                crud.save(AuditLog, {"actor_id": me.id, "action": "suspend_user", "target_type": "user",
-                                     "target_id": target.id, "meta_json": {"note": why}}, db=db)
-                db.commit()
-                return {"id": str(target.id), "suspendedAt": now.isoformat()}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -255,12 +193,35 @@ def suspend_user(user_id: str, body: SuspendIn, me: User, db: Session = Depends(
         6. 前端改成連你的後端（frontend/index.html 的 api-base），平台管理頁按「停權」，那一列出現停權時間與理由
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "suspend_user and 你的"，要全部通過
     """
-    raise not_ready("POST /api/admin/users/{user_id}/suspend", OWNER)
+    # 1. 找人
+    target = crud.get(User, int(user_id) if user_id.isdigit() else 0, db=db)
+    if target is None:
+        raise errors.not_found("找不到這個帳號")
+
+    # 2. 一定要有理由
+    try:
+        why = roles.clean_suspend_reason(body.reason)
+    except ValueError as exc:
+        raise errors.unprocessable(str(exc)) from None
+
+    # 3. 平台管理員不能停（停掉最後一個就沒有人能解除了）
+    try:
+        roles.require_suspendable(target.is_platform_admin)
+    except PermissionError as exc:
+        raise errors.forbidden(str(exc)) from None
+
+    # 4. 停權（不刪任何資料）、所有登入撤銷、寫稽核
+    now = datetime.now(timezone.utc)
+    crud.save(User, {"id": target.id, "suspended_at": now, "suspended_reason": why}, db=db)
+    crud.save(UserSession, {"revoked_at": now}, where={"user_id": target.id, "revoked_at__isnull": True}, db=db)
+    crud.save(AuditLog, {"actor_id": me.id, "action": "suspend_user", "target_type": "user",
+                         "target_id": target.id, "meta_json": {"note": why}}, db=db)
+    db.commit()
+    return {"id": str(target.id), "suspendedAt": now.isoformat()}
 
 
 @router.delete("/admin/users/{user_id}/suspend", summary="解除停權")
 @admin_required
-@stub
 def unsuspend_user(user_id: str, me: User, db: Session = Depends(get_db)):
     """解除停權
 
@@ -306,40 +267,7 @@ def unsuspend_user(user_id: str, me: User, db: Session = Depends(get_db)):
         2. 兩個欄位設 NULL、寫稽核，db.commit()
         3. 回 {"id", "suspendedAt": null}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：把檔案最上面的 import 換成這樣（這個檔案每一支的第一步都一樣，換過一次就好）
 
-            from datetime import datetime, timezone
-
-            from fastapi import APIRouter, Depends
-            from sqlalchemy.orm import Session
-
-            from app.guards import admin_required
-            from app.models import AuditLog, FamilyMember, User, UserSession
-            from app.routers._stub import not_ready, stub
-            from app.schemas.auth import SuspendIn
-            from app.toolkit import crud, errors, roles
-            from app.toolkit.db import get_db
-
-        第二步：把整個 unsuspend_user（從 @router.delete 到 raise not_ready 那行）換成這段。
-        注意 @stub 拿掉了；這段說明字串可以留著。
-
-            @router.delete("/admin/users/{user_id}/suspend", summary="解除停權")
-            @admin_required
-            def unsuspend_user(user_id: str, me: User, db: Session = Depends(get_db)):
-                # 1. 找人，而且要是停權中的
-                target = crud.get(User, int(user_id) if user_id.isdigit() else 0, db=db)
-                if target is None:
-                    raise errors.not_found("找不到這個帳號")
-                if target.suspended_at is None:
-                    raise errors.bad_request("這個帳號沒有被停權")
-
-                # 2. 解除、寫稽核
-                crud.save(User, {"id": target.id, "suspended_at": None, "suspended_reason": None}, db=db)
-                crud.save(AuditLog, {"actor_id": me.id, "action": "unsuspend_user", "target_type": "user",
-                                     "target_id": target.id, "meta_json": {"note": "解除停權"}}, db=db)
-                db.commit()
-                return {"id": str(target.id), "suspendedAt": None}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -353,4 +281,16 @@ def unsuspend_user(user_id: str, me: User, db: Session = Depends(get_db)):
         6. 前端改成連你的後端（frontend/index.html 的 api-base），平台管理頁按「解除停權」，那一列的停權標記消失
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "unsuspend_user and 你的"，要全部通過
     """
-    raise not_ready("DELETE /api/admin/users/{user_id}/suspend", OWNER)
+    # 1. 找人，而且要是停權中的
+    target = crud.get(User, int(user_id) if user_id.isdigit() else 0, db=db)
+    if target is None:
+        raise errors.not_found("找不到這個帳號")
+    if target.suspended_at is None:
+        raise errors.bad_request("這個帳號沒有被停權")
+
+    # 2. 解除、寫稽核
+    crud.save(User, {"id": target.id, "suspended_at": None, "suspended_reason": None}, db=db)
+    crud.save(AuditLog, {"actor_id": me.id, "action": "unsuspend_user", "target_type": "user",
+                         "target_id": target.id, "meta_json": {"note": "解除停權"}}, db=db)
+    db.commit()
+    return {"id": str(target.id), "suspendedAt": None}

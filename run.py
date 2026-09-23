@@ -3,19 +3,25 @@
 """一鍵把整套跑起來（Windows / macOS / Linux 都可以）。
 
     python run.py                前端 5174 ＋ 後端 8000，第一次會自己裝好、建好
-    python run.py --front-only   只跑前端（mock 模式，不需要後端）
-    python run.py --reset        把本機資料庫砍掉重建（dev.db 才有效）
+    python run.py --front-only   只跑前端（mock 模式，不需要後端，也不需要 Docker）
+    python run.py --reset        把本機資料庫砍掉重建
     python run.py --port 5555    換前端的埠號（後端用 --api-port）
+
+需要：Python 3.10 以上、Docker Desktop（要先打開）。
+本機的資料庫跟正式環境一樣是 PostgreSQL，跑在 Docker 裡（docker-compose.yml 的 db）。
 
 做的事，照順序：
 
     1. 檢查 Python 版本
     2. 套件沒裝好就 pip install -r backend/requirements.txt
     3. backend/.env 不存在就建出來（順便產生 JWT_SECRET）
-    4. alembic upgrade head    建表
-    5. python -m app.cli init-db     放入系統預設分類
-    6. python -m app.cli seed-team   建立四位成員的開發用帳號（密碼都是 abcd1234）
-    7. 同時起 uvicorn（後端）與一個靜態伺服器（前端），印出網址
+    4. docker compose up -d --wait db   開 PostgreSQL，等到真的能連
+    5. alembic upgrade head    建表
+    6. python -m app.cli init-db     放入系統預設分類
+    7. python -m app.cli seed-team   建立四位成員的開發用帳號（密碼都是 abcd1234）
+    8. 同時起 uvicorn（後端）與一個靜態伺服器（前端），印出網址
+
+關掉 run.py（Ctrl+C）不會關掉 PostgreSQL，資料也還在。要關它：docker compose stop db
 
 ⚠️ 前端不要用 VS Code 的 Live Server 或直接點開 index.html：
    那樣後端的 CORS 會擋住（來源對不上），而且 file:// 不算 localhost。
@@ -26,6 +32,7 @@ from __future__ import annotations
 import argparse
 import functools
 import http.server
+import io
 import os
 import shutil
 import socket
@@ -109,12 +116,38 @@ def run_cli(*args: str, why: str = "") -> None:
             % (why, " ".join(["python"] + list(args))))
 
 
+#: 以前 .env.example 的預設值。那段時間跑過 run.py 的人，.env 裡還留著這一行
+OLD_SQLITE_DEFAULT = "sqlite:///./dev.db"
+POSTGRES_DEFAULT = "postgresql+psycopg://fambudget:devpassword@localhost:5432/fambudget"
+
+
 def ensure_env() -> None:
     env = os.path.join(BACKEND, ".env")
-    if os.path.exists(env):
+    if not os.path.exists(env):
+        say("    backend/.env 還沒有，先建一份（JWT_SECRET 會自動產生）")
+        run_cli("-m", "app.cli", "init-env", why="建立 .env ")
         return
-    say("    backend/.env 還沒有，先建一份（JWT_SECRET 會自動產生）")
-    run_cli("-m", "app.cli", "init-env", why="建立 .env ")
+    upgrade_old_database_url(env)
+
+
+def upgrade_old_database_url(env: str) -> None:
+    """舊的 .env 還指著 SQLite 的話，換成 Docker 裡的 PostgreSQL。
+
+    ⚠️ 為什麼要自己換：.env 不會被 commit，git pull 更新不到它，run.py 也不覆蓋已經存在的 .env。
+       不換的話，之前跑過 run.py 的人會一直默默用 SQLite——連 Docker 都沒裝也跑得起來，
+       看不出來自己跟大家、跟正式環境用的不是同一種資料庫。
+    只換「完全等於舊預設值」的那一行；自己改過的設定不動。
+    """
+    import re
+
+    text = io.open(env, encoding="utf-8", newline="").read()
+    pattern = r"(?m)^DATABASE_URL=%s[ \t]*(\r?)$" % re.escape(OLD_SQLITE_DEFAULT)
+    if not re.search(pattern, text):
+        return
+    text = re.sub(pattern, lambda m: "DATABASE_URL=%s%s" % (POSTGRES_DEFAULT, m.group(1)), text)
+    io.open(env, "w", encoding="utf-8", newline="").write(text)
+    say("    你的 backend/.env 還是舊的 SQLite 設定。全組現在都用 PostgreSQL（跟正式環境一樣），\n"
+        "    已經幫你換過去了；之後需要 Docker Desktop。舊資料在 backend/dev.db，沒有刪，但不會再用到。")
 
 
 def env_line(key: str) -> str | None:
@@ -135,6 +168,38 @@ def sqlite_file() -> str | None:
     if not url or "sqlite" not in url:
         return None
     return os.path.join(BACKEND, url.split("///")[-1].strip().lstrip("./"))
+
+
+def local_postgres() -> bool:
+    """.env 指的是本機 Docker 裡那顆 PostgreSQL（docker-compose.yml 的 db）嗎？"""
+    url = env_line("DATABASE_URL") or ""
+    return url.startswith("postgresql") and ("@localhost" in url or "@127.0.0.1" in url)
+
+
+def ensure_postgres(reset: bool) -> None:
+    """用 docker compose 把 PostgreSQL 開起來，等到它真的能連才往下走。
+
+    本機跟正式環境（Render）用同一種資料庫，本機寫得對，部署上去就一樣對。
+    資料存在 Docker 的 volume 裡（pgdata），關掉 run.py 甚至重開機都還在。
+    """
+    if not shutil.which("docker"):
+        die("找不到 docker。本機的資料庫跑在 Docker 裡，請先安裝 Docker Desktop：\n"
+            "    https://www.docker.com/products/docker-desktop/\n"
+            "  裝好之後打開它，等它顯示「Engine running」再跑一次 python run.py。")
+    if subprocess.call(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+        die("Docker 沒有在執行。請先打開 Docker Desktop，等它顯示「Engine running」，\n"
+            "  再跑一次 python run.py。\n"
+            "  （Docker Desktop 一打開就跳錯誤、訊息裡有 Inference manager 的話，\n"
+            "    看 README 的「Docker Desktop 一打開就跳「An unexpected error occurred」」那一段。）")
+    if reset:
+        say("    砍掉本機資料庫重建（docker compose down -v）")
+        subprocess.call(["docker", "compose", "down", "-v"], cwd=ROOT)
+    say("    docker compose up -d --wait db（第一次會下載 PostgreSQL，要等一下）")
+    if subprocess.call(["docker", "compose", "up", "-d", "--wait", "db"], cwd=ROOT) != 0:
+        die("PostgreSQL 起不來（上面有 Docker 的錯誤訊息）。\n"
+            "  最常見的是 5432 埠被別的程式占用（例如電腦上另外裝了 PostgreSQL）：\n"
+            "    Windows    netstat -ano | findstr :5432\n"
+            "  關掉它之後再跑一次。")
 
 
 def api_env(front_port: int) -> dict:
@@ -256,7 +321,7 @@ def main() -> None:
             say("\n關掉了。")
         return
 
-    total = 5
+    total = 6
     step(1, total, "檢查套件")
     if not deps_ready():
         install_deps()
@@ -264,29 +329,26 @@ def main() -> None:
     step(2, total, "檢查設定檔")
     ensure_env()
 
-    if args.reset:
+    step(3, total, "啟動資料庫")
+    if local_postgres():
+        ensure_postgres(reset=args.reset)
+    else:
         db = sqlite_file()
-        if db and os.path.exists(db):
+        say("    backend/.env 用的不是本機的 PostgreSQL，這一步跳過（%s）"
+            % ("SQLite：" + os.path.relpath(db, ROOT) if db else env_line("DATABASE_URL")))
+        if args.reset and db and os.path.exists(db):
             os.remove(db)
             say("    砍掉了 %s" % os.path.relpath(db, ROOT))
-        elif not db:
-            say("    你的 .env 用的不是 SQLite，--reset 不動它（請自己處理那顆資料庫）")
 
-    step(3, total, "建立資料表")
-    if not shutil.which("alembic"):
-        run_cli("-m", "alembic", "upgrade", "head", why="建表 ")
-    else:
-        code = subprocess.call(["alembic", "upgrade", "head"], cwd=BACKEND)
-        if code != 0:
-            die("建表失敗（上面有錯誤訊息）。\n"
-                "  最常見的原因是 backend/.env 的 DATABASE_URL 指到一顆沒開的 PostgreSQL。\n"
-                "  本機不用 PostgreSQL 的話，把那一行改成：DATABASE_URL=sqlite:///./dev.db")
+    step(4, total, "建立資料表")
+    # 一律用 python -m：PATH 上的 alembic 可能是別的 Python 裝的，套件版本對不上
+    run_cli("-m", "alembic", "upgrade", "head", why="建表 ")
 
-    step(4, total, "放入系統預設分類與開發用帳號")
+    step(5, total, "放入系統預設分類與開發用帳號")
     run_cli("-m", "app.cli", "init-db", why="建立預設分類 ")
     run_cli("-m", "app.cli", "seed-team", why="建立開發用帳號 ")
 
-    step(5, total, "啟動")
+    step(6, total, "啟動")
     httpd = serve_frontend(args.port)
     api = subprocess.Popen(
         [PY, "-m", "uvicorn", "app.main:app", "--reload",

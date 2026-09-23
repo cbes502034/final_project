@@ -17,7 +17,8 @@ cd backend
 pip install -r requirements.txt
 python -m app.cli init-env        # 從 .env.example 建出 .env，順便產生 JWT_SECRET
 python -m app.cli check-config    # 列出每一段設定填了沒、沒填會怎樣
-alembic upgrade head              # 建表（本機沒有 PostgreSQL：DATABASE_URL 先填 sqlite:///./dev.db）
+docker compose up -d --wait db    # 開 PostgreSQL（在專案最外層跑；要先打開 Docker Desktop）
+alembic upgrade head              # 建表
 python -m app.cli init-db         # 放入系統預設分類
 uvicorn app.main:app --reload
 ```
@@ -110,7 +111,7 @@ backend/
 ## 寫一支路由的完整樣子
 
 打開自己的檔案，找到那一支，**先讀它的說明字串**（那是這一支的規格書，最後兩段是「完整寫法」與「做完怎麼確認」），
-再把 `raise not_ready(...)` 換掉、拿掉 `@stub`：
+再刪掉 `@stub`、把 `raise not_ready(...)` 那一行換成說明字串的第二步。做完長這樣：
 
 ```python
 from app.guards import parent_required
@@ -419,11 +420,12 @@ cd backend && python -m app.ownership
 共用檔案、時程，全部在那一個檔案裡，`pytest` 會拿它去對文件。
 
 **70 支路由已經全部掛好了**（`app/routers/` 底下，一個領域一個資料夾）：守衛、請求主體、說明字串都寫好，函式裡只有
-`raise not_ready(...)`（回 501）。做一支 = 換成真的實作、拿掉 `@stub`。
+`raise not_ready(...)`（回 501）。做一支 = 刪掉 `@stub`、把 `raise not_ready(...)` 那一行換成說明字串的第二步。
+裝飾器、參數、import 都已經放好最終版本，不用動。
 
 **先讀那一支的說明字串**——它就是那一支的規格書，十一個段落：這支做什麼、前端怎麼打、誰能打、
 請求、成功回應、錯誤回應、會用到的資料表、每一步用的工具與資料庫方法、寫法步驟、
-**完整寫法**（可以直接貼上去的整段程式：import ＋ 整個函式）、做完怎麼確認。
+**完整寫法**（第二步就是要貼上去的程式，只有函式內容）、做完怎麼確認。
 照著改完，跑 `pytest tests/routes -k "函式名 and 你的"` 就知道對不對
 （同一組測試也會拿說明裡的程式跑一遍，所以說明不會跟實作走散）。
 
@@ -534,13 +536,17 @@ alembic upgrade head
 **`alembic` 指令噴 `UnicodeDecodeError: 'cp950'`**
 → 有人在 `alembic.ini` 裡寫了中文。那個檔案只能有英文，說明寫在 `alembic/env.py`。
 
-**本機沒有 PostgreSQL**
-→ 不用裝。`.env` 預設就是 `DATABASE_URL=sqlite:///./dev.db`（外鍵檢查已經打開，行為跟 PostgreSQL 一致）。
-測試用的是記憶體裡的 SQLite，正式環境（Render）才是 PostgreSQL。
-想在本機也用 PostgreSQL：`docker compose up`，再照 `.env.example` 裡註解的那一行改 `DATABASE_URL`。
+**本機的資料庫是什麼**
+→ 跟正式環境一樣是 PostgreSQL 16，跑在 Docker 裡（專案最外層 `docker-compose.yml` 的 `db`）。
+不用另外裝 PostgreSQL，只要裝 Docker Desktop、開發前先打開它，`python run.py` 會自己把資料庫開起來。
+`pytest` 例外：用的是記憶體裡的 SQLite，每個測試一份、跑得快、不需要 Docker（`toolkit/db.py` 兩種都支援）。
+
+**`python run.py` 說 Docker 沒有在執行**
+→ 打開 Docker Desktop，等它顯示「Engine running」再跑一次。
+Docker Desktop 一打開就跳 `Inference manager` 的錯誤：看最外層 README 的「Docker Desktop 一打開就跳錯誤」。
 
 **想砍掉資料重來**
-→ 在專案最外層 `python run.py --reset`（只對 SQLite 有效）。
+→ 在專案最外層 `python run.py --reset`（會 `docker compose down -v` 把資料庫清空重建）。
 
 **改了程式但沒生效**
 → 確認啟動時有加 `--reload`。

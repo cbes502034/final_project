@@ -99,27 +99,14 @@ def parse_doc(doc: str) -> dict | None:
     return out
 
 
-def _header_end(lines: list[str], def_line: int) -> int:
-    """def 那一行（從 1 算）開始，到簽名結束（括號配平、以冒號結尾）的那一行。"""
-    depth = 0
-    for i in range(def_line - 1, len(lines)):
-        text = lines[i].split("#", 1)[0]
-        depth += text.count("(") + text.count("[") - text.count(")") - text.count("]")
-        if depth == 0 and text.rstrip().endswith(":"):
-            return i + 1
-    raise ValueError("找不到函式簽名的結尾")
-
-
-def _func_span(tree: ast.Module, name: str) -> tuple[int, int, ast.FunctionDef]:
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
-            start = min([d.lineno for d in node.decorator_list] + [node.lineno])
-            return start, node.end_lineno, node
-    raise LookupError(name)
-
-
 def apply(source: str) -> tuple[str, list]:
-    """一個路由檔的原始碼 → 每一支都照【完整寫法】換好的原始碼，外加第三步要換的服務函式。"""
+    """一個路由檔的原始碼 → 每一支都照【完整寫法】做完的原始碼，外加第三步要換的服務函式。
+
+    做的就是組員照說明字串會做的那兩件事：
+        · 刪掉 @stub
+        · 把說明字串下面的內容（還沒做的就是 raise not_ready 那一行）換成第二步
+    裝飾器、函式名稱、參數、說明字串都不動——第二步裡也只有函式內容。
+    """
     tree = ast.parse(source)
     docs = []
     for node in tree.body:
@@ -136,20 +123,16 @@ def apply(source: str) -> tuple[str, list]:
     extra = []
     # 從檔尾往回換，前面的行號才不會跑掉
     for node, parsed in sorted(docs, key=lambda x: -x[0].lineno):
-        start, end, _ = _func_span(tree, node.name)
-        new = parsed["code"].splitlines(keepends=True)
-        new_tree = ast.parse(parsed["code"])
-        fn = new_tree.body[-1]
-        assert isinstance(fn, ast.FunctionDef) and fn.name == node.name, \
-            "%s 的第二步要是同一個函式（找到的是 %s）" % (node.name, getattr(fn, "name", fn))
-        assert not (isinstance(fn.body[0], ast.Expr) and isinstance(fn.body[0].value, ast.Constant)), \
-            "%s 的第二步不要再放說明字串（套上去時會留著原本那一段）" % node.name
+        body = parsed["code"]
+        # 第二步只有函式內容（可能有 return），包成一個函式才解析得動
+        ast.parse("def _():\n" + textwrap.indent(body, "    "))
         doc_node = node.body[0]
-        doc_lines = lines[doc_node.lineno - 1:doc_node.end_lineno]
-        head = _header_end(new, fn.lineno)
-        indent = " " * fn.body[0].col_offset
-        replaced = new[:head] + [indent + doc_lines[0].lstrip()] + doc_lines[1:] + new[head:]
-        lines[start - 1:end] = replaced
+        ind = " " * doc_node.col_offset
+        new_body = ["\n"] + [ind + line if line.strip() else line for line in body.splitlines(keepends=True)]
+        lines[doc_node.end_lineno:node.end_lineno] = new_body      # 說明字串下面到函式結尾
+        for deco in sorted(node.decorator_list, key=lambda d: -d.lineno):
+            if ast.unparse(deco) == "stub":
+                del lines[deco.lineno - 1]
         extra.extend(parsed["extra"])
     src = "".join(lines)
     # 第一步：換掉 import 區

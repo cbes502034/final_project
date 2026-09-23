@@ -80,6 +80,10 @@ global.fetch = (url, opt) => {
   return hit ? hit[2]() : res(404, { detail: 'Not Found' });
 };
 
+// 左下角那張表：api.js 每打完一支就往這裡丟一筆（綠燈或紅燈）。這裡只記下來，最後拿去比對。
+const lamps = {};
+window.ErrBox = { push: rec => { lamps[rec.fn] = rec.kind; } };
+
 require(path.join(root, 'frontend/js/data.js'));
 require(path.join(root, 'frontend/js/api.js'));
 require(path.join(root, 'frontend/js/notify.js'));
@@ -133,5 +137,6 @@ const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e
   out.bellEmpty = { wrapHidden: bellWrap.hidden, text: bellEls.bellPanel.innerHTML };
   window.Notify.stop();
 
+  out.lamps = lamps;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { console.error('CRASH', e); process.exit(1); });

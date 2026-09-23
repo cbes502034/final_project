@@ -28,7 +28,7 @@ final_project/
 │   │   ├── app.js           畫面繪製與互動
 │   │   ├── data.js          資料表草案與固定清單（分類、主題、角色）。沒有假資料
 │   │   ├── notify.js        通知鈴鐺
-│   │   ├── errbox.js        錯誤匣：後端沒給出正確結果的每一支
+│   │   ├── errbox.js        左下角那張表：每一支後端的綠燈／紅燈
 │   │   └── stars.js         canvas 星空背景
 │   └── docs/                說明文件（也是靜態頁）
 │       ├── index.html       專題手冊
@@ -69,7 +69,7 @@ final_project/
 │
 ├── docs/                  規格文件（Markdown / SVG）
 ├── run.py                 ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
-├── docker-compose.yml     本機用 PostgreSQL 跑整套
+├── docker-compose.yml     本機的 PostgreSQL（db）；run.py 會自己開
 └── render.yaml            部署設定
 ```
 
@@ -82,14 +82,21 @@ final_project/
 
 ### 一鍵跑起來 ★
 
-在**專案最外層**（跟 `backend/`、`frontend/` 同一層）打：
+需要先裝好兩樣東西：
+
+| | |
+|---|---|
+| **Python 3.10 以上** | <https://www.python.org/downloads/>，安裝時勾 Add python.exe to PATH |
+| **Docker Desktop** | <https://www.docker.com/products/docker-desktop/>。本機的資料庫跟正式環境一樣是 **PostgreSQL**，跑在 Docker 裡。**每次開發前先把 Docker Desktop 打開** |
+
+然後在**專案最外層**（跟 `backend/`、`frontend/` 同一層）打：
 
 ```bash
 python run.py
 ```
 
-第一次會自己做完這些：裝套件 → 建 `backend/.env`（含 JWT_SECRET）→ 建表 → 放入系統預設分類 →
-同時起前端與後端。需要的只有 **Python 3.10 以上**，資料庫用 SQLite（`backend/dev.db`），什麼都不用裝。
+第一次會自己做完這些：裝套件 → 建 `backend/.env`（含 JWT_SECRET）→ 用 Docker 開 PostgreSQL →
+建表 → 放入系統預設分類與開發用帳號 → 同時起前端與後端。
 
 | 服務 | 網址 |
 |---|---|
@@ -113,19 +120,38 @@ python run.py
 其他用法：
 
 ```bash
-python run.py --front-only     # 只跑前端（mock 模式，不需要後端）
-python run.py --reset          # 本機資料庫砍掉重建
+python run.py --front-only     # 只跑前端（mock 模式，不需要後端，也不需要 Docker）
+python run.py --reset          # 本機資料庫砍掉重建（docker compose down -v）
 python run.py --port 5555      # 換前端的埠號（後端用 --api-port）
 ```
 
 ⚠️ 前端不要用 VS Code 的 Live Server，也不要直接點開 `index.html`：
 那樣後端的 CORS 會擋住，而且 `file://` 不算 localhost。一律用 `run.py` 起的 5174。
 
+關掉 `run.py`（Ctrl+C）不會關掉 PostgreSQL，資料也都還在，下次開很快。要關它：`docker compose stop db`。
+
+**資料庫會自動建好嗎？** 會，只要 Docker Desktop 是打開的：
+
+| 你的狀況 | `python run.py` 會怎麼做 |
+|---|---|
+| **第一次**，Docker 開著 | 下載 PostgreSQL → 建好資料庫（容器 `fambudget-db-1`）→ 建資料表 → 放入預設分類與開發帳號。大約 1～2 分鐘，要有網路 |
+| **之後每次**，Docker 開著 | 沿用同一顆資料庫，**不會重建**，上次的資料都還在。十幾秒就起來 |
+| 裝了 Docker，**但沒打開** | 停在第 3 步，提醒你先打開 Docker Desktop |
+| **沒裝 Docker** | 停在第 3 步，給你 Docker Desktop 的下載網址 |
+| **以前跑過 `run.py`**（`backend/.env` 還寫著舊的 SQLite） | 自動換成 PostgreSQL 並印出說明，之後就需要 Docker。舊資料留在 `backend/dev.db`，不會再用到 |
+
+每個人的資料庫只在自己的電腦上，跟其他組員、跟線上網站都無關。
+
+**開發帳號每次都一樣**：每次 `python run.py` 都會把那五個帳號重設回原樣（密碼、名字、主題、
+平台管理員身分、停權狀態），所以測「改密碼」「停權」時改到它們，下次啟動就會恢復。
+它們記的帳、家庭、帳本不會被動到。
+
 ### 分開跑（想自己控制的時候）
 
 ```bash
 python run.py --front-only                       # 前端
 
+docker compose up -d --wait db                   # 資料庫（PostgreSQL）
 cd backend                                       # 後端
 pip install -r requirements.txt
 python -m app.cli init-env        # 建出 .env（順便產生 JWT_SECRET）
@@ -140,17 +166,34 @@ uvicorn app.main:app --reload
 ```bash
 cd backend
 python -m app.cli db                                   # 每張表各幾筆
-python -m app.cli db "SELECT id, email FROM users"     # 只能查，不能改
+python -m app.cli db transactions                      # 那張表最新的 10 筆
+python -m app.cli db "SELECT id, email FROM users"     # 自己寫查詢（只能查，不能改）
 ```
 
-### 用 PostgreSQL（跟正式環境一樣）
+### 資料庫：本機跟正式環境都是 PostgreSQL
 
-```bash
-docker compose up
-```
+| | 用什麼 |
+|---|---|
+| 本機開發 | PostgreSQL 16，Docker 裡的 `db`（`docker-compose.yml`），`run.py` 會自己開 |
+| 正式環境（Render） | PostgreSQL，`render.yaml` 自動接上 |
+| `pytest` | 記憶體裡的 SQLite：每個測試一份、跑得快、不需要 Docker |
 
-起一顆 PostgreSQL 16 ＋ 後端 ＋ 前端。本機開發不需要這一條，
-`run.py` 的 SQLite 已經把外鍵檢查打開，行為一致。
+本機跟線上用同一種資料庫，本機寫得對，部署上去就一樣對。
+（70 支照說明字串做好的參考後端，接 PostgreSQL 跑過 70 支路由的完整掃描，0 個問題。）
+
+⚠️ 不要直接打 `docker compose up`（不加 `db`）：那會連同 compose 裡的後端、前端一起起來，
+跟 `run.py` 搶 8000 與 5174 埠。
+
+### Docker Desktop 一打開就跳「An unexpected error occurred」
+
+錯誤訊息裡有 `initializing Inference manager` 或 `dockerInference` 的話，是 Docker 內建的 AI 功能
+（Docker AI／Model Runner）在這台電腦上建不了它要用的通訊檔。我們的專案用不到這個功能，把它關掉就好：
+
+1. 按 **Quit** 關掉 Docker Desktop（**不要**按 Reset to factory defaults，那會清掉所有 Docker 資料）
+2. 用記事本打開 `%APPDATA%\Docker\settings-store.json`
+3. 把 `"EnableDockerAI": true` 改成 `"EnableDockerAI": false`，存檔
+4. 把 `%LOCALAPPDATA%\Docker\run` 這個資料夾改名（例如 `run.old`），Docker 會自己建新的
+5. 重新打開 Docker Desktop
 
 ---
 
@@ -499,11 +542,12 @@ cd backend && python -m app.ownership
 共用檔案、時程，全部在那一個檔案裡，`pytest` 會拿它去對文件。
 
 **70 支路由已經全部掛好了**（`app/routers/` 底下，一個領域一個資料夾）：守衛、請求主體、說明字串都寫好，函式裡只有
-`raise not_ready(...)`（回 501）。做一支 = 換成真的實作、拿掉 `@stub`。
+`raise not_ready(...)`（回 501）。做一支 = 刪掉 `@stub`、把 `raise not_ready(...)` 那一行換成說明字串的第二步。
+裝飾器、參數、import 都已經放好最終版本，不用動。
 
 **先讀那一支的說明字串**——它就是那一支的規格書，十一個段落：這支做什麼、前端怎麼打、誰能打、
 請求、成功回應、錯誤回應、會用到的資料表、每一步用的工具與資料庫方法、寫法步驟、
-**完整寫法**（可以直接貼上去的整段程式：import ＋ 整個函式）、做完怎麼確認。
+**完整寫法**（第二步就是要貼上去的程式，只有函式內容）、做完怎麼確認。
 照著改完，跑 `pytest tests/routes -k "函式名 and 你的"` 就知道對不對
 （同一組測試也會拿說明裡的程式跑一遍，所以說明不會跟實作走散）。
 
