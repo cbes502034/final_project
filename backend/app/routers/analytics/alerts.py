@@ -134,7 +134,9 @@ def list_alerts(me: User, db: Session = Depends(get_db)):
                還沒設過            → {"alerts": []}
                設了 85 和 60 之後  → 60 排在前面
         5. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁「階段性提醒」要列出每一個門檻與開關
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_alerts and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_alerts and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/alerts", OWNER)
 
@@ -259,7 +261,9 @@ def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
                {"percent": 0}                            → 422
                {"percent": 80, "groupId": 別人的帳本}    → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁新增一個門檻，清單馬上多一列
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_alert and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_alert and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/alerts", OWNER)
 
@@ -386,7 +390,9 @@ def update_alert(
                {}                           → 400
                別人的門檻                   → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁把一個門檻關掉，重新整理之後還是關的
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "update_alert and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "update_alert and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PATCH /api/alerts/{aid}", OWNER)
 
@@ -467,6 +473,8 @@ def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_d
                再刪一次  → 404
                刪別人的  → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁刪一個門檻，清單少一列
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_alert and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_alert and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/alerts/{aid}", OWNER)

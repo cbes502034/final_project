@@ -222,7 +222,9 @@ def get_family(me: User, db: Session = Depends(get_db)):
                家長（照看一個孩子）  → 孩子與另一位家長有 savingsGoal；沒照看的孩子沒有這個欄位
                子女                  → 只有自己有 savingsGoal，但看得到全家的名字與監管關係
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁的卡片、照看中的標記要對
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "get_family and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "get_family and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/family", OWNER)
 
@@ -337,7 +339,9 @@ def create_family(body: FamilyIn, me: User, db: Session = Depends(get_db)):
                {"name": "   "}     → 422
         5. 打 GET /api/auth/me → user.role 變成 parent
         6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭頁「建立我的家庭」，畫面換成成員卡片
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_family and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_family and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/family", OWNER)
 
@@ -476,7 +480,9 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
                只有你一位家長時打      → 200，released 是全家人數
         5. 家人打 GET /api/auth/me → family 變成 null；GET /api/transactions 自己的紀錄都還在
         6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁「解散家庭」走完確認流程，每個人都回到「建立／加入」畫面
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "dissolve_family and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "dissolve_family and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/family", OWNER)
 
@@ -592,7 +598,9 @@ def create_invite_code(body: InviteCodeIn, me: User, db: Session = Depends(get_d
                子女的 token       → 403
         5. 資料庫 family_invites 的 code_hash 不能是明碼
         6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁產生邀請碼，畫面顯示碼與到期日
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_invite_code and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_invite_code and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/family/invite", OWNER)
 
@@ -730,7 +738,9 @@ def join_family(body: JoinIn, me: User, db: Session = Depends(get_db)):
                {"code": "ABCD"}                      → 400
                {"code": "ZZZZ-ZZZZ"}                 → 404
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭頁輸入邀請碼，畫面換成成員卡片、帳號選單出現家庭
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "join_family and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "join_family and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/family/join", OWNER)
 
@@ -876,7 +886,9 @@ def lookup_user(me: User, email: str | None = None, db: Session = Depends(get_db
                email=abc                 → 400
                連續查 11 次              → 第 11 次 429
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁「用帳號邀請」搜尋，找得到人時顯示名字與頭像
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "lookup_user and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "lookup_user and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/family/lookup", OWNER)
 
@@ -1004,7 +1016,9 @@ def list_invites(me: User, db: Session = Depends(get_db)):
                發邀請的家長打                    → sent 有那一筆；產生過邀請碼的話 codes 有一筆、code 是 null
                把邀請的 expires_at 改成昨天再打  → 那一筆不見
         5. 前端改成連你的後端（frontend/index.html 的 api-base），被邀請的人登入，總覽最上面出現邀請卡
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_invites and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_invites and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/family/invites", OWNER)
 
@@ -1133,7 +1147,9 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
                邀請別的家庭的人      → 400
         5. 被邀請的人打 GET /api/family/invites → received 有這一筆
         6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁送出邀請，「等待回覆」多一個人
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "send_invite and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "send_invite and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/family/invites", OWNER)
 
@@ -1259,7 +1275,9 @@ def accept_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
                再接受一次                        → 409（已經在家庭裡了）
                用另一個人的 token 接受同一個 id  → 404
         5. 前端改成連你的後端（frontend/index.html 的 api-base），邀請卡按「加入」，帳號選單出現家庭
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "accept_invite and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "accept_invite and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/family/invites/{invite_id}/accept", OWNER)
 
@@ -1371,7 +1389,9 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
                不相干的人刪                → 403
                同一筆再刪一次              → 404
         5. 前端改成連你的後端（frontend/index.html 的 api-base），邀請卡按「婉拒」，卡片不見
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "decline_invite and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "decline_invite and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/family/invites/{invite_id}", OWNER)
 
@@ -1512,7 +1532,9 @@ def change_member_role(user_id: str, body: RolePatchIn, me: User, db: Session = 
                把另一位家長改成子女      → 403
                唯一的家長把自己改成子女  → 409
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁「設為家長」，卡片上的角色改變、「照看中」的標記消失
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "change_member_role and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "change_member_role and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PATCH /api/family/members/{user_id}", OWNER)
 
@@ -1682,7 +1704,9 @@ def remove_member(user_id: str, me: User, db: Session = Depends(get_db)):
                唯一的家長（家裡還有孩子）打 /members/me  → 409
         5. 被移出的子女原本開的帳本 → 家人打 GET /api/groups 看不到了
         6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁「移出家庭」「退出家庭」各走一次確認流程
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "remove_member and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "remove_member and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/family/members/{user_id}", OWNER)
 
@@ -1791,7 +1815,9 @@ def list_guardianships(me: User, db: Session = Depends(get_db)):
                被照看的子女打  → 看得到誰在照看他
                沒有家庭的人打  → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁卡片上的「照看中」標記要對
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_guardianships and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_guardianships and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/guardianships", OWNER)
 
@@ -1926,7 +1952,9 @@ def create_guardianship(body: GuardianshipIn, me: User, db: Session = Depends(ge
                {"wardId": 子女, "guardianId": 另一位家長}  → 403
         5. 打 GET /api/transactions?userId=那個子女 → 他記在任何帳本的都看得到
         6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁「開始照看」，卡片出現「照看中」
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_guardianship and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_guardianship and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/guardianships", OWNER)
 
@@ -2051,7 +2079,9 @@ def end_guardianship(gid: str, me: User, db: Session = Depends(get_db)):
                被照看的子女自己解除    → 403
                解除一個已經結束的      → 404
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁「停止照看」，卡片的「照看中」消失
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "end_guardianship and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "end_guardianship and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/guardianships/{gid}", OWNER)
 
@@ -2170,7 +2200,9 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
                沒照看任何人             → {"allowances": []}
                照看一個孩子、設過 3000  → amount 是 3000，spent 是他這個月的支出
         5. 前端改成連你的後端（frontend/index.html 的 api-base），成員紀錄頁（家長看孩子）顯示零用金與花掉多少
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_allowances and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_allowances and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/allowances", OWNER)
 
@@ -2278,7 +2310,9 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
                amount 填 -1         → 422
         5. 打 GET /api/allowances → amount 是剛設的；GET /api/summary 的支出不能變
         6. 前端改成連你的後端（frontend/index.html 的 api-base），成員紀錄頁改零用金，重新整理後還在
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_allowance and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_allowance and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PUT /api/allowance", OWNER)
 
@@ -2388,6 +2422,8 @@ def list_audit(me: User, db: Session = Depends(get_db)):
                一般使用者打  → 403
         5. 家長改一個角色之後再打 → 最上面多一筆 change_role
         6. 前端改成連你的後端（frontend/index.html 的 api-base），平台管理頁的稽核紀錄，時間顯示成台灣時間
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_audit and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_audit and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/audit", OWNER)

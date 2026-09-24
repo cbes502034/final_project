@@ -10,7 +10,9 @@
 
     pytest tests/routes                                        全部
     pytest tests/routes -k create_transaction                  只跑一支（說明＋你的）
-    pytest tests/routes -k "create_transaction and 你的"        只看你寫的那一支
+    pytest tests/routes -k "create_transaction and u4f60" -v    只看路由檔裡寫的那一支
+                                                               （u4f60 是標籤「你的」的跳脫碼，
+                                                                -k 直接打中文會 0 selected）
 
 兩個都綠，就代表你那一支跟說明講的一樣。
 資料庫是記憶體裡的 SQLite，每個測試一顆新的，不會動到你的資料。

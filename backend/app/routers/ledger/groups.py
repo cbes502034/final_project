@@ -191,7 +191,9 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
                別人開、沒有加我的帳本            → 不會出現
                活動帳本 endsOn 填昨天、還沒結算  → overdue 是 true
         5. 前端改成連你的後端（frontend/index.html 的 api-base），右上角切換器的帳本、筆數，要跟點進去的收支明細一致
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_groups and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_groups and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
     from collections import Counter
@@ -415,7 +417,9 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
                {"name": "旅遊", "color": "red"}                 → 422
         5. 打 GET /api/groups → 剛開的那本要在清單裡
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁開一本，右上角切換器要馬上出現
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_group and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_group and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
     from collections import Counter
@@ -650,7 +654,9 @@ def update_group(
                {}                                     → 400
                用帳本裡另一個成員的 token             → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁「已封存」按「復原」，那本帳要回到切換器
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "update_group and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "update_group and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PATCH /api/groups/{gid}", OWNER)
 
@@ -772,7 +778,9 @@ def archive_or_remove_group(
                先 POST .../settle，再 permanent=true  → 200，includeArchived=true 也看不到
         5. 移除之後，那本帳裡的紀錄在 GET /api/transactions 還查得到（自己記的那幾筆）
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁「封存」「移除」都試一次，確認文案寫著「紀錄不會刪」
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "archive_or_remove_group and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "archive_or_remove_group and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/groups/{gid}", OWNER)
 
@@ -885,7 +893,9 @@ def add_group_member(
                userId 填別的家庭的人  → 404
         5. 被加進來的人打 GET /api/groups → 看得到這本帳
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁「加人」選一位家人，成員名單要多一個名字
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "add_group_member and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "add_group_member and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/groups/{gid}/members", OWNER)
 
@@ -982,7 +992,9 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
                user_id 填自己  → 400
         5. 被移出的人打 GET /api/transactions → 還看得到自己記在這本帳的，看不到別人記的
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁按「移出」，成員名單少一個名字
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "remove_group_member and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "remove_group_member and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/groups/{gid}/members/{user_id}", OWNER)
 
@@ -1078,7 +1090,9 @@ def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depen
                結算一般帳本      → 400
         5. 往這本帳記一筆（POST /api/transactions 帶 groupId）→ 409
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁按「結算」，那本帳的紀錄不再有修改／刪除鈕
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "settle_group and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "settle_group and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/groups/{gid}/settle", OWNER)
 
@@ -1173,6 +1187,8 @@ def set_group_notify(
                不在這本帳裡的人打  → 403
         5. 開了之後，帳本裡另一個人記一筆 → 你的 GET /api/notifications 多一則 group_transaction
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁切換通知開關，重新整理之後要維持
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_group_notify and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_group_notify and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PATCH /api/groups/{gid}/notify", OWNER)

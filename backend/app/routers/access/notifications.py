@@ -231,7 +231,9 @@ def list_notifications(
                設一個 1% 的門檻、記一筆支出後再打      → 多一則 budget_alert；再打一次不會再多
         5. 照看的孩子記一筆 → 家長下一次輪詢多一則 ward_transaction，txId 是那一筆
         6. 前端改成連你的後端（frontend/index.html 的 api-base），登入家長帳號，孩子記一筆之後 20 秒內鈴鐺叮一聲、紅點加一
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_notifications and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_notifications and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/notifications", OWNER)
 
@@ -329,7 +331,9 @@ def read_notification(
                {"read": false}  → readAt 是 null
                別人的通知       → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），點一則通知，那一則不再是粗體、紅點少一
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "read_notification and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "read_notification and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PATCH /api/notifications/{nid}", OWNER)
 
@@ -428,6 +432,8 @@ def read_notifications(body: ReadAllIn, me: User, db: Session = Depends(get_db))
                {}                            → 400
                {"readUntil": 比較舊的 id}    → 只有那之前的變已讀，之後的還是未讀
         5. 前端改成連你的後端（frontend/index.html 的 api-base），通知清單按「全部已讀」，紅點消失
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "read_notifications and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "read_notifications and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PATCH /api/notifications", OWNER)
