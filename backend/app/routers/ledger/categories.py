@@ -38,7 +38,7 @@ OWNER = "成員2"
 
 @router.get("/categories", summary="分類（系統預設＋我們家自訂）")
 @block_admin
-@stub
+# @stub
 def list_categories(me: User, db: Session = Depends(get_db)):
     """分類（系統預設＋我們家自訂）
 
@@ -139,12 +139,44 @@ def list_categories(me: User, db: Session = Depends(get_db)):
         5. 前端改成連你的後端（frontend/index.html 的 api-base），記帳頁的分類下拉要看得到系統分類與我們家的分類
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_categories and 你的"，要全部通過
     """
-    raise not_ready("GET /api/categories", OWNER)
+
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, parent_required
+    from app.models import Category, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.transaction import CategoryIn
+    from app.toolkit import crud, errors
+    from app.toolkit.db import get_db
+
+    # 1. 系統預設（family_id 是 NULL）＋ 我們家自訂的
+    rows = crud.find(Category, {"or": [{"family_id__isnull": True}, {"family_id": me.family_id}]},
+                        order_by="id", db=db)
+
+    # 2. 轉成前端要的樣子；圖示字：系統分類查表，自訂分類取第一個字
+    out = []
+    for c in rows:
+        custom = c.family_id is not None
+        item = {
+            "id": str(c.id),
+            "name": c.name,
+            "kind": c.kind,
+            "color": c.color or "cat-other",
+            "icon": c.name[:1] if custom else catalog.CATEGORY_ICONS.get(c.name, c.name[:1]),
+            "custom": custom,
+        }
+        if custom:
+            item["familyId"] = str(c.family_id)
+        out.append(item)
+    return {"categories": out}
+    # raise not_ready("GET /api/categories", OWNER)
 
 
 @router.post("/categories", status_code=201, summary="新增家庭自訂分類")
 @parent_required
-@stub
+# @stub
 def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
     """新增家庭自訂分類
 
@@ -252,4 +284,37 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁新增一個分類，記帳頁的下拉要馬上看得到
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_category and 你的"，要全部通過
     """
-    raise not_ready("POST /api/categories", OWNER)
+
+
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, parent_required
+    from app.models import Category, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.transaction import CategoryIn
+    from app.toolkit import crud, errors
+    from app.toolkit.db import get_db
+
+
+    # 1. 整理名稱：去頭尾空白、壓掉連續空白
+    name = " ".join(body.name.split())
+    if not name or len(name) > 10:
+        raise errors.unprocessable("分類名稱要 1～10 個字")
+
+    # 2. 同一個收支裡，系統或我們家已經有同名的就擋
+    if crud.exists(Category, {
+        "kind": body.kind,
+        "name": name,
+        "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+    }, db=db):
+        raise errors.conflict("已經有「%s」這個分類了" % name)
+
+    # 3. 新增一列：我們家的分類，顏色一律 cat-other
+    c = crud.save(Category, {"family_id": me.family_id, "name": name, "kind": body.kind,
+                                "color": "cat-other"}, db=db)
+    db.commit()
+    return {"id": str(c.id), "name": c.name, "kind": c.kind, "color": c.color, "icon": name[:1],
+            "custom": True, "familyId": str(me.family_id)}
+    # raise not_ready("POST /api/categories", OWNER)
