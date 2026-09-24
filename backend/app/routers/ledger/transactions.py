@@ -649,7 +649,7 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
 
 
 @router.patch("/transactions/{tx_id}", summary="修改一筆")
-@stub
+# @stub
 def update_transaction(
     body: TransactionPatchIn,
     row=Depends(own(Transaction, "tx_id")),
@@ -971,7 +971,7 @@ def update_transaction(
 
 
 @router.delete("/transactions/{tx_id}", summary="刪除一筆")
-@stub
+# @stub
 def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Depends(get_db)):
     """刪除一筆
 
@@ -1078,7 +1078,37 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("DELETE /api/transactions/{tx_id}", OWNER)
+
+    from datetime import date, datetime, timezone
+
+    from fastapi import APIRouter, Depends, Query, Request
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin, current_user, own, visible_scope
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.transaction import TransactionIn, TransactionPatchIn
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.db import get_db
+
+
+    # 1. 結算過的帳本裡的紀錄不能刪
+    group = crud.get(Group, row.group_id, db=db)
+    try:
+        ledger.require_editable(row.user_id, row.user_id, group.settled_at)
+    except ValueError as exc:
+        raise errors.conflict(str(exc)) from None
+
+    # 2. 先處理指向這一筆的資料（外鍵）：通知刪掉；解析紀錄留著當評測資料，只拿掉連結
+    tx_id = row.id
+    crud.remove(Notification, {"transaction_id": tx_id}, db=db)
+    crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id": tx_id}, db=db)
+
+    # 3. 刪這一筆，一起寫進資料庫
+    crud.remove(Transaction, id=tx_id, db=db)
+    db.commit()
+    return {"deleted": str(tx_id)}
+    # raise not_ready("DELETE /api/transactions/{tx_id}", OWNER)
 
 
 @router.delete("/transactions", summary="一次刪多筆")
