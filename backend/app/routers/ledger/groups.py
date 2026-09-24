@@ -41,7 +41,7 @@ OWNER = "成員2"
 
 @router.get("/groups", summary="我加入的帳本")
 @block_admin
-@stub
+# @stub
 def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(get_db)):
     """我加入的帳本
 
@@ -193,7 +193,69 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
         5. 前端改成連你的後端（frontend/index.html 的 api-base），右上角切換器的帳本、筆數，要跟點進去的收支明細一致
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_groups and 你的"，要全部通過
     """
-    raise not_ready("GET /api/groups", OWNER)
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+
+    # 1. 我加入的帳本（移除的一律不列；沒帶 includeArchived 也不列封存的）
+    mine = crud.find(GroupMember, {"user_id": me.id}, db=db)
+    where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True}
+    if not includeArchived:
+        where["archived_at__isnull"] = True
+    groups = crud.find(Group, where, order_by="id", db=db)
+    if not groups:
+        return {"me": str(me.id), "groups": []}
+    ids = [g.id for g in groups]
+
+    # 2. 一次查完：成員與名字、每本幾筆、我的存款目標、我的通知開關
+    members = crud.find(GroupMember, {"group_id__in": ids}, order_by=("joined_at", "user_id"), db=db)
+    names = {u.id: u.display_name for u in crud.find(User, {"id__in": {m.user_id for m in members}}, db=db)}
+    counts = Counter(crud.find(Transaction, {"group_id__in": ids}, fields="group_id", db=db))
+    goals = {}
+    for row in crud.find(SavingsGoal, {"user_id": me.id, "group_id__in": ids}, order_by="id", db=db):
+        goals[row.group_id] = row.goal_amount              # 後面的蓋掉前面的，留下最新的
+    notify_on = {m.group_id: m.notify for m in mine}
+    today = datetime.now(timezone(timedelta(hours=8))).date()
+
+    # 3. 一本一本組成前端要的樣子
+    out = []
+    for g in groups:
+        inside = [m.user_id for m in members if m.group_id == g.id]
+        out.append({
+            "id": str(g.id),
+            "name": g.name,
+            "icon": g.name[-1:],
+            "color": g.color or catalog.GROUP_COLORS[0],
+            "owner": str(g.created_by),
+            "note": g.note or "",
+            "created": g.created_at.date().isoformat(),
+            "kind": g.kind,
+            "endsOn": g.ends_on.isoformat() if g.ends_on else None,
+            "settledAt": g.settled_at.isoformat() if g.settled_at else None,
+            "archived": g.archived_at is not None,
+            "settled": g.settled_at is not None,
+            "overdue": g.kind == "temp" and g.settled_at is None and g.ends_on is not None and g.ends_on < today,
+            "members": [str(u) for u in inside],
+            "memberNames": [names.get(u, "") for u in inside],
+            "count": counts[g.id],
+            "goal": goals.get(g.id, 0),
+            "canEdit": g.created_by == me.id,
+            "notify": notify_on.get(g.id, False),
+        })
+    return {"me": str(me.id), "groups": out}
+    # raise not_ready("GET /api/groups", OWNER)
 
 
 @router.post("/groups", status_code=201, summary="開一本帳")
@@ -355,7 +417,78 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁開一本，右上角切換器要馬上出現
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_group and 你的"，要全部通過
     """
-    raise not_ready("POST /api/groups", OWNER)
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+
+    # 1. 名稱、顏色、結束日
+    name = " ".join(body.name.split())
+    if not name:
+        raise errors.unprocessable("帳本要有名字")
+    color = body.color or catalog.GROUP_COLORS[0]
+    if color not in catalog.GROUP_COLORS:
+        raise errors.unprocessable("沒有這個顏色")
+    ends_on = None
+    if body.kind == "temp":
+        if not body.endsOn:
+            raise errors.bad_request("活動帳本要有結束日")
+        try:
+            ends_on = date.fromisoformat(body.endsOn)
+        except ValueError:
+            raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
+
+    # 2. 同一個家庭裡不能重名（含封存的）；沒有家庭就只跟自己開的比
+    if me.family_id:
+        people = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"}, fields="user_id", db=db)
+    else:
+        people = [me.id]
+    if crud.exists(Group, {"name": name, "created_by__in": people, "removed_at__isnull": True}, db=db):
+        raise errors.conflict("家裡已經有一本叫「%s」的帳了" % name)
+
+    # 3. 新增帳本，建立的人自動加進去
+    group = crud.save(Group, {
+        "family_id": me.family_id,
+        "name": name,
+        "color": color,
+        "note": body.note.strip() or None,
+        "created_by": me.id,
+        "kind": body.kind,
+        "ends_on": ends_on,
+    }, db=db)
+    crud.save(GroupMember, {"group_id": group.id, "user_id": me.id}, db=db)
+    db.commit()
+
+    # 4. 回傳剛建好的帳本
+    return {
+        "id": str(group.id),
+        "name": group.name,
+        "icon": group.name[-1:],
+        "color": group.color,
+        "owner": str(me.id),
+        "note": group.note or "",
+        "created": group.created_at.date().isoformat(),
+        "kind": group.kind,
+        "endsOn": ends_on.isoformat() if ends_on else None,
+        "settledAt": None,
+        "archived": False,
+        "settled": False,
+        "members": [str(me.id)],
+        "canEdit": True,
+        "notify": False,
+    }
+    # raise not_ready("POST /api/groups", OWNER)
 
 
 @router.patch("/groups/{gid}", summary="改名稱、顏色、說明")
