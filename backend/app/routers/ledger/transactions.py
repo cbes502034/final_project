@@ -645,7 +645,6 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
     out["note"] = tx.note or ""
     out["raw"] = ""
     return out
-    
     # raise not_ready("POST /api/transactions", OWNER)
 
 
@@ -867,7 +866,108 @@ def update_transaction(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("PATCH /api/transactions/{tx_id}", OWNER)
+
+
+    from datetime import date, datetime, timezone
+
+    from fastapi import APIRouter, Depends, Query, Request
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin, current_user, own, visible_scope
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.transaction import TransactionIn, TransactionPatchIn
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.db import get_db
+
+
+    # 1. 整理要改的欄位：只拿有送來的，空的、格式不對的回 400
+    try:
+        patch = ledger.clean_patch(body.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise errors.bad_request(str(exc)) from None
+
+    # 2. 這筆所在的帳本結算過就不能改
+    group = crud.get(Group, row.group_id, db=db)
+    try:
+        ledger.require_editable(me.id, row.user_id, group.settled_at)
+    except ValueError as exc:
+        raise errors.conflict(str(exc)) from None
+
+    changes = {}
+
+    # 3. 換帳本：要是我加入的、沒移除、沒結算的
+    if "groupId" in patch:
+        group_id = int(patch["groupId"]) if str(patch["groupId"]).isdigit() else 0
+        if group_id != row.group_id:
+            target = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
+            joined = crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db)
+            if target is None or not joined:
+                raise errors.forbidden("你沒有加入這本帳")
+            try:
+                ledger.require_open(target.settled_at)
+            except ValueError as exc:
+                raise errors.conflict(str(exc) + "。請換一本帳本") from None
+            changes["group_id"] = group_id
+
+    # 4. 分類要跟收支對得上
+    kind = patch.get("kind", row.kind)
+    if "cat" in patch:
+        category_id = int(patch["cat"]) if str(patch["cat"]).isdigit() else 0
+        category = crud.get(Category, where={
+            "id": category_id,
+            "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+        }, db=db)
+        if category is None:
+            raise errors.bad_request("找不到這個分類")
+        if category.kind != kind:
+            side = "收入" if category.kind == "income" else "支出"
+            raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
+        changes["category_id"] = category.id
+    elif kind != row.kind:
+        # 只改了收支、沒帶分類：換成那一邊的「其他」，不要留一個對不上的分類
+        other = crud.get(Category, where={"family_id__isnull": True, "kind": kind,
+                                          "name": "其他" if kind == "expense" else "其他收入"}, db=db)
+        if other is None:
+            raise errors.bad_request("改收支的時候請一起選分類")
+        changes["category_id"] = other.id
+
+    # 5. 其他欄位照改，寫回去
+    if "date" in patch:
+        changes["occurred_on"] = date.fromisoformat(patch["date"])
+    if "amount" in patch:
+        changes["amount"] = money.quantize(patch["amount"])
+    if "kind" in patch:
+        changes["kind"] = kind
+    if "merchant" in patch:
+        changes["merchant"] = patch["merchant"] or None
+    if "note" in patch:
+        changes["note"] = patch["note"] or None
+    changes["updated_at"] = datetime.now(timezone.utc)
+    crud.save(Transaction, {"id": row.id, **changes}, db=db)
+
+    # 6. 段落記帳的那筆：改過的值記進 nlp_parses.user_corrected（模型抓錯的標註）
+    parse = crud.get(NlpParse, where={"transaction_id": row.id}, db=db) if row.source == "nlp" else None
+    if parse is not None:
+        corrected = dict(parse.user_corrected or {})
+        for key, value in patch.items():
+            if key != "groupId":
+                corrected[key] = float(value) if key == "amount" else value
+        crud.save(NlpParse, {"id": parse.id, "user_corrected": corrected}, db=db)
+
+    # 7. 一起寫進資料庫，回傳改完的那一筆
+    db.commit()
+    out = crud.to_dict(
+        row,
+        fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source", "updated_at"),
+        rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat",
+                "updated_at": "updatedAt"},
+    )
+    out["merchant"] = row.merchant or ""
+    out["note"] = row.note or ""
+    out["raw"] = parse.raw_text if parse else ""
+    return out
+    # raise not_ready("PATCH /api/transactions/{tx_id}", OWNER)
 
 
 @router.delete("/transactions/{tx_id}", summary="刪除一筆")
@@ -983,7 +1083,7 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
 
 @router.delete("/transactions", summary="一次刪多筆")
 @block_admin
-@stub
+# @stub
 def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(get_db)):
     """一次刪多筆
 
@@ -1116,4 +1216,51 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("DELETE /api/transactions", OWNER)
+
+
+    from datetime import date, datetime, timezone
+
+    from fastapi import APIRouter, Depends, Query, Request
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin, current_user, own, visible_scope
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.transaction import TransactionIn, TransactionPatchIn
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.db import get_db
+
+
+
+    # 1. 整理要刪的 id：去空白、去重複；空的或太多回 400
+    try:
+        wanted = ledger.clean_ids(ids or "")
+    except ValueError as exc:
+        raise errors.bad_request(str(exc)) from None
+    numbers = [int(x) if x.isdigit() else 0 for x in wanted]
+
+    # 2. 一次查出這些筆，以及哪幾本帳已經結算
+    rows = {t.id: t for t in crud.find(Transaction, {"id__in": numbers}, db=db)}
+    group_ids = {t.group_id for t in rows.values()}
+    settled = set(crud.find(Group, {"id__in": group_ids, "settled_at__isnull": False}, fields="id", db=db))
+
+    # 3. 每一筆都檢查過；有一筆不行就整批不刪
+    for raw, number in zip(wanted, numbers):
+        t = rows.get(number)
+        if t is None:
+            raise errors.not_found("找不到這筆紀錄：" + raw)
+        try:
+            ledger.require_editable(me.id, t.user_id, t.group_id in settled)
+        except PermissionError as exc:
+            raise errors.forbidden(str(exc) + "。這次一筆都沒有刪") from None
+        except ValueError as exc:
+            raise errors.conflict(str(exc) + "。這次一筆都沒有刪") from None
+
+    # 4. 全部通過，才在同一個交易裡刪
+    tx_ids = list(rows)
+    crud.remove(Notification, {"transaction_id__in": tx_ids}, db=db)
+    crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id__in": tx_ids}, db=db)
+    crud.remove(Transaction, {"id__in": tx_ids, "user_id": me.id}, db=db)
+    db.commit()
+    return {"deleted": wanted}
+    # raise not_ready("DELETE /api/transactions", OWNER)
