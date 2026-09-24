@@ -14,10 +14,6 @@
 * 規則（誰可以、什麼時候不行）：app/toolkit/ 對應的模組，函式說明裡寫了拿來怎麼用
 * 回傳的 id 要轉成字串（crud.to_dict 預設就會轉）
 
-⚠️ API 的欄位名跟資料表不一樣，四個要改名（資料表裡沒有 date 這個欄位，它叫 occurred_on）：
-    occurred_on → date　　category_id → cat　　user_id → user　　group_id → group
-   讀出來用 crud.to_dict(tx, rename={...}) 一行帶過；寫進去是反方向，自己轉。
-
 `python -m app.ownership` 會列出每個人還剩幾支（有 @stub 的算還沒做）。
 """
 
