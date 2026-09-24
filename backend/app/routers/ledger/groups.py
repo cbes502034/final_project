@@ -262,7 +262,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
 
 @router.post("/groups", status_code=201, summary="開一本帳")
 @block_admin
-@stub
+# @stub
 def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
     """開一本帳
 
@@ -496,7 +496,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
 
 
 @router.patch("/groups/{gid}", summary="改名稱、顏色、說明")
-@stub
+# @stub
 def update_group(
     body: GroupPatchIn,
     group=Depends(in_group("gid", owner=True)),
@@ -658,11 +658,81 @@ def update_group(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("PATCH /api/groups/{gid}", OWNER)
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+
+    sent = body.model_fields_set
+    changes = {}
+
+    # 1. 名稱：不能空白；同一個家庭裡不能跟別本重名
+    if "name" in sent:
+        name = " ".join((body.name or "").split())
+        if not name:
+            raise errors.unprocessable("帳本要有名字")
+        if name != group.name:
+            if me.family_id:
+                people = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"},
+                                   fields="user_id", db=db)
+            else:
+                people = [me.id]
+            if crud.exists(Group, {"name": name, "created_by__in": people, "removed_at__isnull": True,
+                                   "id__ne": group.id}, db=db):
+                raise errors.conflict("家裡已經有一本叫「%s」的帳了" % name)
+        changes["name"] = name
+
+    # 2. 顏色只收清單裡的代號
+    if "color" in sent:
+        if body.color not in catalog.GROUP_COLORS:
+            raise errors.unprocessable("沒有這個顏色")
+        changes["color"] = body.color
+
+    # 3. 說明
+    if "note" in sent:
+        changes["note"] = (body.note or "").strip() or None
+
+    # 4. 復原封存：只收 false
+    if "archived" in sent:
+        if body.archived is not False:
+            raise errors.unprocessable("封存請用 DELETE；這裡的 archived 只收 false（復原）")
+        changes["archived_at"] = None
+
+    if not changes:
+        raise errors.bad_request("沒有要改的欄位")
+    crud.save(Group, {"id": group.id, **changes}, db=db)
+    db.commit()
+    return {
+        "id": str(group.id),
+        "name": group.name,
+        "icon": group.name[-1:],
+        "color": group.color or catalog.GROUP_COLORS[0],
+        "owner": str(group.created_by),
+        "note": group.note or "",
+        "created": group.created_at.date().isoformat(),
+        "kind": group.kind,
+        "endsOn": group.ends_on.isoformat() if group.ends_on else None,
+        "settledAt": group.settled_at.isoformat() if group.settled_at else None,
+        "archived": group.archived_at is not None,
+        "settled": group.settled_at is not None,
+        "canEdit": True,
+    }
+    # raise not_ready("PATCH /api/groups/{gid}", OWNER)
 
 
 @router.delete("/groups/{gid}", summary="封存；permanent=true 是移除")
-@stub
+# @stub
 def archive_or_remove_group(
     permanent: bool = False,
     group=Depends(in_group("gid", owner=True)),
@@ -782,11 +852,51 @@ def archive_or_remove_group(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("DELETE /api/groups/{gid}", OWNER)
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+
+    now = datetime.now(timezone.utc)
+
+    # 1. 沒帶 permanent：封存（只設時間，任何紀錄都不動，之後可以復原）
+    if not permanent:
+        if group.archived_at is None:
+            crud.save(Group, {"id": group.id, "archived_at": now}, db=db)
+            db.commit()
+        return {"id": str(group.id), "archived": True}
+
+    # 2. permanent=true：移除。只有結算過的活動帳本可以
+    try:
+        ledger.require_removable(group.created_by, group.created_by, group.settled_at, group.removed_at)
+    except ValueError as exc:
+        raise errors.conflict(str(exc)) from None
+    crud.save(Group, {"id": group.id, "removed_at": now}, db=db)
+    crud.save(AuditLog, {
+        "actor_id": group.created_by,
+        "action": "remove_group",
+        "target_type": "group",
+        "target_id": group.id,
+        "meta_json": {"note": "移除已結算的「%s」" % group.name},
+    }, db=db)
+    db.commit()
+    return {"id": str(group.id), "removed": True}
+    # raise not_ready("DELETE /api/groups/{gid}", OWNER)
 
 
 @router.post("/groups/{gid}/members", status_code=201, summary="把家人加進這本帳")
-@stub
+# @stub
 def add_group_member(
     body: GroupMemberIn,
     group=Depends(in_group("gid", owner=True)),
@@ -897,11 +1007,44 @@ def add_group_member(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/groups/{gid}/members", OWNER)
+    
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+
+
+    # 1. 只能加同一個家庭的人（平台管理員不屬於任何家庭，也加不進來）
+    user_id = int(body.userId) if body.userId.isdigit() else 0
+    same_family = me.family_id is not None and crud.exists(
+        FamilyMember, {"family_id": me.family_id, "user_id": user_id, "status": "active"}, db=db)
+    if not same_family or crud.get(User, user_id, db=db).is_platform_admin:
+        raise errors.not_found("這個家庭裡沒有這個人")
+
+    # 2. 已經在裡面就不用再加
+    if crud.exists(GroupMember, {"group_id": group.id, "user_id": user_id}, db=db):
+        raise errors.conflict("他已經在這本帳裡了")
+
+    # 3. 加進去
+    crud.save(GroupMember, {"group_id": group.id, "user_id": user_id}, db=db)
+    db.commit()
+    return {"group": str(group.id), "user": str(user_id)}
+    # raise not_ready("POST /api/groups/{gid}/members", OWNER)
 
 
 @router.delete("/groups/{gid}/members/{user_id}", summary="把人移出這本帳")
-@stub
+# @stub
 def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True)), db: Session = Depends(get_db)):
     """把人移出這本帳
 
@@ -996,11 +1139,38 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("DELETE /api/groups/{gid}/members/{user_id}", OWNER)
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+
+    # 1. 建立者不能把自己移出去，不然這本帳沒人管得動
+    uid = int(user_id) if user_id.isdigit() else 0
+    if uid == group.created_by:
+        raise errors.bad_request("建立者不能把自己移出去")
+
+    # 2. 刪掉他的成員關係（他自己記過的紀錄不動）
+    removed = crud.remove(GroupMember, {"group_id": group.id, "user_id": uid}, db=db)
+    if not removed:
+        raise errors.not_found("他不在這本帳裡")
+    db.commit()
+    return {"group": str(group.id), "user": str(uid), "removed": True}
+    # raise not_ready("DELETE /api/groups/{gid}/members/{user_id}", OWNER)
 
 
 @router.post("/groups/{gid}/settle", summary="結算活動帳本")
-@stub
+# @stub
 def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depends(get_db)):
     """結算活動帳本
 
@@ -1094,11 +1264,38 @@ def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depen
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/groups/{gid}/settle", OWNER)
+
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+    # 1. 只有活動帳本、而且還沒結算的才能結算
+    if group.kind != "temp":
+        raise errors.bad_request("只有活動帳本需要結算")
+    if group.settled_at is not None:
+        raise errors.conflict("這本帳已經結算過了")
+
+    # 2. 標記結算時間（之後這本帳唯讀；紀錄一筆都不動）
+    now = datetime.now(timezone.utc)
+    crud.save(Group, {"id": group.id, "settled_at": now}, db=db)
+    db.commit()
+    return {"id": str(group.id), "settledAt": now.isoformat()}
+    # raise not_ready("POST /api/groups/{gid}/settle", OWNER)
 
 
 @router.patch("/groups/{gid}/notify", summary="這本帳有動靜要不要通知我")
-@stub
+# @stub
 def set_group_notify(
     body: NotifyIn,
     group=Depends(in_group("gid")),
@@ -1191,4 +1388,24 @@ def set_group_notify(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("PATCH /api/groups/{gid}/notify", OWNER)
+
+
+    from collections import Counter
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, current_user, in_group
+    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.toolkit import crud, errors, ledger
+    from app.toolkit.db import get_db
+
+    # 只改我自己那一列，不影響別人
+    crud.save(GroupMember, {"notify": body.notify}, where={"group_id": group.id, "user_id": me.id}, db=db)
+    db.commit()
+    return {"group": str(group.id), "notify": body.notify}
+    # raise not_ready("PATCH /api/groups/{gid}/notify", OWNER)

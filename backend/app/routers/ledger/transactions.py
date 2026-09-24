@@ -353,98 +353,6 @@ def list_transactions(
 @block_admin
 # @stub
 def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_db)):
-    
-
-
-    from datetime import date, datetime, timezone
-
-    from fastapi import APIRouter, Depends, Query, Request
-    from sqlalchemy.orm import Session
-
-    from app.guards import block_admin, current_user, own, visible_scope
-    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.transaction import TransactionIn, TransactionPatchIn
-    from app.toolkit import crud, errors, ledger, money, notify
-    from app.toolkit.db import get_db
-
-    # 1. 檢查日期格式
-    try:
-        occurred_on = date.fromisoformat(body.date)
-    except ValueError:
-        raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
-
-    # 2. 決定這筆記在哪本帳
-    my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
-    if body.groupId:
-        group_id = int(body.groupId) if body.groupId.isdigit() else 0
-        group = crud.get(Group, where={"id": group_id, "id__in": my_groups,
-                                       "removed_at__isnull": True}, db=db)
-        if group is None:
-            raise errors.not_found("找不到這本帳")
-        try:
-            ledger.require_open(group.settled_at)
-        except ValueError as exc:
-            raise errors.conflict(str(exc) + "。請換一本帳本") from None
-    else:
-        group = crud.get(Group, where={"id__in": my_groups, "removed_at__isnull": True,
-                                       "archived_at__isnull": True, "settled_at__isnull": True},
-                         order_by="id", db=db)
-        if group is None:
-            raise errors.conflict("你還沒有可以記帳的帳本，先到「帳本」開一本")
-
-    # 3. 檢查分類
-    category_id = int(body.cat) if body.cat.isdigit() else 0
-    category = crud.get(Category, where={
-        "id": category_id,
-        "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
-    }, db=db)
-    if category is None:
-        raise errors.bad_request("找不到這個分類")
-    if category.kind != body.kind:
-        side = "收入" if category.kind == "income" else "支出"
-        raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
-
-    # 4. 新增一列 transactions（source 一定是 manual）
-    tx = crud.save(Transaction, {
-        "user_id": me.id,
-        "group_id": group.id,
-        "family_id": me.family_id,
-        "category_id": category.id,
-        "kind": body.kind,
-        "amount": money.quantize(body.amount),
-        "occurred_on": occurred_on,
-        "merchant": body.merchant.strip() or None,
-        "note": body.note.strip() or None,
-        "source": "manual",
-    }, db=db)
-
-    # 5. 新增通知
-    guardians = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, db=db)
-    members = crud.find(GroupMember, {"group_id": group.id}, db=db)
-    rows = []
-    for user_id, reason in notify.recipients_for(tx, guardians, members):
-        rows.append({
-            "recipient_id": user_id,
-            "actor_id": me.id,
-            "transaction_id": tx.id,
-            "type": "ward_transaction" if reason == notify.GUARDIAN else "group_transaction",
-            "payload_json": {"reason": reason},
-        })
-    if rows:
-        crud.save(Notification, rows, db=db)
-
-    # 6. 一起寫進資料庫，回傳成功回應
-    db.commit()
-    out = crud.to_dict(
-        tx,
-        fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
-        rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
-    )
-    out["merchant"] = tx.merchant or ""
-    out["note"] = tx.note or ""
-    out["raw"] = ""
-    return out
     """手動新增一筆
 
     POST /api/transactions
@@ -648,7 +556,95 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
         6. 前端改成連你的後端（frontend/index.html 的 api-base），到記帳頁用「單筆手動」記一筆，收支明細要出現這一筆
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_transaction and 你的"，要全部通過
     """
-    
+    from datetime import date, datetime, timezone
+
+    from fastapi import APIRouter, Depends, Query, Request
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin, current_user, own, visible_scope
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.transaction import TransactionIn, TransactionPatchIn
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.db import get_db
+
+    # 1. 檢查日期格式
+    try:
+        occurred_on = date.fromisoformat(body.date)
+    except ValueError:
+        raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
+
+    # 2. 決定這筆記在哪本帳
+    my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
+    if body.groupId:
+        group_id = int(body.groupId) if body.groupId.isdigit() else 0
+        group = crud.get(Group, where={"id": group_id, "id__in": my_groups,
+                                       "removed_at__isnull": True}, db=db)
+        if group is None:
+            raise errors.not_found("找不到這本帳")
+        try:
+            ledger.require_open(group.settled_at)
+        except ValueError as exc:
+            raise errors.conflict(str(exc) + "。請換一本帳本") from None
+    else:
+        group = crud.get(Group, where={"id__in": my_groups, "removed_at__isnull": True,
+                                       "archived_at__isnull": True, "settled_at__isnull": True},
+                         order_by="id", db=db)
+        if group is None:
+            raise errors.conflict("你還沒有可以記帳的帳本，先到「帳本」開一本")
+
+    # 3. 檢查分類
+    category_id = int(body.cat) if body.cat.isdigit() else 0
+    category = crud.get(Category, where={
+        "id": category_id,
+        "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+    }, db=db)
+    if category is None:
+        raise errors.bad_request("找不到這個分類")
+    if category.kind != body.kind:
+        side = "收入" if category.kind == "income" else "支出"
+        raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
+
+    # 4. 新增一列 transactions（source 一定是 manual）
+    tx = crud.save(Transaction, {
+        "user_id": me.id,
+        "group_id": group.id,
+        "family_id": me.family_id,
+        "category_id": category.id,
+        "kind": body.kind,
+        "amount": money.quantize(body.amount),
+        "occurred_on": occurred_on,
+        "merchant": body.merchant.strip() or None,
+        "note": body.note.strip() or None,
+        "source": "manual",
+    }, db=db)
+
+    # 5. 新增通知
+    guardians = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, db=db)
+    members = crud.find(GroupMember, {"group_id": group.id}, db=db)
+    rows = []
+    for user_id, reason in notify.recipients_for(tx, guardians, members):
+        rows.append({
+            "recipient_id": user_id,
+            "actor_id": me.id,
+            "transaction_id": tx.id,
+            "type": "ward_transaction" if reason == notify.GUARDIAN else "group_transaction",
+            "payload_json": {"reason": reason},
+        })
+    if rows:
+        crud.save(Notification, rows, db=db)
+
+    # 6. 一起寫進資料庫，回傳成功回應
+    db.commit()
+    out = crud.to_dict(
+        tx,
+        fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
+        rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
+    )
+    out["merchant"] = tx.merchant or ""
+    out["note"] = tx.note or ""
+    out["raw"] = ""
+    return out
     
     # raise not_ready("POST /api/transactions", OWNER)
 
