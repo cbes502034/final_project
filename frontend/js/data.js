@@ -328,7 +328,7 @@ window.DATA = {
              ['parent_id', 'BIGINT', 'FK → categories，支援兩層分類'],
              ['color', 'TEXT', ''], ['sort_order', 'INT', '']] },
 
-    { t: 'transactions', label: '收支明細', note: '核心表。所有統計都從這裡算',
+    { t: 'transactions', label: '收支明細', note: '核心表。所有統計都從這裡算。⚠️ 回給前端時四個欄位會改名：occurred_on→date、category_id→cat、user_id→user、group_id→group（crud.to_dict 的 rename）——所以 API 上的 date 在資料表裡叫 occurred_on',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
              ['group_id', 'BIGINT', 'FK → groups，這筆算在哪一本帳上。INDEX'],
              ['family_id', 'BIGINT', 'FK → families，INDEX'],
