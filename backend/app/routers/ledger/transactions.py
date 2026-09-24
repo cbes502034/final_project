@@ -867,7 +867,9 @@ def update_transaction(
                只送 {"kind": "income"}  → 200，cat 變成「其他收入」
         5. 改一筆段落記帳記進來的，資料庫 nlp_parses 那一列的 user_corrected 要出現改過的欄位
         6. 前端改成連你的後端（frontend/index.html 的 api-base），收支明細某一列按「修改」，存檔後那一列要馬上變
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "update_transaction and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "update_transaction and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PATCH /api/transactions/{tx_id}", OWNER)
 
@@ -976,7 +978,9 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
                刪別人的            → 403
                刪結算過的帳本裡的  → 409
         5. 前端改成連你的後端（frontend/index.html 的 api-base），收支明細某一列按「刪除」，那一列要不見
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_transaction and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_transaction and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/transactions/{tx_id}", OWNER)
 
@@ -1112,6 +1116,8 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
                ids=你的一筆,別人的一筆  → 403，而且你那一筆還在
                ids=你的一筆,99999       → 404，而且你那一筆還在
         5. 前端改成連你的後端（frontend/index.html 的 api-base），收支明細勾兩筆按「刪除」，兩筆一起不見
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_transactions and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_transactions and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("DELETE /api/transactions", OWNER)

@@ -311,6 +311,8 @@ def get_summary(
         5. 自己記一筆 transfer → 任何數字都不能變
         6. 家用帳本裡配偶記的一筆 → 你的 scope=me 數字不能變
         7. 前端改成連你的後端（frontend/index.html 的 api-base），總覽「我／全家」切換、統計頁，數字要跟收支明細加起來一樣
-        8. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "get_summary and 你的"，要全部通過
+        8. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "get_summary and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/summary", OWNER)

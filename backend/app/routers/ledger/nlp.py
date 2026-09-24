@@ -181,7 +181,9 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
                text 填三個空白                           → 422
         5. 把 MODEL_BASE_URL 填成模型服務的網址、重開 uvicorn，再試「早餐55」→ 200，out.amount 是 55、out.cat 是「餐飲」的 id
         6. 資料庫 transactions、nlp_parses 都不能多出任何一列
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "parse_one and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "parse_one and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/nlp/parse", OWNER)
 
@@ -416,7 +418,9 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
         5. MODEL_BASE_URL 填好、重開 uvicorn，再試同一段 → 200，items 有兩筆，cat 都是「餐飲」的 id
         6. 試一段沒有金額的「晚上加油」→ 那一筆 amount 是 null、missing 有 "amount"
         7. 前端改成連你的後端（frontend/index.html 的 api-base），記帳頁「段落記帳」貼一段話按解析，表格要照 missing、conf 標紅標黃
-        8. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "parse_batch and 你的"，要全部通過
+        8. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "parse_batch and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/nlp/parse-batch", OWNER)
 
@@ -628,7 +632,9 @@ def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
                amount 改成跟 orig 不一樣再送    → 201，nlp_parses 那一列的 user_corrected 只有 amount
                orig.by 填 "rules"               → 201，nlp_parses 那一列的 model_ver 是 "rules"
                cat 填收入分類、kind 填 expense  → 400
-        5. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "confirm_one and 你的"，要全部通過
+        5. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "confirm_one and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/nlp/confirm", OWNER)
 
@@ -830,6 +836,8 @@ def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db))
                第一筆帶一本結算過的 groupId  → 409
         5. 照看你的家長打 GET /api/notifications → 兩筆各一則通知
         6. 前端改成連你的後端（frontend/index.html 的 api-base），記帳頁貼一段話、解析、改一格、按「確認並寫入」，收支明細要出現那幾筆
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "confirm_batch and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "confirm_batch and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/nlp/confirm-batch", OWNER)

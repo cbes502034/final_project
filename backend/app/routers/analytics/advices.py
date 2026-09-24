@@ -174,7 +174,9 @@ def list_advices(me: User, scope: str | None = None, db: Session = Depends(get_d
                家長（有照看孩子）scope=family  → 家庭建議＋孩子的個人建議，沒有自己的
                子女 scope=family               → 跟 scope=me 一樣
         5. 前端改成連你的後端（frontend/index.html 的 api-base），財務建議頁「我／全家」切換，內容要對
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_advices and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_advices and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/advices", OWNER)
 
@@ -426,6 +428,8 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         5. MODEL_BASE_URL 填好、重開 uvicorn，再試 {"scope": "me"} → 201，basis 裡的數字要跟 GET /api/summary 一樣
         6. 同一個月再產生一次 → GET /api/advices 不會出現兩份
         7. 前端改成連你的後端（frontend/index.html 的 api-base），財務建議頁按「產生這個月的建議」，出現新的建議卡片
-        8. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "generate_advices and 你的"，要全部通過
+        8. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "generate_advices and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/advices/generate", OWNER)

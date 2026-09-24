@@ -173,7 +173,9 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
                groupId=某一本帳      → used 只算那本帳的
                groupId=我沒加入的帳  → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），總覽的預算卡，超過的要標紅
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_budgets and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_budgets and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/budgets", OWNER)
 
@@ -293,7 +295,9 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
                {"cat": 餐飲的 id, "limit": -1}    → 422
         5. 打 GET /api/budgets → 看得到剛設的預算
         6. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁改一個分類的預算，離開欄位就跳「已儲存」的提示
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_budget and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_budget and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PUT /api/budgets", OWNER)
 
@@ -421,7 +425,9 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
                {"goal": -1}                             → 422
         5. 打 GET /api/auth/me → user.savingsGoal 是剛設的整體目標
         6. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁改存款目標，總覽的「還可以花」要跟著變
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_savings_goal and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_savings_goal and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("PUT /api/savings-goal", OWNER)
 
@@ -521,6 +527,8 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
                設過兩次整體目標  → 整體是後來那個
         5. 封存一本帳 → 那本帳不在清單裡
         6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁每一本的月目標要跟這支一致
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_savings_goals and 你的"，要全部通過
+        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_savings_goals and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/savings-goals", OWNER)

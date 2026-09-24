@@ -137,7 +137,9 @@ def list_categories(me: User, db: Session = Depends(get_db)):
                家長新增「寵物」之後再打  → 多一個 custom: true 的「寵物」
                別的家庭的人打            → 看不到「寵物」
         5. 前端改成連你的後端（frontend/index.html 的 api-base），記帳頁的分類下拉要看得到系統分類與我們家的分類
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_categories and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_categories and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("GET /api/categories", OWNER)
 
@@ -250,6 +252,8 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
                {"name": "   ", "kind": "expense"}                   → 422
                子女的 token                                         → 403
         5. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁新增一個分類，記帳頁的下拉要馬上看得到
-        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_category and 你的"，要全部通過
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_category and u4f60" -v，要全部通過
+           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
+            -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     raise not_ready("POST /api/categories", OWNER)
