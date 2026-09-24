@@ -43,7 +43,7 @@ OWNER = "成員2"
 
 @router.get("/transactions", summary="收支明細")
 @block_admin
-@stub
+# @stub
 def list_transactions(
     me: User,
     request: Request,
@@ -260,12 +260,102 @@ def list_transactions(
         6. 前端改成連你的後端（frontend/index.html 的 api-base），收支明細頁的篩選一個一個試，結果要跟條件一致
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "list_transactions and 你的"，要全部通過
     """
-    raise not_ready("GET /api/transactions", OWNER)
+
+
+    from datetime import date, datetime, timezone
+
+    from fastapi import APIRouter, Depends, Query, Request
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin, current_user, own, visible_scope
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.transaction import TransactionIn, TransactionPatchIn
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.db import get_db
+
+
+    # 1. 不認得的查詢參數直接擋（默默忽略的話，篩選沒生效也看不出來）
+    allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page"}
+    unknown = sorted(set(request.query_params) - allowed)
+    if unknown:
+        raise errors.unprocessable("不認得的篩選參數：" + "、".join(unknown))
+
+    # 2. 我看得到的人、看得到的帳本；兩條路一定是「或」
+    users, groups = visible_scope(me, db)
+    where = {"and": [{"or": [{"user_id__in": users}, {"group_id__in": groups}]}]}
+
+    # 3. 帶了 userId：要是我查得到的人，不然 403（不要回空陣列）
+    if userId and userId != "all":
+        target = int(userId) if userId.isdigit() else 0
+        members = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
+        if target not in users and target not in members:
+            raise errors.forbidden("你沒有權限看這個人的紀錄")
+        where["user_id"] = target
+
+    # 4. 帶了 groupId：要是我加入的帳本
+    if groupId and groupId != "all":
+        group_id = int(groupId) if groupId.isdigit() else 0
+        if group_id not in groups:
+            raise errors.forbidden("你不在這本帳裡")
+        where["group_id"] = group_id
+
+    # 5. 其他篩選
+    try:
+        if from_:
+            where["occurred_on__gte"] = date.fromisoformat(from_)
+        if to:
+            where["occurred_on__lte"] = date.fromisoformat(to)
+    except ValueError:
+        raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
+    if categoryId:
+        where["category_id"] = int(categoryId) if categoryId.isdigit() else 0
+    if kind and kind != "all":
+        if kind not in ("income", "expense", "transfer"):
+            raise errors.unprocessable("kind 只能是 income、expense 或 transfer")
+        where["kind"] = kind
+    if source and source != "all":
+        if source not in ("manual", "nlp", "import"):
+            raise errors.unprocessable("source 只能是 manual、nlp 或 import")
+        where["source"] = source
+    if q and q.strip():
+        word = q.strip()
+        where["and"].append({"or": [{"merchant__icontains": word}, {"note__icontains": word}]})
+
+    # 6. 查一頁：新的在前，一頁 200 筆
+    result = crud.find(Transaction, where, order_by=("-occurred_on", "-id"), page=page, size=200, db=db)
+    rows = result["items"]
+
+    # 7. 段落記帳的那幾筆，一次把原句與信心度查回來
+    parses = {}
+    if rows:
+        for p in crud.find(NlpParse, {"transaction_id__in": [t.id for t in rows]}, db=db):
+            parses[p.transaction_id] = p
+
+    # 8. 轉成前端要的樣子
+    out = []
+    for t in rows:
+        item = crud.to_dict(
+            t,
+            fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
+            rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
+        )
+        item["merchant"] = t.merchant or ""
+        item["note"] = t.note or ""
+        p = parses.get(t.id)
+        item["raw"] = p.raw_text if p else ""
+        if p:
+            item["parsed"] = {"conf": float(p.confidence or 0), "catConf": float(p.cat_confidence or 0)}
+        else:
+            item["parsed"] = {"conf": 1, "catConf": 1}
+        out.append(item)
+    return {"transactions": out, "total": result["total"]}
+    # raise not_ready("GET /api/transactions", OWNER)
 
 
 @router.post("/transactions", status_code=201, summary="手動新增一筆")
 @block_admin
-@stub
+# @stub
 def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_db)):
     
 
@@ -564,7 +654,7 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
     """
     
     
-    raise not_ready("POST /api/transactions", OWNER)
+    # raise not_ready("POST /api/transactions", OWNER)
 
 
 @router.patch("/transactions/{tx_id}", summary="修改一筆")
