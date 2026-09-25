@@ -41,7 +41,7 @@ OWNER = "成員2"
 
 @router.post("/nlp/parse", summary="單句解析（不寫入）")
 @block_admin
-@stub
+# @stub
 def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
     """單句解析（不寫入）
 
@@ -185,12 +185,63 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/nlp/parse", OWNER)
+
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
+    from app.services.llm import client, parse
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.config import settings
+    from app.toolkit.db import get_db
+
+
+    # 1. 全是空白不算一句話
+    text = body.text.strip()
+    if not text:
+        raise errors.unprocessable("先寫一句話")
+
+    # 2. 分類清單（系統的＋我們家的）與台灣的今天，交給模型
+    cats = crud.find(Category, {"or": [{"family_id__isnull": True}, {"family_id": me.family_id}]},
+                     order_by="id", db=db)
+    catalog = [{"id": str(c.id), "name": c.name, "kind": c.kind} for c in cats]
+    today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+    # 3. 叫模型；沒設定、叫不動、還沒做好都回 503（前端會用規則頂著）
+    try:
+        item = parse.parse_one(text, catalog, today)
+    except client.ModelError as exc:
+        raise errors.service_unavailable(str(exc)) from None
+    except NotImplementedError:
+        raise errors.service_unavailable("模型解析還沒做好，先用前端的規則解析") from None
+
+    # 4. 轉成前端要的形狀（不寫資料庫）
+    conf = item.get("conf") or {}
+    return {
+        "raw": text,
+        "matched": False,
+        "note": "",
+        "out": {
+            "date": item.get("date"),
+            "amount": item.get("amount"),
+            "kind": item.get("kind"),
+            "cat": item.get("cat"),
+            "merchant": item.get("merchant") or "",
+            "conf": conf.get("amount", 0),
+            "catConf": conf.get("cat", 0),
+        },
+    }
+    # raise not_ready("POST /api/nlp/parse", OWNER)
 
 
 @router.post("/nlp/parse-batch", summary="段落解析（不寫入）")
 @block_admin
-@stub
+# @stub
 def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
     """段落解析（不寫入）
 
@@ -422,12 +473,50 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/nlp/parse-batch", OWNER)
+
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
+    from app.services.llm import client, parse
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.config import settings
+    from app.toolkit.db import get_db
+
+
+
+    # 1. 全是空白不算一段話
+    text = body.text.strip()
+    if not text:
+        raise errors.unprocessable("先寫一段話")
+
+    # 2. 分類清單（系統的＋我們家的）與台灣的今天，交給模型
+    cats = crud.find(Category, {"or": [{"family_id__isnull": True}, {"family_id": me.family_id}]},
+                     order_by="id", db=db)
+    catalog = [{"id": str(c.id), "name": c.name, "kind": c.kind} for c in cats]
+    today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+    # 3. 叫模型；沒設定、叫不動、還沒做好都回 503（前端會用規則頂著）
+    try:
+        result = parse.parse_batch(text, catalog, today)
+    except client.ModelError as exc:
+        raise errors.service_unavailable(str(exc)) from None
+    except NotImplementedError:
+        raise errors.service_unavailable("模型解析還沒做好，先用前端的規則解析") from None
+
+    # 4. 回傳（不寫資料庫）
+    return {"raw": text, "matched": False, "items": result["items"], "note": result.get("note", "")}
+    # raise not_ready("POST /api/nlp/parse-batch", OWNER)
 
 
 @router.post("/nlp/confirm", status_code=201, summary="單筆確認後寫入")
 @block_admin
-@stub
+# @stub
 def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
     """單筆確認後寫入
 
@@ -636,12 +725,125 @@ def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/nlp/confirm", OWNER)
+
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
+    from app.services.llm import client, parse
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.config import settings
+    from app.toolkit.db import get_db
+
+
+
+    # 1. 檢查日期格式
+    try:
+        occurred_on = date.fromisoformat(body.date)
+    except ValueError:
+        raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
+
+    # 2. 決定這筆記在哪本帳（規則跟 POST /api/transactions 一樣）
+    my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
+    if body.groupId:
+        group_id = int(body.groupId) if body.groupId.isdigit() else 0
+        group = crud.get(Group, where={"id": group_id, "id__in": my_groups,
+                                       "removed_at__isnull": True}, db=db)
+        if group is None:
+            raise errors.not_found("找不到這本帳")
+        try:
+            ledger.require_open(group.settled_at)
+        except ValueError as exc:
+            raise errors.conflict(str(exc) + "。請換一本帳本") from None
+    else:
+        group = crud.get(Group, where={"id__in": my_groups, "removed_at__isnull": True,
+                                       "archived_at__isnull": True, "settled_at__isnull": True},
+                         order_by="id", db=db)
+        if group is None:
+            raise errors.conflict("你還沒有可以記帳的帳本，先到「帳本」開一本")
+
+    # 3. 檢查分類
+    category_id = int(body.cat) if body.cat.isdigit() else 0
+    category = crud.get(Category, where={
+        "id": category_id,
+        "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+    }, db=db)
+    if category is None:
+        raise errors.bad_request("找不到這個分類")
+    if category.kind != body.kind:
+        side = "收入" if category.kind == "income" else "支出"
+        raise errors.bad_request("「%s」是%s分類，跟這筆的收支對不上" % (category.name, side))
+
+    # 4. 新增一列 transactions（source 一定是 nlp）
+    tx = crud.save(Transaction, {
+        "user_id": me.id,
+        "group_id": group.id,
+        "family_id": me.family_id,
+        "category_id": category.id,
+        "kind": body.kind,
+        "amount": money.quantize(body.amount),
+        "occurred_on": occurred_on,
+        "merchant": body.merchant.strip() or None,
+        "note": body.note.strip() or None,
+        "source": "nlp",
+    }, db=db)
+
+    # 5. 新增一列 nlp_parses：模型當下怎麼解析、使用者改了哪些欄位
+    final = {"date": body.date, "amount": body.amount, "kind": body.kind, "cat": body.cat,
+             "merchant": body.merchant, "note": body.note}
+    orig = body.orig.model_dump() if body.orig else None
+    corrected = None
+    if orig is not None:
+        corrected = {k: v for k, v in final.items() if orig.get(k) != v} or None
+    crud.save(NlpParse, {
+        "transaction_id": tx.id,
+        "user_id": me.id,
+        "raw_text": body.raw,
+        "parsed_json": orig,
+        "user_corrected": corrected,
+        "confidence": body.conf,
+        "cat_confidence": body.catConf,
+        "model_ver": "rules" if orig and orig["by"] == "rules" else settings.model_name,
+    }, db=db)
+
+    # 6. 新增通知（跟 POST /api/transactions 一樣）
+    guardians = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, db=db)
+    members = crud.find(GroupMember, {"group_id": group.id}, db=db)
+    rows = []
+    for user_id, reason in notify.recipients_for(tx, guardians, members):
+        rows.append({
+            "recipient_id": user_id,
+            "actor_id": me.id,
+            "transaction_id": tx.id,
+            "type": "ward_transaction" if reason == notify.GUARDIAN else "group_transaction",
+            "payload_json": {"reason": reason},
+        })
+    if rows:
+        crud.save(Notification, rows, db=db)
+
+    # 7. 一起寫進資料庫，回傳這一筆
+    db.commit()
+    out = crud.to_dict(
+        tx,
+        fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
+        rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
+    )
+    out["merchant"] = tx.merchant or ""
+    out["note"] = tx.note or ""
+    out["raw"] = body.raw
+    out["parsed"] = {"conf": body.conf, "catConf": body.catConf}
+    return out
+    # raise not_ready("POST /api/nlp/confirm", OWNER)
 
 
 @router.post("/nlp/confirm-batch", status_code=201, summary="批次確認後一次寫入")
 @block_admin
-@stub
+# @stub
 def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db)):
     """批次確認後一次寫入
 
@@ -840,4 +1042,107 @@ def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db))
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/nlp/confirm-batch", OWNER)
+
+
+    from datetime import date, datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin
+    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
+    from app.services.llm import client, parse
+    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit.config import settings
+    from app.toolkit.db import get_db
+
+
+
+    # 1. 決定整批記在哪本帳：只看第一筆的 groupId
+    wanted = body.items[0].groupId
+    my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
+    if wanted:
+        group_id = int(wanted) if wanted.isdigit() else 0
+        group = crud.get(Group, where={"id": group_id, "id__in": my_groups,
+                                       "removed_at__isnull": True}, db=db)
+        if group is None:
+            raise errors.not_found("找不到這本帳")
+        try:
+            ledger.require_open(group.settled_at)
+        except ValueError as exc:
+            raise errors.conflict(str(exc) + "。請換一本帳本") from None
+    else:
+        group = crud.get(Group, where={"id__in": my_groups, "removed_at__isnull": True,
+                                       "archived_at__isnull": True, "settled_at__isnull": True},
+                         order_by="id", db=db)
+        if group is None:
+            raise errors.conflict("你還沒有可以記帳的帳本，先到「帳本」開一本")
+
+    # 2. 每一筆先檢查完；有一筆不對，整批一筆都不寫
+    cats = {c.id: c for c in crud.find(Category, {
+        "or": [{"family_id__isnull": True}, {"family_id": me.family_id}]}, db=db)}
+    checked = []
+    for n, item in enumerate(body.items, 1):
+        try:
+            occurred_on = date.fromisoformat(item.date)
+        except ValueError:
+            raise errors.unprocessable("第 %d 筆的日期要是 YYYY-MM-DD" % n) from None
+        category = cats.get(int(item.cat) if item.cat.isdigit() else 0)
+        if category is None:
+            raise errors.bad_request("第 %d 筆：找不到這個分類" % n)
+        if category.kind != item.kind:
+            side = "收入" if category.kind == "income" else "支出"
+            raise errors.bad_request("第 %d 筆：「%s」是%s分類，跟這筆的收支對不上" % (n, category.name, side))
+        checked.append((item, occurred_on, category))
+
+    # 3. 全部過了才寫：每一筆一列 transactions ＋ 一列 nlp_parses
+    guardians = crud.find(Guardianship, {"ward_id": me.id, "ended_at__isnull": True}, db=db)
+    members = crud.find(GroupMember, {"group_id": group.id}, db=db)
+    notes = []
+    for item, occurred_on, category in checked:
+        tx = crud.save(Transaction, {
+            "user_id": me.id,
+            "group_id": group.id,
+            "family_id": me.family_id,
+            "category_id": category.id,
+            "kind": item.kind,
+            "amount": money.quantize(item.amount),
+            "occurred_on": occurred_on,
+            "merchant": item.merchant.strip() or None,
+            "note": item.note.strip() or None,
+            "source": "nlp",
+        }, db=db)
+        final = {"date": item.date, "amount": item.amount, "kind": item.kind, "cat": item.cat,
+                 "merchant": item.merchant, "note": item.note}
+        orig = item.orig.model_dump() if item.orig else None
+        corrected = None
+        if orig is not None:
+            corrected = {k: v for k, v in final.items() if orig.get(k) != v} or None
+        conf = item.conf.model_dump() if item.conf else {}
+        crud.save(NlpParse, {
+            "transaction_id": tx.id,
+            "user_id": me.id,
+            "raw_text": item.span,
+            "parsed_json": orig,
+            "user_corrected": corrected,
+            "confidence": conf.get("amount"),
+            "cat_confidence": conf.get("cat"),
+            "model_ver": "rules" if orig and orig["by"] == "rules" else settings.model_name,
+        }, db=db)
+        for user_id, reason in notify.recipients_for(tx, guardians, members):
+            notes.append({
+                "recipient_id": user_id,
+                "actor_id": me.id,
+                "transaction_id": tx.id,
+                "type": "ward_transaction" if reason == notify.GUARDIAN else "group_transaction",
+                "payload_json": {"reason": reason},
+            })
+
+    # 4. 通知一次寫，全部一起存進資料庫
+    if notes:
+        crud.save(Notification, notes, db=db)
+    db.commit()
+    return {"created": len(checked)}
+    # raise not_ready("POST /api/nlp/confirm-batch", OWNER)
