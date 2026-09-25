@@ -13,16 +13,25 @@
   /* 分類清單：系統預設 ＋ 我們家自訂的。⚠️ 從 API.categories() 拿，不要直接讀 DATA——
      自訂分類只有 API 知道。登入後、新增分類後由 loadCats() 更新。 */
   var CATS = [];
+  var CATS_ERR = null;                  // 分類拿不到時，是哪一支、什麼錯
+  /* ⚠️ 以前這裡拿不到就退回 data.js 的假分類（id 是 C01、C02…）。
+     畫面看起來「有分類可以選」，送出去的卻是後端不認得的 id，
+     使用者收到的是「找不到這個分類」——前端假裝有東西，錯卻算在他頭上。
+     現在拿不到就是空的，該顯示通知的地方自己去看 CATS_ERR。 */
   function cats(kind) {
-    var list = CATS.length ? CATS : ((global.DATA && global.DATA.categories) || []);
-    return kind ? list.filter(function (c) { return c.kind === kind; }) : list;
+    return kind ? CATS.filter(function (c) { return c.kind === kind; }) : CATS;
   }
   function loadCats() {
     return API.categories().then(function (d) {
       CATS = d.categories || [];
       DATA_CATS = {};
       CATS.forEach(function (c) { DATA_CATS[c.id] = c.name; });
+      CATS_ERR = null;
       return CATS;
+    }, function (e) {
+      CATS = [];
+      CATS_ERR = e;
+      throw e;
     });
   }
 
@@ -267,6 +276,17 @@
       '</div></div>';
   }
 
+  /* 一頁上好幾支 API 一起打的時候用這個包起來。
+
+     ⚠️ 不要接住錯誤之後回一個空的清單頂著——
+        那等於把「這一支還沒做」畫成「你還沒有帳本」，是在講一句不是真的話。
+        soft() 把錯誤原封不動帶回來（放在 __err），哪一區用到哪一支，
+        那一區就自己換成 errState() 的通知卡。後端做好之後，
+        同一個位置自動變回正常內容，前端一行都不用改。 */
+  function soft(p) {
+    return p.then(function (d) { return d; }, function (e) { return { __err: e }; });
+  }
+
   /* 畫面程式本身出錯（不是 API）：一樣講出是哪一支函式、第幾行，不要默默壞掉 */
   function frontFault(err, fallback) {
     var stack = String((err && err.stack) || '');
@@ -417,8 +437,10 @@
       { nav: 'stats', label: '統計', icon: 'stats' },
       { nav: 'advice', label: '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '',
         badge: o.warn ? o.warn + ' 則要注意' : '' },
-      { nav: 'members', label: o.fm && o.fm.family ? '家庭成員' : '加入家庭', icon: 'members',
-        badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
+      /* ⚠️ 家庭那一支問不到（famOff）時一律寫「家庭成員」：寫「加入家庭」
+         等於斷定他沒有家庭，而我們根本沒問到。 */
+      { nav: 'members', label: !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭成員',
+        icon: 'members', badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
       { nav: 'profile', label: '個人資料', icon: 'profile' },
       { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
       /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
@@ -474,7 +496,7 @@
       var line = fm.family.name + '的' + (ROLE_TW[user.role] || '成員');
       return (fm.members || []).length > 1 ? line + '　·　' + fm.members.length + ' 位家人' : line;
     }
-    if (fm && fm.family === null && !fm.off) return '還沒有加入家庭　·　建立一個，或輸入邀請碼';
+    if (fm && fm.family === null && !fm.__err) return '還沒有加入家庭　·　建立一個，或輸入邀請碼';
     return todayText();
   }
 
@@ -488,28 +510,29 @@
       greet(m.user);
       var sc = scopeOf(m), fam = sc === 'family';
       return Promise.all([
-        API.summary({ scope: sc, groupId: GROUP }),
-        API.budgets({ groupId: GROUP }),
-        API.groups({}).catch(function () { return { groups: [] }; }),
-        API.advices({ scope: sc }).catch(function () { return { advices: [] }; }),
-        /* off: true ＝ 這一支問不到（還沒做、或斷線）。要跟「真的沒有家庭」分開——
-           問不到就別在標題下面寫「還沒有加入家庭」，他可能是有的。 */
-        API.members().catch(function () { return { members: [], family: null, off: true }; }),
+        soft(API.summary({ scope: sc, groupId: GROUP })),
+        soft(API.budgets({ groupId: GROUP })),
+        soft(API.groups({})),
+        soft(API.advices({ scope: sc })),
+        soft(API.members()),
         /* 今天的紀錄：我的模式只看自己，全家模式看全家（下面再濾成統計算進去的那幾個人） */
-        API.transactions(Object.assign({ from: todayKey(), to: todayKey(), groupId: GROUP },
-          fam ? {} : { userId: m.user.id })).catch(function () { return { transactions: [] }; })
+        soft(API.transactions(Object.assign({ from: todayKey(), to: todayKey(), groupId: GROUP },
+          fam ? {} : { userId: m.user.id })))
       ]).then(function (r) {
-        var d = r[0], b = r[1], gs = r[2].groups || [], ads = r[3].advices || [], fm = r[4];
-        var ids = d.members ? d.members.map(function (u) { return u.id; }) : [m.user.id];
-        var today = (r[5].transactions || []).filter(function (t) { return !fam || ids.indexOf(t.user) >= 0; });
+        var d = r[0], b = r[1], gs = r[2].__err ? [] : (r[2].groups || []),
+            ads = r[3].__err ? [] : (r[3].advices || []), fm = r[4], tx = r[5];
+        var ids = !d.__err && d.members ? d.members.map(function (u) { return u.id; }) : [m.user.id];
+        var today = tx.__err ? [] : (tx.transactions || []).filter(function (t) {
+          return !fam || ids.indexOf(t.user) >= 0;
+        });
         greet(m.user, fm,
-              fam ? '全家這個月' : '',
-              fam ? d.members.length + ' 位家人的收支' : '',
+              fam && !d.__err ? '全家這個月' : '',
+              fam && !d.__err ? d.members.length + ' 位家人的收支' : '',
               scopeSeg(m));
 
-        var sv = d.savings, lv = sv.level;
-        var used = Math.min(100, Math.round(sv.ratio * 100));
-        var budgets = fam ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; });
+        var sv = d.__err ? null : d.savings, lv = sv ? sv.level : '';
+        var used = sv ? Math.min(100, Math.round(sv.ratio * 100)) : 0;
+        var budgets = b.__err ? [] : (fam ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; }));
         var warn = ads.filter(function (a) { return a.level === 'warn'; }).length;
         var go = fam ? '#/stats' : '#/entry';
         var chev = '<svg class="wal__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
@@ -518,8 +541,11 @@
         var h = '<div class="page"><div id="homeInv"></div><div class="dash">';
 
         /* 1. 疊在一起的數字卡——像皮夾裡的卡片。
-              後面兩張露出一截：收入、支出；最前面那張是這個月還可以花。 */
-        h += '<section class="wal wal--' + lv + '" aria-label="這個月的錢">' +
+              後面兩張露出一截：收入、支出；最前面那張是這個月還可以花。
+              ⚠️ 這些數字全部來自 GET /api/summary。那一支還沒做的時候不要畫空卡，
+                 直接在這個位置講清楚是哪一支、誰負責。 */
+        h += d.__err ? errState(d.__err) :
+          '<section class="wal wal--' + lv + '" aria-label="這個月的錢">' +
           '<a class="wal__strip wal__strip--1" href="' + go + '">' +
             '<span>' + (fam ? '全家收入' : '本月收入') + '</span><b>' + amt(d.income) + '</b>' + chev + '</a>' +
           '<a class="wal__strip wal__strip--2" href="' + go + '">' +
@@ -544,15 +570,16 @@
           '</div>' +
         '</section>';
 
-        /* 2. 常用功能 */
-        h += quickTiles({ fam: fam, count: d.count, groups: gs.length, warn: warn, fm: fm });
+        /* 2. 常用功能：這一區不靠任何一支 API，永遠畫得出來（登出在裡面） */
+        h += quickTiles({ fam: fam, count: d.__err ? 0 : d.count, groups: gs.length,
+                          warn: warn, fm: fm, famOff: !!fm.__err });
         h += '</div>';
 
         /* 3. 預算：一個分類一張小卡 */
         h += '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
           (budgets.length ? '<span class="sec__n">' + budgets.length + ' 項</span>' : '') +
           '<a class="sec__link" href="#/stats">看統計 ›</a></div>';
-        h += budgets.length
+        h += b.__err ? errState(b.__err) : budgets.length
           ? '<div class="bgrid">' + budgets.map(function (x) {
               var p = Math.round(x.pct * 100);
               return '<div class="bcard' + (x.over ? ' is-over' : '') + '">' +
@@ -566,28 +593,32 @@
             }).join('') + '</div>'
           : '<a class="card bnone" href="#/profile">' + emptyState('還沒有設定預算', '到「個人資料 › 每月預算」替常花的分類設個上限 ›') + '</a>';
 
-        if (fam) {
+        if (fam && !d.__err) {
           h += '<div class="sec"><h2 class="sec__t">每個人的這個月</h2></div>' +
             memberTable(d.members, d.expense) +
             '<div class="card mshare-card">' + memberBar(d.members, d.expense) + '</div>';
         }
 
         /* 4. 今天的紀錄：一打開就看得到今天的動向 */
-        h += todayCard(today, fam);
+        h += tx.__err
+          ? '<div class="sec"><h2 class="sec__t">今天的紀錄</h2></div>' + errState(tx.__err)
+          : todayCard(today, fam);
 
         $view.innerHTML = h + '</div>';
         animate();
 
-        /* 有人邀請你、或是你還沒有家庭，放在最上面——這是現在唯一要你決定的事 */
-        API.invites().then(function (inv) {
+        /* 有人邀請你、或是你還沒有家庭，放在最上面——這是現在唯一要你決定的事。
+           ⚠️ 這一支問不到就整塊不顯示：寫「還沒有加入家庭」等於替後端回答，
+              他可能是有家庭的，只是我們問不到。 */
+        soft(API.invites()).then(function (inv) {
           var box = document.getElementById('homeInv');
-          if (!box) return;
+          if (!box || inv.__err) return;
           if (inv.received.length) box.innerHTML = inviteCards(inv.received);
           else if (!m.family && !m.user.isPlatformAdmin) {
             box.innerHTML = '<a class="nudge" href="#/members"><b>還沒有加入家庭</b>' +
               '<span>建立一個，或輸入家人給你的邀請碼 →</span></a>';
           }
-        }).catch(function () {});
+        });
       });
     }).catch(function (e) {
       /* 數字拿不到，但功能還是要能按——尤其是登出 */
@@ -1010,7 +1041,18 @@
   /* ============================================================
      段落記帳
      ============================================================ */
+  /* 分類拿不到時，用到它的地方一律換成這張通知。
+     後端把 GET /api/categories 做出來之後，同一個位置自動變回正常的表單。 */
+  function catsMissing() {
+    return CATS_ERR
+      ? errState(CATS_ERR)
+      : '<div class="err"><div class="err__t">還沒有分類</div>' +
+        '<div class="err__s">分類清單是空的，記帳需要至少一個分類。</div></div>';
+  }
+
   function paraHTML() {
+    /* 解析完每一筆都要挑分類才能寫入。沒有分類就先別讓人打完一段話才卡住。 */
+    if (!cats().length) return '<div class="card">' + catsMissing() + '</div>';
     return '<div class="card nlp">' +
       '<div class="card__h"><span class="card__t">寫一段話，系統幫你拆成好幾筆</span>' +
       '<span class="card__s">解析後由你確認才寫入</span></div>' +
@@ -1136,6 +1178,9 @@
      ============================================================ */
   function singleHTML() {
     var ec = cats('expense');
+    /* 分類是必填，而且 id 一定要是後端給的。一個都沒有就別畫表單——
+       畫了也只能送出一筆後端不認得的資料。 */
+    if (!ec.length) return '<div class="card">' + catsMissing() + '</div>';
     var today = todayKey();
     return '<div class="card">' +
       '<div class="card__h"><span class="card__t">單筆手動輸入</span>' +
@@ -1183,11 +1228,15 @@
     if (!box) return;
     Promise.all([
       API.transactions(Object.assign({}, F, { groupId: GROUP })),
-      API.groups({ includeArchived: true }).catch(function () { return { groups: [] }; })
+      soft(API.groups({ includeArchived: true }))
     ]).then(function (r) {
       TXROWS = r[0].transactions;
-      TXGROUPS = r[1].groups || [];
+      /* 帳本清單只用來把 group id 換成名字。那一支還沒做的話，
+         明細照樣列得出來（明細本身是另一支），但要講一句為什麼沒有帳本名稱——
+         不講的話那一欄空白，看起來像「這幾筆沒有歸到任何帳本」。 */
+      TXGROUPS = r[1].__err ? [] : (r[1].groups || []);
       renderTx();
+      if (r[1].__err) box.insertAdjacentHTML('afterbegin', errState(r[1].__err));
     }).catch(function (e) { box.innerHTML = errState(e); });
   }
 
@@ -3083,6 +3132,7 @@
       var me = r[0].user.id;
       var have = {};
       (r[1].budgets || []).forEach(function (b) { if (b.user === me) have[b.cat] = b.limit; });
+      if (!cats('expense').length) { wrap.innerHTML = catsMissing(); return; }
       wrap.innerHTML = '<div class="card bud">' +
         '<p class="bud__h">替常花的分類設一個每月上限。總覽會顯示用了幾成，財務建議也會提醒超過的分類。填 0 就是不設。</p>' +
         '<div class="bud__g">' + cats('expense').map(function (c) {
@@ -3321,8 +3371,9 @@
         if (!admin && page === 'admin') { location.hash = '#/'; return; }
         /* 還沒走完註冊後的個人化設定：先帶去設定（每一步都能跳過，不是關卡） */
         if (!admin && !m.user.onboardedAt && page !== 'setup') { location.hash = '#/setup'; return; }
-        /* 分類（含家庭自訂）先拿到，記帳、統計的下拉才完整。拿不到也照畫，用系統預設 */
-        return (admin || CATS.length ? Promise.resolve() : loadCats().catch(function (e) { toast(e.message, 'err'); }))
+        /* 分類（含家庭自訂）先拿到，記帳、統計的下拉才完整。
+           ⚠️ 拿不到就照實空著——用到分類的地方會自己顯示是哪一支還沒做。 */
+        return (admin || CATS.length ? Promise.resolve() : loadCats().catch(function () {}))
           .then(render);
       }).catch(function (e) {
         /* 權杖失效（後端說沒登入）→ 回登入頁；其他錯誤直接講出是哪一支 */

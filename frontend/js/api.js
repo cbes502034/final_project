@@ -3326,15 +3326,12 @@
     return e;
   }
 
-  /* 錯誤匣：業務錯誤（403、409、422……）是後端**正確**的回答，不進去；
-     其餘三種（還沒做／出錯、連不上、形狀不對）都是「這一支的輸出不對」，一筆都不漏。 */
+  /* 標記一下這個錯誤已經處理過，不要在巢狀的 then／catch 裡被重複包裝。
+     ⚠️ 以前這裡會把每一支的結果推進左下角那張總表。那張表已經拆掉了——
+        「哪一支還沒做」要講在畫面上對應的位置，看的人才知道跟眼前的東西有什麼關係。 */
   function report(e) {
     if (e.kind === 'business' || e.logged) return;
     e.logged = true;
-    if (global.ErrBox && global.ErrBox.push) {
-      global.ErrBox.push({ fn: e.fn, route: e.route, owner: e.owner, kind: e.kind,
-        status: e.status || 0, message: e.message, detail: e.detail });
-    }
   }
 
   function call(name, args) {
@@ -3375,16 +3372,6 @@
         }
       }
       var done = fillIn(name, res);
-      /* 走到這裡 = 後端回了、形狀也對（SHAPE、ROWS 都過了）→ 錯誤匣那張表亮綠燈。
-         只在接真後端時記：mock 是前端自己演的，亮綠燈沒有意義。
-         備援頂出來的結果（503 時的 fallback）不算——那不是後端做出來的。 */
-      // ⚠️ 要看 res（後端原樣），不能看 done——fillIn 重新組物件時會把 fallback 那個欄位弄丟
-      // authState、reset 這種 FN 登記成 [null, '前端'] 的沒有打後端，不亮燈
-      var info = FN[name] || [];
-      if (MODE === 'http' && info[0] && !(res && res.fallback) && global.ErrBox && global.ErrBox.push) {
-        global.ErrBox.push({ fn: 'API.' + name, route: info[0] || null, owner: info[1] || null,
-          kind: 'ok', status: 0, message: '', detail: null });
-      }
       return done;
     }).catch(function (e) { throw tag(e, name); });
   }

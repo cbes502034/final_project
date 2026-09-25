@@ -80,14 +80,24 @@ global.fetch = (url, opt) => {
   return hit ? hit[2]() : res(404, { detail: 'Not Found' });
 };
 
-// 左下角那張表：api.js 每打完一支就往這裡丟一筆（綠燈或紅燈）。這裡只記下來，最後拿去比對。
+// 每一支的結果：回應正確記 ok，出錯記 kind（backend／network／shape）。
+// 業務錯誤（403、409、422…）是後端正確的回答，不記。
+// 備援頂出來的（503 的 fallback）也不記——那不是後端做出來的。
 const lamps = {};
-window.ErrBox = { push: rec => { lamps[rec.fn] = rec.kind; } };
 
 require(path.join(root, 'frontend/js/data.js'));
 require(path.join(root, 'frontend/js/api.js'));
 require(path.join(root, 'frontend/js/notify.js'));
 const A = window.API;
+Object.keys(A).forEach(k => {
+  const f = A[k];
+  if (typeof f !== 'function') return;
+  A[k] = function () {
+    return f.apply(A, arguments).then(
+      r => { if (!(r && r.fallback)) lamps['API.' + k] = 'ok'; return r; },
+      e => { if (e && e.kind && e.kind !== 'business') lamps['API.' + k] = e.kind; throw e; });
+  };
+});
 const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e.fn, route: e.route, owner: e.owner }));
 
 (async () => {

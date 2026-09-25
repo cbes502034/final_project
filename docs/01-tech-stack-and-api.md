@@ -140,7 +140,6 @@ final_project/
 │   │   ├── api.js          ★    唯一的資料入口：mock／http 兩個轉接器 ＋ 前端代勞 ＋ 錯誤指出是哪一支
 │   │   ├── app.js               路由、畫面繪製、互動
 │   │   ├── notify.js            通知鈴鐺（20 秒輪詢）
-│   │   └── errbox.js            左下角那張表：打過的每一支，回應正確亮綠燈、出錯亮紅燈
 │   └── docs/                    專題手冊（站上的 /docs/）
 │
 ├── backend/

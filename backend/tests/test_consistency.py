@@ -604,7 +604,6 @@ def test_前端沒有呼叫不存在的函式():
         "frontend/js/app.js",
         "frontend/js/api.js",
         "frontend/js/notify.js",
-        "frontend/js/errbox.js",
         "frontend/js/data.js",
         "frontend/js/stars.js",
     ):
@@ -2285,6 +2284,37 @@ def test_前端沒有假資料_也沒有範例帳號():
             assert bad not in read(f), "%s 還寫著範例帳號 %s" % (f, bad)
 
 
+def test_前端不替後端補假資料():
+    """那一支沒做，畫面上就不能出現對應的內容。
+
+    前端只做兩件事：提供介面、把後端回的東西呈現出來。
+    以前有三種「替後端補」的寫法，全部拆掉了：
+      1. 分類拿不到 → 退回 data.js 的假分類（id 是 C01…），送出去後端不認得
+      2. .catch(() => ({ groups: [] })) → 把「還沒做」畫成「你還沒有帳本」
+      3. 左下角那張總表 → 「哪一支沒做」講在畫面角落，跟眼前的東西對不起來
+    """
+    app = read("frontend/js/app.js")
+    api = read("frontend/js/api.js")
+    html = read("frontend/index.html")
+
+    # 1. 分類沒有假資料退路
+    cats = app[app.index("function cats(kind)"):app.index("function loadCats()")]
+    assert "global.DATA" not in cats, "分類又退回 data.js 的假分類了"
+    assert "catsMissing" in app, "分類拿不到的時候要有一張通知卡"
+
+    # 2. 沒有「接住錯誤然後給空資料」的寫法
+    for bad in ("return { groups: [] }", "return { advices: [] }",
+                "return { transactions: [] }", "return { members: [], family: null"):
+        assert app.count(bad) == 0, "又把「還沒做」畫成「沒有資料」了：" + bad
+    assert "function soft(p)" in app and "__err" in app, \
+        "多支一起打的時候要用 soft()：錯誤帶著走，哪一區用到就哪一區自己講"
+
+    # 3. 錯誤匣拆乾淨
+    for gone in ("ErrBox", "errbox"):
+        assert gone not in app and gone not in api and gone not in html, \
+            "左下角那張表沒拆乾淨：" + gone
+
+
 def test_右上角的帳號選單已經拆掉():
     """原本那個面板裡的五樣東西，有三樣跟儀表板重複，剩下兩樣（換主題、登出）
 
@@ -2336,7 +2366,7 @@ def test_總覽的標題是招呼語_不是總覽兩個字():
 
     fam = app[app.index("function famLine(user, fm)"):app.index("function vHome()")]
     assert "fm.family.name" in fam and "ROLE_TW" in fam, "第二行要講「哪個家庭的什麼身分」"
-    assert "fm.off" in fam,         "家庭那一支問不到的時候不能寫「還沒有加入家庭」——他可能是有家庭的，只是我們問不到"
+    assert "fm.__err" in fam,         "家庭那一支問不到的時候不能寫「還沒有加入家庭」——他可能是有家庭的，只是我們問不到"
 
 
 def test_閒置太久先問過再登出():
