@@ -1116,8 +1116,10 @@ def test_全家模式只整理資訊不能編輯():
     全家模式三個都要收起來——記帳永遠是記自己的。
     """
     app = read("frontend/js/app.js")
-    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "fam ? null : { quick: true" in home, "全家模式的儀表板不該有「記一筆」按鈕"
+    home = (re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+            # 功能格子在 quickTiles()：錯誤畫面也要用，所以拆成獨立的函式
+            + re.search(r"function quickTiles\(o\) \{(.*?)\n  \}", app, re.S).group(1))
+    assert "o.fam ? null : { quick: true" in home, "全家模式的儀表板不該有「記一筆」按鈕"
     assert "<input" not in home and "<select" not in home, "總覽出現了可以編輯的欄位"
     for fn in ("memberTable", "tile"):
         body = re.search(r"function %s\(.*?\) \{(.*?)\n  \}" % fn, app, re.S).group(1)
@@ -1561,7 +1563,9 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
 
     app = read("frontend/js/app.js")
     assert "sheetOpen" not in app and "fambudget.rail" not in app, "側欄與「更多」面板的程式沒拆乾淨"
-    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    home = (re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+            # 功能格子在 quickTiles()：錯誤畫面也要用，所以拆成獨立的函式
+            + re.search(r"function quickTiles\(o\) \{(.*?)\n  \}", app, re.S).group(1))
     tiles = set(re.findall(r"nav: '(\w+)'", home))
 
     routes = re.search(r"var ROUTES = \{(.*?)\};", app, re.S).group(1)
@@ -2175,7 +2179,9 @@ def test_主題存在帳號上_各選各的():
 def test_總覽照銀行_App_疊卡_常用功能_底部分頁():
     """參考富邦新版：數字卡疊在一起、常用功能收在一張卡裡、手機底部分頁中間是記一筆。"""
     app = read("frontend/js/app.js")
-    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    home = (re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+            # 功能格子在 quickTiles()：錯誤畫面也要用，所以拆成獨立的函式
+            + re.search(r"function quickTiles\(o\) \{(.*?)\n  \}", app, re.S).group(1))
     for part in ("wal__strip--1", "wal__strip--2", "wal__card", 'class="qk"', 'class="dgrid"'):
         assert part in home, "總覽少了 " + part
     assert "hero" not in home, "舊的大數字卡還在"
@@ -2198,7 +2204,9 @@ def test_總覽最下面是今天的紀錄_只看不改():
     ⚠️ 只放今天，不是把收支明細搬過來：沒有篩選、沒有刪除、沒有表格。
     """
     app = read("frontend/js/app.js")
-    home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+    home = (re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
+            # 功能格子在 quickTiles()：錯誤畫面也要用，所以拆成獨立的函式
+            + re.search(r"function quickTiles\(o\) \{(.*?)\n  \}", app, re.S).group(1))
     assert "from: todayKey(), to: todayKey()" in home, "今天的紀錄要用日期範圍去問，不是拿全部回來自己挑"
     assert home.rindex("todayCard(") > home.index("預算使用狀況"), "今天的紀錄放在最下面"
     card = re.search(r"function todayCard\(rows, fam\) \{(.*?)\n  \}", app, re.S).group(1)
@@ -2293,6 +2301,22 @@ def test_右上角的帳號選單已經拆掉():
 
     # 登出還在，只是換了位置——這是整個網站唯一的登出入口
     assert "id='logout'" in app or 'id="logout"' in app or "id: 'logout'" in app
+
+
+def test_常用功能不跟著_summary_一起消失():
+    """GET /api/summary 還沒做的時候，總覽的內容會整塊換成錯誤卡。
+
+    功能格子要是也一起不見，使用者連**登出**都按不到——
+    帳號選單拆掉之後，那是整個網站唯一的出口。
+    """
+    app = read("frontend/js/app.js")
+    home = app[app.index("function vHome()"):]
+    assert "quickTiles({})" in home, "錯誤畫面也要把常用功能畫出來"
+
+    tiles = app[app.index("function quickTiles(o)"):app.index("function tile(t)")]
+    assert "o = o || {}" in tiles, "什麼資料都沒有的時候也要畫得出來"
+    for part in ("id: 'logout'", "#/profile/theme"):
+        assert part in tiles, "常用功能少了 " + part
 
 
 def test_總覽的標題是招呼語_不是總覽兩個字():

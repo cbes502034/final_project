@@ -402,6 +402,34 @@
     out: '<path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/>'
   };
 
+  /* 常用功能：原本側欄的東西都在這裡。
+     ⚠️ 全家模式只整理資訊，沒有「記一筆」——記帳永遠是記自己的。
+     ⚠️ 這一區**不能**跟著 GET /api/summary 的成敗走。數字拿不到時整頁換成
+        錯誤卡，功能格子要是也一起不見，使用者連登出都按不到——而登出是
+        整個網站唯一的出口。所以 o 裡的東西全部可以是 undefined：
+        那幾個角標（幾筆、幾本、幾則）沒有就不顯示，格子照樣在。 */
+  function quickTiles(o) {
+    o = o || {};
+    var tiles = [
+      o.fam ? null : { quick: true, label: '記一筆', icon: 'add', tone: 'add' },
+      { nav: 'entry', label: '收支明細', icon: 'entry', badge: o.count ? o.count + ' 筆' : '' },
+      { nav: 'groups', label: '帳本', icon: 'groups', badge: o.groups ? o.groups + ' 本' : '' },
+      { nav: 'stats', label: '統計', icon: 'stats' },
+      { nav: 'advice', label: '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '',
+        badge: o.warn ? o.warn + ' 則要注意' : '' },
+      { nav: 'members', label: o.fm && o.fm.family ? '家庭成員' : '加入家庭', icon: 'members',
+        badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
+      { nav: 'profile', label: '個人資料', icon: 'profile' },
+      { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
+      /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
+         整個網站只有這兩個地方進得去主題與登出，不能跟著一起消失。 */
+      { href: '#/profile/theme', label: '換主題', icon: 'theme' },
+      { id: 'logout', label: '登出', icon: 'out', tone: 'out' }
+    ];
+    return '<section class="qk"><div class="qk__h"><h2 class="qk__t">常用功能</h2></div>' +
+      '<nav class="dgrid" aria-label="功能">' + tiles.filter(Boolean).map(tile).join('') + '</nav></section>';
+  }
+
   function tile(t) {
     /* id ＝ 這一格按下去要做事，不是換頁（目前只有登出，處理在下面的委派裡） */
     var attr = t.id ? ' id="' + t.id + '"'
@@ -516,25 +544,8 @@
           '</div>' +
         '</section>';
 
-        /* 2. 常用功能：原本側欄的東西都在這裡
-              ⚠️ 全家模式只整理資訊，沒有「記一筆」——記帳永遠是記自己的 */
-        var tiles = [
-          fam ? null : { quick: true, label: '記一筆', icon: 'add', tone: 'add' },
-          { nav: 'entry', label: '收支明細', icon: 'entry', badge: d.count ? d.count + ' 筆' : '' },
-          { nav: 'groups', label: '帳本', icon: 'groups', badge: gs.length ? gs.length + ' 本' : '' },
-          { nav: 'stats', label: '統計', icon: 'stats' },
-          { nav: 'advice', label: '財務建議', icon: 'advice', tone: warn ? 'warn' : '', badge: warn ? warn + ' 則要注意' : '' },
-          { nav: 'members', label: fm.family ? '家庭成員' : '加入家庭', icon: 'members',
-            badge: fm.family ? fm.members.length + ' 人' : '' },
-          { nav: 'profile', label: '個人資料', icon: 'profile' },
-          { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
-          /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
-             整個網站只有這兩個地方進得去主題與登出，不能跟著一起消失。 */
-          { href: '#/profile/theme', label: '換主題', icon: 'theme' },
-          { id: 'logout', label: '登出', icon: 'out', tone: 'out' }
-        ];
-        h += '<section class="qk"><div class="qk__h"><h2 class="qk__t">常用功能</h2></div>' +
-          '<nav class="dgrid" aria-label="功能">' + tiles.filter(Boolean).map(tile).join('') + '</nav></section>';
+        /* 2. 常用功能 */
+        h += quickTiles({ fam: fam, count: d.count, groups: gs.length, warn: warn, fm: fm });
         h += '</div>';
 
         /* 3. 預算：一個分類一張小卡 */
@@ -578,7 +589,10 @@
           }
         }).catch(function () {});
       });
-    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+    }).catch(function (e) {
+      /* 數字拿不到，但功能還是要能按——尤其是登出 */
+      $view.innerHTML = '<div class="page">' + errState(e) + quickTiles({}) + '</div>';
+    });
   }
 
   /* 今天的紀錄。上面一條是今天花了多少、收了多少，下面是一筆一筆。
