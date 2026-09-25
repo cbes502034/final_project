@@ -216,14 +216,6 @@
 
   global.__slide = { open: slideOpen, close: slideClose };
 
-  /* 右上角的帳號選單：往下拉開、往上收回 */
-  function acctMenu(on) {
-    var p = document.getElementById('acctPanel'), b = document.getElementById('acctBtn');
-    if (!p) return;
-    if (on === undefined) on = p.hidden;
-    if (b) { b.setAttribute('aria-expanded', on ? 'true' : 'false'); b.classList.toggle('open', !!on); }
-    if (on) { paintAcct(); slideOpen(p); } else slideClose(p);
-  }
   var draft = null;                       // 自然語言解析後、尚未確認的暫存
 
   /* ---------- 小工具 ---------- */
@@ -405,11 +397,15 @@
     advice: '<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3z"/><path d="M9.5 20.5h5"/>',
     members: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.3"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20"/><path d="M15.5 14.5h1.5a3.5 3.5 0 0 1 3.5 3.5v2"/>',
     profile: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V20"/>',
-    guide: '<path d="M12 6.5S10 5 7 5H4v13h3c3 0 5 1.5 5 1.5S14 18 17 18h3V5h-3c-3 0-5 1.5-5 1.5z"/><path d="M12 6.5v13"/>'
+    guide: '<path d="M12 6.5S10 5 7 5H4v13h3c3 0 5 1.5 5 1.5S14 18 17 18h3V5h-3c-3 0-5 1.5-5 1.5z"/><path d="M12 6.5v13"/>',
+    theme: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/>',
+    out: '<path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/>'
   };
 
   function tile(t) {
-    var attr = t.quick ? ' data-quick="entry"' : t.nav !== undefined ? ' data-nav="' + t.nav + '"' : '';
+    /* id ＝ 這一格按下去要做事，不是換頁（目前只有登出，處理在下面的委派裡） */
+    var attr = t.id ? ' id="' + t.id + '"'
+      : t.quick ? ' data-quick="entry"' : t.nav !== undefined ? ' data-nav="' + t.nav + '"' : '';
     var tag = t.href ? 'a' : 'button';
     return '<' + tag + ' class="dtile' + (t.tone ? ' dtile--' + t.tone : '') + '"' + attr + (t.href ? ' href="' + t.href + '"' : '') + '>' +
       '<span class="dtile__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
@@ -531,7 +527,11 @@
           { nav: 'members', label: fm.family ? '家庭成員' : '加入家庭', icon: 'members',
             badge: fm.family ? fm.members.length + ' 人' : '' },
           { nav: 'profile', label: '個人資料', icon: 'profile' },
-          { href: 'docs/guide.html', label: '使用說明', icon: 'guide' }
+          { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
+          /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
+             整個網站只有這兩個地方進得去主題與登出，不能跟著一起消失。 */
+          { href: '#/profile/theme', label: '換主題', icon: 'theme' },
+          { id: 'logout', label: '登出', icon: 'out', tone: 'out' }
         ];
         h += '<section class="qk"><div class="qk__h"><h2 class="qk__t">常用功能</h2></div>' +
           '<nav class="dgrid" aria-label="功能">' + tiles.filter(Boolean).map(tile).join('') + '</nav></section>';
@@ -2346,10 +2346,7 @@
       b: '家用、旅遊基金可以分開記。切過去之後，數字都只看那一本。' },
     { sel: '#bell', hash: '#/',
       t: '通知',
-      b: '家人記帳、或是你花到設定的比例時，這裡會亮。' },
-    { sel: '#acctBtn', hash: '#/',
-      t: '你的帳戶卡',
-      b: '點頭貼看這個月記了幾天、快速換主題；點名字進個人資料。' }
+      b: '家人記帳、或是你花到設定的比例時，這裡會亮。' }
   ];
     var tourAt = -1;
 
@@ -2958,7 +2955,7 @@
             '<p class="gate__alt"><a href="#/forgot">重新申請一封</a>　·　<a href="#/login">回去登入</a></p></div>');
   }
 
-  function vProfile() {
+  function vProfile(at) {
     head('個人資料', '');
     $view.innerHTML = '<div class="page">' + skeleton(3) + '</div>';
     API.me().then(function (m) {
@@ -3041,6 +3038,12 @@
       foldRestore();
       paintAlerts();
       paintSessions();
+      /* 從儀表板的「換主題」進來的（#/profile/theme）：直接捲到主題那一段，
+         不用自己往下找。主題設定本來就在這一頁的最下面。 */
+      if (at === 'theme') {
+        var thm = document.querySelector('.thm');
+        if (thm && thm.scrollIntoView) thm.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
     });
   }
 
@@ -3096,48 +3099,8 @@
     }).join('');
   }
 
-  /* ---------------------------------------------------------
-     我的帳戶卡（右上角頭貼點開）
-
-     ⚠️ 以前這裡是一串連結：個人資料、家庭成員、使用說明……
-     跟儀表板上的常用功能幾乎一樣，等於同一件事放兩個地方。
-     現在只放儀表板上「沒有」的：
-       · 家人（頭像疊在一起，點了進家庭成員）
-       · 快速換主題（八個小圓點，按一下就換）
-     --------------------------------------------------------- */
-  function paintAcct() {
-    var sw = document.getElementById('acctThemes');
-    var cur = currentTheme();
-    if (sw) sw.innerHTML = (global.DATA.themes || []).map(function (t) {
-      var on = t.id === cur;
-      return '<button type="button" class="acctm__sw' + (on ? ' on' : '') + '" data-theme-pick="' + esc(t.id) + '" ' +
-        'data-theme="' + esc(t.id) + '" title="' + esc(t.name) + '" aria-label="換成' + esc(t.name) + '" ' +
-        'aria-pressed="' + on + '"></button>';
-    }).join('');
-
-    var fam = document.getElementById('acctFam');
-    if (!fam) return;
-    /* 這一列是附加的。先收起來，拿到資料才打開——拿不到（那一支還沒做、
-       或是斷線）就讓它維持收起來，而不是在卡片中間留一塊空白。
-       是哪一支還沒做，頁面上的錯誤卡已經講了，這裡不再講一次。 */
-    fam.hidden = true;
-    API.me().then(function (m) {
-      if (m.user.isPlatformAdmin) return;          // 平台管理員沒有帳，也不屬於任何家庭
-      return API.members().then(function (fm) {
-        fam.innerHTML = fm.family
-          ? '<span class="acctm__fm"><span class="acctm__k">' + esc(fm.family.name) + '</span>' +
-              '<small>' + fm.members.length + ' 位家人</small></span>' +
-            '<span class="acctm__avs">' + fm.members.slice(0, 5).map(function (u) { return ava(u); }).join('') + '</span>'
-          : '<span class="acctm__fm"><span class="acctm__k">還沒有加入家庭</span><small>建立一個，或輸入邀請碼</small></span>';
-        fam.hidden = false;
-      /* 家庭那一支拿不到就維持收起來。寧可不顯示，也不要寫「還沒有加入
-         家庭」——他可能是有家庭的，只是我們問不到。 */
-      }, function () {});
-    }).catch(function () {});
-  }
-
   function markTheme(id) {
-    Array.prototype.forEach.call(document.querySelectorAll('.thm__i, .acctm__sw'), function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll('.thm__i'), function (b) {
       var on = b.dataset.themePick === id;
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -3296,18 +3259,6 @@
   function paintWho() {
     API.me().then(function (m) {
       ME = m;
-      /* 帳戶卡最上面：頭貼、全名、身分 · 家庭。整塊點下去是個人資料 */
-      var role = ROLE_TW[m.user.role] || (m.user.isPlatformAdmin ? '平台管理員' : '還沒有家庭');
-      var card = ava(m.user, 'ava--md') +
-        '<span class="acct__m"><b class="acct__n">' + esc(m.user.name) + '</b>' +
-          '<span class="acct__r">' + esc(role) + (m.family ? ' · ' + esc(m.family.name) : '') + '</span></span>' +
-        '<span class="acctm__to">個人資料' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
-          'stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span>';
-      var w = document.getElementById('who');
-      if (w) w.innerHTML = ava(m.user, 'ava--sm') + '<span class="acctm__n">' + esc(callName(m.user.name)) + '</span>';
-      var wc = document.getElementById('whoCard');
-      if (wc) wc.innerHTML = card;
       /* 角色決定「有沒有這個功能」，監管決定「看得到誰」——兩件事 */
       document.body.classList.toggle('role-child', m.user.role !== 'parent');
       /* ⚠️ 平台管理員沒有財務頁可以看——那不是藏起來，是他真的沒有資料 */
@@ -3381,7 +3332,6 @@
         Array.prototype.forEach.call(document.querySelectorAll('.tabbar__i[data-tab]'), function (b) {
           b.classList.toggle('on', b.dataset.tab === tab);
         });
-        acctMenu(false);
       }
     });
   }
@@ -3433,9 +3383,6 @@
     var q = t.closest('[data-help]');
     if (q) { openHelp(q.dataset.help); return; }
 
-    /* 右上角的帳號選單；點選單以外的地方就收起來 */
-    if (t.closest('#acctBtn')) { acctMenu(); return; }
-
     var tp = t.closest('[data-theme-pick]');
     if (tp) { chooseTheme(tp.dataset.themePick); return; }
     var tg = t.closest('[data-thm-go]');
@@ -3444,14 +3391,8 @@
       if (row) row.scrollBy({ left: Number(tg.dataset.thmGo) * 186, behavior: 'smooth' });
       return;
     }
-    if (!t.closest('#acctm')) {
-      var ap = document.getElementById('acctPanel');
-      if (ap && !ap.hidden) acctMenu(false);
-    }
-
     /* 記一筆：從哪裡按都直接打開記帳的輸入區 */
     if (t.closest('[data-quick="entry"]')) {
-      acctMenu(false);
       if (/^#\/entry/.test(location.hash)) {
         if (!FOLD.entry) foldToggle('entry');
         var fw = document.getElementById('fold-entry');
@@ -3473,7 +3414,7 @@
     }
 
     var nav = t.closest('[data-nav]');
-    if (nav) { acctMenu(false); location.hash = '#/' + nav.dataset.nav; return; }
+    if (nav) { location.hash = '#/' + nav.dataset.nav; return; }
 
     /* 成員那一列點下去看他的紀錄。
        存款目標的輸入框也在這一列裡，點它不能跳走。 */
@@ -3611,7 +3552,6 @@
     }
 
     if (t.closest('#logout')) {
-      acctMenu(false);
       API.logout().then(function () {
         // 先把通知收件匣清掉，不然登出後 DOM 裡還躺著上一個人的明細
         if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
@@ -4617,12 +4557,6 @@
   }, { passive: true });
 
   window.addEventListener('hashchange', paint);
-
-  (function () {
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') acctMenu(false);
-    });
-  })();
 
   /* 更早的版本有一個顯示 API 模式的小徽章。那是給開發者看的，
      介面上已經拿掉——這裡留一個保險，元素不在就不要炸。 */

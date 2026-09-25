@@ -1557,35 +1557,33 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
     html = read("frontend/index.html")
     for gone in ('class="rail"', 'class="tabs"', 'id="sheet"', 'id="moreBtn"', 'id="logout2"'):
         assert gone not in html, "側欄／手機底部分頁還留著：" + gone
-    assert 'class="appbar"' in html and 'id="acctPanel"' in html
+    assert 'class="appbar"' in html
 
     app = read("frontend/js/app.js")
     assert "sheetOpen" not in app and "fambudget.rail" not in app, "側欄與「更多」面板的程式沒拆乾淨"
     home = re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
     tiles = set(re.findall(r"nav: '(\w+)'", home))
 
-    menu = re.search(r'<div class="acctm__p" id="acctPanel" hidden>(.*?)\n        </div>', html, re.S).group(1)
-    in_menu = set(re.findall(r'data-nav="(\w+)"', menu))
-
     routes = re.search(r"var ROUTES = \{(.*?)\};", app, re.S).group(1)
     pages = set(re.findall(r"(\w+): v\w+", routes))
     # 登入／註冊沒登入才看得到；member 是從家庭成員點進去的；admin 只有平台管理員（登入就直接導過去）
     # forgot 從登入頁點、reset 從信裡的連結點、setup 是註冊完路由閘帶過去的
     need = pages - {"login", "register", "member", "admin", "forgot", "reset", "setup"}
-    missing = need - tiles - in_menu
+    missing = need - tiles
     assert not missing, "這些頁面拆掉側欄之後進不去了：%s" % sorted(missing)
     assert "quick: true" in home, "儀表板上要有「記一筆」"
-    assert "docs/guide.html" in home and 'href="docs/guide.html"' in menu
-    assert 'href="docs/index.html"' in menu and 'id="logout"' in menu
+    # 換主題與登出原本在右上角的帳號選單裡。選單拆掉之後搬進常用功能——
+    # 整個網站只有這兩個地方進得去，不能跟著選單一起消失。
+    for part in ("docs/guide.html", "#/profile/theme", "id: 'logout'"):
+        assert part in home, "常用功能少了 " + part
 
     # 其他頁面要能回到總覽；總覽本身不需要那顆鈕
     assert 'id="homeBtn"' in html
     route = re.search(r"function render\(\) \{(.*?)\n      \}", app, re.S).group(1)
     assert "hb.hidden = page === ''" in route
 
-    # 平台管理員沒有財務頁：帳號選單裡的「個人資料／家庭成員」和記一筆都不給
+    # 平台管理員沒有財務頁：記一筆不給
     css = read("frontend/css/app.css")
-    assert "body.is-admin .acctm__fam" in css
     assert "body.is-admin .appbar__add" in css
 
 
@@ -1719,10 +1717,12 @@ def test_下拉面板浮在按鈕下面_不搬進版面():
     tools = html[html.index('class="phead__tools"'):html.index('<div id="view">')]
     for part in ('id="gsw"', 'id="searchDrawer"'):
         assert part in tools, "帳本與搜尋要跟標題在同一行：少了 " + part
-    # 通知每一頁都用得到，跟帳號選單一起放在頂列
+    # 頂列只剩通知：它每一頁都用得到。其他的都在總覽的常用功能裡
     bar = html[html.index('<header class="appbar">'):html.index('</header>')]
-    for part in ('id="bell"', 'id="bellPanel"', 'id="acctPanel"'):
+    for part in ('id="bell"', 'id="bellPanel"'):
         assert part in bar, "頂列少了 " + part
+    assert "acctm" not in bar, "帳號選單已經拆掉了，頂列不要再長回來"
+
 
     css = read("frontend/css/app.css")
     for sel in (r"\.phead__tools \.gsw__p,\s*\.phead__tools \.bell__panel", r"\.appbar \.bell__panel"):
@@ -1730,7 +1730,6 @@ def test_下拉面板浮在按鈕下面_不搬進版面():
         assert rule, "找不到 " + sel
         assert "position: absolute" in rule.group(1), "下拉面板應該用定位浮起來，不佔版面：" + sel
         assert "overflow-y: auto" in rule.group(1), "項目多的時候面板要自己捲，不能把頁面撐長：" + sel
-    assert re.search(r"\.acctm__p \{[^}]*position: absolute", css), "帳號選單也要浮起來"
 
 
 def test_電腦版的搜尋框不會被點掉():
@@ -1959,8 +1958,6 @@ def test_點了才長出來的東西_打開和收起都有動畫():
 
     assert "slideClose(wrap)" in body("foldToggle") and "slideOpen(wrap)" in body("foldToggle")
     assert "slideAway(" in body("ledgerToggle") and "slideOpen(" in body("ledgerToggle")
-    assert "slideOpen(p)" in body("acctMenu") and "slideClose(p)" in body("acctMenu"), \
-        "帳號選單要往下拉開、往上收回"
     for bad in ("gp.hidden = !gp.hidden", "gp2.hidden = true", "sd.hidden = !sd.hidden",
                 "sd2.hidden = true", "mp.hidden = !mp.hidden", "mp2.hidden = true", "wrap.hidden = !on"):
         assert bad not in app, "還有直接瞬間開關的寫法：" + bad
@@ -2280,28 +2277,22 @@ def test_前端沒有假資料_也沒有範例帳號():
             assert bad not in read(f), "%s 還寫著範例帳號 %s" % (f, bad)
 
 
-def test_帳戶卡不再重複儀表板上的功能():
-    """右上角點開原本是一串連結，跟常用功能幾乎一樣。
+def test_右上角的帳號選單已經拆掉():
+    """原本那個面板裡的五樣東西，有三樣跟儀表板重複，剩下兩樣（換主題、登出）
 
-    現在放的是儀表板上沒有的：家人、快速換主題。
-    進個人資料和家庭成員是點「名字」和「家人那一列」，不另外列成選項。
+    搬進常用功能。同一件事不要兩個入口，頂列也就只剩通知。
     """
     html = read("frontend/index.html")
-    menu = html[html.index('id="acctPanel"'):html.index("</header>")]
-    for label in ("收支明細", "帳本", "統計", "財務建議", ">個人資料<", ">家庭成員<"):
-        assert label not in menu, "帳戶卡又列出了儀表板上已經有的：" + label
-    assert len(re.findall(r'data-nav="', menu)) <= 2
-    for part in ('id="acctFam"', 'id="acctThemes"'):
-        assert part in menu, "帳戶卡少了 " + part
-    # 「這個月記帳 N / M 天」拿掉了：看得出習慣，但不影響任何決定，
-    # 而且為了畫它要多打一次 GET /api/transactions
-    assert "acctHabit" not in menu, "記帳天數那一格已經移除了"
-
+    for gone in ('id="acctPanel"', 'id="acctBtn"', 'id="whoCard"', 'id="acctThemes"', 'id="acctFam"'):
+        assert gone not in html, "帳號選單還留著：" + gone
 
     app = read("frontend/js/app.js")
-    paint = re.search(r"function paintAcct\(\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "data-theme-pick" in paint and 'data-theme="' in paint, "主題小圓點要能直接換，而且自己掛著那一套的顏色"
-    assert "isPlatformAdmin" in paint, "平台管理員沒有帳也沒有家庭，不要去問"
+    for gone in ("acctMenu", "paintAcct"):
+        assert gone not in app, "程式沒拆乾淨：" + gone
+    assert "acctm" not in read("frontend/css/app.css"), "樣式沒拆乾淨"
+
+    # 登出還在，只是換了位置——這是整個網站唯一的登出入口
+    assert "id='logout'" in app or 'id="logout"' in app or "id: 'logout'" in app
 
 
 def test_總覽的標題是招呼語_不是總覽兩個字():
@@ -2342,10 +2333,6 @@ def test_閒置太久先問過再登出():
     for part in ("renew:", "ttl:"):
         assert api.count(part) >= 2, "mock 與 http 兩邊都要有 " + part
     assert "expiresIn: d.expiresIn" in api, "要把 expiresIn 存下來當閒置門檻"
-    mark = re.search(r"function markTheme\(id\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert ".acctm__sw" in mark, "在帳戶卡換主題之後，設定頁的「使用中」也要跟著變（反過來也是）"
-    menu_fn = re.search(r"function acctMenu\(on\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "paintAcct()" in menu_fn, "打開的時候才去問資料，不要每一頁都先算好"
 
 
 _TXF_DRIVER = _THEME_DRIVER.split("(async () => {")[0] + r"""

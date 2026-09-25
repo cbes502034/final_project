@@ -2522,16 +2522,6 @@ body.dw-push #view { padding-top: 0; }
   min-height: 100vh; background: transparent; border: 0;
 }
 
-/* ---------- 側欄 ---------- */
-
-
-/* ---------- 帳戶卡：我是誰 ---------- */
-
-.acct__m { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
-.acct__n { font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
-.acct__r { font-size: 12px; color: var(--ink-faint); }
-
 /* ---------- 最常用的動作 ---------- */
 
 
@@ -3435,39 +3425,7 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 .appbar .bell__i { padding: 12px 16px; color: var(--ink); }
 .appbar .bell__i:hover { padding-left: 16px; background: var(--card-2); }
 .appbar .bell__empty { padding: 28px 16px; color: var(--ink-soft); }
-
-/* 我的帳號 */
-.acctm { position: relative; }
-.acctm__b {
-  display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 10px 0 4px;
-  color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: var(--r-pill);
-}
-.acctm__b:hover, .acctm__b.open { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 #who { display: inline-flex; align-items: center; gap: 8px; width: auto; }
-.acctm__b .ava { width: 32px; height: 32px; flex: 0 0 32px; font-size: 14.5px; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.acctm__n { font-size: 14px; font-weight: 600; white-space: nowrap; }
-.acctm__cv { width: 14px; height: 14px; opacity: .7; transition: transform .2s var(--ease); }
-.acctm__b.open .acctm__cv { transform: rotate(180deg); }
-.acctm__p {
-  position: absolute; top: calc(100% + 10px); right: 0; z-index: 65; width: 264px; padding: 6px 0; overflow: hidden;
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
-}
-.acctm__p[hidden] { display: none; }
-.acctm__h { display: flex; align-items: center; gap: 12px; padding: 10px 16px 14px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
-.acctm__h .acct__m { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.acctm__h .acct__n { font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.acctm__h .acct__r { font-size: 12.5px; color: var(--ink-faint); }
-.acctm__h .ava { width: 42px; height: 42px; flex: 0 0 42px; font-size: 16px; background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.acctm__i {
-  display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 16px;
-  font-size: 14.5px; color: var(--ink); background: transparent; border: 0; text-align: left; text-decoration: none;
-}
-.acctm__i:hover { background: var(--card-2); color: var(--ink); }
-.acctm__ic { width: 18px; height: 18px; color: var(--ink-faint); }
-.acctm__i--out { margin-top: 6px; border-top: 1px solid var(--line); color: var(--down); }
-.acctm__i--out .acctm__ic { color: var(--down); }
-body.is-admin .acctm__fam, body.is-admin .acctm__to { display: none; }
-body.is-admin .acctm__h { pointer-events: none; }
 
 .phead { padding-top: 22px; }
 .phead__t { font-family: var(--display); }
@@ -3689,7 +3647,7 @@ body.is-admin .acctm__h { pointer-events: none; }
   /* 底部有分頁列了，錯誤匣要讓開，不然蓋住中間的「記一筆」 */
   .eb { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
   body.is-out .eb, body.is-admin .eb { bottom: 24px; }   /* 這兩種情況沒有分頁列 */
-  .appbar .bell__panel, .acctm__p { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; }
+  .appbar .bell__panel { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; }
 
   .tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
@@ -3724,7 +3682,6 @@ body.is-admin .acctm__h { pointer-events: none; }
   .toasts { bottom: max(calc(80px + env(safe-area-inset-bottom, 0px)), var(--eb-clear, 0px)); }
 }
 @media (max-width: 560px) {
-  .acctm__n { display: none; }
   #view .wal__strip { padding: 12px 18px 30px; }
   #view .wal__card { padding: 18px 18px 16px; }
   #view .wal__v { font-size: 34px; }
@@ -3738,64 +3695,6 @@ body.is-admin .acctm__h { pointer-events: none; }
   #view .thm__row { grid-auto-columns: 150px; }
   .thm__pv { height: 176px; }
 }
-
-
-/* ============================================================
-   我的帳戶卡（右上角頭貼點開）
-   ------------------------------------------------------------
-   不再是一串跟儀表板重複的連結，而是一張「關於我」的小卡：
-   記帳習慣、家人、快速換主題。
-   ============================================================ */
-.acctm__p { width: 312px; padding: 0; }
-.acctm__h {
-  display: flex; align-items: center; gap: 12px; width: 100%; margin: 0; padding: 16px;
-  text-align: left; color: var(--ink); cursor: pointer;
-  background: linear-gradient(135deg, var(--accent-wash), var(--card) 80%);
-  border: 0; border-bottom: 1px solid var(--line);
-  transition: background-color .16s var(--ease);
-}
-.acctm__h:hover { background: var(--accent-wash); }
-.acctm__h .acct__m { flex: 1 1 auto; }
-.acctm__to { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
-.acctm__to svg { width: 14px; height: 14px; }
-.acctm__k { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
-.acctm__k b { font-size: 16px; color: var(--ink); margin-left: 2px; }
-.acctm__k span { color: var(--ink-faint); font-weight: 500; }
-
-
-.acctm__fam {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 60px; margin: 0; padding: 10px 16px;
-  text-align: left; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--line); cursor: pointer;
-}
-.acctm__fam:hover { background: var(--card-2); }
-.acctm__fm { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
-.acctm__fm small { font-size: 12px; color: var(--ink-faint); }
-.acctm__avs { display: flex; margin-left: auto; padding-left: 8px; }
-.acctm__avs .ava { width: 30px; height: 30px; flex: 0 0 30px; margin-left: -8px; font-size: 12px; font-weight: 700;
-  color: var(--accent-hi); background: var(--accent-wash); border: 2px solid var(--card); }
-
-.acctm__row { padding: 12px 16px; border-bottom: 1px solid var(--line); }
-.acctm__sws { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; margin-top: 10px; color: var(--ink); }
-/* 每一顆自己掛著 data-theme：左上是那一套的底色，右下是主色；形狀也是那一套的圓角 */
-.acctm__sw {
-  display: block; width: 100%; aspect-ratio: 1; padding: 0; cursor: pointer;
-  background: linear-gradient(135deg, var(--band) 0 50%, var(--accent) 50% 100%);
-  border: 1px solid var(--line-2); border-radius: var(--r-pill);
-  transition: transform .18s var(--back);
-}
-.acctm__sw:hover { transform: scale(1.12); }
-.acctm__sw.on { outline: 2px solid currentColor; outline-offset: 2px; }
-
-.acctm__ft { display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 16px; }
-.acctm__ft a { font-size: 13px; color: var(--ink-soft); text-decoration: none; }
-.acctm__ft a:hover { color: var(--accent); }
-.acctm__out {
-  display: inline-flex; align-items: center; gap: 6px; height: 32px; margin-left: auto; padding: 0 12px;
-  font-size: 13px; font-weight: 700; color: var(--down); background: var(--down-wash);
-  border: 0; border-radius: var(--r-pill);
-}
-.acctm__out:hover { background: color-mix(in srgb, var(--down) 16%, var(--card)); }
-.acctm__oi { width: 15px; height: 15px; }
 
 /* ============================================================
    總覽：今天的紀錄
@@ -3839,7 +3738,6 @@ body.is-admin .acctm__h { pointer-events: none; }
 
 /* 手機、平板：面板固定在畫面上，但要貼著右邊的頭貼，不要跑到左邊去 */
 @media (max-width: 900px) {
-  .acctm__p { left: auto; right: 12px; width: min(312px, calc(100vw - 24px)); }
 }
 @media (max-width: 760px) {
   #view .tdy__l { grid-template-columns: minmax(0, 1fr); }
@@ -3860,3 +3758,8 @@ body.is-admin .acctm__h { pointer-events: none; }
 .idle .hp__b p { margin: 0 0 8px; }
 .idle__n { color: var(--ink-soft); font-size: var(--fs-sm); }
 .idle__n b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* 登出那一格：跟其他功能不一樣，它是「離開」，所以顏色壓低、不搶位置。
+   ⚠️ 不要做成紅色的——登出不是危險動作，紅色會跟刪除那類混在一起。 */
+#view .dtile--out .dtile__ic { background: var(--sunk); color: var(--ink-faint); border-color: var(--line); }
+#view .dtile--out .dtile__t { color: var(--ink-soft); }

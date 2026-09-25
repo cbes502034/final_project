@@ -43,7 +43,8 @@
   <!-- ============================================================
        頂列：像銀行 App 的首頁
        沒有側欄。所有功能都在「總覽」的儀表板上；其他頁面左上角有「總覽」可以回去。
-       右邊只放兩樣每一頁都用得到的：通知、我的帳號。
+       右邊只放通知。換主題、登出這些原本在帳號選單裡的，
+       跟其他功能一起放在總覽的「常用功能」——同一件事不要兩個入口。
        ============================================================ -->
   <header class="appbar">
     <div class="appbar__in">
@@ -58,26 +59,6 @@
           <span class="bell__n" id="bellDot" hidden>0</span>
         </button>
         <div class="bell__panel" id="bellPanel" hidden></div>
-      </div>
-      <div class="acctm" id="acctm">
-        <button class="acctm__b" id="acctBtn" aria-expanded="false" aria-controls="acctPanel" aria-label="我的帳號">
-          <span id="who"></span><svg class="acctm__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
-        <!-- 我的帳戶卡：放儀表板上「沒有」的東西——
-             家人、快速換主題。功能入口都在儀表板上，這裡不再列一次。 -->
-        <div class="acctm__p" id="acctPanel" hidden>
-          <button type="button" class="acctm__h" id="whoCard" data-nav="profile"></button>
-          <button type="button" class="acctm__fam" id="acctFam" data-nav="members"></button>
-          <div class="acctm__row">
-            <div class="acctm__k">主題</div>
-            <div class="acctm__sws" id="acctThemes"></div>
-          </div>
-          <div class="acctm__ft">
-            <a href="docs/guide.html">使用說明</a>
-            <a href="docs/index.html">專題文件</a>
-            <button type="button" class="acctm__out" id="logout"><svg class="acctm__oi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h5v16h-5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg><span>登出</span></button>
-          </div>
-        </div>
       </div>
     </div>
   </header>
