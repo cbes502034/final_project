@@ -911,6 +911,10 @@
       return Promise.resolve({ loggedIn: !!(s.auth && s.auth.loggedIn) });
     },
 
+    /* mock 沒有真的 token，續期永遠成功——閒置提示的流程照樣走得完 */
+    renew: function () { return sleep(80).then(function () { return { ok: true }; }); },
+    ttl: function () { return 1800; },
+
     login: function (c) {
       var s = load(); c = c || {};
       return sleep(260).then(function () {
@@ -2718,7 +2722,7 @@
   /* 登入閘：mock 也跟真後端一樣，沒登入就 401。
      ⚠️ 沒有這一層的話，登出之後某個畫面還在打 API，mock 會拿著 me = null 往下跑，
      錯在「讀不到 null 的 name」這種看不出原因的地方。 */
-  var MOCK_PUBLIC = ['authState', 'login', 'register', 'logout', 'requestPasswordReset', 'confirmPasswordReset', 'reset'];
+  var MOCK_PUBLIC = ['authState', 'renew', 'ttl', 'login', 'register', 'logout', 'requestPasswordReset', 'confirmPasswordReset', 'reset'];
   Object.keys(mock).forEach(function (name) {
     if (MOCK_PUBLIC.indexOf(name) >= 0) return;
     var fn = mock[name];
@@ -2817,7 +2821,8 @@
     }).then(function (d) {
       setTokens({
         accessToken: d.accessToken,
-        refreshToken: d.refreshToken || t.refreshToken
+        refreshToken: d.refreshToken || t.refreshToken,
+        expiresIn: d.expiresIn || t.expiresIn
       });
       refreshing = null;
       return d;
@@ -2837,7 +2842,7 @@
 
   function keep(d) {
     if (d && d.accessToken) {
-      setTokens({ accessToken: d.accessToken, refreshToken: d.refreshToken });
+      setTokens({ accessToken: d.accessToken, refreshToken: d.refreshToken, expiresIn: d.expiresIn });
     }
     return d;
   }
@@ -2852,6 +2857,14 @@
     authState:         function ()      {
       var t = tokens();
       return Promise.resolve({ loggedIn: !!(t && t.accessToken) });
+    },
+    /* 閒置太久之後，使用者按「繼續使用」時主動換一張新的 access token。
+       平常不用呼叫——send() 收到 401 會自己續期。 */
+    renew:             function ()      { return doRefresh(); },
+    /* access token 幾秒後過期（後端 login 回的 expiresIn）。閒置多久要問人就照它。 */
+    ttl:               function ()      {
+      var t = tokens();
+      return (t && Number(t.expiresIn)) || 1800;
     },
     login:             function (c)     {
       return req('/api/auth/login', { method: 'POST', body: c }).then(keep);
@@ -2964,6 +2977,8 @@
   var FN = {
     me:                 ['GET /api/auth/me', '成員1'],
     authState:          [null, '前端'],
+    renew:              [null, '前端'],
+    ttl:                [null, '前端'],
     login:              ['POST /api/auth/login', '成員1'],
     register:           ['POST /api/auth/register', '成員1'],
     logout:             ['POST /api/auth/logout', '成員1'],

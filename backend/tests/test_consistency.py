@@ -1585,7 +1585,7 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
 
     # 平台管理員沒有財務頁：帳號選單裡的「個人資料／家庭成員」和記一筆都不給
     css = read("frontend/css/app.css")
-    assert "body.is-admin .acctm__habit" in css and "body.is-admin .acctm__fam" in css
+    assert "body.is-admin .acctm__fam" in css
     assert "body.is-admin .appbar__add" in css
 
 
@@ -2283,7 +2283,7 @@ def test_前端沒有假資料_也沒有範例帳號():
 def test_帳戶卡不再重複儀表板上的功能():
     """右上角點開原本是一串連結，跟常用功能幾乎一樣。
 
-    現在放的是儀表板上沒有的：這個月記帳天數、家人、快速換主題。
+    現在放的是儀表板上沒有的：家人、快速換主題。
     進個人資料和家庭成員是點「名字」和「家人那一列」，不另外列成選項。
     """
     html = read("frontend/index.html")
@@ -2291,13 +2291,57 @@ def test_帳戶卡不再重複儀表板上的功能():
     for label in ("收支明細", "帳本", "統計", "財務建議", ">個人資料<", ">家庭成員<"):
         assert label not in menu, "帳戶卡又列出了儀表板上已經有的：" + label
     assert len(re.findall(r'data-nav="', menu)) <= 2
-    for part in ('id="acctHabit"', 'id="acctFam"', 'id="acctThemes"'):
+    for part in ('id="acctFam"', 'id="acctThemes"'):
         assert part in menu, "帳戶卡少了 " + part
+    # 「這個月記帳 N / M 天」拿掉了：看得出習慣，但不影響任何決定，
+    # 而且為了畫它要多打一次 GET /api/transactions
+    assert "acctHabit" not in menu, "記帳天數那一格已經移除了"
+
 
     app = read("frontend/js/app.js")
     paint = re.search(r"function paintAcct\(\) \{(.*?)\n  \}", app, re.S).group(1)
     assert "data-theme-pick" in paint and 'data-theme="' in paint, "主題小圓點要能直接換，而且自己掛著那一套的顏色"
     assert "isPlatformAdmin" in paint, "平台管理員沒有帳也沒有家庭，不要去問"
+
+
+def test_總覽的標題是招呼語_不是總覽兩個字():
+    """「總覽」對使用者沒有任何資訊——他知道自己剛剛點了什麼。
+
+    換成頭貼 ＋「午安，王大明」＋「王家的家長　·　4 位家人」：
+    打開就確認了現在是誰在用、屬於哪個家，換人登入也一眼看得出來。
+    """
+    assert 'id="pav"' in read("frontend/index.html"), "頁首少了頭貼那一格（id=pav）"
+
+    app = read("frontend/js/app.js")
+    assert "head('總覽'" not in app, "總覽的標題不要再寫死「總覽」"
+
+    greet = app[app.index("function greet(user, fm, title, sub, act)"):app.index("function famLine(")]
+    assert "ava(user)" in greet, "招呼語旁邊要有頭貼"
+    assert greet.index("head(") < greet.index("getElementById('pav')"),         "要先 head() 再放頭貼——head() 會把頭貼那一格清掉，順序反了頭貼永遠是空的"
+
+    fam = app[app.index("function famLine(user, fm)"):app.index("function vHome()")]
+    assert "fm.family.name" in fam and "ROLE_TW" in fam, "第二行要講「哪個家庭的什麼身分」"
+    assert "fm.off" in fam,         "家庭那一支問不到的時候不能寫「還沒有加入家庭」——他可能是有家庭的，只是我們問不到"
+
+
+def test_閒置太久先問過再登出():
+    """access token 會自己過期。什麼都不講的話，使用者回來點一下就跳回登入頁，
+
+    正在填的東西一起不見。所以先問「還在嗎？」，倒數完才登出。
+    """
+    app = read("frontend/js/app.js")
+    idle = app[app.index("function idleAsk()"):app.index("function idleClose()")]
+    # 比對「有沒有呼叫」，不是「有沒有提到」——那一段的註解就寫著為什麼不能用它
+    assert "requestAnimationFrame(" not in idle, (
+        "不能用 rAF 加 .on：分頁在背景會被節流，對話框會一直停在 opacity: 0——"
+        "而閒置的分頁本來就多半在背景")
+    assert "offsetWidth" in idle, "要先強迫算一次版面，transition 才有起點"
+    assert "idleStay" in idle and "idleOut" in idle, "兩個選擇都要有：繼續使用、登出"
+
+    api = read("frontend/js/api.js")
+    for part in ("renew:", "ttl:"):
+        assert api.count(part) >= 2, "mock 與 http 兩邊都要有 " + part
+    assert "expiresIn: d.expiresIn" in api, "要把 expiresIn 存下來當閒置門檻"
     mark = re.search(r"function markTheme\(id\) \{(.*?)\n  \}", app, re.S).group(1)
     assert ".acctm__sw" in mark, "在帳戶卡換主題之後，設定頁的「使用中」也要跟著變（反過來也是）"
     menu_fn = re.search(r"function acctMenu\(on\) \{(.*?)\n  \}", app, re.S).group(1)

@@ -64,10 +64,9 @@
           <span id="who"></span><svg class="acctm__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <!-- 我的帳戶卡：放儀表板上「沒有」的東西——
-             記帳習慣、家人、快速換主題。功能入口都在儀表板上，這裡不再列一次。 -->
+             家人、快速換主題。功能入口都在儀表板上，這裡不再列一次。 -->
         <div class="acctm__p" id="acctPanel" hidden>
           <button type="button" class="acctm__h" id="whoCard" data-nav="profile"></button>
-          <div class="acctm__habit" id="acctHabit"></div>
           <button type="button" class="acctm__fam" id="acctFam" data-nav="members"></button>
           <div class="acctm__row">
             <div class="acctm__k">主題</div>
@@ -86,6 +85,8 @@
   <main class="main">
     <!-- 第一層標題：頁面。右邊是這一頁的切換與工具（我｜全家、帳本、搜尋） -->
     <div class="phead" id="phead">
+      <!-- 總覽才有的頭貼。其他頁面 head() 會把它收起來 -->
+      <span class="phead__av" id="pav" hidden></span>
       <div class="phead__m">
         <div class="phead__k" id="pkick"></div>
         <h1 class="phead__t" id="ptitle">總覽</h1>

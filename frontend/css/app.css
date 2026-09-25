@@ -2564,7 +2564,24 @@ body.is-admin .bell__wrap { display: none; }
   padding: 26px var(--page-x) 6px;
   display: flex; align-items: flex-end; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap;
 }
-.phead__m { min-width: 0; }
+/* margin-right: auto ＝ 讓標題那一塊吃掉中間的空白，右邊的工具才會貼到底。
+   ⚠️ 不能只靠 .phead 的 space-between：總覽多了頭貼之後變成三格，
+      space-between 會把標題推到正中間，跟頭貼中間裂出一條縫。 */
+.phead__m { min-width: 0; margin-right: auto; }
+/* 總覽的問候區：頭貼 ＋「嗨，名字」＋ 哪個家庭的誰。
+   頭貼不參與伸縮（flex: 0 0 auto），名字再長也不會把它壓扁。 */
+.phead__av { flex: 0 0 auto; display: block; align-self: center; }
+.phead__av[hidden] { display: none; }
+/* 這一顆要看得出是「你」，所以用主色實心，不是清單裡那種淡的。
+   有上傳頭貼的話 .ava--img 會蓋掉背景，只留下圓角與外框。 */
+.phead__av .ava {
+  width: 52px; height: 52px; font-size: 20px;
+  background: var(--accent); border-color: var(--accent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+@media (max-width: 560px) {
+  .phead__av .ava { width: 44px; height: 44px; font-size: 17px; }
+}
 .phead__k { font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--accent); margin-bottom: 6px; }
 .phead__k:empty { display: none; }
 .phead__t {
@@ -3449,7 +3466,7 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 .acctm__ic { width: 18px; height: 18px; color: var(--ink-faint); }
 .acctm__i--out { margin-top: 6px; border-top: 1px solid var(--line); color: var(--down); }
 .acctm__i--out .acctm__ic { color: var(--down); }
-body.is-admin .acctm__habit, body.is-admin .acctm__fam, body.is-admin .acctm__to { display: none; }
+body.is-admin .acctm__fam, body.is-admin .acctm__to { display: none; }
 body.is-admin .acctm__h { pointer-events: none; }
 
 .phead { padding-top: 22px; }
@@ -3745,11 +3762,6 @@ body.is-admin .acctm__h { pointer-events: none; }
 .acctm__k b { font-size: 16px; color: var(--ink); margin-left: 2px; }
 .acctm__k span { color: var(--ink-faint); font-weight: 500; }
 
-.acctm__habit { min-height: 92px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-.acctm__cal { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; margin-top: 8px; }
-.acctm__cal i { display: block; aspect-ratio: 1; background: var(--sunk); border-radius: var(--r-xs); }
-.acctm__cal i.on { background: var(--accent); }
-.acctm__cal i:last-child { box-shadow: inset 0 0 0 2px var(--accent-line); }
 
 .acctm__fam {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 60px; margin: 0; padding: 10px 16px;
@@ -3842,3 +3854,9 @@ body.is-admin .acctm__h { pointer-events: none; }
 @media (max-width: 560px) {
   .appbar__brand.brand { font-size: 24px; }
 }
+
+/* 閒置太久的問話框。沿用 .hp 那一套，只多一行倒數的樣子。
+   倒數的數字用等寬數字，9→8→7 的時候整行不會左右跳動。 */
+.idle .hp__b p { margin: 0 0 8px; }
+.idle__n { color: var(--ink-soft); font-size: var(--fs-sm); }
+.idle__n b { color: var(--ink); font-variant-numeric: tabular-nums; }

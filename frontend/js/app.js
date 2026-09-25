@@ -419,18 +419,58 @@
     '</' + tag + '>';
   }
 
+  /* ---------------------------------------------------------
+     總覽的問候區
+
+     ⚠️ 以前這裡寫「總覽」。那兩個字對使用者沒有任何資訊——
+        他知道自己點了什麼，不需要畫面再覆誦一次。
+        換成頭貼 ＋「嗨，名字」＋ 哪個家庭的誰：打開就確認了
+        「現在是誰在用、屬於哪個家」，換人登入也一眼看得出來。
+
+     早安／午安／晚安用台灣時間算，跟記帳的日期同一套時區
+     （伺服器在 UTC，直接用本機時間在別的時區會招呼錯）。
+     --------------------------------------------------------- */
+  /* 標題那一行：頭貼 ＋ 招呼 ＋ 哪個家庭的誰。
+     title／sub 傳了就用傳的（全家模式自己講「全家這個月」），沒傳就自己組。
+     ⚠️ fm 拿不到（那一支還沒做、或斷線，off: true）時不要寫「還沒有加入家庭」——
+        他可能是有家庭的，只是我們問不到。那種情況退回顯示日期。 */
+  function greet(user, fm, title, sub, act) {
+    /* ⚠️ 一定要先 head() 再放頭貼：head() 會把頭貼那一格清掉（換頁時要收起來），
+       順序反過來的話剛放好的頭貼馬上被它清掉，標題旁邊永遠是空的。 */
+    head(title || (greeting() + '，' + callName(user.name)), sub || famLine(user, fm), act);
+    var av = document.getElementById('pav');
+    if (av) {
+      av.innerHTML = ava(user);
+      av.hidden = false;
+    }
+  }
+
+  function famLine(user, fm) {
+    if (fm && fm.family) {
+      var line = fm.family.name + '的' + (ROLE_TW[user.role] || '成員');
+      return (fm.members || []).length > 1 ? line + '　·　' + fm.members.length + ' 位家人' : line;
+    }
+    if (fm && fm.family === null && !fm.off) return '還沒有加入家庭　·　建立一個，或輸入邀請碼';
+    return todayText();
+  }
+
   function vHome() {
-    head('總覽', '');
+    /* 還沒拿到人之前先擺上一次骨架。ME 有的話（換頁回來）直接招呼，
+       不要先閃一下「總覽」再換成名字。 */
+    if (ME && ME.user) greet(ME.user); else head('', '');
     $view.innerHTML = '<div class="page">' + skeleton(4, 'skel__k') + '</div>';
 
     API.me().then(function (m) {
+      greet(m.user);
       var sc = scopeOf(m), fam = sc === 'family';
       return Promise.all([
         API.summary({ scope: sc, groupId: GROUP }),
         API.budgets({ groupId: GROUP }),
         API.groups({}).catch(function () { return { groups: [] }; }),
         API.advices({ scope: sc }).catch(function () { return { advices: [] }; }),
-        API.members().catch(function () { return { members: [], family: null }; }),
+        /* off: true ＝ 這一支問不到（還沒做、或斷線）。要跟「真的沒有家庭」分開——
+           問不到就別在標題下面寫「還沒有加入家庭」，他可能是有的。 */
+        API.members().catch(function () { return { members: [], family: null, off: true }; }),
         /* 今天的紀錄：我的模式只看自己，全家模式看全家（下面再濾成統計算進去的那幾個人） */
         API.transactions(Object.assign({ from: todayKey(), to: todayKey(), groupId: GROUP },
           fam ? {} : { userId: m.user.id })).catch(function () { return { transactions: [] }; })
@@ -438,9 +478,10 @@
         var d = r[0], b = r[1], gs = r[2].groups || [], ads = r[3].advices || [], fm = r[4];
         var ids = d.members ? d.members.map(function (u) { return u.id; }) : [m.user.id];
         var today = (r[5].transactions || []).filter(function (t) { return !fam || ids.indexOf(t.user) >= 0; });
-        head(fam ? '全家這個月' : greeting() + '，' + callName(m.user.name),
-             fam ? d.members.length + ' 位家人的收支' : todayText(),
-             scopeSeg(m));
+        greet(m.user, fm,
+              fam ? '全家這個月' : '',
+              fam ? d.members.length + ' 位家人的收支' : '',
+              scopeSeg(m));
 
         var sv = d.savings, lv = sv.level;
         var used = Math.min(100, Math.round(sv.ratio * 100));
@@ -2567,6 +2608,9 @@
     $title.textContent = t;
     $sub.textContent = sub || '';
     $sub.hidden = !sub;
+    /* 頭貼只有總覽要，其他頁面一律收起來——不收的話換頁之後它會留在標題旁邊 */
+    var av = document.getElementById('pav');
+    if (av) { av.innerHTML = ''; av.hidden = true; }
     var a = document.getElementById('pact');
     if (a) { a.innerHTML = act || ''; a.hidden = !act; }
     /* 有「我／全家」切換的頁面，小字直接說現在看的是誰 */
@@ -3058,7 +3102,6 @@
      ⚠️ 以前這裡是一串連結：個人資料、家庭成員、使用說明……
      跟儀表板上的常用功能幾乎一樣，等於同一件事放兩個地方。
      現在只放儀表板上「沒有」的：
-       · 這個月記帳的天數（一格一天，看得出習慣）
        · 家人（頭像疊在一起，點了進家庭成員）
        · 快速換主題（八個小圓點，按一下就換）
      --------------------------------------------------------- */
@@ -3072,44 +3115,24 @@
         'aria-pressed="' + on + '"></button>';
     }).join('');
 
-    var habit = document.getElementById('acctHabit'), fam = document.getElementById('acctFam');
-    if (!habit || !fam) return;
-    /* 這兩列是附加的。先收起來，拿到資料才打開——拿不到（那一支還沒做、
+    var fam = document.getElementById('acctFam');
+    if (!fam) return;
+    /* 這一列是附加的。先收起來，拿到資料才打開——拿不到（那一支還沒做、
        或是斷線）就讓它維持收起來，而不是在卡片中間留一塊空白。
        是哪一支還沒做，頁面上的錯誤卡已經講了，這裡不再講一次。 */
-    habit.hidden = true;
     fam.hidden = true;
     API.me().then(function (m) {
       if (m.user.isPlatformAdmin) return;          // 平台管理員沒有帳，也不屬於任何家庭
-      var day = todayKey(), first = day.slice(0, 8) + '01';
-      return Promise.all([
-        API.transactions({ userId: m.user.id, from: first, to: day }),
-        API.members().catch(function () { return null; })
-      ]).then(function (r) {
-        var seen = {};
-        r[0].transactions.forEach(function (t) { seen[t.date] = true; });
-        var n = Number(day.slice(8)), got = 0, cells = '';
-        for (var i = 1; i <= n; i++) {
-          var k = day.slice(0, 8) + ('0' + i).slice(-2);
-          if (seen[k]) got++;
-          cells += '<i' + (seen[k] ? ' class="on"' : '') + ' title="' + Number(day.slice(5, 7)) + '/' + i +
-            (seen[k] ? ' 有記帳' : '') + '"></i>';
-        }
-        habit.innerHTML = '<div class="acctm__k">這個月記帳 <b>' + got + '</b><span> / ' + n + ' 天</span></div>' +
-          '<div class="acctm__cal" aria-hidden="true">' + cells + '</div>';
-        habit.hidden = false;
-
-        var fm = r[1];
-        /* fm 是 null = 家庭那一支拿不到。寧可不顯示，也不要寫「還沒有加入
-           家庭」——他可能是有家庭的，只是我們問不到。 */
-        if (!fm) return;
+      return API.members().then(function (fm) {
         fam.innerHTML = fm.family
           ? '<span class="acctm__fm"><span class="acctm__k">' + esc(fm.family.name) + '</span>' +
               '<small>' + fm.members.length + ' 位家人</small></span>' +
             '<span class="acctm__avs">' + fm.members.slice(0, 5).map(function (u) { return ava(u); }).join('') + '</span>'
           : '<span class="acctm__fm"><span class="acctm__k">還沒有加入家庭</span><small>建立一個，或輸入邀請碼</small></span>';
         fam.hidden = false;
-      });
+      /* 家庭那一支拿不到就維持收起來。寧可不顯示，也不要寫「還沒有加入
+         家庭」——他可能是有家庭的，只是我們問不到。 */
+      }, function () {});
     }).catch(function () {});
   }
 
@@ -4620,8 +4643,125 @@
      不會報錯，只是提示永遠不出現，很難發現。 */
   global.toast = toast;
 
+  /* ---------------------------------------------------------
+     閒置太久：先問，不要直接把人踢出去
+
+     access token 的壽命由後端決定（登入時回的 expiresIn，預設 30 分鐘）。
+     放著不動它就會自己過期，這時候如果什麼都不講，使用者回來點一下，
+     畫面會突然跳回登入頁，正在填的東西一起不見。
+
+     所以閒置滿一個 token 的壽命就先問一次：
+       · 按「繼續使用」→ 換一張新的 token，留在原地，什麼都沒掉
+       · 不理它 → 倒數 60 秒後登出
+
+     ⚠️ 這是體感問題，不是安全機制。真正的保護是後端的 token 會過期——
+        前端這層只是讓過期這件事被看見，不要變成沒頭沒尾的閃退。
+     ⚠️ 只在登入狀態下問。登入頁本來就沒有東西要保護。
+     --------------------------------------------------------- */
+  var IDLE_GRACE = 60;                 // 問完之後給幾秒
+  var idleAskMs = 1800 * 1000;         // 閒置多久要問。登入後由 API.ttl() 覆蓋
+  var idleLast = Date.now();
+  var idleLeft = 0, idleBusy = false;
+
+  function idleTouch() { if (!document.getElementById('idle')) idleLast = Date.now(); }
+
+  function idleCheck() {
+    if (document.getElementById('idle')) return;              // 已經在問了
+    if (Date.now() - idleLast < idleAskMs) return;
+    API.authState().then(function (a) {
+      if (!a.loggedIn || document.getElementById('idle')) return;
+      idleAsk();
+    });
+  }
+
+  function idleAsk() {
+    idleLeft = IDLE_GRACE;
+    var w = el('<div class="hp idle" id="idle">' +
+      '<div class="hp__c" role="alertdialog" aria-modal="true" aria-labelledby="idleT">' +
+        '<div class="hp__h"><h3 id="idleT">還在嗎？</h3></div>' +
+        '<div class="hp__b">' +
+          '<p>你已經有一段時間沒有動作，登入狀態快要過期了。</p>' +
+          '<p class="idle__n">還有 <b id="idleN">' + IDLE_GRACE + '</b> 秒，之後會自動登出。</p>' +
+        '</div>' +
+        '<div class="hp__d">' +
+          '<button class="btn" id="idleOut">登出</button>' +
+          '<button class="btn btn--go" id="idleStay">繼續使用</button>' +
+        '</div>' +
+      '</div></div>');
+    document.body.appendChild(w);
+    document.body.classList.add('hp-on');
+    /* ⚠️ 這裡不能用 requestAnimationFrame 來加 .on。
+       分頁在背景時瀏覽器會把 rAF 節流到幾乎不跑，class 加不上去，
+       對話框就一直停在 opacity: 0——而「閒置太久」這件事，
+       分頁本來就多半在背景，等於最需要它的時候看不到。
+       改成先讀一次 offsetWidth 強迫算版面（transition 才有起點），再直接加。 */
+    void w.offsetWidth;
+    w.classList.add('on');
+    var stay = document.getElementById('idleStay');
+    if (stay) stay.focus();
+  }
+
+  function idleClose() {
+    var w = document.getElementById('idle');
+    if (w) w.remove();
+    document.body.classList.remove('hp-on');
+    idleBusy = false;
+    idleLast = Date.now();
+  }
+
+  function idleLogout(why) {
+    idleClose();
+    API.logout().catch(function () {}).then(function () {
+      ME = null; CATS = [];
+      location.hash = '#/login';
+      paint();
+      if (why) toast(why, 'err');
+    });
+  }
+
+  function idleStay() {
+    if (idleBusy) return;
+    idleBusy = true;
+    var b = document.getElementById('idleStay');
+    if (b) { b.disabled = true; b.textContent = '續期中…'; }
+    /* 換一張新的 access token。換不到（refresh token 也過期了、或被撤銷）
+       就只能重新登入——這時候硬留在畫面上，下一個動作還是會 401。 */
+    API.renew().then(function () {
+      idleClose();
+    }, function () {
+      idleLogout('登入已經過期，請重新登入');
+    });
+  }
+
+  /* 一秒一次：只有問話框開著的時候在倒數；平常這一格什麼都不做。
+     另外每 15 秒檢查一次閒置多久了（不用更密，差 15 秒沒人感覺得出來）。 */
+  setInterval(function () {
+    var n = document.getElementById('idleN');
+    if (!n) return;
+    idleLeft -= 1;
+    if (idleLeft <= 0) { idleLogout('閒置太久，已經登出'); return; }
+    n.textContent = idleLeft;
+  }, 1000);
+  setInterval(idleCheck, 15000);
+
+  /* 有動作就重新計時。passive：這幾個事件只是用來計時，不會擋捲動 */
+  ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) {
+    document.addEventListener(ev, idleTouch, { passive: true });
+  });
+  /* 分頁切回來馬上檢查一次——放著一整晚的情況，等 15 秒才問太慢 */
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) idleCheck();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('#idleStay')) { idleStay(); return; }
+    if (e.target.closest && e.target.closest('#idleOut')) { idleLogout(''); }
+  });
+
   API.authState().then(function (a) {
     if (a.loggedIn && global.Notify) global.Notify.start();
+    /* 閒置門檻 = access token 的壽命，後端改了前端跟著改，不用兩邊對數字 */
+    if (a.loggedIn) API.ttl().then(function (sec) { idleAskMs = (Number(sec) || 1800) * 1000; });
 
     /* 第一次打開才問。網址帶 ?tour=1 可以重看一次。 */
     if (!a.loggedIn) return;
