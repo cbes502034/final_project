@@ -21,6 +21,8 @@ class FamilyIn(BaseModel):
 class InviteCodeIn(BaseModel):
     """⚠️ 身分由家長決定，拿到碼的人不能自己選。"""
     role: str = Field(pattern="^(parent|child)$")
+    #: 這組碼給誰用的，家長自己填。明碼只出現一次，之後清單上就靠這個名字分辨哪一組是哪一組。
+    label: str = Field(min_length=1, max_length=30)
 
 
 class JoinIn(BaseModel):

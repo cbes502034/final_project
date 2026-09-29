@@ -3178,20 +3178,59 @@ body.is-out .foot { display: none; }
 #view .found__m small { font-size: 12.5px; color: var(--ink-faint); }
 #view .found__a { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
-#view .code {
-  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px;
-  padding: 14px 16px; background: var(--warn-wash); border: 1px dashed color-mix(in srgb, var(--warn) 55%, transparent);
+/* 邀請碼清單。一個身分可以有好幾組，所以外層自己捲——
+   數量多了不會把整頁撐長，旁邊的「用帳號邀請」也不會被推走。
+   max-height 用 rem：使用者把字級調大時，框也跟著長高，不會擠成一條縫。 */
+#view .codes {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 13rem; overflow-y: auto; margin-top: 10px;
+  padding-right: 4px;                      /* 捲軸不要壓到刪除鈕 */
+  overscroll-behavior: contain;            /* 捲到底不要順手把整頁帶著捲 */
 }
-#view .code + .code { margin-top: 8px; }
-#view .code__v { font-family: var(--code); font-size: 26px; font-weight: 700; letter-spacing: .14em; color: var(--ink); }
-#view .code__m { grid-column: 1; font-size: 12.5px; color: var(--ink-faint); }
-#view .code .btn { grid-row: 1 / span 2; grid-column: 2; }
+/* 一組一列，比原本那張大卡矮很多：名字最重要，碼是遮起來的，不需要佔版面 */
+#view .code {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; background: var(--card-2); border: 1px solid var(--line);
+}
+#view .code__m { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+#view .code__n { font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#view .code__d { font-size: 11.5px; color: var(--ink-faint); }
+#view .code__v {
+  margin-left: auto; font-family: var(--code); font-size: 13px; letter-spacing: .1em;
+  color: var(--ink-dim); white-space: nowrap;
+}
+/* 過期的還留在清單上（家長要自己刪），但整列變淡，不要跟還能用的混在一起 */
+#view .code.is-gone { opacity: .55; }
+#view .code.is-gone .code__d { color: var(--down); }
+#view .ic--sm { width: 28px; height: 28px; flex: 0 0 28px; }
+/* 窄螢幕把遮起來的碼藏掉：它一個字都沒帶資訊（每一組長得一樣），
+   佔掉的寬度讓名字與到期日被擠成兩行反而更難讀。 */
+@media (max-width: 480px) {
+  #view .code__v { display: none; }
+}
+
+/* 產生邀請碼的對話框 */
+.cg__note { margin: 14px 0 0; font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; }
+.cg__lab { margin: 0 0 10px; font-size: 13px; color: var(--ink-soft); }
+.cg__code {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px; background: var(--sunk); border: 1px solid var(--line-2);
+}
+.cg__code code {
+  font-family: var(--code); font-size: 24px; font-weight: 700; letter-spacing: .14em;
+  color: var(--ink); word-break: break-all;
+}
+.cg__warn {
+  margin: 12px 0 0; padding: 10px 12px; font-size: 12.5px; line-height: 1.7;
+  color: var(--ink-soft); background: var(--warn-wash);
+  border: 1px dashed color-mix(in srgb, var(--warn) 55%, transparent);
+}
 
 @media (max-width: 640px) {
   #view .invc { flex-wrap: wrap; }
   #view .invc__a { width: 100%; justify-content: flex-end; }
   #view .fam0 { padding: 26px 18px 22px; }
-  #view .code__v { font-size: 21px; }
+  .cg__code code { font-size: 20px; }
   #view .found__a { width: 100%; justify-content: space-between; margin-left: 0; }
 }
 

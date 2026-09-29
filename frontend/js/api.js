@@ -2391,14 +2391,16 @@
         var me = memberOf(s.me);
         if (!isParentOf(s, me.familyId)) throw oops('只有家長可以邀請家人', 403);
         if (p.role !== 'parent' && p.role !== 'child') throw oops('身分只能是家長或子女');
-        (s.codes || []).forEach(function (c) {
-          if (c.familyId === me.familyId && c.role === p.role && c.status === 'pending') c.status = 'cancelled';
-        });
+        var label = String(p.label || '').trim();
+        if (!label || label.length > 30) throw oops('這組碼要有名字（30 字以內）');
+        /* ⚠️ 不要作廢同身分的舊碼：一個家長可以同時發好幾組給不同的人，
+           作廢舊的會把別人手上還沒用的碼弄失效。不要的由他自己刪。 */
         var row = { id: stampId('K'), familyId: me.familyId, role: p.role, code: newCode(),
-                    createdBy: s.me, status: 'pending', expiresAt: daysLater(INVITE_DAYS) };
+                    label: label, createdBy: s.me, status: 'pending', expiresAt: daysLater(INVITE_DAYS) };
         s.codes = (s.codes || []).concat([row]);
         save();
-        return { code: row.code, role: row.role, expiresAt: row.expiresAt };
+        /* 明碼只在這一次回應裡出現——清單那一支不會再給 */
+        return { id: row.id, code: row.code, label: row.label, role: row.role, expiresAt: row.expiresAt };
       });
     },
 
@@ -2495,8 +2497,12 @@
               var u = memberOf(i.invitee) || {};
               return { id: i.id, name: u.name, email: u.email, avatar: u.avatar, role: i.role, expiresAt: i.expiresAt };
             }) : [],
+          /* ⚠️ code 一律 null：真後端只存雜湊，明碼拿不回來。mock 要一樣，
+             不然前端會在 mock 下看得到碼、接真後端就突然不見。新的在前。 */
           codes: parent ? (s.codes || []).filter(function (c) { return c.familyId === me.familyId && live(c); })
-            .map(function (c) { return { code: c.code, role: c.role, expiresAt: c.expiresAt }; }) : []
+            .slice().reverse()
+            .map(function (c) { return { id: c.id, code: null, label: c.label || '', role: c.role,
+                                         expiresAt: c.expiresAt }; }) : []
         };
       });
     },
@@ -2670,10 +2676,12 @@
     },
 
     /* 被邀請的人婉拒，或是發邀請那一家的家長取消 */
+    /* 婉拒／取消帳號邀請，或是刪掉一組邀請碼——兩種都在這一支（跟真後端一樣） */
     declineInvite: function (id) {
       var s = load();
       return sleep(240).then(function () {
-        var row = (s.invites || []).filter(function (i) { return i.id === id; })[0];
+        var row = (s.invites || []).filter(function (i) { return i.id === id; })[0]
+          || (s.codes || []).filter(function (c) { return c.id === id; })[0];
         if (!row || row.status !== 'pending') throw oops('找不到這個邀請', 404);
         if (row.invitee === s.me) row.status = 'declined';
         else if (isParentOf(s, row.familyId)) row.status = 'cancelled';

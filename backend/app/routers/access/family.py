@@ -514,35 +514,40 @@ def create_invite_code(body: InviteCodeIn, me: User, db: Session = Depends(get_d
             me.family_role   一定是 'parent'
 
     【請求主體】body 是 InviteCodeIn（app/schemas/family.py）
-        欄位  型別  必填  說明
-        role  字串  是    parent／child，其他值 FastAPI 自動回 422
-        範例：{"role": "child"}
+        欄位   型別  必填  說明
+        role   字串  是    parent／child，其他值 FastAPI 自動回 422
+        label  字串  是    這組碼給誰用的，1～30 字。空的、太長 FastAPI 自動回 422
+        範例：{"role": "child", "label": "給女兒"}
 
     【成功回應】狀態碼 201
-        {"code": "K7QM-3XWP", "role": "child", "expiresAt": "2026-09-24T03:00:00+00:00"}
+        {"id": "12", "code": "K7QM-3XWP", "label": "給女兒", "role": "child",
+         "expiresAt": "2026-09-24T03:00:00+00:00"}
+        · ⚠️ code（明碼）**只有這一次**會出現。資料庫只存雜湊，之後任何一支都拿不回來。
+        · id 要回：畫面上那一列要能單獨刪掉，靠的就是它。
 
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
-        狀態碼  什麼時候                 detail
-        403     不是家長                 只有家長可以做這件事（守衛回）
-        422     role 不是 parent／child  （FastAPI 自動回）
+        狀態碼  什麼時候                        detail
+        403     不是家長                        只有家長可以做這件事（守衛回）
+        422     role 不是 parent／child、label 空的或超過 30 字  （FastAPI 自動回）
 
     【會用到的資料表】
         表              讀／寫  用來做什麼
-        family_invites  寫      同身分的舊碼作廢；新增一列（只有 code_hash，沒有 invitee）
+        family_invites  寫      新增一列（只有 code_hash 與 label，沒有 invitee）
 
     【每一步用的工具與資料庫方法】
-        步驟        呼叫                                              做什麼
-        1 舊碼作廢  crud.save(FamilyInvite, {"status": "cancelled", …}, where={…, "code_hash__isnull": False}, db=db)  code_hash 不是 NULL 的才是邀請碼
-        2 產生      family.new_code()                                 8 碼、中間一個 -，用 secrets 產生
-                    family.hash_code(code)                            雜湊（會先正規化），資料庫只存這個
-                    family.expires_at(days=settings.invite_ttl_days)  現在起算 N 天
-                    crud.save(FamilyInvite, {…}, db=db)               新增一列
-                    db.commit()                                       寫進去
+        步驟    呼叫                                              做什麼
+        1 產生  family.new_code()                                 8 碼、中間一個 -，用 secrets 產生
+                family.hash_code(code)                            雜湊（會先正規化），資料庫只存這個
+                family.expires_at(days=settings.invite_ttl_days)  現在起算 N 天
+                crud.save(FamilyInvite, {…}, db=db)               新增一列
+                db.commit()                                       寫進去
 
     【寫法步驟】
-        1. 我們家同一個身分、還沒用的舊碼 → cancelled
-        2. 產生新碼，存雜湊與到期時間
-        3. db.commit()，回傳明碼（只有這一次）
+        1. 產生新碼，連同 label 存雜湊與到期時間
+        2. db.commit()，回傳 id 與明碼（明碼只有這一次）
+        ⚠️ **不要把同身分的舊碼作廢。** 一個家長可以同時發好幾組給不同的人
+           （「給女兒」「給外婆」各一組），作廢舊的會把別人手上還沒用的碼弄失效。
+           不要的那一組由家長自己在畫面上刪掉（DELETE /api/family/invites/{id}）。
 
     【完整寫法】照下面兩步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -567,37 +572,36 @@ def create_invite_code(body: InviteCodeIn, me: User, db: Session = Depends(get_d
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
         裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            # 1. 同一個身分再產生一次，舊的那組作廢
-            now = datetime.now(timezone.utc)
-            crud.save(FamilyInvite, {"status": "cancelled", "responded_at": now}, where={
-                "family_id": me.family_id, "role": body.role, "status": "pending", "code_hash__isnull": False,
-            }, db=db)
-
-            # 2. 產生新碼：資料庫只存雜湊
+            # 1. 產生新碼：資料庫只存雜湊
+            #    ⚠️ 不要作廢同身分的舊碼——別人手上那組可能還沒用
             code = family.new_code()
             expires = family.expires_at(days=settings.invite_ttl_days)
-            crud.save(FamilyInvite, {
+            row = crud.save(FamilyInvite, {
                 "family_id": me.family_id,
                 "inviter_id": me.id,
                 "code_hash": family.hash_code(code),
+                "label": body.label.strip(),
                 "role": body.role,
                 "expires_at": expires,
             }, db=db)
             db.commit()
 
-            # 3. 明碼只在這一次回應裡出現
-            return {"code": code, "role": body.role, "expiresAt": expires.isoformat()}
+            # 2. 明碼只在這一次回應裡出現
+            return {"id": str(row.id), "code": code, "label": row.label,
+                    "role": body.role, "expiresAt": expires.isoformat()}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
         2. 瀏覽器打開 http://localhost:8000/docs，找到 POST /api/family/invite
         3. 按右上角 Authorize，貼上家長登入拿到的 accessToken
         4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
-               {"role": "child"}  → 201，拿到一組 XXXX-XXXX
-               再產生一次 child   → 201，舊的那組拿去 join 會回 400
-               子女的 token       → 403
-        5. 資料庫 family_invites 的 code_hash 不能是明碼
-        6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁產生邀請碼，畫面顯示碼與到期日
+               {"role": "child", "label": "給女兒"}  → 201，拿到一組 XXXX-XXXX 與 id
+               再產生一次 child                      → 201，**兩組都還能用**（不要作廢舊的）
+               label 填空字串                        → 422
+               子女的 token                          → 403
+        5. 資料庫 family_invites 的 code_hash 不能是明碼，label 要看得到
+        6. 前端改成連你的後端（frontend/index.html 的 api-base），家庭成員頁產生邀請碼，
+           對話框要顯示明碼與到期日，關掉之後清單上只剩名字與遮起來的碼
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_invite_code and u4f60" -v，要全部通過
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
@@ -925,8 +929,11 @@ def list_invites(me: User, db: Session = Depends(get_db)):
                        "expiresAt": "2026-09-24T03:00:00+00:00"}],
          "sent": [{"id": "10", "name": "王玉珍", "email": "yuzhen@wang.tw", "avatar": "珍", "role": "child",
                    "expiresAt": "2026-09-24T03:00:00+00:00"}],
-         "codes": [{"code": null, "role": "parent", "expiresAt": "2026-09-24T03:00:00+00:00"}]}
+         "codes": [{"id": "11", "code": null, "label": "給女兒", "role": "parent",
+                    "expiresAt": "2026-09-24T03:00:00+00:00"}]}
         · 不是家長的人，sent、codes 都是空陣列
+        · ⚠️ codes 的 code **一律是 null**：資料庫只存雜湊，明碼只在產生的當下出現一次。
+          清單上靠 label 分辨哪一組是哪一組，靠 id 刪掉其中一組
         · 新的在前
 
     【錯誤回應】
@@ -1004,7 +1011,8 @@ def list_invites(me: User, db: Session = Depends(get_db)):
                 who = people[r.invitee_id]
                 sent.append({"id": str(r.id), "name": who.display_name, "email": who.email,
                              "avatar": who.display_name[-1:], "role": r.role, "expiresAt": r.expires_at.isoformat()})
-            codes = [{"code": None, "role": r.role, "expiresAt": r.expires_at.isoformat()} for r in code_rows]
+            codes = [{"id": str(r.id), "code": None, "label": r.label, "role": r.role,
+                      "expiresAt": r.expires_at.isoformat()} for r in code_rows]
             return {"received": received, "sent": sent, "codes": codes}
 
     【做完怎麼確認】
@@ -1317,7 +1325,7 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                            detail
         403     不是被邀請的人，也不是那一家的家長  這個邀請不是給你的
-        404     找不到、已經回覆過、或是邀請碼      找不到這個邀請
+        404     找不到、或已經回覆過                找不到這個邀請
 
     【會用到的資料表】
         表              讀／寫  用來做什麼
@@ -1325,16 +1333,21 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
 
     【每一步用的工具與資料庫方法】
         步驟      呼叫                        做什麼
-        1 找      crud.get(FamilyInvite, where={"id": …, "status": "pending", "code_hash__isnull": True}, db=db)  還沒回覆的帳號邀請
-        2 誰在按  invite.invitee_id == me.id  被邀請的人
+        1 找      crud.get(FamilyInvite, where={"id": …, "status": "pending"}, db=db)  還沒回覆的那一列
+        2 誰在按  invite.invitee_id == me.id  被邀請的人（帳號邀請才有）
                   me.family_role == "parent" and me.family_id == invite.family_id  那一家的家長
         3 改      crud.save(FamilyInvite, {"id": …, "status": …, "responded_at": now}, db=db)  不刪列
                   db.commit()                 寫進去
 
     【寫法步驟】
-        1. 找還沒回覆的帳號邀請（404）
+        1. 找還沒回覆的那一列（404）
         2. 被邀請的人 → declined；那一家的家長 → cancelled；其他人 → 403
         3. 寫回去，db.commit()，回 {"id", "status"}
+        ⚠️ **帳號邀請與邀請碼都走這一支。** 邀請碼沒有 invitee（`invitee_id` 是 NULL），
+           所以一定是走家長那一條 → cancelled，等於把那一組碼作廢；
+           已經拿到那組碼的人再去 join 會被擋下來（狀態不是 pending 了）。
+        ⚠️ 不要在 where 裡加 `code_hash__isnull`：加了就只找得到其中一種，
+           另一種永遠回 404。
 
     【完整寫法】照下面兩步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -1359,13 +1372,13 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
         裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            # 1. 還沒回覆的帳號邀請
+            # 1. 還沒回覆的那一列（帳號邀請與邀請碼都在這張表）
             number = int(invite_id) if invite_id.isdigit() else 0
-            invite = crud.get(FamilyInvite, where={"id": number, "status": "pending", "code_hash__isnull": True}, db=db)
+            invite = crud.get(FamilyInvite, where={"id": number, "status": "pending"}, db=db)
             if invite is None:
                 raise errors.not_found("找不到這個邀請")
 
-            # 2. 被邀請的人是婉拒；那一家的家長是取消
+            # 2. 被邀請的人是婉拒；那一家的家長是取消（邀請碼沒有 invitee，一定走這條）
             if invite.invitee_id == me.id:
                 status = "declined"
             elif me.family_role == "parent" and me.family_id == invite.family_id:
@@ -1386,9 +1399,11 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
         4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
                被邀請的人刪                → 200，status 是 declined
                發邀請那一家的家長刪另一筆  → 200，status 是 cancelled
+               家長刪掉自己的一組邀請碼    → 200，status 是 cancelled；那組碼拿去 join 會失敗
                不相干的人刪                → 403
                同一筆再刪一次              → 404
-        5. 前端改成連你的後端（frontend/index.html 的 api-base），邀請卡按「婉拒」，卡片不見
+        5. 前端改成連你的後端（frontend/index.html 的 api-base），邀請卡按「婉拒」卡片不見；
+           邀請碼那一列按「刪除」，那一組從清單上消失
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "decline_invite and u4f60" -v，要全部通過
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）

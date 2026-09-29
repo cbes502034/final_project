@@ -303,6 +303,7 @@ window.DATA = {
              ['inviter_id', 'BIGINT', 'FK → users，發出邀請的家長'],
              ['invitee_id', 'BIGINT', 'FK → users。用邀請碼時為 NULL，有人拿碼加入才填'],
              ['code_hash', 'TEXT', '邀請碼的雜湊，只有邀請碼才有。⚠️ 不存明碼'],
+             ['label', 'TEXT', '這組碼是給誰用的（家長自己填，例如「給女兒」）。只有邀請碼才有，用帳號邀請為 NULL'],
              ['role', 'TEXT', "'parent' / 'child'，由家長決定，被邀請的人不能改"],
              ['status', 'TEXT', "'pending' / 'accepted' / 'declined' / 'cancelled'"],
              ['expires_at', 'TIMESTAMPTZ', '七天後過期'],

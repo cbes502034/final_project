@@ -1763,9 +1763,7 @@
         '<div id="invFound" class="invp__r"><p class="invp__hint">只接受完整的 email，找到之後再選身分。</p></div>' +
       '</div></section>' +
       '<section class="duo__c"><div class="card invp">' +
-        '<div class="invp__h"><span class="invp__n">2</span><b>或是給他邀請碼</b></div>' +
-        '<div class="invp__row"><span class="invp__k">身分</span>' +
-          seg('codrole', [['child', '子女'], ['parent', '家長']], INV.codeRole) +
+        '<div class="invp__h"><span class="invp__n">2</span><b>或是給他邀請碼</b>' +
           '<button class="btn btn--sm btn--go" data-code-new>產生邀請碼</button></div>' +
         '<div id="invCodes"></div>' +
       '</div></section>' +
@@ -1773,25 +1771,100 @@
     paintCodes();
   };
 
+  /* 還剩幾天過期。當天到期寫「今天到期」，過了就是「已過期」——
+     只寫日期的話，使用者還要自己換算今天是幾號。 */
+  function ttlText(iso) {
+    var left = Math.ceil((new Date(iso) - Date.now()) / 86400000);
+    if (left < 0) return '已過期';
+    if (left === 0) return '今天到期';
+    return '剩 ' + left + ' 天';
+  }
+
+  /* 邀請碼清單。
+     ⚠️ 真後端只存雜湊，明碼拿不回來（code 一律 null），所以這裡一律顯示 ••••-••••。
+        明碼只在產生的當下、在對話框裡出現一次——跟 access token 同一套做法。
+     ⚠️ 一個身分可以有好幾組，所以外層要能捲動：數量多了也不會把版面撐長。 */
   function paintCodes() {
     var box = document.getElementById('invCodes');
     if (!box) return;
     API.invites().then(function (inv) {
       box.innerHTML = inv.codes.length
-        ? inv.codes.map(function (c) {
-            /* ⚠️ 真後端只存邀請碼的雜湊，拿不回明碼（code 是 null）：
-               這裡顯示遮起來的樣子、不給複製鈕，明碼只在產生的當下出現一次。 */
-            var open = !!c.code;
-            return '<div class="code">' +
-              '<div class="code__v" aria-label="邀請碼">' + (open ? esc(c.code) : '••••-••••') + '</div>' +
-              '<div class="code__m">' + roleTW(c.role) + '　·　' + shortDate(c.expiresAt) + '前有效　·　只能用一次' +
-                (open ? '' : '　·　碼只在產生當下顯示，忘了就重新產生一組') + '</div>' +
-              (open ? '<button class="btn btn--sm" data-copy="' + esc(c.code) + '">複製</button>' : '') +
+        ? '<div class="codes" role="list">' + inv.codes.map(function (c) {
+            var gone = new Date(c.expiresAt) < Date.now();
+            return '<div class="code' + (gone ? ' is-gone' : '') + '" role="listitem">' +
+              '<div class="code__m">' +
+                '<b class="code__n">' + esc(c.label || '未命名') + '</b>' +
+                '<span class="code__d">' + roleTW(c.role) + '　·　' + ttlText(c.expiresAt) +
+                  '（' + shortDate(c.expiresAt) + '）　·　只能用一次</span>' +
+              '</div>' +
+              '<span class="code__v" aria-label="邀請碼已隱藏">••••-••••</span>' +
+              '<button class="ic ic--sm" data-code-del="' + esc(c.id) + '" title="刪除這組" ' +
+                'aria-label="刪除「' + esc(c.label || '未命名') + '」這組邀請碼">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+                'stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
             '</div>';
-          }).join('')
+          }).join('') + '</div>'
         : '<p class="invp__hint">產生之後傳給家人，他在「家庭」頁輸入就能加入。</p>';
     });
   }
+
+  /* ---------------------------------------------------------
+     產生邀請碼：先取名字與身分，再產生
+
+     ⚠️ 明碼只有 POST /api/family/invite 的回應裡有，資料庫只存雜湊。
+        所以關掉這個對話框之後就真的拿不回來了——這件事要寫在上面，
+        不是等使用者關掉才發現。
+     --------------------------------------------------------- */
+  function codeNew() {
+    var w = el('<div class="hp" id="cg">' +
+      '<div class="hp__c" role="dialog" aria-modal="true" aria-labelledby="cgT">' +
+        '<div class="hp__h"><h3 id="cgT">產生邀請碼</h3>' +
+          '<button class="hp__x" id="cgX" aria-label="關閉">✕</button></div>' +
+        '<div class="hp__b" id="cgBody">' +
+          '<label class="fld"><span>這組碼給誰用</span>' +
+            '<input type="text" id="cgLabel" maxlength="30" placeholder="例如：給女兒" autocomplete="off"></label>' +
+          '<div class="fld"><span>加入後的身分</span>' +
+            seg('cgrole', [['child', '子女'], ['parent', '家長']], INV.codeRole) + '</div>' +
+          '<p class="cg__note">碼在下一步顯示，<b>只會出現這一次</b>。關掉之後就拿不回來了，忘了只能重新產生一組。</p>' +
+        '</div>' +
+        '<div class="hp__d">' +
+          '<button class="btn" id="cgNo">取消</button>' +
+          '<button class="btn btn--go" id="cgGo">產生</button>' +
+        '</div>' +
+      '</div></div>');
+    document.body.appendChild(w);
+    document.body.classList.add('hp-on');
+    void w.offsetWidth;
+    w.classList.add('on');
+    var f = document.getElementById('cgLabel');
+    if (f) f.focus();
+  }
+
+  function codeClose() {
+    var w = document.getElementById('cg');
+    if (w) w.remove();
+    document.body.classList.remove('hp-on');
+    paintCodes();
+  }
+
+  /* 產生好了：同一個對話框換成「這是你的碼」，複製鈕與警語放在一起 */
+  function codeDone(c) {
+    var body = document.getElementById('cgBody');
+    var foot = document.querySelector('#cg .hp__d');
+    var title = document.getElementById('cgT');
+    if (!body || !foot) return;
+    if (title) title.textContent = '邀請碼產生好了';
+    body.innerHTML =
+      '<p class="cg__lab">' + esc(c.label) + '　·　' + roleTW(c.role) + '　·　' + ttlText(c.expiresAt) +
+        '（' + shortDate(c.expiresAt) + '前有效）</p>' +
+      '<div class="cg__code"><code>' + esc(c.code) + '</code>' +
+        '<button class="btn btn--sm" data-copy="' + esc(c.code) + '">複製</button></div>' +
+      '<p class="cg__warn">⚠️ 關掉這個視窗之後就<b>看不到這組碼了</b>。' +
+        '系統只存它的雜湊，任何人都查不回來——現在就複製傳給對方。</p>';
+    foot.innerHTML = '<button class="btn btn--go" id="cgOk">我存好了</button>';
+  }
+
+
 
   function paintFound(r) {
     var box = document.getElementById('invFound');
@@ -3862,9 +3935,9 @@
       Array.prototype.forEach.call(ir.parentNode.children, function (b) { b.classList.toggle('on', b === ir); b.setAttribute('aria-pressed', b === ir); });
       return;
     }
-    var cr = t.closest('[data-codrole]');
+    var cr = t.closest('[data-codrole]') || t.closest('[data-cgrole]');
     if (cr) {
-      INV.codeRole = cr.dataset.codrole;
+      INV.codeRole = cr.dataset.codrole || cr.dataset.cgrole;
       Array.prototype.forEach.call(cr.parentNode.children, function (b) { b.classList.toggle('on', b === cr); b.setAttribute('aria-pressed', b === cr); });
       return;
     }
@@ -3877,10 +3950,28 @@
       }).catch(function (err) { isd.disabled = false; toast(err.message || '送不出去', 'err'); });
       return;
     }
-    if (t.closest('[data-code-new]')) {
-      API.createInviteCode({ role: INV.codeRole }).then(function (c) {
-        paintCodes(); toast('邀請碼 ' + c.code + ' 產生好了', 'ok');
-      }).catch(function (err) { toast(err.message || '產生失敗', 'err'); });
+    if (t.closest('[data-code-new]')) { codeNew(); return; }
+    if (t.closest('#cgX') || t.closest('#cgNo') || t.closest('#cgOk')) { codeClose(); return; }
+    if (t.closest('#cgGo')) {
+      var lab = document.getElementById('cgLabel');
+      var name = (lab && lab.value || '').trim();
+      if (!name) { toast('先幫這組碼取個名字，之後才分得出哪一組是哪一組', 'err'); if (lab) lab.focus(); return; }
+      var go = document.getElementById('cgGo');
+      if (go) { go.disabled = true; go.textContent = '產生中…'; }
+      API.createInviteCode({ role: INV.codeRole, label: name }).then(function (c) {
+        codeDone(c);
+      }).catch(function (err) {
+        if (go) { go.disabled = false; go.textContent = '產生'; }
+        toast(err.message || '產生失敗', 'err');
+      });
+      return;
+    }
+    var cdel = t.closest('[data-code-del]');
+    if (cdel) {
+      cdel.disabled = true;
+      API.declineInvite(cdel.dataset.codeDel).then(function () {
+        paintCodes(); toast('已刪除這組邀請碼', 'ok');
+      }).catch(function (err) { cdel.disabled = false; toast(err.message || '刪不掉', 'err'); });
       return;
     }
     var cp = t.closest('[data-copy]');

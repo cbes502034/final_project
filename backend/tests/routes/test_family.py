@@ -142,21 +142,57 @@ JOIN = ("POST", "/api/family/join")
 
 
 @pytest.mark.route(*CODE)
-def test_create_invite_code_只存雜湊_同身分舊碼作廢(api):
+def test_create_invite_code_只存雜湊_同身分可以有好幾組(api):
+    """明碼只回一次、資料庫只存雜湊；同一個身分可以同時發好幾組，各自有名字。
+
+    ⚠️ 不可以「同身分再產生就把舊的作廢」——別人手上那組可能還沒用。
+       不要的那一組由家長自己刪（DELETE /api/family/invites/{id}）。
+    """
     dad, kid = user("d@x.tw", "爸爸"), user("k@x.tw", "小華")
     family_of((dad, "parent"), (kid, "child"))
-    r = api.post("/api/family/invite", headers=login(dad), json={"role": "child"})
+    r = api.post("/api/family/invite", headers=login(dad), json={"role": "child", "label": "給女兒"})
     assert r.status_code == 201, r.text
     first = r.json()
-    assert first["role"] == "child" and len(first["code"]) == 9 and first["code"][4] == "-" and first["expiresAt"]
+    assert first["role"] == "child" and first["label"] == "給女兒" and first["id"]
+    assert len(first["code"]) == 9 and first["code"][4] == "-" and first["expiresAt"]
     row = crud.get(FamilyInvite, where={"code_hash__isnull": False})
     assert row.code_hash == family.hash_code(first["code"]) and first["code"] not in row.code_hash
-    api.post("/api/family/invite", headers=login(dad), json={"role": "parent"})
-    api.post("/api/family/invite", headers=login(dad), json={"role": "child"})
-    statuses = [(i.role, i.status) for i in crud.find(FamilyInvite, order_by="id")]
-    assert statuses == [("child", "cancelled"), ("parent", "pending"), ("child", "pending")]
-    assert api.post("/api/family/invite", headers=login(kid), json={"role": "child"}).status_code == 403
-    assert api.post("/api/family/invite", headers=login(dad), json={"role": "boss"}).status_code == 422
+    assert row.label == "給女兒"
+
+    api.post("/api/family/invite", headers=login(dad), json={"role": "parent", "label": "給外婆"})
+    api.post("/api/family/invite", headers=login(dad), json={"role": "child", "label": "給兒子"})
+    rows = [(i.role, i.label, i.status) for i in crud.find(FamilyInvite, order_by="id")]
+    assert rows == [("child", "給女兒", "pending"), ("parent", "給外婆", "pending"),
+                    ("child", "給兒子", "pending")], "舊的那組不可以被作廢"
+
+    assert api.post("/api/family/invite", headers=login(kid),
+                    json={"role": "child", "label": "x"}).status_code == 403
+    assert api.post("/api/family/invite", headers=login(dad),
+                    json={"role": "boss", "label": "x"}).status_code == 422
+    assert api.post("/api/family/invite", headers=login(dad),
+                    json={"role": "child", "label": ""}).status_code == 422
+
+
+@pytest.mark.route(*CODE)
+def test_家長可以單獨刪掉一組邀請碼(api):
+    """明碼看不到之後，清單上靠 label 分辨、靠 id 刪。刪掉那一組就不能再拿來加入。"""
+    dad = user("d@x.tw", "爸爸")
+    family_of((dad, "parent"))
+    a = api.post("/api/family/invite", headers=login(dad), json={"role": "child", "label": "給女兒"}).json()
+    b = api.post("/api/family/invite", headers=login(dad), json={"role": "child", "label": "給兒子"}).json()
+
+    listed = api.get("/api/family/invites", headers=login(dad)).json()["codes"]
+    assert [c["label"] for c in listed] == ["給兒子", "給女兒"], "新的在前，而且要帶名字"
+    assert all(c["code"] is None and c["id"] for c in listed), "明碼不可以回，id 要回（刪的時候用）"
+
+    r = api.delete("/api/family/invites/" + a["id"], headers=login(dad))
+    assert r.status_code == 200 and r.json()["status"] == "cancelled"
+    left = api.get("/api/family/invites", headers=login(dad)).json()["codes"]
+    assert [c["label"] for c in left] == ["給兒子"]
+
+    other = user("o@x.tw", "路人")
+    assert api.post("/api/family/join", headers=login(other),
+                    json={"code": a["code"]}).status_code == 400, "刪掉的碼不能再用"
 
 
 @pytest.mark.route(*JOIN)

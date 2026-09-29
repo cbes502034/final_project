@@ -1761,7 +1761,7 @@ _FAMILY_DRIVER = _ADMIN_DRIVER.split("(async () => {")[0] + r"""
   await API.login({ email: 'yuhan@lin.tw', password: PW });
   out.u3Visible = (await API.me()).visible;
   out.childLookup = await fails(API.lookupUser('yuzhen@mail.tw'));
-  out.childCode = await fails(API.createInviteCode({ role: 'parent' }));
+  out.childCode = await fails(API.createInviteCode({ role: 'parent', label: '給外婆' }));
   await API.login({ email: 'shufen@lin.tw', password: PW });
   out.u2Visible = (await API.me()).visible;
 
@@ -1776,7 +1776,7 @@ _FAMILY_DRIVER = _ADMIN_DRIVER.split("(async () => {")[0] + r"""
 
   await API.login({ email: 'jianguo@lin.tw', password: PW });
   out.u1SeesU5 = (await API.me()).visible.includes('U5');
-  const code = await API.createInviteCode({ role: 'parent' });
+  const code = await API.createInviteCode({ role: 'parent', label: '給外婆' });
   out.code = code;
   await API.register({ name: '林小姑', email: 'aunt@mail.tw', password: PW });
   out.newUser = (await API.me()).user;
@@ -2570,7 +2570,7 @@ const tryIt = p => p.then(r => r, e => ({ error: e.message, status: e.status || 
   out.removeTwice = await tryIt(API.removeGroup('G4'));
 
   // 家長離開：他產生的邀請碼作廢；沒有家長的家不能加入
-  const code = (await API.createInviteCode({ role: 'child' })).code;
+  const code = (await API.createInviteCode({ role: 'child', label: '給女兒' })).code;
   await API.leaveFamily();                          // 還有陳淑芬這位家長，可以退
   for (const e of ['yuhan@lin.tw', 'yuxuan@lin.tw', 'shufen@lin.tw']) {
     await API.login({ email: e, password: PW }); await API.leaveFamily();

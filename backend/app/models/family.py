@@ -72,6 +72,9 @@ class FamilyInvite(Base):
     invitee_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
     # 邀請碼的雜湊，只有邀請碼才有。⚠️ 不存明碼
     code_hash: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
+    # 這組碼是給誰用的，家長自己填（例如「給女兒」）。只有邀請碼才有，用帳號邀請為 NULL。
+    # ⚠️ 明碼看不到之後，這是唯一能認出「哪一組是哪一組」的東西——要刪掉某一組時靠它。
+    label: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 'parent' / 'child'，由家長決定，被邀請的人不能改
     role: Mapped[str] = mapped_column(Text, nullable=False)
     # 'pending' / 'accepted' / 'declined' / 'cancelled'

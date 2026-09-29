@@ -55,7 +55,7 @@ async function rec(name, ...args) {
   await rec('sessions');
   await rec('categories');
   await rec('createFamily', { name: '王家' });
-  const code = await rec('createInviteCode', { role: 'parent' });
+  const code = await rec('createInviteCode', { role: 'parent', label: '給外婆' });
   const found = await rec('lookupUser', 'xiaohua@wang.tw');
   await rec('sendInvite', { userId: found.user.id, role: 'child' });
   await rec('invites');
