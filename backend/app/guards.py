@@ -66,6 +66,10 @@ own()／in_group()／can_see_user() 已經幫你接好，其他查詢請照 scop
 
 from __future__ import annotations
 
+import uuid
+from datetime import datetime, timezone
+from sqlalchemy import select
+
 import functools
 import inspect
 from collections.abc import Callable
@@ -77,8 +81,7 @@ from sqlalchemy.orm import Session
 
 from app.toolkit import crud, errors, password_reset, tokens
 from app.toolkit.db import get_db
-from app.toolkit.deps import bearer, current_user_id
-
+from app.toolkit.deps import bearer, current_token_payload, current_user_id
 __all__ = [
     "current_user", "guard", "protect",
     "login_required", "guest_only", "parent_required", "family_required", "onboarded_required",
@@ -96,10 +99,43 @@ def _models():
 # ===========================================================================
 # 目前登入的人
 # ===========================================================================
-def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_db)):
+def current_user(
+    uid: int = Depends(current_user_id),
+    db: Session = Depends(get_db),
+    payload: dict = Depends(current_token_payload),
+):
     """驗 token → 撈使用者 → 擋停權 → 掛上家庭與角色。每一個守衛的第一步。"""
-    m = _models()
+    m = _models()    
+    
+    sid = payload.get("sid")
+    if not isinstance(sid, str):
+        raise errors.unauthorized("登入資訊無效，請重新登入")
+
+    try:
+        session_id = uuid.UUID(sid)
+    except ValueError:
+        
+           
+        raise errors.unauthorized("登入資訊無效，請重新登入") from None
+        
+    session = db.get(m.UserSession, session_id)
+    if (
+        session is None
+        or session.user_id != uid
+        or session.revoked_at is not None
+    ):
+        raise errors.unauthorized("登入資訊無效，請重新登入")
+    
+    
+   
+    expires_at = session.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at <= datetime.now(timezone.utc):
+        raise errors.unauthorized("登入已過期，請重新登入")
     user = db.get(m.User, uid)
+    
     if user is None:
         raise errors.unauthorized("登入資訊無效，請重新登入")
     if user.suspended_at is not None:
@@ -337,7 +373,11 @@ def token_required(kind: str = "password_reset", field: str = "token") -> Callab
             digest = password_reset.hash_token((payload or {}).get(field))
         except ValueError:
             raise errors.bad_request(password_reset.INVALID_MESSAGE) from None
-        row = crud.get(m.PasswordReset, where={"token_hash": digest}, db=db)
+        row = db.execute(
+            select(m.PasswordReset)
+            .where(m.PasswordReset.token_hash == digest)
+            .with_for_update()
+        ).scalar_one_or_none()
         try:
             password_reset.require_usable(row.expires_at if row else None, row.used_at if row else None)
         except ValueError:

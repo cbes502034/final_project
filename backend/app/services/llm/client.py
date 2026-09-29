@@ -50,7 +50,9 @@ def complete(
     """
     if not is_configured():
         return None
-    url = settings.model_base_url.rstrip("/") + "/v1/chat/completions"
+    if isinstance(retries, bool) or not isinstance(retries, int) or retries < 0:
+        raise ValueError("retries 必須是非負整數")
+    url = settings.model_base_url.strip().rstrip("/") + "/v1/chat/completions"
     headers = {"content-type": "application/json"}
     if settings.model_api_key:
         headers["authorization"] = "Bearer " + settings.model_api_key
@@ -58,11 +60,11 @@ def complete(
     body = {"model": settings.model_name, "messages": messages, "max_tokens": max_tokens, "temperature": temperature}
 
     own = client is None
-    client = client or httpx.Client(timeout=settings.model_timeout_seconds)
+    client = client if client is not None else httpx.Client(timeout=settings.model_timeout_seconds)
     try:
         for attempt in range(retries + 1):
             try:
-                res = client.post(url, json=body, headers=headers)
+                res = client.post(url, json=body, headers=headers, timeout=settings.model_timeout_seconds)
             except httpx.HTTPError as exc:
                 if attempt < retries:
                     time.sleep(0.5 * (attempt + 1))
@@ -74,9 +76,12 @@ def complete(
             if res.status_code != 200:
                 raise ModelError("模型服務回 %d" % res.status_code)
             try:
-                return res.json()["choices"][0]["message"]["content"]
-            except (ValueError, KeyError, IndexError):
+                content = res.json()["choices"][0]["message"]["content"]
+            except (ValueError, KeyError, IndexError, TypeError):
                 raise ModelError("模型服務回來的格式看不懂") from None
+            if not isinstance(content, str) or not content.strip():
+                raise ModelError("模型服務沒有回有效文字")
+            return content
     finally:
         if own:
             client.close()
@@ -84,22 +89,19 @@ def complete(
 
 
 def complete_json(prompt: str, **kwargs: Any) -> Any:
-    """跟 complete 一樣，但要求回 JSON 並解析。模型常在 JSON 外面包 ```json，這裡會剝掉。"""
+    """解析第一個 JSON 物件或陣列，容許外層 Markdown 與說明文字。
+
+    呼叫端負責在 prompt 要求 JSON，以及驗證業務欄位；這裡只驗證 JSON 語法。
+    """
     text = complete(prompt, **kwargs)
     if text is None:
         return None
     raw = text.strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`")
-        raw = raw[raw.find("\n") + 1:] if "\n" in raw else raw
     start = min([i for i in (raw.find("{"), raw.find("[")) if i >= 0], default=-1)
     if start < 0:
         raise ModelError("模型沒有回 JSON")
     try:
-        return json.loads(raw[start:])
+        value, _ = json.JSONDecoder().raw_decode(raw, start)
+        return value
     except json.JSONDecodeError:
-        end = max(raw.rfind("}"), raw.rfind("]"))
-        try:
-            return json.loads(raw[start:end + 1])
-        except json.JSONDecodeError:
-            raise ModelError("模型回的 JSON 壞掉了") from None
+        raise ModelError("模型回的 JSON 壞掉了") from None
