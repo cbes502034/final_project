@@ -35,11 +35,11 @@ from app.toolkit.db import get_db
 
 router = APIRouter(tags=["預算與存款目標"])
 OWNER = "成員3"
-
+ 
 
 @router.get("/budgets", summary="預算與已花")
 @block_admin
-@stub
+# @stub
 def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get_db)):
     """預算與已花
 
@@ -177,7 +177,62 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("GET /api/budgets", OWNER)
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin, visible_scope
+    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import BudgetIn, SavingsGoalIn
+    from app.toolkit import crud, errors, money, period, roles
+    from app.toolkit.db import get_db
+
+    # 1. 這個月的起訖（台灣時間）
+    this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
+    start, end = period.month_range(this_month)
+
+    # 2. 我看得到的人的每月分類預算
+    users, groups = visible_scope(me, db)
+    budgets = crud.find(Budget, {"user_id__in": users, "period_type": "month", "category_id__isnull": False},
+                        order_by="id", db=db)
+
+    # 3. 只算某一本帳：要是我加入的
+    group_id = None
+    if groupId and groupId != "all":
+        group_id = int(groupId) if groupId.isdigit() else 0
+        if group_id not in groups:
+            raise errors.forbidden("你不在這本帳裡")
+
+    # 4. 已花多少：這個月、這個人、這個分類的支出，從明細現算
+    spent = {}
+    if budgets:
+        where = {"user_id__in": {b.user_id for b in budgets}, "kind": "expense",
+                 "occurred_on__between": (start, end)}
+        if group_id is not None:
+            where["group_id"] = group_id
+        for t in crud.find(Transaction, where, fields=("user_id", "category_id", "amount"), db=db):
+            key = (t["user_id"], t["category_id"])
+            spent[key] = money.add(spent.get(key), t["amount"])
+
+    # 5. 配上已花、有沒有超過、用掉幾成；用掉比例高的排前面
+    out = []
+    for b in budgets:
+        used = spent.get((b.user_id, b.category_id), money.ZERO)
+        out.append({
+            "user": str(b.user_id),
+            "period": b.period_type,
+            "cat": str(b.category_id),
+            "limit": b.limit_amount,
+            "used": used,
+            "over": used > b.limit_amount,
+            "pct": money.quantize(money.ratio(used, b.limit_amount), 4),
+        })
+    out.sort(key=lambda row: row["pct"], reverse=True)
+    return {"budgets": out}
+    
+    # raise not_ready("GET /api/budgets", OWNER)
 
 
 @router.put("/budgets", summary="設定預算（limit 0 = 拿掉）")

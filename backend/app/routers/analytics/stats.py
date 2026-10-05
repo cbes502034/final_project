@@ -41,7 +41,7 @@ OWNER = "成員3"
 
 @router.get("/summary", summary="個人／家庭摘要")
 @block_admin
-@stub
+# @stub
 def get_summary(
     me: User,
     scope: str | None = None,
@@ -315,4 +315,97 @@ def get_summary(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("GET /api/summary", OWNER)
+
+
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app import catalog
+    from app.guards import block_admin, visible_scope
+    from app.models import Allowance, FamilyMember, Guardianship, SavingsGoal, User
+    from app.routers._stub import not_ready, stub
+    from app.services import analytics
+    from app.toolkit import crud, errors, images, money, period
+    from app.toolkit.config import settings
+    from app.toolkit.db import get_db
+
+
+
+    # 1. 期間：台灣的這個月
+    this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
+
+    # 2. 要算誰：me 只有自己；family 是我看得到全部紀錄的人。照看的孩子收入不算進家庭收入
+    scope = scope or "me"
+    if scope not in ("me", "family"):
+        raise errors.unprocessable("scope 只能是 me 或 family")
+    users, groups = visible_scope(me, db)
+    wards = set(crud.find(Guardianship, {"guardian_id": me.id, "ended_at__isnull": True}, fields="ward_id", db=db))
+    people = users if scope == "family" else {me.id}
+    kids = [u for u in people if u in wards]
+    earners = [u for u in people if u not in wards]
+
+    # 3. 只算某一本帳：要是我加入的
+    group_id = None
+    if groupId and groupId != "all":
+        group_id = int(groupId) if groupId.isdigit() else 0
+        if group_id not in groups:
+            raise errors.forbidden("你不在這本帳裡")
+
+    # 4. 加總（整個系統只有 analytics 加總錢）
+    nums = analytics.summary(db, people, earners, this_month, group_id)
+    per_user = nums["perUser"]
+
+    # 5. 存款目標：選了帳本用那本帳的，沒選用整體的；每個人最新的一筆
+    goals = {}
+    for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id": group_id}, order_by="id", db=db):
+        goals[row.user_id] = row.goal_amount
+    savings = analytics.savings_status(nums["income"], nums["expense"], money.add(*goals.values()))
+    savings["rule"] = {"warnAt": settings.savings_warn_ratio, "overAt": settings.savings_over_ratio,
+                       "note": catalog.SAVINGS_RULE_NOTE}
+
+    # 6. 我給照看的孩子的零用金（設定，不是支出）
+    allowance = money.ZERO
+    if kids:
+        allowance = money.add(*crud.find(Allowance, {"payer_id": me.id, "ward_id__in": kids,
+                                                     "period_key__isnull": True}, fields="amount", db=db))
+
+    # 7. 每個人的這個月，各自的燈號
+    roles = {m.user_id: m.role for m in crud.find(FamilyMember, {"user_id__in": people, "status": "active"}, db=db)}
+    members = []
+    for u in crud.find(User, {"id__in": people}, order_by="id", db=db):
+        mine = per_user[u.id]
+        status = analytics.savings_status(mine["income"], mine["expense"], goals.get(u.id, 0))
+        members.append({
+            "id": str(u.id),
+            "name": u.display_name,
+            "role": roles.get(u.id),
+            "avatar": u.display_name[-1:],
+            "avatarUrl": images.to_data_uri(u.avatar_bytes, u.avatar_mime) if u.avatar_bytes else None,
+            "income": mine["income"],
+            "expense": mine["expense"],
+            "savingsGoal": goals.get(u.id, 0),
+            "allowance": status["allowance"],
+            "savingsRatio": status["ratio"],
+            "savingsLevel": status["level"],
+            "shortfall": status["shortfall"],
+        })
+
+    # 8. 全部組起來
+    return {
+        "period": this_month,
+        "scope": scope,
+        "income": nums["income"],
+        "expense": nums["expense"],
+        "count": nums["count"],
+        "wardIncome": money.add(*[per_user[u]["income"] for u in kids]),
+        "allowance": allowance,
+        "wardSpend": money.add(*[per_user[u]["expense"] for u in kids]),
+        "savings": savings,
+        "byCat": nums["byCat"],
+        "monthly": nums["monthly"],
+        "yearly": nums["yearly"],
+        "members": members,
+    }
+    # raise not_ready("GET /api/summary", OWNER)
