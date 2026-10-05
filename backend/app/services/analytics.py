@@ -41,5 +41,52 @@ def savings_status(income: Any, expense: Any, goal: Any) -> dict[str, Any]:
 
 
 def summary(db: Any, users: list[int], earners: list[int], period: str, group_id: int | None = None) -> dict[str, Any]:
-    """GET /api/summary 的數字。users 是這次要算的人，earners 是收入要算進去的人（不含子女）。"""
-    raise NotImplementedError("成員3：從 transactions 加總 income／expense／byCat／monthly／yearly")  # TODO(成員3)
+    '''GET /api/summary 的數字。users 是這次要算的人，earners 是收入要算進去的人（不含子女）。'''
+    from datetime import date
+
+    from app.models import Transaction
+    from app.toolkit import crud, period as periods
+
+    users, earners = set(users), set(earners)
+    year = int(period[:4])
+    months = periods.recent_months(period, 6)
+    years = [str(year - 2), str(year - 1), str(year)]
+
+    # a. 一次查出這三年、這些人記的收支（transfer 不算；選了帳本只算那本）
+    where = {"user_id__in": users, "kind__in": ["income", "expense"],
+             "occurred_on__between": (date(year - 2, 1, 1), date(year, 12, 31))}
+    if group_id is not None:
+        where["group_id"] = group_id
+    rows = crud.find(Transaction, where, fields=("user_id", "category_id", "kind", "amount", "occurred_on"), db=db)
+
+    # b. 一筆一筆分到桶子裡
+    per_user = {u: {"income": money.ZERO, "expense": money.ZERO} for u in users}
+    monthly = {m: {"income": money.ZERO, "expense": money.ZERO} for m in months}
+    yearly = {y: {"income": money.ZERO, "expense": money.ZERO} for y in years}
+    by_cat = {}
+    count = 0
+    for r in rows:
+        ym = r["occurred_on"].isoformat()[:7]
+        kind, amount = r["kind"], r["amount"]
+        if ym == period:
+            count += 1
+            per_user[r["user_id"]][kind] += amount
+            if kind == "expense":
+                by_cat[r["category_id"]] = by_cat.get(r["category_id"], money.ZERO) + amount
+        if kind == "income" and r["user_id"] not in earners:
+            continue                      # 子女的收入不算進家庭收入（多半是零用金，會重複算）
+        if ym in monthly:
+            monthly[ym][kind] += amount
+        yearly[ym[:4]][kind] += amount
+
+    # c. 合計：收入只加 earners，支出加全部
+    return {
+        "income": money.add(*[per_user[u]["income"] for u in users if u in earners]),
+        "expense": money.add(*[per_user[u]["expense"] for u in users]),
+        "count": count,
+        "byCat": [{"cat": str(c), "amount": a}
+                  for c, a in sorted(by_cat.items(), key=lambda kv: kv[1], reverse=True)],
+        "monthly": [{"m": m, **monthly[m]} for m in months],
+        "yearly": [{"y": y, "partial": periods.is_incomplete_year(y), **yearly[y]} for y in years],
+        "perUser": per_user,
+    }
