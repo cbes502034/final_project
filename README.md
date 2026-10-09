@@ -13,6 +13,7 @@
 | **API 瀏覽** | <https://fambudget-web.onrender.com/docs/api.html> |
 | **前後端串接契約** | `docs/02-前後端串接契約.md` ← 動工前一定要看 |
 | **模型設計** | <https://fambudget-web.onrender.com/docs/model.html> |
+| **LLM 實作規劃** | `docs/03-LLM實作規劃.md` ← 模型線的每一步、誰做、怎麼算過關 |
 
 ---
 
