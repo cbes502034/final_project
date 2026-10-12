@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>使用說明</title>
+<meta name="description" content="家庭記帳的使用說明：三分鐘上手、記帳、總覽、帳本、提醒、家人、個人資料與主題。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yuji+Boku&amp;family=Kaushan+Script&amp;text=%E5%AE%B6%E5%BA%AD%E8%A8%98%E5%B8%B3FamBudget&amp;display=swap">
+<!-- 跟系統同一套主題：在系統裡選了什麼，說明書就是什麼顏色 -->
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('fambudget.theme');
+      if (t && /^[a-z]+$/.test(t)) document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="../css/tokens.css?v=150">
+<link rel="stylesheet" href="../css/themes.css?v=150">
+<style>
+  /* ============================================================
+     使用說明：跟系統同一套樣子
+     淡色帶、圓角卡片、圓形圖示，顏色和圓角全部用系統的變數——
+     所以換主題的時候，這一頁會跟著換。
+     內容是重點式：每一節一張卡，左邊是「在哪裡」，右邊是重點。
+     ============================================================ */
+  body { background: transparent; }
+  .g-band {
+    position: absolute; left: 0; right: 0; top: 0; height: 520px; z-index: -1;
+    background: var(--band-bg); pointer-events: none;
+  }
+
+  /* 頂列 */
+  .g-bar {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--band) 80%, transparent);
+    -webkit-backdrop-filter: saturate(1.3) blur(14px); backdrop-filter: saturate(1.3) blur(14px);
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  }
+  .g-bar__in { max-width: 1060px; margin: 0 auto; height: 60px; padding: 0 24px; display: flex; align-items: center; gap: 10px; }
+  .g-brand.brand { font-size: 28px; }
+  .g-sep { padding-left: 10px; margin-left: 2px; border-left: 1px solid var(--line-2); font-size: 14px; color: var(--ink-faint); }
+  .g-back {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 14px 0 8px;
+    font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: none;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-pill); box-shadow: var(--shadow-flat);
+  }
+  .g-back:hover { color: var(--accent); border-color: var(--accent-line); }
+  .g-back svg { width: 18px; height: 18px; }
+
+  .g-wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px 80px; }
+  .g-ic { display: inline-grid; place-items: center; flex: 0 0 auto; color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--card));
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--card)); border-radius: var(--r-icon); }
+  .g-ic svg { width: 55%; height: 55%; }
+
+  /* 開場：三步驟 */
+  .g-hero { padding: 36px 0 18px; }
+  .g-hero__k { font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--accent); }
+  .g-hero h1 { margin-top: 6px; font-family: var(--display); font-size: 34px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+  .g-hero__s { margin-top: 8px; font-size: 15px; color: var(--ink-soft); }
+  .g-start { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+  .g-step {
+    position: relative; display: flex; gap: 14px; align-items: flex-start; padding: 18px;
+    background: var(--card); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    border-radius: var(--r-card); box-shadow: var(--shadow-card);
+  }
+  .g-step .g-ic { width: 46px; height: 46px; }
+  .g-step__n { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); }
+  .g-step h3 { margin: 2px 0 4px; font-family: var(--sans); font-size: 16px; font-weight: 700; color: var(--ink); }
+  .g-step p { font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); }
+  .g-step p b { color: var(--ink); }
+  .g-hero__a { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+  .g-tour {
+    display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 18px;
+    font-size: 14px; font-weight: 700; color: var(--on-accent); text-decoration: none;
+    background: var(--accent); border-radius: var(--r-pill);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+  .g-tour:hover { color: var(--on-accent); background: var(--accent-hi); }
+  .g-hero__h { font-size: 13px; color: var(--ink-faint); }
+
+  /* 目錄：一排圓形圖示，像常用功能 */
+  .g-toc {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 10px 0 8px; padding: 14px 10px;
+    background: var(--card); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    border-radius: var(--r-card); box-shadow: var(--shadow-card);
+  }
+  .g-toc a {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 2px;
+    font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: none; text-align: center;
+    border-radius: var(--r-sm); white-space: nowrap;
+  }
+  .g-toc a:hover { background: var(--card-2); color: var(--ink); }
+  .g-toc .g-ic { width: 44px; height: 44px; transition: transform .18s var(--back); }
+  .g-toc a:hover .g-ic { transform: translateY(-2px); }
+
+  /* 每一節：左邊是在哪裡，右邊是重點 */
+  .g-sec {
+    display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 0; margin-top: 16px; overflow: hidden;
+    scroll-margin-top: 76px;
+    background: var(--card); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    border-radius: var(--r-card); box-shadow: var(--shadow-block);
+  }
+  .g-sec__l { padding: 22px 22px 20px; background: var(--card-2); border-right: 1px solid var(--line); }
+  .g-sec__h { display: flex; align-items: center; gap: 12px; }
+  .g-sec__h .g-ic { width: 44px; height: 44px; }
+  .g-sec__n { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); }
+  .g-sec h2 { font-family: var(--display); font-size: 21px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+  .g-sec__lead { margin-top: 12px; font-size: 14px; line-height: 1.65; color: var(--ink-soft); }
+  .g-where { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .g-where span {
+    display: inline-flex; align-items: center; height: 26px; padding: 0 10px;
+    font-size: 12px; font-weight: 600; color: var(--accent-hi); background: var(--accent-wash); border-radius: var(--r-pill);
+  }
+  .g-sec__r { padding: 18px 24px 14px; min-width: 0; }
+
+  .g-pts { margin: 0; padding: 0; list-style: none; }
+  .g-pts li {
+    position: relative; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 4px 16px;
+    padding: 11px 0; border-bottom: 1px dashed var(--line); font-size: 14.5px; line-height: 1.6; color: var(--ink-soft);
+  }
+  .g-pts li:last-child { border-bottom: 0; }
+  .g-pts b { position: relative; padding-left: 14px; font-weight: 700; color: var(--ink); }
+  .g-pts b::before { content: ''; position: absolute; left: 0; top: .62em; width: 6px; height: 6px; background: var(--accent); border-radius: var(--r-dot); }
+  .g-pts em { font-style: normal; font-weight: 700; color: var(--ink); }
+
+  .g-sub { margin: 14px 0 2px; font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--accent); }
+
+  .g-eg {
+    margin: 14px 0 0; padding: 12px 14px; font-size: 14px; line-height: 1.7; color: var(--ink);
+    background: var(--card); border: 1px dashed var(--line-3); border-radius: var(--r-input);
+  }
+  .g-eg i { display: block; margin-bottom: 4px; font-style: normal; font-size: 11.5px; font-weight: 700; letter-spacing: .08em; color: var(--ink-faint); }
+  .g-formula {
+    margin: 14px 0 0; padding: 12px 14px; font-size: 14px; font-weight: 700; line-height: 1.9; color: var(--accent-hi);
+    background: var(--accent-wash); border-radius: var(--r-input);
+  }
+  .g-note {
+    display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 4px; padding: 10px 14px;
+    font-size: 13.5px; line-height: 1.6; color: var(--ink-soft);
+    background: var(--warn-wash); border-radius: var(--r-input);
+  }
+  .g-note b { color: var(--warn-ink); white-space: nowrap; }
+
+  /* 常見問題 */
+  .g-qa { columns: 2; column-gap: 14px; margin-top: 4px; }
+  .g-qa details {
+    break-inside: avoid; margin: 0 0 10px;
+    background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-input);
+    transition: border-color .16s var(--ease), background-color .16s var(--ease);
+  }
+  .g-qa details[open] { background: var(--card); border-color: var(--accent-line); }
+  .g-qa summary {
+    position: relative; padding: 12px 40px 12px 14px; cursor: pointer; list-style: none;
+    font-size: 14.5px; font-weight: 600; color: var(--ink);
+  }
+  .g-qa summary::-webkit-details-marker { display: none; }
+  .g-qa summary::after {
+    content: ''; position: absolute; right: 16px; top: 18px; width: 7px; height: 7px;
+    border-right: 2px solid var(--ink-faint); border-bottom: 2px solid var(--ink-faint);
+    transform: rotate(45deg); transition: transform .22s var(--back);
+  }
+  .g-qa details[open] summary::after { transform: rotate(-135deg); top: 21px; border-color: var(--accent); }
+  .g-qa summary:hover { color: var(--accent); }
+  .g-qa .a { padding: 0 14px 12px; font-size: 13.5px; line-height: 1.7; color: var(--ink-soft); }
+  .g-qa .a b { color: var(--ink); }
+
+  .g-foot { margin-top: 24px; text-align: center; font-size: 13.5px; color: var(--ink-faint); }
+  .g-foot a { font-weight: 700; color: var(--accent); }
+
+  @media (max-width: 960px) {
+    .g-start { grid-template-columns: minmax(0, 1fr); }
+    .g-toc { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .g-sec { grid-template-columns: minmax(0, 1fr); }
+    .g-sec__l { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+  @media (max-width: 640px) {
+    .g-bar__in, .g-wrap { padding-left: 16px; padding-right: 16px; }
+    .g-sep { display: none; }
+    .g-brand.brand { font-size: 24px; }
+    .g-hero { padding-top: 22px; }
+    .g-hero h1 { font-size: 27px; }
+    .g-toc .g-ic { width: 40px; height: 40px; }
+    .g-toc a { font-size: 12px; }
+    .g-sec__l { padding: 18px 16px 16px; }
+    .g-sec__r { padding: 8px 16px 10px; }
+    .g-pts li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .g-qa { columns: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 圖示：跟系統的常用功能同一套線條 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-goal" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11c0-3.9-3.1-6-7-6S5 7.1 5 11c0 2.2 1 3.8 2.5 4.9V19h3v-2h3v2h3v-3.1C18 14.8 19 13.2 19 11z"/><path d="M12 5V3M9 3h6"/></g></symbol>
+    <symbol id="i-entry" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M9 13h6M9 16.5h4"/></g></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/></g></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h11a3 3 0 0 1 3 3v12H7a3 3 0 0 1-3-3z"/><path d="M18 8h2v12"/><path d="M8 9h6M8 13h4"/></g></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M10.5 20a2 2 0 0 0 3 0"/></g></symbol>
+    <symbol id="i-family" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.3"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20"/><path d="M15.5 14.5h1.5a3.5 3.5 0 0 1 3.5 3.5v2"/></g></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V20"/></g></symbol>
+    <symbol id="i-qa" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17.5v.01"/></g></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6 9 12l6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="g-band" aria-hidden="true"></div>
+
+<header class="g-bar">
+  <div class="g-bar__in">
+    <a class="brand g-brand" href="../index.html" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
+    <span class="g-sep">使用說明</span>
+    <a class="g-back" href="../index.html"><svg aria-hidden="true"><use href="#i-back"/></svg>回到系統</a>
+  </div>
+</header>
+
+<main class="g-wrap">
+
+  <!-- 開場 -->
+  <section class="g-hero" id="start">
+    <div class="g-hero__k">使用說明</div>
+    <h1>三分鐘上手</h1>
+    <p class="g-hero__s">做完這三步，之後每天只要記帳就好。</p>
+
+    <div class="g-start">
+      <div class="g-step">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-goal"/></svg></span>
+        <div>
+          <div class="g-step__n">STEP 1</div>
+          <h3>設定每月想存多少</h3>
+          <p>建好帳號會先帶你設定；之後在 常用功能 › <b>個人資料</b> › 存錢計畫 改</p>
+        </div>
+      </div>
+      <div class="g-step">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-add"/></svg></span>
+        <div>
+          <div class="g-step__n">STEP 2</div>
+          <h3>記下今天花了什麼</h3>
+          <p>按 <b>＋ 記一筆</b>，打一段話就好</p>
+        </div>
+      </div>
+      <div class="g-step">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-home"/></svg></span>
+        <div>
+          <div class="g-step__n">STEP 3</div>
+          <h3>回總覽看結果</h3>
+          <p>最大的數字就是<b>這個月還可以花</b>多少</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="g-hero__a">
+      <a class="g-tour" href="../index.html?tour=1">再走一次導覽 →</a>
+      <span class="g-hero__h">畫面上標題旁的 <b>?</b> 按下去也有說明</span>
+    </div>
+  </section>
+
+  <!-- 目錄 -->
+  <nav class="g-toc" aria-label="目錄">
+    <a href="#write"><span class="g-ic"><svg aria-hidden="true"><use href="#i-entry"/></svg></span>記帳</a>
+    <a href="#read"><span class="g-ic"><svg aria-hidden="true"><use href="#i-home"/></svg></span>總覽</a>
+    <a href="#books"><span class="g-ic"><svg aria-hidden="true"><use href="#i-book"/></svg></span>帳本</a>
+    <a href="#alert"><span class="g-ic"><svg aria-hidden="true"><use href="#i-bell"/></svg></span>提醒</a>
+    <a href="#family"><span class="g-ic"><svg aria-hidden="true"><use href="#i-family"/></svg></span>家人</a>
+    <a href="#me"><span class="g-ic"><svg aria-hidden="true"><use href="#i-user"/></svg></span>個人與主題</a>
+    <a href="#qa"><span class="g-ic"><svg aria-hidden="true"><use href="#i-qa"/></svg></span>常見問題</a>
+  </nav>
+
+  <!-- 記帳 -->
+  <section class="g-sec" id="write">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-entry"/></svg></span>
+        <div><div class="g-sec__n">01</div><h2>記帳</h2></div>
+      </div>
+      <p class="g-sec__lead">不用填表格，把今天花了什麼打成一段話。</p>
+      <div class="g-where"><span>總覽 › ＋ 記一筆</span><span>手機底部中間的 ＋</span><span>電腦右上角</span></div>
+      <div class="g-eg"><i>你打</i>早餐 55，中午吃飯 320，晚上加油 1200，打工賺了 1500</div>
+    </div>
+    <div class="g-sec__r">
+      <ul class="g-pts">
+        <li><b>自動拆開</b><span>送出後拆成一筆一筆，金額和分類都填好</span></li>
+        <li><b>確認再存</b><span>每一筆標出對應原句的哪一段；沒講金額的會標出來，<em>沒補完不會存</em></span></li>
+        <li><b>猜錯就改</b><span>「在全家買飲料」的全家是店名，這種地方可能猜錯，直接改掉</span></li>
+        <li><b>只記一筆</b><span>切到「單筆手動」，自己填金額、分類、店家</span></li>
+        <li><b>記錯了</b><span>收支明細每一列右邊按<em>修改</em>：金額、日期、分類、帳本都能改；別人的只能看</span></li>
+        <li><b>一次刪很多筆</b><span>收支明細按「選取多筆」，勾好按「刪除 N 筆」；其中一筆刪不了就<em>一筆都不刪</em></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 總覽 -->
+  <section class="g-sec" id="read">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-home"/></svg></span>
+        <div><div class="g-sec__n">02</div><h2>總覽</h2></div>
+      </div>
+      <p class="g-sec__lead">打開就是總覽，回答一件事：這個月還能花多少。</p>
+      <div class="g-where"><span>其他頁面左上角「‹ 總覽」</span><span>手機底部「總覽」</span></div>
+      <div class="g-formula">收入 − 每月想存 ＝ 可花上限<br>可花上限 − 已經花的 ＝ 還可以花</div>
+    </div>
+    <div class="g-sec__r">
+      <ul class="g-pts">
+        <li><b>疊在一起的卡</b><span>後面露出<em>本月收入</em>、<em>本月支出</em>，最前面是<em>這個月還可以花</em></span></li>
+        <li><b>進度條</b><span>看的是「離存不到錢還有多遠」：接近上限變黃，超過變紅</span></li>
+        <li><b>常用功能</b><span>所有功能都在這；圖示下的小字是現況，例如「4 本」「2 則要注意」</span></li>
+        <li><b>預算小卡</b><span>一個分類一張，看是哪一類把錢吃掉；右上角「看統計 ›」</span></li>
+        <li><b>今天的紀錄</b><span>最下面：今天花多少、收多少，和今天記的每一筆</span></li>
+        <li><b>我｜全家</b><span>家長可以切到全家，整理全家的數字，<em>只能看、不能記帳</em></span></li>
+        <li><b>財務建議</b><span>常用功能 › 財務建議，按「<em>產生這個月的建議</em>」；每一則都附算式可以核對。家長照看著家人時可以產生全家的</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 帳本 -->
+  <section class="g-sec" id="books">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-book"/></svg></span>
+        <div><div class="g-sec__n">03</div><h2>帳本</h2></div>
+      </div>
+      <p class="g-sec__lead">把不同用途的錢分開：家用、旅遊基金、自己的零用。</p>
+      <div class="g-where"><span>常用功能 › 帳本</span><span>標題右邊的帳本選單</span></div>
+      <div class="g-eg"><i>分類和帳本差在哪</i><b>分類</b>是錢花在什麼；<b>帳本</b>是算在哪一份預算。同樣吃飯，聚餐算家用、出國吃的算旅遊基金。</div>
+    </div>
+    <div class="g-sec__r">
+      <ul class="g-pts">
+        <li><b>開一本</b><span>「常設帳本」右邊「＋ 開一本」；誰都可以開，開的人管這本</span></li>
+        <li><b>切換</b><span>切過去之後，總覽和統計的數字都只算那一本</span></li>
+        <li><b>各自的目標</b><span>點開那本帳就能填它自己的月目標，跟整體目標各算各的</span></li>
+        <li><b>活動帳本</b><span>旅行、婚禮這種一次性的；過了結束日<em>不會自動結束</em>，由開帳本的人按「結算」，之後不能再記</span></li>
+        <li><b>封存</b><span>收起來不用，<em>不是刪除</em>；在「已封存」隨時叫回來</span></li>
+        <li><b>移除</b><span>只有結算過的活動帳本可以移除：帳本不見、<em>不能復原</em>，但裡面的紀錄都還在各自的收支明細和統計裡</span></li>
+        <li><b>加人</b><span>加進來的人看得到這本帳的所有紀錄，其他本看不到；目前只能加家人</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 提醒 -->
+  <section class="g-sec" id="alert">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-bell"/></svg></span>
+        <div><div class="g-sec__n">04</div><h2>提醒</h2></div>
+      </div>
+      <p class="g-sec__lead">不用等月底，花到你設的比例就通知。</p>
+      <div class="g-where"><span>個人資料 › 花到幾成提醒我</span><span>右上角鈴鐺</span></div>
+      <div class="g-eg"><i>通知長這樣</i>旅遊基金 已用掉可花額度的 <b>103%</b>（超過你設的 100%）</div>
+    </div>
+    <div class="g-sec__r">
+      <ul class="g-pts">
+        <li><b>自己設門檻</b><span>可以設好幾個，例如 60%、85%、100%</span></li>
+        <li><b>算的是</b><span>可花額度的幾成，<em>不是收入的幾成</em></span></li>
+        <li><b>針對某本帳</b><span>例如「旅遊基金花到九成就叫我」</span></li>
+        <li><b>不會一直吵</b><span>同一個門檻<em>一個月只響一次</em>，下個月重新開始</span></li>
+        <li><b>暫停</b><span>把開關關掉就好，設定會留著</span></li>
+        <li><b>帳本動靜</b><span>在帳本裡打開「有動靜通知我」才會通知，預設是關的</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 家人 -->
+  <section class="g-sec" id="family">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-family"/></svg></span>
+        <div><div class="g-sec__n">05</div><h2>家人與全家</h2></div>
+      </div>
+      <p class="g-sec__lead">記帳預設只有自己看得到。加入家庭之後，照下面的規則分享。</p>
+      <div class="g-where"><span>常用功能 › 家庭成員</span><span>還沒有家庭：加入家庭</span></div>
+    </div>
+    <div class="g-sec__r">
+      <div class="g-sub">加入家庭</div>
+      <ul class="g-pts">
+        <li><b>建立</b><span>建立家庭的人就是家長</span></li>
+        <li><b>用帳號邀請</b><span>輸入家人的<em>完整 email</em>，選家長或子女送出，對方按「加入」</span></li>
+        <li><b>用邀請碼</b><span>產生 8 碼傳給家人輸入；<em>只能用一次、七天失效</em></span></li>
+      </ul>
+      <div class="g-sub">誰看得到誰</div>
+      <ul class="g-pts">
+        <li><b>家長之間</b><span>同一個家庭互相看得到</span></li>
+        <li><b>孩子的紀錄</b><span>家長在孩子的卡片上按「<em>開始照看</em>」之後才看得到；<em>只能看、不能改、不能登入對方帳號</em></span></li>
+        <li><b>停止照看</b><span>照看的家長或另一位家長可以按「停止照看」；<em>孩子自己不能停</em>，但每個人都看得到是誰在照看</span></li>
+        <li><b>存多少錢</b><span>每月存款目標<em>只有本人能設</em>；家長可以在孩子的紀錄頁給零用金</span></li>
+        <li><b>離開</b><span>任何人都能退出；家長可以移出孩子。紀錄不會刪，但彼此就看不到了</span></li>
+      </ul>
+      <div class="g-sub">家長可以做的</div>
+      <ul class="g-pts">
+        <li><b>設為家長</b><span>孩子的卡片上按「設為家長」。之後<em>不能把他改回子女</em>，只有他自己能調整</span></li>
+        <li><b>改成子女</b><span>家裡有兩位以上家長時，自己的卡片上可以「改成子女」；你照看家人的關係會結束</span></li>
+        <li><b>家庭自訂分類</b><span>系統的分類不夠用時，在「家庭自訂分類」加一個，全家記帳、預算、統計都用得到</span></li>
+        <li><b>解散家庭</b><span><em>唯一的家長</em>才會看到。每個人都離開這個家、照看與零用金結束，<em>紀錄一筆都不刪</em></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 個人資料與主題 -->
+  <section class="g-sec" id="me">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-user"/></svg></span>
+        <div><div class="g-sec__n">06</div><h2>個人資料與主題</h2></div>
+      </div>
+      <p class="g-sec__lead">名字、大頭貼、密碼、理財習慣，還有整個系統的外觀。</p>
+      <div class="g-where"><span>常用功能 › 個人資料</span><span>常用功能 › 換主題</span></div>
+    </div>
+    <div class="g-sec__r">
+      <ul class="g-pts">
+        <li><b>個人化設定</b><span>建好帳號後一步一步問：<em>每月想存多少 → 理財習慣 → 主題</em>，每一步都能跳過</span></li>
+        <li><b>大頭貼</b><span>選一張照片就好，會自動裁切縮小；沒上傳就用名字最後一個字</span></li>
+        <li><b>Email</b><span>是登入帳號，目前不能改</span></li>
+        <li><b>換主題</b><span>總覽的「常用功能」有一格<em>換主題</em>，按下去直接帶到主題那一段</span></li>
+        <li><b>主題設定</b><span>個人資料最下面，左右滑著看、<em>按一下就換</em>，一共八套</span></li>
+        <li><b>主題存在帳號上</b><span>換手機登入也一樣；家人各選各的</span></li>
+        <li><b>理財習慣</b><span>選理財風格、目標、固定安排，財務建議會參考</span></li>
+        <li><b>每月預算</b><span>「每月預算」裡替每個支出分類填上限，離開欄位就存好；填 0 就是不設</span></li>
+        <li><b>登入中的裝置</b><span>看得到在哪裡登入過；覺得怪怪的就按「<em>登出所有裝置</em>」，再重設密碼</span></li>
+      </ul>
+      <div class="g-note"><b>不是投資建議</b><span>填了定期定額只是讓系統知道錢去哪，系統不提供投資、保險、稅務建議。</span></div>
+    </div>
+  </section>
+
+  <!-- 常見問題 -->
+  <section class="g-sec" id="qa" style="grid-template-columns:minmax(0,1fr)">
+    <div class="g-sec__r" style="padding-top:22px">
+      <div class="g-sec__h" style="margin-bottom:14px">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-qa"/></svg></span>
+        <div><div class="g-sec__n">07</div><h2>常見問題</h2></div>
+      </div>
+      <div class="g-qa">
+        <details>
+          <summary>忘記密碼怎麼辦？</summary>
+          <div class="a">登入頁按<b>「忘記密碼？」</b>，輸入註冊用的 email，會收到一封重設密碼的信。連結 <b>30 分鐘內有效、只能用一次</b>；設好新密碼之後，其他裝置上的登入都會登出。沒收到的話看一下垃圾信件匣。</div>
+        </details>
+        <details>
+          <summary>註冊完為什麼還要設定？可以跳過嗎？</summary>
+          <div class="a">可以跳過。只是先問你<b>每個月想存多少</b>，總覽的「這個月還可以花」才算得出來；理財習慣和主題也在這裡一起選。之後都能在個人資料改。</div>
+        </details>
+        <details>
+          <summary>改了存款目標，之前的月份會變嗎？</summary>
+          <div class="a">不會。過去的月份用<b>當時</b>設定的數字。</div>
+        </details>
+        <details>
+          <summary>為什麼看不到某個家人的紀錄？</summary>
+          <div class="a">孩子要有家長按了「開始照看」才看得到；家長之間同一個家庭就互相看得到。跟你共用帳本的人，只看得到那本帳裡的紀錄。</div>
+        </details>
+        <details>
+          <summary>結算之後紀錄去哪了？</summary>
+          <div class="a"><b>哪裡都沒去。</b>紀錄還在那本帳和你的明細裡，只是那本帳不能再記新的。結算完的帳本會收到帳本頁的「已結算」裡。</div>
+        </details>
+        <details>
+          <summary>結算過的帳本裡記錯了，可以改嗎？</summary>
+          <div class="a"><b>不能改也不能刪。</b>結算就是大家對過帳了，改一筆，對好的數字就不對了。那幾列會標「已結算」、沒有修改和刪除。真的要更正，另外記一筆補回來。</div>
+        </details>
+        <details>
+          <summary>「今天」「這個月」是照什麼算的？</summary>
+          <div class="a">照<b>你手機或電腦上的日期</b>。記一筆時日期預設是今天，一段話裡的「昨天」也從今天往回算；活動帳本過了結束日沒，也是跟今天比。</div>
+        </details>
+        <details>
+          <summary>結算完的活動帳本可以刪掉嗎？</summary>
+          <div class="a">可以選兩種：<b>封存</b>是收起來，之後還能叫回來；<b>移除</b>是帳本不見、不能復原。兩種都<b>不會刪紀錄</b>——每一筆還在記帳的人自己的收支明細裡，統計數字也不變。只有開這本帳的人能操作。</div>
+        </details>
+        <details>
+          <summary>有人記帳，我會被通知嗎？</summary>
+          <div class="a">兩種情況會：<b>你監管的人</b>記帳，或你在帳本打開了「有動靜通知我」。同一筆只通知一次。</div>
+        </details>
+        <details>
+          <summary>把人移出帳本會怎樣？</summary>
+          <div class="a">他之後看不到<b>別人</b>記在那本帳的紀錄，也不能再往那本帳記。他<b>自己記過的不會不見</b>，還在他自己的收支明細裡。</div>
+        </details>
+        <details>
+          <summary>財務建議的數字可靠嗎？</summary>
+          <div class="a">每則建議都附依據的算式可以核對。<b>數字是系統算的</b>，模型只負責講成人話。</div>
+        </details>
+        <details>
+          <summary>我是唯一的家長，可以退出嗎？</summary>
+          <div class="a">要先邀請另一位家長，或讓其他人先離開，才能退出；也可以直接<b>解散家庭</b>（每個人離開，紀錄都不刪）。家長退出時，他產生、還沒用過的邀請碼會一起失效；家裡沒有家長時，也不能再用邀請碼加入。</div>
+        </details>
+        <details>
+          <summary>邀請碼過期或用過了？</summary>
+          <div class="a">請家長在「家庭成員」→「邀請家人」再產生一組，舊的會自動作廢。</div>
+        </details>
+        <details>
+          <summary>系統管理員看得到我的帳嗎？</summary>
+          <div class="a"><b>看不到。</b>他只能停權違規帳號、查操作紀錄，畫面上沒有任何一筆金額，也不能登入你的帳號。</div>
+        </details>
+        <details>
+          <summary>帳號被停權會怎樣？</summary>
+          <div class="a">暫時不能登入，會看到停權理由。<b>紀錄一筆都不會刪</b>，解除後都還在。</div>
+        </details>
+        <details>
+          <summary>重要的動作為什麼要再輸入一次密碼？</summary>
+          <div class="a">移出家人、退出或解散家庭、改角色、移除帳本這些<b>做了就回不去</b>的動作，會先請你再輸入一次密碼（解散還要打一段確認碼），免得手機借給別人時被誤按。</div>
+        </details>
+        <details>
+          <summary>畫面寫「後端還沒做這一支」是什麼意思？</summary>
+          <div class="a">系統還在開發中：那個功能的伺服器端還沒完成，訊息後面會寫是哪一個功能、誰負責。<b>其他功能照常能用</b>：那一塊會變成一張說明卡，這一頁的其他區塊、其他頁面都照常。通知鈴鐺也會直接講「這一支做好之前，通知都收不到」，不會假裝沒有通知。左下角還有一張表，列出這一頁用到的每一個功能：<b>做好的亮綠燈、還沒做好的亮紅燈</b>（可以整個複製給負責的人）。</div>
+        </details>
+        <details>
+          <summary>手機可以用嗎？</summary>
+          <div class="a">可以。用瀏覽器開同一個網址，版面會自動調整，底部有分頁列。</div>
+        </details>
+      </div>
+      <p class="g-foot">還是找不到答案？畫面上標題旁的 <b>?</b> 按下去有那個欄位的說明。　<a href="../index.html">回到系統 ›</a></p>
+    </div>
+  </section>
+
+</main>
+
+<script src="docs.js?v=5"></script>
+</body>
+</html>

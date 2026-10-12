@@ -1,0 +1,133 @@
+{
+  "status": "passed",
+  "model": "actual trained LoRA adapter",
+  "database": "isolated in-memory SQLite",
+  "authentication": "overridden only in this test harness; login/session flow not tested",
+  "simple": {
+    "expenses": [
+      {
+        "category": "食",
+        "item": "早餐",
+        "amount": 50
+      },
+      {
+        "category": "食",
+        "item": "午餐",
+        "amount": 100
+      },
+      {
+        "category": "食",
+        "item": "晚餐",
+        "amount": 200
+      },
+      {
+        "category": "行",
+        "item": "加油",
+        "amount": 100
+      },
+      {
+        "category": "其他",
+        "item": "娛樂",
+        "amount": 200
+      }
+    ]
+  },
+  "project": {
+    "raw": "早餐50 午餐100 晚餐200 加油100 買周邊200",
+    "matched": false,
+    "items": [
+      {
+        "seq": 1,
+        "span": "早餐50",
+        "date": "2026-10-07",
+        "amount": 50.0,
+        "kind": "expense",
+        "cat": "1",
+        "merchant": "",
+        "note": "早餐",
+        "conf": {
+          "date": 0.0,
+          "amount": 0.0,
+          "kind": 0.0,
+          "cat": 0.0
+        },
+        "missing": [],
+        "hint": ""
+      },
+      {
+        "seq": 2,
+        "span": "午餐100",
+        "date": "2026-10-07",
+        "amount": 100.0,
+        "kind": "expense",
+        "cat": "1",
+        "merchant": "",
+        "note": "午餐",
+        "conf": {
+          "date": 0.0,
+          "amount": 0.0,
+          "kind": 0.0,
+          "cat": 0.0
+        },
+        "missing": [],
+        "hint": ""
+      },
+      {
+        "seq": 3,
+        "span": "晚餐200",
+        "date": "2026-10-07",
+        "amount": 200.0,
+        "kind": "expense",
+        "cat": "1",
+        "merchant": "",
+        "note": "晚餐",
+        "conf": {
+          "date": 0.0,
+          "amount": 0.0,
+          "kind": 0.0,
+          "cat": 0.0
+        },
+        "missing": [],
+        "hint": ""
+      },
+      {
+        "seq": 4,
+        "span": "加油100 買",
+        "date": "2026-10-07",
+        "amount": 100.0,
+        "kind": "expense",
+        "cat": "2",
+        "merchant": "",
+        "note": "加油",
+        "conf": {
+          "date": 0.0,
+          "amount": 0.0,
+          "kind": 0.0,
+          "cat": 0.0
+        },
+        "missing": [],
+        "hint": ""
+      },
+      {
+        "seq": 5,
+        "span": "周邊200",
+        "date": "2026-10-07",
+        "amount": 200.0,
+        "kind": "expense",
+        "cat": "8",
+        "merchant": "",
+        "note": "娛樂",
+        "conf": {
+          "date": 0.0,
+          "amount": 0.0,
+          "kind": 0.0,
+          "cat": 0.0
+        },
+        "missing": [],
+        "hint": ""
+      }
+    ],
+    "note": "這段話被切成 5 筆。切分本身也是模型的判斷，請對照原句檢查。"
+  },
+  "ledger_rows_created": 0
+}

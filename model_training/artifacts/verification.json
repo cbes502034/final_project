@@ -1,0 +1,10 @@
+{
+  "baseline_failures": 22,
+  "current_failures": 22,
+  "added_failures": [],
+  "changed_failure_messages": [],
+  "new_expense_tests_passed": 37,
+  "training_pipeline_tests_passed": 4,
+  "nlp_documentation_tests_passed": 9,
+  "comparison_normalizes": "memory addresses and generated test JWTs"
+}

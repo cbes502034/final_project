@@ -1,0 +1,38 @@
+{
+  "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+  "training_steps": 120,
+  "trainable_parameters": 540672,
+  "test_examples": 91,
+  "base_metrics": {
+    "examples": 91,
+    "seconds": 677.38,
+    "json_valid_rate": 1.0,
+    "raw_exact_match": 0.32967032967032966,
+    "validated_exact_match": 0.6043956043956044,
+    "raw_category_accuracy": 0.4019607843137255,
+    "raw_item_accuracy": 0.7549019607843137,
+    "raw_amount_accuracy": 0.9313725490196079
+  },
+  "lora_metrics": {
+    "examples": 91,
+    "seconds": 520.44,
+    "json_valid_rate": 1.0,
+    "raw_exact_match": 0.8791208791208791,
+    "validated_exact_match": 0.989010989010989,
+    "raw_category_accuracy": 0.9607843137254902,
+    "raw_item_accuracy": 0.9901960784313726,
+    "raw_amount_accuracy": 0.9313725490196079
+  },
+  "evaluation_scope": "synthetic held-out template groups; final validation rules were debugged on test outputs",
+  "weights": {
+    "expense-lora/adapter_model.safetensors": {
+      "bytes": 2175168,
+      "sha256": "0a11b0d3382a0f8d24981029fc15a8b3c22d5bc319287b90f9288a6fa29e7d83"
+    },
+    "expense-merged/model.safetensors": {
+      "bytes": 1976163472,
+      "sha256": "50e53820a171156b94baf9391a7ff85c6888191558022a755ce64564e007c366"
+    }
+  }
+}

@@ -1,0 +1,3184 @@
+{
+  "metrics": {
+    "examples": 91,
+    "seconds": 520.44,
+    "json_valid_rate": 1.0,
+    "raw_exact_match": 0.8791208791208791,
+    "validated_exact_match": 0.989010989010989,
+    "raw_category_accuracy": 0.9607843137254902,
+    "raw_item_accuracy": 0.9901960784313726,
+    "raw_amount_accuracy": 0.9313725490196079
+  },
+  "predictions": [
+    {
+      "text": "我在便當上花費50元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": 50
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"便當\",\"amount\":50}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": 50
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": 50
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買便當但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"便當\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了350元買飲料",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"飲料\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了800元買水費",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"水費\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "沒有花錢",
+      "expected": {
+        "expenses": []
+      },
+      "raw": "{\"expenses\":[]}",
+      "parsed": {
+        "expenses": []
+      },
+      "validated": {
+        "expenses": []
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在課本上花費100元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"課本\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買房租但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"房租\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了1200元買車票",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 1200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"車票\",\"amount\":1200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 1200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 1200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買鞋子但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"鞋子\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買計程車但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"計程車\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "買周邊大概100塊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在學費上花費350元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"學費\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了100元買購買周邊 然後 剛剛付了200元買計程車 然後 剛剛付了350元買車票",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          },
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 200
+          },
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":100},{\"category\":\"行\",\"item\":\"計程車\",\"amount\":200},{\"category\":\"行\",\"item\":\"車票\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          },
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 200
+          },
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          },
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 200
+          },
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在晚餐上花費35元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 35
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"晚餐\",\"amount\":35}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 35
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 35
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了800元買計程車",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"計程車\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了100元買買周邊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買課本但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"課本\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了50元買課本",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": 50
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"課本\",\"amount\":50}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": 50
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "課本",
+            "amount": 50
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在加油上花費100元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"加油\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買飲料但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"飲料\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了150元買便當",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": 150
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"便當\",\"amount\":150}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": 150
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "便當",
+            "amount": 150
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在水費上花費800元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"水費\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了800元買電費",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"電費\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在鞋子上花費100元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"鞋子\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買電影票但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"電影票\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了35元買咖啡",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": 35
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"咖啡\",\"amount\":35}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": 35
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": 35
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在補習費上花費85元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 85
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"補習費\",\"amount\":85}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 85
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 85
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了1200元買零食",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 1200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"零食\",\"amount\":1200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 1200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 1200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了800元買加油",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"加油\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了1200元買電影票",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": 1200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"電影票\",\"amount\":1200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": 1200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": 1200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買電費但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"電費\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在衣服上花費800元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"衣服\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買咖啡但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"咖啡\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在車票上花費35元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 35
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"車票\",\"amount\":35}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 35
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 35
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買加油但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"加油\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買買周邊但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "衣服大概100塊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"衣服\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "學費大概100塊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"學費\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了100元買捐款",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"捐款\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了200元買遊戲",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": 200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"遊戲\",\"amount\":200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": 200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": 200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買零食但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"零食\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了85元買午餐",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 85
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"午餐\",\"amount\":85}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 85
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 85
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在電影票上花費1200元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": 1200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"電影票\",\"amount\":1200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": 1200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": 1200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買購買周邊但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "加油大概100塊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"加油\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在購買周邊上花費100元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在咖啡上花費800元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"咖啡\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "咖啡",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了100元買停車",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"停車\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在電費上花費350元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"電費\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "電費",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買遊戲但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"遊戲\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在捐款上花費50元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": 50
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"捐款\",\"amount\":50}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": 50
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": 50
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在遊戲上花費800元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": 800
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"遊戲\",\"amount\":800}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": 800
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "遊戲",
+            "amount": 800
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了350元買補習費 然後 剛剛付了350元買買周邊 然後 剛剛付了100元買計程車",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 350
+          },
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 350
+          },
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"補習費\",\"amount\":350},{\"category\":\"其他\",\"item\":\"買周邊\",\"amount\":350},{\"category\":\"行\",\"item\":\"計程車\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 350
+          },
+          {
+            "category": "其他",
+            "item": "買周邊",
+            "amount": 350
+          },
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 350
+          },
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 350
+          },
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買車票但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"車票\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買停車但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"停車\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買晚餐但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"晚餐\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了150元買購買周邊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 150
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":150}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 150
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 150
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買水費但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"水費\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "水費",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買捐款但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"捐款\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了50元買演唱會門票",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": 50
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"演唱會門票\",\"amount\":50}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": 50
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": 50
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買外套但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"外套\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了350元買早餐",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"早餐\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了200元買買周邊 然後 剛剛付了100元買車票 然後 剛剛付了200元買停車",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 200
+          },
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 100
+          },
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":200},{\"category\":\"住\",\"item\":\"車票\",\"amount\":100},{\"category\":\"行\",\"item\":\"停車\",\"amount\":200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 200
+          },
+          {
+            "category": "住",
+            "item": "車票",
+            "amount": 100
+          },
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 200
+          },
+          {
+            "category": "行",
+            "item": "車票",
+            "amount": 100
+          },
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在演唱會門票上花費35元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": 35
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"演唱會門票\",\"amount\":35}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": 35
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": 35
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了150元買晚餐",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 150
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"晚餐\",\"amount\":150}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 150
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 150
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "早餐大概100塊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"早餐\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買補習費但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"補習費\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在早餐上花費100元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"早餐\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了150元買衣服",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": 150
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"衣服\",\"amount\":150}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": 150
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": 150
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買演唱會門票但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"演唱會門票\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "演唱會門票",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買衣服但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"衣服\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "衣服",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "電影票大概100塊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"樂\",\"item\":\"電影票\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "樂",
+            "item": "電影票",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了350元買停車 然後 剛剛付了200元買零食 然後 剛剛付了350元買捐款",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 350
+          },
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 200
+          },
+          {
+            "category": "其他",
+            "item": "捐款",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"停車\",\"amount\":350},{\"category\":\"食\",\"item\":\"零食\",\"amount\":200},{\"category\":\"樂\",\"item\":\"捐款\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 350
+          },
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 200
+          },
+          {
+            "category": "樂",
+            "item": "捐款",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 350
+          },
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 200
+          },
+          {
+            "category": "樂",
+            "item": "捐款",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買早餐但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"早餐\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買午餐但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"午餐\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了100元買外套",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"外套\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在午餐上花費85元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 85
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"午餐\",\"amount\":85}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 85
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 85
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "房租大概100塊",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"房租\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在買周邊上花費1200元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 1200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"其他\",\"item\":\"娛樂\",\"amount\":1200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 1200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 1200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在飲料上花費35元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": 35
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"飲料\",\"amount\":35}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": 35
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "飲料",
+            "amount": 35
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了150元買補習費",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 150
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"補習費\",\"amount\":150}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 150
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "補習費",
+            "amount": 150
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了85元買學費",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": 85
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"學費\",\"amount\":85}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": 85
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": 85
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了200元買房租",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": 200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"房租\",\"amount\":200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": 200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": 200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "有買學費但忘了多少錢",
+      "expected": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": null
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"育\",\"item\":\"學費\",\"amount\":null}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": null
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "育",
+            "item": "學費",
+            "amount": null
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在停車上花費85元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 85
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"停車\",\"amount\":85}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 85
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "停車",
+            "amount": 85
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在計程車上花費50元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 50
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"行\",\"item\":\"計程車\",\"amount\":50}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 50
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "行",
+            "item": "計程車",
+            "amount": 50
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在外套上花費350元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"外套\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "外套",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在零食上花費100元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 100
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"零食\",\"amount\":100}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 100
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "零食",
+            "amount": 100
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "我在房租上花費350元",
+      "expected": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"住\",\"item\":\"房租\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "住",
+            "item": "房租",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "剛剛付了350元買鞋子",
+      "expected": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": 350
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"衣\",\"item\":\"鞋子\",\"amount\":350}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": 350
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "衣",
+            "item": "鞋子",
+            "amount": 350
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    },
+    {
+      "text": "早餐50 午餐100 晚餐200 加油100 買周邊200",
+      "expected": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 50
+          },
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 100
+          },
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 200
+          },
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 100
+          },
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 200
+          }
+        ]
+      },
+      "raw": "{\"expenses\":[{\"category\":\"食\",\"item\":\"早餐\",\"amount\":50},{\"category\":\"食\",\"item\":\"午餐\",\"amount\":100},{\"category\":\"食\",\"item\":\"晚餐\",\"amount\":200},{\"category\":\"其他\",\"item\":\"加油\",\"amount\":100},{\"category\":\"周邊\",\"item\":\"娛樂\",\"amount\":200}]}",
+      "parsed": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 50
+          },
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 100
+          },
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 200
+          },
+          {
+            "category": "其他",
+            "item": "加油",
+            "amount": 100
+          },
+          {
+            "category": "周邊",
+            "item": "娛樂",
+            "amount": 200
+          }
+        ]
+      },
+      "validated": {
+        "expenses": [
+          {
+            "category": "食",
+            "item": "早餐",
+            "amount": 50
+          },
+          {
+            "category": "食",
+            "item": "午餐",
+            "amount": 100
+          },
+          {
+            "category": "食",
+            "item": "晚餐",
+            "amount": 200
+          },
+          {
+            "category": "行",
+            "item": "加油",
+            "amount": 100
+          },
+          {
+            "category": "其他",
+            "item": "娛樂",
+            "amount": 200
+          }
+        ]
+      },
+      "error": null,
+      "json_valid": true
+    }
+  ],
+  "status": "complete",
+  "split": "test",
+  "limited": false,
+  "model": "E:\\LLM\\topic\\final_project\\model_training\\artifacts\\expense-lora",
+  "validation_rules_refreshed": "same final validator applied to stored raw generations; no retraining"
+}

@@ -1,0 +1,355 @@
+/* ============================================================
+   tokens.css — 設計權杖
+
+   視覺方向：紙本帳冊。
+   米白的紙、乾淨的線、克制的顏色、看得懂的數字。
+   顏色只在「有意義的時候」出現——收入、支出、提醒，
+   其餘一律讓位給內容。
+
+   互動：每一個可以按的東西都要有反應。
+   浮起（hover）、壓下（active）、回彈（transition），
+   讓介面像實體物件一樣可以被「碰」。
+   ============================================================ */
+:root {
+  /* -- 紙與面 ------------------------------------------------
+     paper 是整頁的底，card 是浮在上面的紙卡。
+     兩者的差距刻意做得很小，靠陰影和線條分層，不是靠顏色對比。 */
+  --paper:       #F4F1EA;
+  --paper-2:     #EFEBE2;
+  --card:        #FFFFFF;
+  --card-2:      #FCFAF6;
+  --card-3:      #F7F4EE;
+  --sunk:        #F1EEE6;          /* 輸入框、內凹的區塊 */
+
+  /* -- 線 -- */
+  --line:        #E7E2D8;
+  --line-2:      #DAD3C6;
+  --line-3:      #C3BAA9;
+
+  /* -- 字 ----------------------------------------------------
+     不用純黑。純黑配米白會太刺，#1B1D21 讀起來柔和但一樣清楚。 */
+  --ink:         #1B1D21;
+  --ink-soft:    #4E535A;
+  --ink-faint:   #666B73;          /* ⚠️ 小字要過 4.5:1。原本 #7B8189 只有 3.9 */
+  --ink-dim:     #858A91;          /* 幣別這類裝飾字，門檻 3:1 */
+
+  /* -- 主色：深玉綠 ------------------------------------------
+     錢的顏色。飽和度壓低，跟米白配起來像印刷油墨而不是螢光。 */
+  --accent:      #1B6B5A;
+  --accent-hi:   #14564A;
+  --accent-soft: #4E9585;
+  --accent-wash: #E6F0EC;
+  --accent-line: #BFD9D1;
+
+  /* -- 副色：陶土橘 ------------------------------------------
+     只用在需要「暖」的地方（歡迎、提示、空狀態），不搶主色。 */
+  --accent-2:      #C4693C;
+  --accent-2-wash: #FBEDE4;
+  --on-accent:     #FFFFFF;        /* 主色按鈕上的字。深色主題主色是螢光綠，字就要反過來用深色 */
+
+  /* -- 語意色 -- */
+  --up:          #2C7A56;          /* 收入、達標 */
+  --down:        #BE4239;          /* 支出、超支 */
+  --warn:        #B0741A;          /* 接近上限 */
+  --info:        #3C5FA0;          /* 參考資訊 */
+
+  --up-wash:     #E7F2EC;
+  --down-wash:   #FCEEEC;
+  --warn-wash:   #FBF0DE;
+  --info-wash:   #EAEFF8;
+  --warn-ink:    #8C5409;          /* 提醒色拿來當「字」的時候用這個，warn 本身只夠當圖示 */
+
+  /* -- 疊在一起的數字卡 ----------------------------------------
+     像皮夾裡的卡片：後面兩張露出一截（收入、支出），最前面那張是還可以花。
+     stack-1、stack-2 上面是白字，stack-3 上面是一般的深色字。 */
+  --stack-1:     #123F36;
+  --stack-2:     #1B6B5A;
+  --stack-3:     #FFFFFF;
+  --stack-ink:   #FFFFFF;
+
+  --band:        #E3EEE8;          /* 頁面最上面那一條淡色帶，往下淡出 */
+  --badge:       #D6453A;          /* 未讀數字的紅底 */
+  --badge-ink:   #FFFFFF;
+  --knob:        #FFFFFF;          /* 開關上的圓鈕 */
+  --shade:       #3C3223;          /* 陰影的顏色。米白底上用純黑會發灰 */
+  --shade-deep:  #1C1812;          /* 遮罩 */
+
+  /* -- 圓角：交給主題決定 ------------------------------------
+     ⚠️ 2026-09-14 改。以前這裡全部是 0（帳冊的直線感），
+     使用者看了一陣子覺得「全部方方正正有點怪」，拿富邦、元大的 App 當參考——
+     大圓角的卡片、圓形的功能圖示、膠囊形的按鈕。
+
+     現在圓角是主題的一部分：預設是圓潤的，「資訊科技」「藝術」兩套再收回直角。
+     元件只寫 var(--r-*)，不寫數字。 */
+  --r-card:      20px;   /* 區塊、卡片 */
+  --r-panel:     16px;   /* 浮起來的面板 */
+  --r-input:     12px;   /* 按鈕、輸入框 */
+  --r-sm:        10px;   /* 小方塊：圖示底、品牌方塊 */
+  --r-xs:        6px;    /* 程式碼、極小的東西 */
+  --r-icon:      999px;  /* 常用功能的圖示底：圓的 */
+  --r-pill:      999px;  /* 膠囊、徽章、開關 */
+  --r-bar:       999px;  /* 進度條 */
+  --r-ava:       999px;  /* 頭像 */
+  --r-dot:       999px;  /* 分類與帳本的小色點 */
+
+  /* -- 字體 --------------------------------------------------
+     數字用等寬，因為帳目要對得齊。 */
+  /* ⚠️ 2026-09-14：全站只用一套字。
+     以前標題是襯線體、內文黑體、數字等寬、主題還會各自換字（楷體、粉圓、等寬），
+     一頁裡混了四五種字。現在全部是粉圓體，主題只換顏色和形狀。
+     例外只有兩個：品牌那兩行（藝術字）、程式碼（要對齊，一定得等寬）。 */
+  --sans: "Huninn", "jf-openhuninn-2.0", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --serif: var(--sans);
+  --display: var(--sans);
+  --mono: var(--sans);                /* 介面上的數字、編號也同一套 */
+  --code: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --brand-zh: "Yuji Boku", "Kaisei Decol", serif;     /* 品牌：毛筆字的「家庭記帳」 */
+  --brand-en: "Kaushan Script", "Segoe Script", cursive;  /* 品牌：筆刷草寫的 FamBudget */
+
+  /* -- 尺度 -- */
+  --rail: 232px;
+  --bar: 62px;
+
+  /* -- 標題層級 ----------------------------------------------
+     ⚠️ 三層標題**不可以只差一兩個像素**。
+
+     之前頁面標題 17px、區塊標題 15.5px、卡片標題 15px，
+     同字體、同字重、同顏色、同一個左邊界——使用者根本分不出
+     「這是一整頁」「這是一個區塊」「這是區塊裡的一張卡」，
+     整個畫面讀起來混成一片。
+
+     現在三層用四種方式同時拉開：
+       第一層  頁面   30px  襯線 700   內容區最上方，上面有分區小字
+       第二層  區塊   19px  黑體 700   白色區塊的「外面」，左邊一條色帶
+       第三層  卡片   14.5px 黑體 600  白色區塊的「裡面」，淡色標題列
+     字級、字體、位置、裝飾都不同，任何一項看不出來，其他三項也看得出來。 */
+  --h1: 30px;
+  --h2: 19px;
+  --h3: 14.5px;
+  --lbl: 12px;           /* 欄位標籤、表頭 */
+
+  /* -- 版面 --------------------------------------------------
+     ⚠️ 內容有最大寬度。寬螢幕上不設上限的話，
+     標題在最左邊、「記一筆」在一千多像素外的最右邊，
+     眼睛要橫跨整個螢幕才找得到它屬於哪裡。 */
+  --page-w: 1120px;
+  --page-x: 32px;        /* 內容左右留白 */
+  --pad: 22px;           /* 區塊內距 */
+  --gap: 18px;           /* 區塊之間 */
+  --ctl: 36px;           /* 一般控制項的高度（篩選、小按鈕） */
+
+  /* -- 動態曲線 ----------------------------------------------
+     ease  一般轉場
+     out   收尾慢，適合「浮起來」
+     back  尾端過衝一點點，按鈕回彈用，這是「手感」的來源 */
+  --ease: cubic-bezier(.3, .7, .3, 1);
+  --out:  cubic-bezier(.16, 1, .3, 1);
+  --back: cubic-bezier(.34, 1.56, .64, 1);
+
+}
+
+* { box-sizing: border-box; }
+
+/* ⚠️ 會引用其他變數的變數，要在每一個 [data-theme] 上重新宣告一次。
+
+   自訂屬性往下繼承的是「已經代換好的值」。主題設定頁的小預覽自己掛著
+   data-theme="tech"，如果 --shadow-card 只在 :root 算過一次，
+   預覽裡拿到的就是米白主題的陰影色，不會跟著那一套主題變。 */
+:root, [data-theme] {
+  --shadow-flat:  0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-block: 0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 6px 18px color-mix(in srgb, var(--shade) 6%, transparent);
+  --shadow-card:  0 1px 2px color-mix(in srgb, var(--shade) 5%, transparent),
+                  0 10px 28px color-mix(in srgb, var(--shade) 8%, transparent);
+  --shadow-lift:  0 2px 4px color-mix(in srgb, var(--shade) 6%, transparent),
+                  0 14px 34px color-mix(in srgb, var(--shade) 12%, transparent);
+  --shadow-pop:   0 8px 20px color-mix(in srgb, var(--shade) 10%, transparent),
+                  0 28px 64px color-mix(in srgb, var(--shade) 16%, transparent);
+  --shadow-in:    inset 0 1px 2px color-mix(in srgb, var(--shade) 6%, transparent);
+  --scrim:        color-mix(in srgb, var(--shade-deep) 38%, transparent);
+
+  /* 頁面底紋：兩團極淡的暖光，加上幾乎看不見的方格（帳簿的暗示） */
+  --bg-art:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px),
+    radial-gradient(900px 600px at 12% -6%, color-mix(in srgb, var(--accent-2) 5%, transparent), transparent 62%),
+    radial-gradient(760px 520px at 92% 4%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 60%);
+  --bg-size: 88px 88px, 88px 88px, auto, auto;
+  /* 最上面那條色帶：從 --band 往下淡出 */
+  --band-bg: linear-gradient(180deg, var(--band) 0%, color-mix(in srgb, var(--band) 55%, transparent) 55%, transparent 100%);
+}
+
+html {
+  background-color: var(--paper);
+  background-image: var(--bg-art);
+  background-size: var(--bg-size);
+  background-attachment: fixed;
+  scroll-behavior: smooth;
+
+  /* ---------- 語意色：分類與帳本 ----------
+     ⚠️ 這些**不是裝飾色，是資料的顏色**。
+
+     以前它們是色碼，直接寫在 data.js 裡（餐飲 #C4693C、家用 #27405E …）。
+     那表示它們是「資料」不是「主題」——換一套外觀的時候，
+     圓餅圖和帳本圓點還是原來的顏色，跟整頁格格不入。
+
+     改成代號之後，資料只說「這是餐飲」，**由主題決定餐飲長什麼樣**。
+     要做第二套外觀，只要在這裡重新定義一次就好。
+
+     ⚠️ 加新顏色之前先量對比：小圓點這類非文字元素門檻是 3:1，
+     有測試在擋（見 test_帳本顏色在米白上看得見）。 */
+  --cat-food: #C4693C;
+  --cat-transit: #3C5FA0;
+  --cat-home: #6A5B9E;
+  --cat-daily: #2C7A56;
+  --cat-fun: #BE4239;
+  --cat-study: #B0741A;
+  --cat-health: #3E8DA8;
+  --cat-other: #8A8E95;
+  --cat-bonus: #1B6B5A;
+
+  --book-indigo: #27405E;
+  --book-violet: #4A3F6B;
+  --book-teal: #1F5E63;
+  --book-moss: #2F5D3A;
+  --book-umber: #7A4A2E;
+  --book-wine: #7A2F3C;
+
+}
+
+body {
+  margin: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.7;
+  letter-spacing: .1px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* 舊版的星空 canvas 在紙上沒有意義，收起來 */
+#stars { display: none; }
+
+h1, h2, h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: -.015em;
+  color: var(--ink);
+}
+h4 { margin: 0; font-weight: 600; letter-spacing: .01em; }
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select, textarea { font: inherit; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hi); }
+table { border-collapse: collapse; }
+
+code, pre, kbd, samp { font-family: var(--code); }
+
+/* ============================================================
+   品牌：上面毛筆字「家庭記帳」，下面筆刷草寫 FamBudget
+   ------------------------------------------------------------
+   中文是英文的兩倍大，兩行一樣寬，沒有框。系統、使用說明、專題文件共用這一份。
+   ⚠️ 數字是量出來的（兩種字「墨」的實際寬度，單位是各自的 em）：
+        家庭記帳 在 Yuji Boku 裡：墨寬 3.92em，左邊留白 0.07em
+        FamBudget 在 Kaushan Script 裡：墨寬 4.58em，左邊留白 0.11em
+     ⚠️ 加了字距之後瀏覽器會關掉連字，英文的墨寬實測變成 4.78em。
+     英文縮成 1/2 之後是 4.78 ÷ 2 ＝ 2.39em（中文的 em），差 1.55em，
+     平均分給 8 個字母間距 → 每個間距約 0.2em（中文）＝ 0.41em（英文自己的 em，實測校正過）。
+     最後一個字母後面也會多一格間距，用 margin-right 收回去；左邊往右推一點點對齊筆畫。
+     （使用者先要三倍，字母被撐得太開，改成兩倍。）
+   換字體的話這幾個數字要重新量。
+   ============================================================ */
+.brand {
+  display: inline-flex; flex-direction: column; align-items: flex-start !important; gap: 0 !important; width: max-content;
+  font-size: 22px; line-height: 1; color: var(--ink); text-decoration: none;
+}
+.brand:hover { color: var(--ink); text-decoration: none; }
+.brand__zh { display: block; font-family: var(--brand-zh); font-size: 1em; font-weight: 400; line-height: 1; letter-spacing: 0; white-space: nowrap; }
+.brand__en {
+  display: block; margin: -.06em -.41em 0 .03em;   /* 上下貼近：英文大寫的頂端剛好碰到中文筆畫的底 */
+  font-family: var(--brand-en); font-size: .5em; font-weight: 400; line-height: 1.05; letter-spacing: .41em; white-space: nowrap;
+  color: var(--accent);
+}
+
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+.serif { font-family: var(--serif); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: var(--r-pill);
+  border: 4px solid transparent; background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--line-3); background-clip: content-box; }
+
+::selection { background: var(--accent-wash); color: var(--accent-hi); }
+
+/* ============================================================
+   互動的共通語彙
+   ------------------------------------------------------------
+   任何「可以按」的東西都掛上 .tap，就有一致的手感：
+   滑過去浮起來，按下去壓回去。
+   ============================================================ */
+.tap {
+  transition: transform .18s var(--back),
+              box-shadow .18s var(--out),
+              background-color .16s var(--ease),
+              border-color .16s var(--ease),
+              color .16s var(--ease);
+}
+.tap:hover { transform: translateY(-1px); }
+.tap:active { transform: translateY(0) scale(.985); transition-duration: .06s; }
+
+/* ---------- 動態 ---------- */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideL {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes growW { from { width: 0 !important; } }
+@keyframes growH { from { height: 0 !important; } }
+@keyframes shimmer {
+  from { background-position: -420px 0; }
+  to   { background-position: 420px 0; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(14px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes nudge {
+  0%, 100% { transform: none; }
+  30%      { transform: translateX(-3px); }
+  60%      { transform: translateX(3px); }
+}
+
+.rise { animation: riseIn .5s var(--out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  html { scroll-behavior: auto; }
+  .tap:hover, .tap:active { transform: none; }
+}

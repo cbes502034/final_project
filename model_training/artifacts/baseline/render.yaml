@@ -1,0 +1,87 @@
+# ============================================================
+# Render 部署設定
+# ------------------------------------------------------------
+# 兩個服務 + 一個資料庫：
+#   web  靜態前端（走 CDN，即時載入）
+#   api  FastAPI 後端
+#   db   PostgreSQL
+# ============================================================
+
+databases:
+  - name: fambudget-db
+    plan: free
+    databaseName: fambudget
+    user: fambudget
+
+services:
+  # ---------- 前端：純靜態 ----------
+  - type: web
+    name: fambudget-web
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: ./frontend
+    pullRequestPreviewsEnabled: false
+    # 這裡刻意沒有 rewrite 規則。
+    # 前端走的是 hash 路由（#/entry），瀏覽器只會跟伺服器要 "/"，
+    # 井號後面完全不會送出去 —— 所以不需要「任何路徑都回 index.html」。
+    # 而且那種規則有機會把 /docs/*.html 這些真實檔案一起吃掉。
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+
+  # ---------- 後端：FastAPI ----------
+  # ⚠️ 名字不能叫 fambudget-api —— Render 的子網域是全球共用的，
+  # fambudget-api.onrender.com 已經被另一個使用者的西班牙文記帳 App 佔走了。
+  # 千萬不要把前端的 api-base 指過去，那會把使用者的資料送到陌生人的伺服器。
+  - type: web
+    name: fambudget-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # 先把資料表升到最新版（alembic/versions/），再啟動。沒有新版本時 upgrade 什麼都不做
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      # production：資料庫不印 SQL、錯誤訊息不帶內部細節
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fambudget-db
+          property: connectionString
+      - key: ALLOWED_ORIGINS
+        value: https://fambudget-web.onrender.com,http://localhost:5174
+      # JWT_SECRET、MODEL_BASE_URL、MODEL_API_KEY 要在 Render 後台自行填入，不要寫進 repo
+      - key: JWT_SECRET
+        sync: false
+      # 我們自己微調的模型服務網址。留空時後端會回傳假資料，
+      # 前後端仍然串得起來。
+      - key: MODEL_BASE_URL
+        sync: false
+      # 模型服務要驗證時的 token（私有的 Hugging Face Space）。公開的就留空
+      - key: MODEL_API_KEY
+        sync: false
+      # 忘記密碼的寄信服務（Brevo HTTP API）。⚠️ 免費方案擋 SMTP 埠，不要改用 SMTP。
+      # 金鑰與寄件信箱都在 Render 後台自行填入，不要寫進 repo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: 家庭記帳
+      # 重設密碼信裡的連結開頭
+      - key: APP_BASE_URL
+        value: https://fambudget-web.onrender.com
+      # 平台管理員的 email（逗號分隔），python -m app.cli make-admin 會用到。是個人信箱，在後台填
+      - key: ADMIN_EMAILS
+        sync: false

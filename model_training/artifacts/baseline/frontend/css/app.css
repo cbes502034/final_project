@@ -1,0 +1,3728 @@
+/* ============================================================
+   app.css — 元件與八個畫面
+   ============================================================ */
+
+/* ⚠️ 這條要放在最前面，而且一定要有。
+
+   瀏覽器預設的 [hidden] 是 `display: none`，但它的優先度跟元素選擇器
+   一樣低——只要我們自己寫了 `.gsw__p { display: grid }`，class 就贏了，
+   hidden 屬性直接失效。
+
+   這個坑踩過兩次，而且兩次都不會報錯，只會「怪怪的」：
+     · 帳本面板永遠攤在首頁上，把第一屏整個佔掉；
+       按切換鈕時 hidden 有翻，畫面卻沒變——看起來就是「按了沒反應」。
+     · 搜尋框在寬螢幕看得見、打得了字，hidden 卻是 true，
+       螢幕閱讀器會直接跳過它。
+
+   所以這裡一次講死：hidden 說了算。 */
+[hidden] { display: none !important; }
+
+.app { position: relative; z-index: 1; display: flex; min-height: 100vh; }
+
+/* ============================================================
+   左側導覽
+   ============================================================ */
+
+.brand__n { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+
+/* ============================================================
+   文件清單：釘在側欄底部，不跟著捲動
+   ------------------------------------------------------------
+   刻意做得很緊湊。原本一份文件一張大卡片，三份就把側欄撐爆
+   （1366×768 的筆電上最後一個導覽項會被裁掉）。
+   清單式可以容納五六份都不會有問題。
+   ============================================================ */
+.docs { padding: 0 10px 6px; flex: 0 0 auto; }
+
+/* 專題說明文件是主文件，給它一點顏色跟其他區隔 */
+
+
+/* ============================================================
+   上方列
+   ============================================================ */
+.main { flex: 1; margin-left: calc(var(--rail) + 24px); min-width: 0; padding-right: 12px; }
+
+.search { position: relative; width: 250px; max-width: 32vw; }
+.search input {
+  width: 100%; background: var(--sunk); border: 1px solid var(--line);
+  border-radius: var(--r-input); color: var(--ink);
+  padding: 9px 14px 9px 34px; font-size: 13px; letter-spacing: .16px;
+  transition: border-color .2s, background .2s;
+}
+.search input::placeholder { color: var(--ink-dim); }
+.search input:focus { outline: none; border-color: var(--accent); background: var(--accent-line); }
+.search__ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--ink-dim); }
+
+/* ============================================================
+   按鈕
+   ============================================================ */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 9px 18px; font-size: 13.5px; font-weight: 500; letter-spacing: .16px;
+  border: 1px solid var(--line-2); border-radius: var(--r-input); color: var(--ink-soft);
+  transition: all .2s var(--ease);
+}
+.btn:hover { border-color: var(--accent); color: var(--ink); background: var(--accent-wash); }
+.btn--go {
+  background: var(--accent); border-color: var(--accent); color: var(--card);
+  box-shadow: 0 6px 20px var(--accent-line);
+}
+.btn--go:hover { background: var(--accent-hi); border-color: var(--accent-hi); color: var(--card); box-shadow: var(--shadow-lift); }
+.btn--sm { padding: 6px 13px; font-size: 12.5px; }
+.btn--danger:hover { border-color: var(--down); color: var(--down); background: var(--down-wash); }
+.btn[disabled] { opacity: .45; pointer-events: none; }
+.btn__sp {
+  width: 13px; height: 13px; border: 2px solid currentColor; border-top-color: transparent;
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+
+/* ============================================================
+   頁面容器
+   ============================================================ */
+.page { padding: 22px 4px 70px; max-width: 1380px; animation: fadeIn .35s var(--ease); }
+.mock {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 12px 0 0; padding: 11px 18px; font-size: 12px; color: var(--warn);
+  background: var(--warn-wash); border: 1px solid var(--warn-wash);
+  border-radius: var(--r-card);
+}
+.mock b { font-size: 11px; letter-spacing: .1em; }
+.mock code {
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+  background: var(--sunk); padding: 2px 7px; border-radius: var(--r-xs);
+}
+
+.sec { display: flex; align-items: center; gap: 12px; margin: 32px 0 15px; }
+.sec:first-child { margin-top: 0; }
+.sec__t { font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--ink); }
+.sec__n { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--ink-dim); margin-left: auto; }
+
+/* ============================================================
+   卡片與指標
+   ============================================================ */
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-card); padding: 20px 22px 22px;
+  box-shadow: var(--shadow-card);
+  animation: riseIn .55s var(--ease) both;
+}
+.card__h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 18px; }
+.card__t { font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink); }
+.card__s { font-size: 11.5px; color: var(--ink-faint); margin-left: auto; }
+
+.kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (min-width: 1180px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 520px)  { .kpis { grid-template-columns: 1fr; } }
+
+.kpi {
+  position: relative; overflow: hidden;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-card); padding: 18px 20px 20px;
+  box-shadow: var(--shadow-card);
+  transition: transform .25s var(--ease), border-color .25s var(--ease);
+  animation: riseIn .55s var(--ease) both;
+}
+.kpi:hover { transform: translateY(-3px); border-color: var(--line-2); }
+.kpi::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: .55;
+}
+.kpi--up::before, .kpi--ok::before   { background: linear-gradient(90deg, transparent, var(--up), transparent); }
+.kpi--down::before, .kpi--crit::before { background: linear-gradient(90deg, transparent, var(--down), transparent); }
+.kpi--warn::before { background: linear-gradient(90deg, transparent, var(--warn), transparent); }
+.kpi__k { font-size: 12px; color: var(--ink-faint); letter-spacing: .06em; }
+.kpi__v {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 26px; font-weight: 600; line-height: 1.2; color: var(--ink); margin: 10px 0 6px;
+}
+.kpi__v small { font-size: 13px; color: var(--ink-dim); font-weight: 400; margin-left: 4px; }
+.kpi--up .kpi__v, .kpi--ok .kpi__v   { color: var(--up); }
+.kpi--down .kpi__v, .kpi--crit .kpi__v { color: var(--down); }
+.kpi--warn .kpi__v { color: var(--warn); }
+.kpi__s { font-size: 11.5px; color: var(--ink-faint); line-height: 1.6; }
+
+/* ============================================================
+   標籤
+   ============================================================ */
+.tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500; letter-spacing: .04em;
+  padding: 3px 10px; border-radius: var(--r-pill); border: 1px solid;
+}
+.tag--up    { color: var(--up);   border-color: var(--up-wash); background: var(--up-wash); }
+.tag--down  { color: var(--down); border-color: var(--down-wash); background: var(--down-wash); }
+.tag--warn  { color: var(--warn); border-color: var(--warn-wash); background: var(--warn-wash); }
+.tag--info  { color: var(--info); border-color: color-mix(in srgb, var(--info) 35%, transparent); background: var(--info-wash); }
+.tag--soft  { color: var(--ink-soft); border-color: var(--line-2); background: var(--sunk); }
+.tag--na    { color: var(--ink-dim); border-color: var(--line); }
+.tag--CRITICAL { color: var(--down); border-color: var(--down-wash); background: var(--down-wash); }
+.tag--MEDIUM   { color: var(--warn); border-color: var(--warn-wash); background: var(--warn-wash); }
+.tag--done     { color: var(--up);   border-color: var(--up-wash); background: var(--up-wash); }
+
+/* ============================================================
+   工具列與篩選
+   ============================================================ */
+.bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 16px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  padding: 7px 15px; font-size: 12.5px; font-weight: 500; letter-spacing: .16px;
+  border: 1px solid var(--line-2); border-radius: var(--r-pill); color: var(--ink-faint);
+  transition: all .2s var(--ease);
+}
+.chip:hover { border-color: var(--accent); color: var(--ink); background: var(--accent-wash); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--card); }
+
+.sel {
+  background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink-soft);
+  padding: 7px 30px 7px 15px; font-size: 12.5px; appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
+  background-size: 5px 5px; background-repeat: no-repeat;
+}
+.sel:hover, .sel:focus { border-color: var(--accent); color: var(--ink); outline: none; }
+
+/* ============================================================
+   表格
+   ============================================================ */
+.tbl {
+  border: 1px solid var(--line); border-radius: var(--r-card); overflow: auto;
+  background: var(--card); box-shadow: var(--shadow-card);
+  margin-bottom: 4px;
+}
+.tbl table { width: 100%; min-width: 640px; font-size: 13px; }
+.tbl th {
+  background: var(--card-3); color: var(--ink-faint); text-align: left;
+  padding: 13px 18px; border-bottom: 1px solid var(--line);
+  font-size: 11.5px; font-weight: 500; letter-spacing: .1em; white-space: nowrap;
+}
+.tbl td { padding: 14px 18px; border-bottom: 1px solid var(--line); color: var(--ink-soft); vertical-align: top; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl tbody tr { transition: background .18s; }
+.tbl tbody tr:hover { background: var(--card-3); }
+.tbl tbody tr:hover td { color: var(--ink); }
+.tbl b { color: var(--ink); font-weight: 600; }
+.tbl .mono { font-family: var(--mono); font-size: 12px; }
+
+/* ============================================================
+   列（成員、明細）
+   ============================================================ */
+.rows { display: flex; flex-direction: column; gap: 10px; }
+.row {
+  display: grid; align-items: center; gap: 16px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-card); padding: 16px 20px;
+  box-shadow: var(--shadow-card);
+  transition: transform .22s var(--ease), border-color .22s var(--ease);
+  animation: riseIn .5s var(--ease) both;
+}
+.row:hover { transform: translateY(-2px); border-color: var(--line-2); }
+.row__m { min-width: 0; }
+.row__top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 6px; }
+.row__act { font-size: 15px; font-weight: 600; color: var(--ink); }
+.row__sub { font-size: 12.5px; color: var(--ink-faint); line-height: 1.7; }
+.row__do { display: flex; gap: 7px; justify-content: flex-end; }
+
+.sla { text-align: right; }
+.sla__v { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); }
+.sla__b { height: 5px; background: var(--paper-2); border-radius: var(--r-bar); margin-top: 7px; overflow: hidden; }
+.sla__b i { display: block; height: 100%; border-radius: var(--r-bar); animation: growW .9s var(--ease) both; }
+
+/* 頭像 */
+.ava {
+  width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--r-ava);
+  background: linear-gradient(140deg, var(--accent-line), var(--accent-line));
+  border: 1px solid var(--line-2); color: var(--card);
+  font-family: var(--serif); font-size: 15px; font-weight: 600;
+}
+.ava--sm { width: 26px; height: 26px; font-size: 12px; }
+
+/* 目前登入者 */
+.who { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.quota__k { font-size: 10.5px; letter-spacing: .12em; color: var(--ink-dim); }
+
+/* ============================================================
+   預算列
+   ============================================================ */
+.bgt { display: grid; grid-template-columns: 150px 1fr 190px; align-items: center; gap: 16px; padding: 11px 0; }
+.bgt__k { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--ink-soft); }
+.bgt__t { height: 8px; background: var(--paper-2); border-radius: var(--r-bar); overflow: hidden; }
+.bgt__t i { display: block; height: 100%; border-radius: var(--r-bar); animation: growW 1s var(--ease) both; }
+.bgt__v { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); text-align: right; }
+.bgt__v.is-over { color: var(--down); font-weight: 600; }
+.dot { width: 10px; height: 10px; border-radius: var(--r-dot); display: inline-block; flex: 0 0 10px; }
+
+/* ============================================================
+   圓環與長條
+   ============================================================ */
+.dnt { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; }
+.dnt__l { flex: 1; min-width: 230px; display: flex; flex-direction: column; gap: 9px; }
+.dnt__i { display: grid; grid-template-columns: 10px 1fr auto 48px; align-items: center; gap: 11px; font-size: 12.5px; }
+.dnt__n { color: var(--ink-soft); }
+.dnt__v { font-family: var(--mono); color: var(--ink-faint); font-size: 11.5px; }
+.dnt__p { font-family: var(--mono); color: var(--ink-dim); font-size: 11px; text-align: right; }
+
+.bars { display: flex; gap: 14px; align-items: flex-end; height: 155px; padding-top: 8px; }
+.bars__g { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; }
+.bars__p { flex: 1; display: flex; gap: 4px; align-items: flex-end; width: 100%; justify-content: center; }
+.bars__p i { width: 13px; display: block; border-radius: var(--r-bar); animation: growH .9s var(--ease) both; }
+.bars__k { font-family: var(--mono); font-size: 10px; color: var(--ink-dim); }
+
+.mix { display: flex; flex-direction: column; gap: 12px; }
+.mix__r { display: grid; grid-template-columns: 52px 1fr 34px; align-items: center; gap: 12px; }
+.mix__k { font-size: 12.5px; color: var(--ink-soft); }
+.mix__t { height: 8px; background: var(--paper-2); border-radius: var(--r-bar); overflow: hidden; }
+.mix__t i { display: block; height: 100%; border-radius: var(--r-bar); animation: growW 1s var(--ease) both; }
+.mix__n { font-family: var(--mono); font-size: 12.5px; color: var(--ink); text-align: right; }
+
+.lgd { display: flex; gap: 16px; font-size: 11.5px; color: var(--ink-faint); margin-top: 14px; flex-wrap: wrap; }
+.lgd i { display: inline-block; width: 9px; height: 9px; border-radius: var(--r-dot); margin-right: 6px; vertical-align: -1px; }
+
+/* ============================================================
+   交易列
+   ============================================================ */
+.tx {
+  display: grid; grid-template-columns: 44px 1fr auto auto; align-items: center; gap: 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: 14px 18px; margin-bottom: 9px;
+  transition: transform .2s var(--ease), border-color .2s var(--ease);
+  animation: riseIn .45s var(--ease) both;
+}
+.tx:hover { transform: translateY(-2px); border-color: var(--line-2); }
+.tx__c {
+  width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--r-dot);
+  border: 1px solid; font-size: 12.5px; font-weight: 600;
+}
+.tx__t { font-size: 14px; color: var(--ink); font-weight: 500; }
+.tx__s { font-size: 12px; color: var(--ink-faint); margin-top: 4px; line-height: 1.7; }
+.tx__raw { color: var(--accent-hi); font-size: 11.5px; }
+.tx__a { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--down); white-space: nowrap; }
+.tx__a.is-in { color: var(--up); }
+
+/* ============================================================
+   一句話記帳
+   ============================================================ */
+.nlp__in { display: flex; gap: 10px; margin-bottom: 14px; }
+.nlp__in input {
+  flex: 1; background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink);
+  padding: 14px 22px; font-size: 15.5px; letter-spacing: .16px;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.nlp__in input::placeholder { color: var(--ink-dim); }
+.nlp__in input:focus {
+  outline: none; border-color: var(--accent); background: var(--accent-line);
+  box-shadow: 0 0 0 4px var(--accent-line);
+}
+.nlp__ex { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--ink-dim); }
+
+.prs {
+  margin-top: 18px; border: 1px solid var(--accent-line); border-radius: var(--r-card);
+  background: linear-gradient(140deg, var(--accent-line), var(--accent-line));
+  padding: 18px 20px; animation: riseIn .35s var(--ease);
+}
+.prs__h { font-size: 13.5px; color: var(--ink); margin-bottom: 15px; }
+.prs__g { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 13px; }
+.prs__f { display: flex; flex-direction: column; gap: 6px; }
+.prs__f label { font-size: 11.5px; letter-spacing: .06em; color: var(--ink-faint); }
+.prs__f label span { color: var(--accent-hi); font-family: var(--mono); }
+.prs__f.is-low label span { color: var(--warn); }
+.prs__f input, .prs__f select {
+  background: var(--sunk); border: 1px solid var(--line-2); border-radius: var(--r-input);
+  color: var(--ink); padding: 10px 13px; font-size: 13.5px;
+}
+.prs__f.is-low input, .prs__f.is-low select { border-color: var(--warn-wash); }
+.prs__f input:focus, .prs__f select:focus { outline: none; border-color: var(--accent); }
+.prs__w {
+  margin-top: 15px; font-size: 12.5px; color: var(--warn); line-height: 1.8;
+  background: var(--warn-wash); border-radius: var(--r-input); padding: 11px 14px;
+}
+.prs__n {
+  margin-top: 15px; font-size: 12.5px; color: var(--ink-faint); line-height: 1.8;
+  background: var(--card-3); border-radius: var(--r-pill); padding: 11px 14px;
+}
+.prs__a { display: flex; gap: 9px; margin-top: 17px; }
+
+/* ============================================================
+   財務建議
+   ============================================================ */
+.adv {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: 20px 22px; margin-bottom: 12px; box-shadow: var(--shadow-card);
+  position: relative; overflow: hidden;
+  animation: riseIn .5s var(--ease) both;
+}
+.adv::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; }
+.adv--warn::before { background: linear-gradient(180deg, var(--down), transparent); }
+.adv--info::before { background: linear-gradient(180deg, var(--info), transparent); }
+.adv--ok::before   { background: linear-gradient(180deg, var(--up), transparent); }
+.adv__h { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; margin-bottom: 11px; }
+.adv__t { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); }
+.adv__m { margin-left: auto; font-size: 11.5px; color: var(--ink-dim); }
+.adv__b { font-size: 13.5px; line-height: 1.95; color: var(--ink-soft); margin-bottom: 15px; }
+.adv__basis, .adv__sug { border-top: 1px solid var(--line); padding-top: 13px; margin-top: 13px; }
+.adv__bk { font-size: 11px; letter-spacing: .1em; color: var(--ink-dim); margin-bottom: 8px; }
+.adv__basis ul, .adv__sug ul { padding-left: 19px; list-style: disc; }
+.adv__basis li, .adv__sug li { font-size: 12.5px; line-height: 1.9; color: var(--ink-soft); }
+.adv__basis li { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); }
+
+/* ============================================================
+   說明區塊
+   ============================================================ */
+.note {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: 16px 20px; margin: 18px 0; max-width: 820px;
+  position: relative; overflow: hidden;
+}
+.note::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent); opacity: .6; }
+.note--warn::before { background: var(--warn); }
+.note--crit::before { background: var(--down); }
+.note__k { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--accent-hi); margin-bottom: 8px; }
+.note--warn .note__k { color: var(--warn); }
+.note--crit .note__k { color: var(--down); }
+.note p { font-size: 13px; line-height: 1.95; color: var(--ink-soft); }
+.note code { font-family: var(--code); font-size: 12px; background: var(--sunk); padding: 2px 7px; border-radius: var(--r-xs); color: var(--ink); }
+
+/* ============================================================
+   資料表抽屜
+   ============================================================ */
+.acc {
+  border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card);
+  overflow: hidden;
+}
+.acc[open] { border-color: var(--line-2); }
+.acc__h {
+  display: flex; align-items: center; gap: 13px; cursor: pointer;
+  padding: 15px 20px; list-style: none; user-select: none; flex-wrap: wrap;
+}
+.acc__h::-webkit-details-marker { display: none; }
+.acc__h:hover { background: var(--card-3); }
+.acc__code {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--accent-hi);
+  background: var(--accent-wash); border: 1px solid var(--accent-line);
+  padding: 3px 11px; border-radius: var(--r-xs);
+}
+.acc[open] .acc__code { background: var(--accent); color: var(--card); border-color: var(--accent); }
+.acc__t { font-size: 14px; font-weight: 500; color: var(--ink); }
+.acc__en { margin-left: auto; font-size: 12px; color: var(--ink-dim); }
+.acc__ic { position: relative; width: 13px; height: 13px; flex: 0 0 13px; }
+.acc__ic i { position: absolute; background: var(--ink-faint); border-radius: var(--r-dot); }
+.acc__ic i:first-child { left: 0; right: 0; top: 5.5px; height: 2px; }
+.acc__ic i:last-child  { top: 0; bottom: 0; left: 5.5px; width: 2px; }
+.acc[open] .acc__ic i:last-child { display: none; }
+.acc[open] .acc__ic i { background: var(--accent); }
+.acc__b { padding: 0 20px 18px; border-top: 1px solid var(--line); }
+.acc__b .tbl { border: 0; box-shadow: none; background: transparent; border-radius: var(--r-card); }
+.acc__b .tbl table { min-width: 460px; }
+
+/* ============================================================
+   狀態
+   ============================================================ */
+.skel { display: flex; flex-direction: column; gap: 10px; }
+.skel__r {
+  height: 68px; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  background-image: linear-gradient(90deg, transparent, var(--card-3), transparent);
+  background-size: 420px 100%; background-repeat: no-repeat;
+  animation: shimmer 1.3s infinite linear;
+}
+.skel__k { height: 118px; }
+
+.empty { text-align: center; padding: 64px 20px; animation: fadeIn .35s var(--ease); }
+.empty__ic { width: 46px; height: 46px; margin: 0 auto 18px; color: var(--ink-dim); }
+.empty__t { font-family: var(--serif); font-size: 16px; color: var(--ink); margin-bottom: 7px; }
+.empty__s { font-size: 13px; color: var(--ink-faint); max-width: 400px; margin: 0 auto; line-height: 1.8; }
+
+.err {
+  border: 1px solid var(--down-wash); background: var(--down-wash);
+  border-radius: var(--r-card); padding: 18px 20px; margin: 18px 0;
+}
+.err__t { font-size: 14px; font-weight: 600; color: var(--down); margin-bottom: 6px; }
+.err__s { font-size: 13px; color: var(--ink-soft); line-height: 1.8; }
+/* 出錯的是哪一支：函式、路由、負責的人。給組員看，要能直接複製 */
+.err__w { margin-top: 8px; font-size: 12.5px; color: var(--ink); overflow-wrap: anywhere; }
+.err__w code { font-family: var(--code); font-size: 12px; padding: 1px 6px; background: var(--sunk); border-radius: var(--r-xs); }
+.err__m { margin-top: 4px; font-size: 12px; color: var(--ink-faint); }
+
+/* ============================================================
+   浮動提示
+   ============================================================ */
+.toasts { position: fixed; right: 24px; bottom: 24px; z-index: 80; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+.toast {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card-3); border: 1px solid var(--line-2); border-radius: var(--r-panel);
+  padding: 13px 20px; box-shadow: var(--shadow-pop);
+  animation: slideL .3s var(--ease); max-width: 400px;
+}
+.toast--ok  { border-color: var(--up-wash); }
+.toast--err { border-color: var(--down-wash); }
+.toast__t { font-size: 13px; color: var(--ink); }
+.toast__u {
+  font-size: 12px; color: var(--accent-hi); border: 1px solid var(--line-2);
+  padding: 4px 13px; border-radius: var(--r-pill);
+}
+.toast__u:hover { border-color: var(--accent); background: var(--accent-wash); }
+
+/* ============================================================
+   RWD
+   ============================================================ */
+@media (max-width: 1080px) {
+  .row { grid-template-columns: 1fr !important; row-gap: 12px; }
+  .sla, .row__do { justify-self: start; text-align: left; }
+  .row__do { justify-content: flex-start; }
+}
+
+@media (max-width: 900px) {
+  .app { display: block; }
+  /* 橫向排列時文件清單也要變成一排膠囊，不然會直向堆疊把側欄撐高 */
+  .docs { display: flex; padding: 0 4px; flex: 0 0 auto; align-items: center; gap: 2px; }
+  .main { margin-left: 0; padding: 0 8px; }
+  .page { padding: 18px 0 60px; }
+}
+
+@media (max-width: 560px) {
+  .search { width: 140px; }
+  .kpi__v { font-size: 22px; }
+  .bgt { grid-template-columns: 1fr; gap: 7px; }
+  .bgt__v { text-align: left; }
+  .tx { grid-template-columns: 40px 1fr; row-gap: 10px; }
+  .tx__a, .tx .btn { grid-column: 2; justify-self: start; }
+  .toasts { right: 12px; left: 12px; bottom: 12px; }              /* 手機上寸土寸金，這一句在文件裡有 */
+  .toast { max-width: none; }
+}
+
+/* 兩欄圖表區 */
+.charts { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; }
+@media (max-width: 1080px) { .charts { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   兩種寫入方式的模式選擇（互斥）
+   ============================================================ */
+
+.mode {
+  display: flex; align-items: flex-start; gap: 14px; text-align: left;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+  padding: 18px 20px;
+  transition: all .22s var(--ease); opacity: .55;
+}
+.mode:hover { opacity: .85; border-color: var(--line-2); }
+.mode.on {
+  opacity: 1; border-color: var(--accent-line);
+  background: linear-gradient(140deg, var(--accent-line), var(--accent-line));
+  box-shadow: 0 8px 30px var(--accent-line);
+}
+.mode .tag { flex: 0 0 auto; margin-top: 2px; }
+
+/* 段落輸入 */
+.nlp__ta {
+  width: 100%; background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink);
+  padding: 15px 18px; font-size: 15px; line-height: 1.9; letter-spacing: .16px;
+  font-family: var(--sans); resize: vertical; margin-bottom: 13px;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.nlp__ta::placeholder { color: var(--ink-dim); }
+.nlp__ta:focus {
+  outline: none; border-color: var(--accent); background: var(--accent-line);
+  box-shadow: 0 0 0 4px var(--accent-line);
+}
+.nlp__row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* ============================================================
+   批次解析結果表
+   ============================================================ */
+.btbl { border: 1px solid var(--line-2); border-radius: var(--r-card); overflow: hidden; }
+.btbl__hd, .btbl__r {
+  display: grid;
+  grid-template-columns: 34px minmax(180px, 1.5fr) 136px 106px 92px 116px 130px 36px;
+  gap: 10px; align-items: center; padding: 10px 14px;
+}
+.btbl__hd {
+  background: var(--card-3); border-bottom: 1px solid var(--line-2);
+  font-size: 11px; letter-spacing: .08em; color: var(--ink-faint);
+}
+.btbl__r {
+  border-bottom: 1px solid var(--line);
+  animation: riseIn .4s var(--ease) both;
+  transition: background .18s;
+}
+.btbl__r:last-child { border-bottom: 0; }
+.btbl__r:hover { background: var(--card-2); }
+.btbl__r.has-miss { background: var(--warn-wash); }
+.btbl__n {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  width: 22px; height: 22px; display: grid; place-items: center;
+  border: 1px solid var(--line-2); border-radius: var(--r-pill);
+}
+.btbl__r.has-miss .btbl__n { border-color: var(--warn-wash); color: var(--warn); }
+.btbl__span { font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; min-width: 0; }
+.btbl__hint {
+  display: block; font-style: normal; font-size: 11px; color: var(--ink-dim);
+  margin-top: 4px; line-height: 1.6;
+}
+.btbl__del {
+  width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--r-input);
+  color: var(--ink-dim); font-size: 12px; transition: all .18s;
+}
+.btbl__del:hover { color: var(--down); background: var(--down-wash); }
+
+/* 每一格：缺欄位與低信心直接標在該欄位上 */
+.bcell { position: relative; display: block; min-width: 0; }
+.bcell input, .bcell select {
+  width: 100%; background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink);
+  padding: 8px 10px; font-size: 12.5px;
+}
+.bcell input:focus, .bcell select:focus { outline: none; border-color: var(--accent); }
+.bcell__c, .bcell__x {
+  position: absolute; right: 7px; top: -8px; font-style: normal;
+  font-size: 9.5px; padding: 1px 6px; border-radius: var(--r-input);
+  font-family: var(--mono); letter-spacing: 0;
+}
+.bcell__c { color: var(--warn); background: var(--warn-wash); border: 1px solid var(--warn-wash); }
+.bcell.is-low input, .bcell.is-low select { border-color: var(--warn-wash); }
+
+.bcell__x {
+  color: var(--card); background: var(--down); font-family: var(--sans);
+  box-shadow: 0 3px 10px var(--down-wash);
+}
+.bcell.is-miss input, .bcell.is-miss select {
+  border-color: var(--down); background: var(--down-wash);
+}
+.bcell.is-miss input::placeholder { color: var(--down); }
+
+@media (max-width: 1080px) {
+  .btbl__hd { display: none; }
+  .btbl__r {
+    grid-template-columns: 30px 1fr 30px;
+    row-gap: 12px; padding: 14px;
+  }
+  .btbl__span { grid-column: 2 / 3; }
+  .btbl__r .bcell { grid-column: 2 / 3; }
+  .bcell__c, .bcell__x { top: -7px; }
+}
+
+/* ============================================================
+   每月存款目標與超支警告
+   ============================================================ */
+.svg-card {
+  border-radius: var(--r-card); padding: 20px 22px; margin-bottom: 18px;
+  border: 1px solid var(--line); background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.svg-card--safe { border-color: var(--up-wash); background: linear-gradient(140deg, var(--up-wash), var(--card)); }
+.svg-card--near { border-color: var(--warn-wash); background: linear-gradient(140deg, var(--warn-wash), var(--card)); }
+.svg-card--over { border-color: var(--down-wash); background: linear-gradient(140deg, var(--down-wash), var(--card)); }
+
+.svg-card__h { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.svg-card__ic {
+  width: 30px; height: 30px; flex: 0 0 30px; border-radius: var(--r-sm);
+  display: grid; place-items: center; font-size: 15px; font-weight: 700; color: var(--card);
+}
+.svg-card--safe .svg-card__ic { background: var(--up); }
+.svg-card--near .svg-card__ic { background: var(--warn); }
+.svg-card--over .svg-card__ic { background: var(--down); box-shadow: 0 0 0 6px var(--down-wash); }
+.svg-card__t { font-family: var(--serif); font-size: 16.5px; font-weight: 600; color: var(--ink); }
+
+.svg-card__bar {
+  position: relative; height: 10px; border-radius: var(--r-bar);
+  background: var(--sunk); overflow: visible; margin-bottom: 18px;
+}
+.svg-card__bar i {
+  display: block; height: 100%; border-radius: var(--r-bar);
+  animation: growW 1s var(--ease) both;
+}
+.svg-card--safe .svg-card__bar i { background: var(--up); }
+.svg-card--near .svg-card__bar i { background: var(--warn); }
+.svg-card--over .svg-card__bar i { background: var(--down); }
+.svg-card__bar em {
+  position: absolute; top: -5px; width: 2px; height: 20px;
+  background: var(--ink-faint); border-radius: var(--r-bar);
+}
+
+.svg-card__nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; }
+.svg-n { display: flex; flex-direction: column; gap: 4px; }
+.svg-n__k { font-size: 11.5px; color: var(--ink-faint); }
+.svg-n__v { font-family: var(--mono); font-size: 17px; font-weight: 600; color: var(--ink); }
+.svg-n__h { font-size: 10.5px; color: var(--ink-dim); }
+
+.svg-card__msg {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+  font-size: 13px; line-height: 1.9; color: var(--ink-soft);
+}
+.svg-card--over .svg-card__msg b { color: var(--down); }
+.svg-card--near .svg-card__msg b { color: var(--warn); }
+
+/* 成員頁的存款目標輸入 */
+.goal { display: flex; flex-direction: column; gap: 4px; }
+.goal label { font-size: 10.5px; color: var(--ink-dim); }
+.goal__i {
+  width: 116px; background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink);
+  padding: 7px 14px; font-size: 13px; font-family: var(--mono);
+}
+.goal__i:focus { outline: none; border-color: var(--accent); }
+
+/* ============================================================
+   監管通知：鈴鐺與下拉面板
+   ============================================================ */
+.bell__wrap { position: relative; flex: 0 0 auto; }
+.bell__wrap[hidden] { display: none; }   /* 沒有監管對象就整個收起來 */
+.bell {
+  position: relative; width: 36px; height: 36px; cursor: pointer;
+  display: grid; place-items: center; border-radius: var(--r-input);
+  background: transparent; border: 1px solid var(--line); color: var(--ink-soft);
+  transition: color .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
+}
+.bell svg { width: 18px; height: 18px; }
+.bell:hover { color: var(--ink); border-color: var(--line-2); background: var(--sunk); }
+.bell.has { color: var(--warn); border-color: var(--warn-wash); }
+.bell__n {
+  position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px;
+  padding: 0 4px; border-radius: var(--r-pill); background: var(--down); color: var(--card);
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; line-height: 1;
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.bell__panel {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 60;
+  width: min(360px, calc(100vw - 32px));
+  background: var(--card-2); border: 1px solid var(--line-2);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+.bell__h {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; border-bottom: 1px solid var(--line);
+}
+.bell__t { font-family: var(--serif); font-size: 14px; font-weight: 600; color: var(--ink); }
+.bell__mute, .bell__all {
+  margin-left: auto; cursor: pointer; font-family: var(--sans); font-size: 11.5px;
+  padding: 4px 9px; border-radius: var(--r-input);
+  border: 1px solid var(--line-2); background: transparent; color: var(--ink-faint);
+  transition: color .18s var(--ease), border-color .18s var(--ease);
+}
+.bell__all { margin-left: 0; color: var(--accent-hi); border-color: var(--accent-line); }
+.bell__mute:hover, .bell__all:hover { color: var(--ink); border-color: var(--line-3); }
+
+.bell__list { max-height: 340px; overflow-y: auto; }
+.bell__i {
+  display: flex; gap: 10px; align-items: flex-start; width: 100%;
+  padding: 11px 14px; cursor: pointer; text-align: left;
+  background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  transition: background .18s var(--ease);
+}
+.bell__i:hover { background: var(--sunk); }
+.bell__i:last-child { border-bottom: 0; }
+.bell__dot {
+  width: 7px; height: 7px; border-radius: var(--r-dot); margin-top: 6px;
+  flex: 0 0 7px; background: transparent;
+}
+.bell__i.unread .bell__dot { background: var(--warn); }
+.bell__m { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bell__l { font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
+.bell__i.unread .bell__l { color: var(--ink); }
+.bell__s { font-size: 11px; color: var(--ink-dim); font-family: var(--mono); }
+
+.bell__empty {
+  padding: 26px 18px; text-align: center; font-size: 13px; color: var(--ink-faint);
+  line-height: 1.9;
+}
+.bell__empty span { font-size: 12px; color: var(--ink-dim); }
+
+.bell__f {
+  padding: 10px 14px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--ink-dim); line-height: 1.7;
+}
+.bell__f b { color: var(--warn); font-weight: 500; }
+
+@media (max-width: 560px) {
+  .bell__panel { right: -8px; width: calc(100vw - 24px); }
+}
+
+/* ============================================================
+   登入 / 註冊 / 個人資料
+   ============================================================ */
+
+/* 沒登入的時候把整個工作區收起來，只留登入卡片 */
+body.is-out footer { display: none; }
+
+/* ⚠️ .rail 是 position: fixed，所以 display:none 並不會把空間還回來。
+   真正把內容推開的是 .main 的 margin-left——那個一定要一起清掉，
+   不然登入卡片會往右偏一整條側邊欄的寬度。 */
+body.is-out .main {
+  margin-left: 0;
+  padding: 0;
+}
+
+.gate {
+  min-height: 100vh; display: grid; place-items: center; padding: 32px 20px;
+  /* ⚠️ 欄寬要釘住。預設的 auto 欄會被裡面最寬的東西撐開——
+     個人化設定那一排 8 張主題預覽一撐，卡片就比手機螢幕還寬。 */
+  grid-template-columns: minmax(0, 1fr);
+}
+.gate__c {
+  width: min(400px, 100%);
+  background: var(--card); border: 1px solid var(--line-2);
+  border-radius: var(--r-card); box-shadow: var(--shadow-pop);
+  padding: 34px 30px 28px;
+}
+.gate__b { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; }
+.gate__t {
+  font-family: var(--serif); font-size: 24px; font-weight: 600;
+  color: var(--ink); margin: 0 0 6px;
+}
+.gate__s { font-size: 12.5px; color: var(--ink-faint); line-height: 1.75; margin: 0 0 22px; }
+
+.gate__f { display: flex; flex-direction: column; gap: 15px; }
+.gate__go { width: 100%; justify-content: center; margin-top: 4px; }
+.gate__alt { font-size: 12px; color: var(--ink-dim); text-align: center; margin: 2px 0 0; }
+.gate__alt a { color: var(--accent-hi); text-decoration: none; }
+.gate__alt a:hover { text-decoration: underline; }
+
+
+/* 個人化設定要放主題預覽和理財選項，比登入框寬一點 */
+.gate__c--wide { width: min(540px, 100%); }
+/* 忘記密碼：密碼欄右下角，小字 */
+.gate__fp { align-self: flex-end; margin-top: -8px; font-size: 12.5px; color: var(--accent-hi); text-decoration: none; }
+.gate__fp:hover { text-decoration: underline; }
+/* 長得像連結的按鈕：跳過、換一個 email */
+.gate__lnk {
+  align-self: center; padding: 4px 6px; background: transparent; border: 0; box-shadow: none;
+  font-size: 12.5px; color: var(--ink-faint); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.gate__lnk:hover { color: var(--accent-hi); }
+
+/* ---- 個人化設定：第幾步 ---- */
+.stp { display: flex; gap: 6px; margin: -8px 0 20px; padding: 0; list-style: none; }
+.stp__i {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px;
+  padding-top: 8px; border-top: 3px solid var(--line-2);
+  font-size: 12px; color: var(--ink-dim); white-space: nowrap;
+}
+.stp__i b {
+  flex: none; width: 20px; height: 20px; display: grid; place-items: center;
+  font-size: 11px; border-radius: var(--r-pill); background: var(--sunk); color: var(--ink-faint);
+}
+.stp__i span { overflow: hidden; text-overflow: ellipsis; }
+.stp__i.done { border-top-color: color-mix(in srgb, var(--accent) 45%, var(--line-2)); }
+.stp__i.done b { background: color-mix(in srgb, var(--accent) 20%, var(--card)); color: var(--accent); }
+.stp__i.on { border-top-color: var(--accent); color: var(--ink); font-weight: 600; }
+.stp__i.on b { background: var(--accent); color: var(--on-accent); }
+
+.su__chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; }
+.su__chip {
+  padding: 6px 12px; font-size: 13px; font-family: var(--sans); cursor: pointer;
+  color: var(--ink-soft); background: var(--sunk); border: 1px solid var(--line-2); border-radius: var(--r-pill);
+}
+.su__chip:hover { color: var(--accent); border-color: var(--accent); }
+.su__f { margin: 0; font-size: 12.5px; line-height: 1.7; color: var(--ink-faint); }
+.su__f b { color: var(--ink); }
+.su__nav { display: flex; gap: 10px; margin-top: 4px; }
+.su__nav .btn { flex: 1 1 0; justify-content: center; }
+/* 手機：卡片內距收一點，理財習慣的選項才排得下兩欄（一欄的話要滑很久） */
+@media (max-width: 560px) {
+  .gate__c { padding: 28px 18px 22px; }
+}
+#view .su__thm { margin: 0 -6px 16px; }
+
+/* ---- 忘記密碼：送出之後 ---- */
+.fgt { display: flex; flex-direction: column; gap: 12px; }
+.fgt__t { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink); }
+.fgt__h, .fgt__demo { margin: 0; font-size: 12.5px; line-height: 1.7; color: var(--ink-faint); }
+.fgt__mail {
+  display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;
+  background: var(--sunk); border: 1px dashed var(--line-3); border-radius: var(--r-card);
+  font-size: 13px; line-height: 1.7; color: var(--ink-soft);
+}
+.fgt__mail p { margin: 0; }
+.fgt__k { font-size: 12px; font-weight: 600; color: var(--accent); }
+.fgt__dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 0; }
+.fgt__dl dt { color: var(--ink-dim); }
+.fgt__dl dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+
+/* ---- 表單欄位（登入頁與個人資料共用） ---- */
+.fld { display: flex; flex-direction: column; gap: 6px; }
+.fld > span { font-size: 12px; color: var(--ink-faint); }
+.fld input {
+  width: 100%; padding: 10px 12px;
+  background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink);
+  font-family: var(--sans); font-size: 13.5px;
+  transition: border-color .18s var(--ease);
+}
+.fld input:focus { outline: none; border-color: var(--accent); }
+.fld input:disabled { color: var(--ink-dim); cursor: not-allowed; }
+.fld__h { font-size: 11px; color: var(--ink-dim); font-style: normal; line-height: 1.6; }
+
+/* ---- 個人資料 ---- */
+.prof { display: flex; gap: 20px; align-items: center; padding: 20px; }
+.prof__m { min-width: 0; }
+.prof__l { font-size: 13px; color: var(--ink-soft); line-height: 1.75; margin: 0 0 12px; }
+.prof__h { font-size: 11.5px; color: var(--ink-dim); }
+.prof__do { display: flex; gap: 8px; flex-wrap: wrap; }
+.prof__do label { cursor: pointer; }
+.prof__form { display: flex; flex-direction: column; gap: 16px; padding: 20px; max-width: 460px; }
+.prof__out { display: flex; align-items: center; gap: 20px; padding: 20px; }
+.prof__out button { margin-left: auto; flex: 0 0 auto; }
+
+/* ---- 頭像：有圖就放圖 ---- */
+.ava--img { padding: 0; overflow: hidden; }
+.ava--img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ava--xl { width: 84px; height: 84px; font-size: 30px; flex: 0 0 84px; }
+
+/* ---- 側邊欄的登出 ---- */
+
+
+@media (max-width: 560px) {
+  .prof { flex-direction: column; align-items: flex-start; }
+  .prof__out { flex-direction: column; align-items: flex-start; }
+  .prof__out button { margin-left: 0; }
+}
+
+/* ============================================================
+   成員明細（唯讀）、可展開的說明、被通知指到的那一筆
+   ============================================================ */
+
+/* ---- 成員與權限：整列可點 ---- */
+.row--open { cursor: pointer; }
+.row--open:hover { border-color: var(--line-3); }
+
+/* 「看紀錄」一直在，不是 hover 才浮出來——哪幾列點得下去要一眼看得出來 */
+.row__go2 { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+/* ⚠️ 這一欄原本寫死 108px，「21 筆 →」一放進去就沒位子了，
+   後面的「結算」「封存」被擠成一個字一行。欄寬改成 auto，
+   按鈕本身也不准斷行——兩個字的按鈕斷成兩行永遠是錯的。 */
+.row__go2 .gx { flex: 0 0 auto; white-space: nowrap; }
+.rowbtn {
+  flex: 0 0 auto; white-space: nowrap;
+  padding: 6px 12px; border-radius: var(--r-input);
+  border: 1px solid var(--line-2); background: transparent;
+  font-size: 11.5px; color: var(--ink-faint);
+  transition: color .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
+}
+.row--open:hover .rowbtn {
+  color: var(--accent-hi); border-color: var(--accent-line); background: var(--sunk);
+}
+
+.hint { font-size: 12.5px; color: var(--ink-faint); line-height: 1.8; margin: 0 0 14px; }
+
+/* ---- 點開才看的說明 ---- */
+.fold {
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--card); margin-bottom: 12px; overflow: hidden;
+}
+.fold__h {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 13px 16px 13px 38px; cursor: pointer; position: relative;
+  list-style: none; transition: background .18s var(--ease);
+}
+.fold__h::-webkit-details-marker { display: none; }
+.fold__h:hover { background: var(--sunk); }
+.fold__h::before {
+  content: ''; position: absolute; left: 16px; top: 18px;
+  width: 6px; height: 6px; border-right: 1.6px solid var(--ink-dim);
+  border-bottom: 1.6px solid var(--ink-dim); transform: rotate(-45deg);
+  transition: transform .2s var(--ease), border-color .2s var(--ease);
+}
+.fold[open] .fold__h::before { transform: rotate(45deg); border-color: var(--accent); }
+.fold__t { font-family: var(--serif); font-size: 14px; font-weight: 600; color: var(--ink); }
+.fold__s { font-size: 11.5px; color: var(--ink-dim); line-height: 1.6; }
+.fold__b { padding: 0 16px 16px; }
+
+/* ---- 成員抬頭 ---- */
+.mhead { display: flex; align-items: center; gap: 18px; padding: 20px; }
+.mhead__m { min-width: 0; flex: 1 1 auto; }
+.mhead__top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.mhead__n { font-family: var(--serif); font-size: 19px; font-weight: 600; color: var(--ink); }
+.mhead__s { font-size: 13px; color: var(--ink-soft); line-height: 1.8; margin: 0; }
+.mhead__h { font-size: 11.5px; color: var(--warn); }
+.mhead__n2 {
+  flex: 0 0 auto; text-align: right; display: flex;
+  flex-direction: column; gap: 2px; padding-left: 18px;
+  border-left: 1px solid var(--line);
+}
+.mhead__n2 b { font-family: var(--mono); font-size: 22px; color: var(--ink); font-weight: 500; }
+.mhead__n2 span { font-size: 11px; color: var(--ink-dim); }
+
+.back {
+  display: inline-block; margin-bottom: 14px;
+  font-size: 12.5px; color: var(--ink-faint); text-decoration: none;
+  transition: color .18s var(--ease);
+}
+.back:hover { color: var(--accent-hi); }
+
+/* ---- 被通知指到的那一筆 ---- */
+.tx.is-hit {
+  border-color: var(--accent);
+  background: var(--accent-line);
+  box-shadow: 0 0 0 1px var(--accent) inset, 0 0 22px var(--accent-line);
+  animation: hitpulse 1.5s var(--ease) 1;
+}
+@keyframes hitpulse {
+  0%   { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 0 var(--accent-line); }
+  45%  { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 30px var(--accent-line); }
+  100% { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 22px var(--accent-line); }
+}
+.note--hit { border-left-color: var(--accent); }
+.note--hit .note__k { color: var(--accent-hi); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tx.is-hit { animation: none; }
+}
+
+@media (max-width: 560px) {
+  .mhead { flex-wrap: wrap; gap: 14px; }
+  .mhead__n2 { border-left: 0; padding-left: 0; text-align: left; flex-direction: row; align-items: baseline; gap: 6px; }
+  .row__go { display: none; }
+}
+
+
+/* 存款目標自己一張卡，不再擠在成員名冊那一列裡 */
+/* 一個輸入框不需要佔滿一整條。跟其他欄位一樣寬就好。 */
+.prof__goal { padding: 0 28px 26px; }
+.prof__goal .goal__i { width: 200px; font-size: 15px; }
+
+@media (max-width: 560px) {
+  .prof__goal .goal__i { width: 100%; }
+}
+
+/* ============================================================
+   群組切換器、群組管理、階段性提醒
+   ============================================================ */
+.gsw { position: relative; flex: 0 0 auto; }
+.gsw__b {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 7px 11px; border-radius: var(--r-input);
+  border: 1px solid var(--line-2); background: var(--sunk); color: var(--ink-soft);
+  font-family: var(--sans); font-size: 12.5px; white-space: nowrap;
+  transition: border-color .18s var(--ease), color .18s var(--ease);
+}
+.gsw__b:hover { border-color: var(--line-3); color: var(--ink); }
+.gsw__b svg { width: 13px; height: 13px; opacity: .6; }
+.gsw__d { width: 8px; height: 8px; border-radius: var(--r-dot); flex: 0 0 8px; }
+.gsw__n { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+
+.gsw__p {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
+  width: min(280px, calc(100vw - 32px));
+  background: var(--card-2); border: 1px solid var(--line-2);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop); overflow: hidden;
+}
+.gsw__i {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 13px; cursor: pointer; text-align: left;
+  background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  transition: background .18s var(--ease);
+}
+.gsw__i:hover { background: var(--sunk); }
+.gsw__i.on { background: var(--accent-line); }
+.gsw__m { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.gsw__m b { font-size: 13px; font-weight: 500; color: var(--ink); }
+.gsw__m i { font-style: normal; font-size: 11px; color: var(--ink-dim); font-family: var(--mono); }
+.gsw__more {
+  display: block; padding: 10px 13px; font-size: 11.5px;
+  color: var(--accent-hi); text-decoration: none; text-align: center;
+}
+.gsw__more:hover { background: var(--sunk); }
+
+/* ---- 群組管理 ---- */
+.gnew { display: flex; gap: 16px; align-items: flex-end; padding: 20px; flex-wrap: wrap; }
+.gnew .fld { flex: 1 1 180px; }
+.gnew select {
+  padding: 10px 12px; background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink); font-family: var(--sans); font-size: 13.5px;
+}
+.gx {
+  cursor: pointer; padding: 5px 10px; border-radius: var(--r-input);
+  border: 1px solid var(--line-2); background: transparent;
+  color: var(--ink-dim); font-family: var(--sans); font-size: 11px;
+  transition: color .18s var(--ease), border-color .18s var(--ease);
+}
+.gx:hover { color: var(--down); border-color: var(--down-wash); }
+
+.gmem { padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+.gmem__g { display: flex; flex-direction: column; gap: 8px; }
+.gmem__t { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink); }
+.gmem__l, .gmem__add { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.gmem__add { font-size: 11.5px; color: var(--ink-dim); }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  border: 1px solid var(--line-2); background: var(--sunk);
+  font-size: 12px; color: var(--ink-soft);
+}
+.chip button {
+  cursor: pointer; border: 0; background: transparent; padding: 0;
+  color: var(--ink-dim); font-size: 13px; line-height: 1;
+}
+.chip button:hover { color: var(--down); }
+.chip--add { cursor: pointer; color: var(--ink-dim); }
+.chip--add:hover { color: var(--accent-hi); border-color: var(--accent-line); }
+
+/* ---- 階段性提醒 ---- */
+#alertBox { padding: 20px; }
+.alist { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 18px; }
+.ai {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: var(--r-card);
+  border: 1px solid var(--line); background: var(--sunk);
+}
+.ai.off { opacity: .5; }
+.ai__p {
+  font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--warn);
+  min-width: 54px;
+}
+.ai.off .ai__p { color: var(--ink-dim); }
+.ai__s { font-size: 12.5px; color: var(--ink-soft); flex: 1 1 auto; }
+.ai__t, .ai__x {
+  cursor: pointer; border: 1px solid var(--line-2); background: transparent;
+  border-radius: var(--r-input); color: var(--ink-dim); font-family: var(--sans);
+  transition: color .18s var(--ease), border-color .18s var(--ease);
+}
+.ai__t { padding: 4px 10px; font-size: 11px; }
+.ai__x { padding: 2px 8px; font-size: 14px; line-height: 1.2; }
+.ai__t:hover { color: var(--ink); border-color: var(--line-3); }
+.ai__x:hover { color: var(--down); border-color: var(--down-wash); }
+
+.anew { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+        padding-top: 16px; border-top: 1px solid var(--line); }
+.anew .fld { flex: 0 1 auto; }
+.anew select, .anew input {
+  padding: 9px 12px; background: var(--sunk); border: 1px solid var(--line-2);
+  border-radius: var(--r-input); color: var(--ink); font-family: var(--sans); font-size: 13px;
+}
+.anew input { width: 110px; font-family: var(--mono); }
+
+@media (max-width: 720px) {
+  .gsw__n { max-width: 88px; }
+}
+
+/* 提醒通知的第二行：金額 */
+.bell__n2 { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+
+/* 已封存的帳本 */
+.gx--sure { color: var(--down); border-color: var(--down-wash); }
+.arch { padding: 20px; }
+.arch__l { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.arch__i {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--r-card);
+  border: 1px dashed var(--line-2); background: var(--sunk);
+}
+.arch__n { font-size: 13.5px; color: var(--ink-soft); }
+.arch__c { font-size: 11.5px; color: var(--ink-dim); font-family: var(--mono); margin-left: auto; }
+.arch__i .btn { flex: 0 0 auto; }
+
+
+/* ============================================================
+   紙感調校與互動層
+   ------------------------------------------------------------
+   前面的規則是深色底時寫的。米白底上有兩件事不一樣：
+
+   1. 白卡浮在米白紙上，靠的是「邊線 + 極淡的暖陰影」，
+      不是靠亮度差——亮度差在這裡幾乎等於零。
+   2. 深色底可以用發光表示互動，紙上不行。
+      紙的互動語言是「浮起來」和「壓下去」。
+   ============================================================ */
+
+/* ---------- 面：白卡要站得出來 ---------- */
+.card, .kpi, .row {
+  border-color: var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+/* 可以點的卡片會抬起來，滑鼠移開才落回去 */
+.row--open, .kpi--tap, .btn, .chip, .gsw__b, .bell, .rowbtn {
+  transition: transform .18s var(--back), box-shadow .18s var(--out),
+              background-color .16s var(--ease), border-color .16s var(--ease),
+              color .16s var(--ease);
+}
+.row--open:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.row--open:active { transform: translateY(0) scale(.995); transition-duration: .07s; }
+
+/* ---------- 導覽：左側細線代替整塊底色 ---------- */
+
+
+/* ---------- 按鈕：按得下去 ---------- */
+.btn { box-shadow: var(--shadow-flat); }
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-card); }
+.btn:active { transform: translateY(0) scale(.97); box-shadow: none; transition-duration: .06s; }
+.btn--go { box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 22%, transparent); }
+.btn--go:hover { box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 26%, transparent); }
+.btn--go:active { box-shadow: 0 1px 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+/* ---------- 輸入：聚焦時整個欄位往內收一下 ---------- */
+input, select, textarea {
+  transition: border-color .16s var(--ease), box-shadow .18s var(--out),
+              background-color .16s var(--ease);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-wash);
+  background: var(--card) !important;
+}
+
+/* ---------- 明細列：滑過去左邊長出一條色帶 ---------- */
+.tx { position: relative; transition: background-color .16s var(--ease), transform .16s var(--out); }
+.tx::before {
+  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
+  width: 0; border-radius: var(--r-dot); background: var(--accent);
+  transition: width .2s var(--back);
+}
+.tx:hover { background: var(--card-2); }
+.tx:hover::before { width: 3px; }
+
+/* ---------- 進度條：慢一點，看得到它長 ---------- */
+.bgt__t i, .mix__t i, .sla__b i { transition: width .8s var(--out); }
+
+/* ---------- 分頁與標籤 ---------- */
+.tag { transition: background-color .16s var(--ease), color .16s var(--ease); }
+
+/* ---------- 表格 ---------- */
+.tbl thead th { background: var(--card-3); color: var(--ink-faint); font-weight: 500; }
+.tbl tbody tr { transition: background-color .14s var(--ease); }
+
+/* ---------- 頭像在紙上要有邊 ---------- */
+.ava { box-shadow: var(--shadow-flat); }
+
+/* ---------- 通知面板 ---------- */
+.bell__panel, .gsw__p { box-shadow: var(--shadow-pop); animation: popIn .22s var(--out) both; }
+.bell__i, .gsw__i { transition: background-color .14s var(--ease), padding-left .18s var(--out); }
+.bell__i:hover, .gsw__i:hover { padding-left: 18px; }
+
+/* ---------- 骨架屏在紙上的顏色 ---------- */
+.skel > i, .skel__l {
+  background-image: linear-gradient(90deg, var(--paper-2), var(--card-3), var(--paper-2)) !important;
+}
+
+
+/* 原本的「一張紙」一層已經拿掉，改由檔案最後的「設計系統：儀表板」取代。 */
+
+
+/* ============================================================
+   問號與說明彈窗
+   ============================================================ */
+.q {
+  display: inline-grid; place-items: center;
+  width: 17px; height: 17px; margin-left: 6px; flex: 0 0 17px;
+  border-radius: var(--r-card); border: 1px solid var(--line-2);
+  background: transparent; color: var(--ink-dim);
+  font-family: var(--sans); font-size: 11px; font-weight: 600; line-height: 1;
+  vertical-align: middle; cursor: help;
+  transition: transform .18s var(--back), background-color .16s var(--ease),
+              color .16s var(--ease), border-color .16s var(--ease);
+}
+.q:hover {
+  background: var(--accent); border-color: var(--accent);
+  color: var(--card); transform: scale(1.15);
+}
+.q:active { transform: scale(.92); }
+
+.hp {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center; padding: 24px;
+  background: var(--scrim);
+  backdrop-filter: blur(7px) saturate(.9);
+  -webkit-backdrop-filter: blur(7px) saturate(.9);
+  opacity: 0; transition: opacity .2s var(--ease);
+}
+.hp.on { opacity: 1; }
+/* 背景鎖住：頁面不捲動，底下也點不到（.hp 蓋住整頁） */
+body.hp-on { overflow: hidden; }
+
+.hp__c {
+  width: min(460px, 100%); max-height: 84vh; overflow: auto;
+  background: var(--card); border: 1px solid var(--line-2);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+  transform: translateY(16px) scale(.97);
+  transition: transform .26s var(--back);
+}
+.hp.on .hp__c { transform: none; }
+
+.hp__h {
+  display: flex; align-items: center; gap: 12px;
+  padding: 20px 22px 14px; border-bottom: 1px solid var(--line);
+}
+.hp__h h3 { font-size: 17px; flex: 1 1 auto; }
+.hp__x {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: var(--r-input);
+  display: grid; place-items: center; color: var(--ink-dim);
+  font-size: 13px; transition: background-color .16s var(--ease), color .16s var(--ease);
+}
+.hp__x:hover { background: var(--sunk); color: var(--ink); }
+
+.hp__b { padding: 18px 22px 6px; }
+.hp__b p { font-size: 14px; color: var(--ink-soft); line-height: 1.95; margin-bottom: 14px; }
+.hp__b p:last-child { margin-bottom: 0; }
+.hp__b b { color: var(--ink); font-weight: 500; }
+.hp__f {
+  font-family: var(--mono); font-size: 13px !important; color: var(--accent-hi) !important;
+  background: var(--accent-wash); padding: 12px 16px; border-radius: var(--r-input);
+  line-height: 1.9 !important;
+}
+.hp__d { padding: 12px 22px 20px; display: flex; justify-content: center; }
+.hp__d .btn { min-width: 132px; justify-content: center; }
+
+@media (max-width: 560px) {
+  .hp { padding: 16px; align-items: flex-end; }
+  .hp__c { width: 100%; }
+}
+
+
+/* ============================================================
+   形狀
+   ------------------------------------------------------------
+   膠囊形（圓到底的按鈕）是這幾年 AI 產品的招牌長相，
+   放在財務系統上會顯得不夠正式。這裡一律改成小圓角的方形——
+   那是軟體與文件的形狀，看起來像工具而不是聊天框。
+
+   圓形只留給兩種東西：真正是圓的（未讀紅點），
+   以及約定俗成就是圓的（問號）。
+   ============================================================ */
+.btn { border-radius: var(--r-input); }
+.tag, .chip { border-radius: var(--r-pill); }
+
+/* 頭像改成圓角方形。正圓是社群平台的語言，方的比較像證件照。 */
+.ava, .ava--sm, .ava--xl { border-radius: var(--r-ava); }
+.ava--sm { border-radius: var(--r-ava); }
+
+/* 未讀紅點與問號維持圓的 */
+.bell__n { border-radius: var(--r-pill); }
+.q { border-radius: var(--r-card); }
+.gsw__d { border-radius: var(--r-dot); }      /* 帳本的顏色點改成小方塊 */
+
+/* 輸入框跟按鈕同一個語言 */
+.goal__i, .fld input, .fld select, .anew input, .anew select, .gnew select,
+input[type="number"], input[type="text"], input[type="email"],
+input[type="password"], input[type="search"], select, textarea {
+  border-radius: var(--r-input);
+}
+
+
+/* ============================================================
+   直角
+   ------------------------------------------------------------
+   圓角權杖已經全部歸零，這裡只處理幾個寫死的數值，
+   以及真正需要是圓的兩個東西。
+   ============================================================ */
+.ava, .ava--sm, .ava--xl { border-radius: var(--r-ava); }
+.tag, .chip { border-radius: var(--r-pill); }
+.gsw__d { border-radius: var(--r-dot); }
+.bell__n { border-radius: var(--r-pill); min-width: 16px; }
+.q { border-radius: 50%; }                  /* 問號是圓的——這是約定俗成的說明標記 */
+.bell__dot, .ai__p::before { border-radius: var(--r-dot); }
+.hp__x { border-radius: var(--r-input); }
+.fl__n { border-radius: var(--r-pill); }
+
+/* 直角之後，線條就是唯一的分隔——讓它更明確一點 */
+.card, .kpi, .row, .tx { border-color: var(--line); }
+.btn { border-width: 1px; }
+.btn--go { border-color: var(--accent); }
+
+
+/* ============================================================
+   頂欄與抽屜
+   ------------------------------------------------------------
+   原本頂欄上是四個各自畫框的按鈕：帳本、搜尋、鈴鐺、記一筆。
+   四個框擠在一起，每個都在喊「我是按鈕」，很吵。
+
+   改成檔案櫃的做法：
+   頂欄只有文字和圖示，中間用細直線分隔（像帳簿的欄位）；
+   點下去，面板從頂欄下緣**整條拉開**，像拉開一個抽屜。
+
+   好處是頂欄安靜下來，而且抽屜是整個寬度的，
+   內容有地方好好排，不用擠在一個小下拉選單裡。
+   ============================================================ */
+
+
+/* 每個控制項：沒有框，靠左邊一條細直線跟鄰居分開 */
+.gsw, .bell__wrap, .search {
+  display: flex; align-items: center;
+  border-left: 1px solid var(--line);
+  position: static;                 /* 讓抽屜貼著 .top 而不是貼著自己 */
+}
+
+.gsw__b, .bell {
+  height: 100%; border: 0; background: transparent; box-shadow: none;
+  padding: 0 18px; border-radius: var(--r-input); color: var(--ink-soft);
+  transition: background-color .16s var(--ease), color .16s var(--ease);
+}
+.gsw__b:hover, .bell:hover { background: var(--card-2); color: var(--ink); transform: none; }
+.gsw__b:active, .bell:active { background: var(--card-3); transform: none; }
+.gsw__b { gap: 9px; }
+.bell { width: auto; }
+.bell.has { color: var(--warn); }
+
+/* 開著的時候，控制項自己也要看得出來是被按下的那一個 */
+.gsw__b.open, .bell.open { background: var(--accent-wash); color: var(--accent-hi); }
+
+/* 搜尋：一條線上的輸入，不是一個盒子 */
+.search {
+  background: transparent; border-radius: var(--r-input);
+  padding: 0 16px; min-width: 200px;
+}
+.search input {
+  border: 0; background: transparent; box-shadow: none !important;
+  padding: 0 0 0 8px; height: 100%; width: 100%;
+}
+.search input:focus { border: 0 !important; box-shadow: none !important; }
+.search:focus-within { background: var(--card-2); }
+
+/* 記一筆：唯一的主要動作。不用框，用一條底線。 */
+
+
+/* ---------- 抽屜本體 ---------- */
+.bell__panel, .gsw__p {
+  position: absolute; top: 100%; left: 0; right: 0; width: auto;
+  border: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line-2);
+  border-radius: var(--r-panel); background: var(--card);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--shade) 9%, transparent);
+  animation: drawer .26s var(--out) both;
+  max-height: min(60vh, 520px); overflow: auto;
+}
+@keyframes drawer {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 抽屜裡面用整個寬度排，不要擠成一條 */
+.gsw__p { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.gsw__i {
+  border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
+  padding: 16px 20px;
+}
+.gsw__i:hover { padding-left: 24px; }
+.gsw__i.on { background: var(--accent-wash); box-shadow: inset 3px 0 0 var(--accent); }
+.gsw__more {
+  grid-column: 1 / -1; text-align: left; padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.bell__h { padding: 14px 28px; }
+.bell__i { padding: 14px 28px; }
+.bell__i:hover { padding-left: 34px; }
+.bell__f { padding: 12px 28px; }
+.bell__empty { padding: 34px 28px; }
+
+/* 抽屜拉開時，底下的內容壓暗一點，視線自然往上 */
+.dw-on #view { opacity: .55; transition: opacity .2s var(--ease); pointer-events: none; }
+
+@media (max-width: 720px) {
+  .search { min-width: 0; flex: 1 1 auto; }
+  .gsw__b, .bell { padding: 0 13px; }
+  .gsw__n { max-width: 72px; }
+}
+
+
+/* ============================================================
+   標籤不再是框
+   ------------------------------------------------------------
+   「管理者」「超支」這些狀態，本來每一個都被一個小框圈住。
+   一個畫面上十幾個小框，視線會被切得很碎。
+
+   改成純文字：顏色負責語意，大小負責層級，不用邊框。
+   需要更強調的（超支、未讀）才給一點底色。
+   ============================================================ */
+.tag {
+  border: 0; background: transparent; padding: 0;
+  font-size: 11.5px; font-weight: 500; letter-spacing: .2px;
+}
+.tag--done { color: var(--accent); }
+.tag--up   { color: var(--up); }
+.tag--down { color: var(--down); font-weight: 600; }
+.tag--warn, .tag--MEDIUM { color: var(--warn); }
+.tag--info { color: var(--info); }
+.tag--soft, .tag--na { color: var(--ink-dim); }
+.tag--llm  { color: var(--accent-2); }
+
+/* 側欄底部：角色與登出都是文字 */
+
+
+/* 分類那顆小色塊：留著顏色，拿掉框 */
+.tx__c { border: 0; }
+
+/* 唯一保留底色的：未讀數字 */
+.bell__n {
+  background: var(--down); color: var(--card);
+  padding: 1px 5px; font-size: 10px;
+}
+
+
+/* ============================================================
+   頂欄：一排對齊的圖示
+   ------------------------------------------------------------
+   四個控制項現在都是同樣大小的圖示，等距排開，
+   中間用細直線分隔——像帳簿上的欄位線。
+   要說明的（哪一本帳、幾則未讀）用小標記掛在圖示上，不佔版面。
+
+   點下去一樣是抽屜：整條拉開，內容有地方好好排。
+   ============================================================ */
+.ic {
+  position: relative; flex: 0 0 auto;
+  width: 54px; align-self: stretch;
+  display: grid; place-items: center;
+  border: 0; border-left: 1px solid var(--line); border-radius: var(--r-input);
+  background: transparent; color: var(--ink-faint);
+  transition: background-color .16s var(--ease), color .16s var(--ease);
+}
+.ic svg { width: 19px; height: 19px; }
+.ic:hover { background: var(--card-2); color: var(--ink); }
+.ic:active { background: var(--card-3); }
+.ic.open { background: var(--accent-wash); color: var(--accent-hi); }
+
+/* 目前在哪一本帳：圖示右下角一個小方點 */
+.ic__d {
+  position: absolute; right: 13px; bottom: 13px;
+  width: 7px; height: 7px; border: 1.5px solid var(--card);
+}
+
+/* 記一筆是主要動作，給它主色 */
+.ic--go { color: var(--accent); }
+.ic--go:hover { background: var(--accent-wash); color: var(--accent-hi); }
+.ic--go svg { width: 21px; height: 21px; }
+
+/* 未讀數字改成掛在圖示右上 */
+.bell__n { top: 11px; right: 11px; }
+
+/* 搜尋抽屜 */
+#searchDrawer {
+  position: absolute; top: 100%; left: 0; right: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 18px 28px; background: var(--card);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line-2);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--shade) 9%, transparent);
+  animation: drawer .26s var(--out) both;
+  min-width: 0;
+}
+#searchDrawer .search__ic { width: 18px; height: 18px; color: var(--ink-dim); flex: 0 0 18px; }
+#searchDrawer input {
+  flex: 1 1 auto; border: 0; background: transparent; font-size: 16px;
+  color: var(--ink); padding: 0;
+}
+#searchDrawer input:focus { outline: none; box-shadow: none !important; }
+#searchDrawer input::placeholder { color: var(--ink-dim); }
+
+/* 頂欄的標題不要被擠掉 */
+
+
+/* 鈴鐺跟其他三個圖示同一個尺寸，四個才會真的等距 */
+.bell__wrap { border-left: 1px solid var(--line); }
+.bell {
+  width: 54px; align-self: stretch; height: auto;
+  display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: var(--r-input); background: transparent;
+}
+.bell svg { width: 19px; height: 19px; }
+
+
+/* ============================================================
+   單一動作一律置中
+   ------------------------------------------------------------
+   表單最後那一排如果只有一顆按鈕，就把它擺中間。
+   靠左會讓它看起來像還沒排完；置中才像「這一段到此為止，按這裡」。
+   ============================================================ */
+.prof__form > div:last-child,
+.gnew > div:last-child,
+.anew > div:last-child,
+.gate__f > div:last-child {
+  display: flex; justify-content: center; width: 100%;
+}
+.prof__form > div:last-child .btn,
+.gnew > div:last-child .btn,
+.anew > div:last-child .btn {
+  min-width: 148px; justify-content: center;
+}
+
+/* 表單本身也置中對齊，按鈕才不會孤零零地偏一邊 */
+.prof__form { align-items: stretch; }
+.gnew, .anew { align-items: flex-end; }
+
+/* 登出那一列的按鈕也置中在自己的位置 */
+.prof__out button { min-width: 120px; justify-content: center; }
+
+
+/* ============================================================
+   頂欄的兩個方案
+   ------------------------------------------------------------
+   方案一 bar-text：文字 ＋ 抽屜（面板從頂欄下緣整條拉開）
+   方案二 bar-icon：圖示 ＋ 一般下拉（面板貼著按鈕，不佔整條）
+
+   兩種長相都在 DOM 裡，用 class 切換顯示。挑定之後刪掉另一邊。
+   ============================================================ */
+
+/* ---------- 共通：帳本觸發的零件 ---------- */
+.gsw__ic, .gsw__cv { width: 19px; height: 19px; }
+.gsw__cv { width: 13px; height: 13px; opacity: .55; }
+
+/* ---------- 方案一：文字 ＋ 抽屜 ---------- */
+
+
+/* 搜尋回到原本的樣子：一條線上的輸入框，不用先點圖示 */
+
+
+/* ---------- 方案二：圖示 ＋ 一般下拉 ---------- */
+
+
+/* 面板不再是整條抽屜，改成貼著按鈕的下拉 */
+
+/* 下拉不遮蔽整頁，所以不要壓暗內容 */
+
+
+/* ---------- 個人資料的登出：一顆按鈕，不用一個區塊 ---------- */
+.prof__out {
+  border-top: 1px solid var(--line); margin-top: 26px;
+  padding-top: 26px; display: flex; justify-content: center;
+}
+
+/* ⚠️ #searchDrawer 自己有 display:flex，會蓋過 [hidden] 的 display:none。
+   方案二要靠 hidden 收起來，所以這裡補一條贏過它。 */
+
+
+/* ============================================================
+   「加一個門檻」那一排
+   ------------------------------------------------------------
+   它是一列行內控制項，不是表單的結尾，所以按鈕不該被推到
+   自己一整行去置中——那會讓一個小功能佔掉兩倍高度。
+   三個東西排在同一條線上就好。
+   ============================================================ */
+.anew {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  padding-top: 18px; border-top: 1px solid var(--line);
+}
+/* 按鈕跟其他表單一樣佔滿一列並置中。
+   之前為了「不要讓一顆按鈕佔掉一整行」把它改成靠左，
+   結果全站只有這一顆是靠左的——一致比省那幾 px 重要。 */
+.anew > div:last-child .btn { min-width: 148px; padding: 9px 18px; }
+.anew input { width: 92px; }
+.anew select { min-width: 170px; }
+.anew .fld > span { font-size: 11.5px; }
+
+@media (max-width: 560px) {
+  /* ⚠️ 這裡本來寫 `.anew select { flex: 1 1 140px }`，那是錯的：
+     <select> 的父層是 .fld，而 .fld 是 flex-direction: column——
+     在直向的軸上，flex-basis 是**高度**。所以那顆下拉在手機上
+     被撐成 140px 高的巨大方塊，整排版面就垮了。
+
+     要伸縮的是 .fld 本身（它才是 .anew 這個橫向 flex 的項目），
+     控制項只要填滿自己的欄寬就好。 */
+  .anew { gap: 10px; }
+  .anew .fld { min-width: 0; }
+  .anew__pct { flex: 0 0 96px; }
+  .anew__grp { flex: 1 1 150px; }
+  .anew__pct input,
+  .anew__grp select { width: 100%; min-width: 0; }
+}
+
+
+/* ============================================================
+   記帳方式：抽屜
+   ------------------------------------------------------------
+   本來是兩張帶說明和範例的大卡片並排。但「要用哪一種寫法」
+   是常態性的選擇——選好之後幾乎不會再動，不值得一直佔著版面。
+   收成一條，點開才展開。
+   ============================================================ */
+.mbar { position: relative; border-bottom: 1px solid var(--line); }
+.mbar__b {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 15px 28px; text-align: left; background: transparent;
+  transition: background-color .16s var(--ease);
+}
+.mbar__b:hover { background: var(--card-2); }
+.mbar__b.open { background: var(--accent-wash); }
+.mbar__n { font-size: 15px; color: var(--ink); font-weight: 500; }
+/* 給箭頭自己的 class，不要用「按鈕底下的 svg」這種靠結構的選擇器——
+   結構一變（例如按鈕被拆開）就對不上，而且不會報錯，只會變得很大。 */
+.mbar__cv {
+  width: 14px; height: 14px; color: var(--ink-dim); margin-left: auto;
+  transition: transform .22s var(--back);
+}
+.mbar__b.open .mbar__cv { transform: rotate(180deg); color: var(--accent); }
+.mbar { display: flex; align-items: center; }
+.mbar .q { margin-right: 24px; }
+.mbar__b { flex: 1 1 auto; }
+
+.mbar__p {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 25;
+  background: var(--card); border-bottom: 1px solid var(--line-2);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--shade) 9%, transparent);
+  animation: drawer .24s var(--out) both;
+}
+.mbar__i {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: 14px 28px; text-align: left; background: transparent;
+  border-bottom: 1px solid var(--line);
+  transition: background-color .16s var(--ease), padding-left .18s var(--out);
+}
+.mbar__i:last-child { border-bottom: 0; }
+.mbar__i:hover { background: var(--card-2); padding-left: 34px; }
+.mbar__i.on { background: var(--accent-wash); box-shadow: inset 3px 0 0 var(--accent); }
+.mbar__t { font-size: 14.5px; color: var(--ink); }
+.mbar__d { font-size: 12px; color: var(--ink-dim); }
+
+@media (max-width: 900px) {
+  .mbar__b, .mbar__i { padding-left: 18px; padding-right: 18px; }
+}
+
+
+/* ============================================================
+   兩欄
+   ------------------------------------------------------------
+   有些內容只需要半欄的寬度——一張頭像、一個數字欄位、
+   兩格密碼。讓它們各自獨佔一整條，整頁會被拉得又長又空。
+
+   兩欄之間用一條直線分開，跟整體的「細線分區」一致。
+   窄螢幕自動疊回一欄。
+   ============================================================ */
+.cols { display: grid; grid-template-columns: 1fr 1fr; }
+.cols > .col { min-width: 0; }
+.cols > .col + .col { border-left: 1px solid var(--line); }
+/* 兩欄裡第一個區塊的上緣線要對齊，所以都保留 */
+.cols > .col > .sec:first-child { border-top: 0; padding-top: 24px; }
+
+@media (max-width: 1080px) {
+  .cols { grid-template-columns: 1fr; }
+  .cols > .col + .col { border-left: 0; }
+  .cols > .col + .col > .sec:first-child { border-top: 1px solid var(--line); }
+}
+
+
+/* ============================================================
+   側欄收合
+   ------------------------------------------------------------
+   --rail 這個權杖同時控制側欄的寬度和內容區的左邊界，
+   所以只要在 body 上換掉它的值，兩邊就會一起動。
+   ============================================================ */
+
+
+.main { transition: width .24s var(--out), margin-left .24s var(--out); }
+
+/* 收起來之後靠 title 顯示名稱，所以 hover 要有回饋 */
+
+
+/* ============================================================
+   篩選：標題 ＋ 下拉
+   ------------------------------------------------------------
+   一排沒有標題的按鈕，使用者看得到選項卻不知道在篩什麼。
+   加上標題之後，「收支：全部」「來源：段落記帳」一眼就懂。
+   ============================================================ */
+.bar {
+  display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
+  padding: 16px 28px; border-bottom: 1px solid var(--line); margin: 0;
+}
+.fsel { display: flex; flex-direction: column; gap: 5px; }
+.fsel > span {
+  font-size: 11px; letter-spacing: .1em; color: var(--ink-dim);
+  font-family: var(--mono); text-transform: uppercase;
+}
+.fsel select {
+  appearance: none; padding: 8px 30px 8px 12px; min-width: 132px;
+  background-color: var(--sunk); border: 1px solid var(--line-2);
+  color: var(--ink); font-size: 13.5px; cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 52%, calc(100% - 12px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color .16s var(--ease), background-color .16s var(--ease);
+}
+.fsel select:hover { border-color: var(--line-3); }
+.fsel select:focus { border-color: var(--accent); background-color: var(--card); }
+
+/* 重置是示範用的，讓它安靜一點 */
+.bar #reset {
+  align-self: flex-end; border: 0; background: transparent;
+  color: var(--ink-dim); font-size: 12px; padding: 8px 0;
+  box-shadow: none;
+}
+.bar #reset:hover { color: var(--accent); transform: none; box-shadow: none; }
+
+@media (max-width: 900px) { .bar { padding-left: 18px; padding-right: 18px; } }
+@media (max-width: 560px) { .fsel { flex: 1 1 140px; } .fsel select { min-width: 0; width: 100%; } }
+
+
+/* ============================================================
+   收支明細：表格
+   ------------------------------------------------------------
+   帳目本來就是一欄一欄對齊的東西——日期對日期、金額對金額。
+   卡片式的排版每一筆資訊的位置都不一樣，一眼掃過去很累。
+   ============================================================ */
+.txw { overflow-x: auto; border-top: 1px solid var(--line); }
+.txt { width: 100%; border-collapse: collapse; }
+
+.txt thead th {
+  /* ⚠️ 這裡不要用 position: sticky。
+     表格外層是 overflow-x: auto（為了讓寬表格自己橫向捲動），
+     那會讓它變成捲動容器——sticky 只會對那個容器生效，不是對視窗。
+     結果表頭吸不住，只是帶著 z-index 滑到頂欄底下，
+     畫在紀錄列上面，把那一列切掉一半。
+
+     吸附在這個結構下做不到，硬做只會遮住東西，所以不做。 */
+  padding: 10px 14px; text-align: left; white-space: nowrap;
+  background: var(--card-3); border-bottom: 1px solid var(--line-2);
+  font-size: 11px; font-weight: 500; letter-spacing: .08em;
+  color: var(--ink-dim); font-family: var(--mono);
+}
+.txt thead th.rt { text-align: right; }
+
+.txr { border-bottom: 1px solid var(--line); transition: background-color .14s var(--ease); }
+.txr:hover { background: var(--card-2); }
+.txr td { padding: 11px 14px; vertical-align: top; }
+
+.txr__d { font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; }
+.txr__c { white-space: nowrap; font-size: 13px; }
+.txr__t { font-size: 14px; color: var(--ink); min-width: 180px; }
+.txr__t em { font-style: normal; color: var(--ink-dim); font-size: 12.5px; }
+.txr__raw { font-size: 11.5px; color: var(--ink-dim); }
+.txr__u { font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+.txr__s { font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+.txr__a {
+  font-family: var(--mono); font-size: 14.5px; font-weight: 500;
+  text-align: right; white-space: nowrap; color: var(--down);
+}
+.txr__a.is-in { color: var(--up); }
+.txr__x { text-align: right; white-space: nowrap; width: 1%; }
+
+/* 被通知指到的那一筆 */
+.txr.is-hit { background: var(--accent-wash); box-shadow: inset 3px 0 0 var(--accent); }
+.txr.is-hit:hover { background: var(--accent-wash); }
+
+/* 刪除：紅字，沒有框。破壞性的動作用顏色表示就夠，不用再畫一個按鈕。 */
+.del {
+  padding: 2px 0; background: transparent; border: 0; box-shadow: none;
+  color: var(--down); font-size: 12.5px; opacity: .7;
+  text-decoration: underline; text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: opacity .16s var(--ease), text-decoration-color .16s var(--ease);
+}
+.del:hover { opacity: 1; text-decoration-color: var(--down); }
+
+/* 修改：跟刪除同一種長相（文字、沒有框），用主色。放在刪除左邊，常用的在前面 */
+.txr__ed {
+  padding: 2px 0; margin-right: 14px; background: transparent; border: 0; box-shadow: none;
+  color: var(--accent); font-size: 12.5px;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+  transition: text-decoration-color .16s var(--ease);
+}
+.txr__ed:hover { text-decoration-color: currentColor; }
+/* 結算過的帳本：自己的紀錄也不能動，講清楚為什麼沒有按鈕 */
+.txr__lock { font-size: 12px; color: var(--ink-dim); }
+
+/* 分類寫在項目底下：只有手機用（桌機有自己的分類欄） */
+.txr__cm { display: none; }
+
+/* 手機：五欄擠在 330px 裡，修改、刪除會被推到畫面外要橫著捲才找得到。
+   收掉年份、分類欄（分類改寫在項目上方），兩顆按鈕直著排。 */
+@media (max-width: 560px) {
+  #view .txr td, #view .txt thead th { padding-left: 8px; padding-right: 8px; }
+  .txr__y, .txr__c { display: none; }
+  .txr__t { min-width: 0; }
+  .txr__cm { display: block; font-size: 11.5px; line-height: 1.5; }
+  .txr__x .txr__ed, .txr__x .del { display: block; margin: 0 0 0 auto; padding: 3px 0 5px; }
+}
+
+/* ---------- 多筆刪除 ---------- */
+.txr__ck { width: 1%; padding-right: 0 !important; }
+.txr__ck input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); cursor: pointer; vertical-align: top; }
+.txr[data-pickrow] { cursor: pointer; }
+.txr.is-picked, .txr.is-picked:hover { background: var(--accent-wash); }
+
+/* 勾選列：吸在頂欄下面，勾到清單底部也看得到「刪除 N 筆」 */
+.pkb {
+  position: sticky; top: calc(var(--appbar-h, 64px) + 8px); z-index: 6;
+  display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 10px 12px 10px 16px;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+}
+.pkb__n { font-size: 13.5px; color: var(--ink-soft); }
+.pkb__n b { color: var(--ink); font-family: var(--mono); font-size: 15px; }
+.pkb__sp { flex: 1 1 auto; }
+
+/* ---------- 修改一筆 ---------- */
+.txe .hp__c { width: min(540px, 100%); }
+.txe__g { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.txe__w { grid-column: 1 / -1; }
+.txe__raw {
+  font-size: 13px !important; line-height: 1.7 !important; color: var(--ink) !important;
+  background: var(--sunk); padding: 10px 14px; border-radius: var(--r-input);
+}
+.txe__raw span { display: block; font-size: 12px; color: var(--ink-dim); }
+.txe .hp__d { gap: 10px; }
+.txe .prs__f input, .txe .prs__f select { width: 100%; min-width: 0; }
+
+/* ---------- 篩選：標題 ＋ 下拉 ---------- */
+.bar {
+  display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
+  padding: 16px 28px; margin: 0;
+}
+.fsel { display: flex; flex-direction: column; gap: 5px; }
+.fsel > span {
+  font-size: 11px; letter-spacing: .08em; color: var(--ink-dim);
+  font-family: var(--mono);
+}
+.fsel select {
+  appearance: none; padding: 8px 30px 8px 12px; min-width: 132px;
+  background-color: var(--sunk); border: 1px solid var(--line-2);
+  color: var(--ink); font-size: 13.5px; cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(100% - 17px) 52%, calc(100% - 12px) 52%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color .16s var(--ease), background-color .16s var(--ease);
+}
+.fsel select:hover { border-color: var(--line-3); }
+.fsel select:focus { border-color: var(--accent); background-color: var(--card); }
+
+@media (max-width: 900px) {
+  .bar { padding-left: 18px; padding-right: 18px; }
+  .txr td, .txt thead th { padding-left: 10px; padding-right: 10px; }
+}
+@media (max-width: 640px) {
+  .txr__u, .txr__s { display: none; }
+}
+
+/* 搜尋欄位不放裝飾用的放大鏡——placeholder 已經說明它是什麼了 */
+.search__ic { display: none; }
+#searchDrawer input { padding-left: 0; }
+
+/* 成員沒有家庭總覽這個功能，側欄就不要留一個點不進去的項目 */
+
+
+/* ============================================================
+   財務建議：可收合的條列
+   ------------------------------------------------------------
+   原本每一則都整個攤開，五六則排下來就是一大片文字。
+   改成一則一行，想看細節才點開。
+   ============================================================ */
+.ad { border-bottom: 1px solid var(--line); }
+.ad__h {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 14px 28px; text-align: left; background: transparent;
+  transition: background-color .16s var(--ease);
+}
+.ad__h:hover { background: var(--card-2); }
+.ad.on .ad__h { background: var(--card-3); }
+
+.ad__lv {
+  flex: 0 0 auto; min-width: 44px; font-size: 11.5px; font-weight: 500;
+}
+.ad__lv--warn { color: var(--down); }
+.ad__lv--ok   { color: var(--up); }
+.ad__lv--info { color: var(--info); }
+
+.ad__t {
+  flex: 1 1 auto; min-width: 0; font-size: 14.5px; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ad__m { flex: 0 0 auto; font-size: 12px; color: var(--ink-faint); }
+.ad__p {
+  flex: 0 0 auto; font-family: var(--mono); font-size: 12px; color: var(--ink-dim);
+}
+.ad__cv {
+  flex: 0 0 auto; width: 14px; height: 14px; color: var(--ink-dim);
+  transition: transform .22s var(--back);
+}
+.ad.on .ad__cv { transform: rotate(180deg); color: var(--accent); }
+
+.ad__b {
+  padding: 4px 28px 22px 86px; animation: riseIn .3s var(--out) both;
+}
+.ad__b p { font-size: 14.5px; color: var(--ink-soft); line-height: 2; margin-bottom: 18px; }
+.ad__k {
+  font-size: 11px; letter-spacing: .08em; color: var(--ink-dim);
+  font-family: var(--mono); margin-bottom: 6px;
+}
+.ad__b ul { margin-bottom: 18px; }
+.ad__b li {
+  font-size: 13.5px; color: var(--ink-soft); line-height: 1.95;
+  padding-left: 14px; position: relative;
+}
+.ad__b li::before {
+  content: ''; position: absolute; left: 0; top: 12px;
+  width: 4px; height: 1px; background: var(--line-3);
+}
+.ad__b ul:last-child { margin-bottom: 0; }
+
+/* 搜尋框長得跟其他篩選一樣 */
+.fsel input[type="search"] {
+  padding: 8px 12px; min-width: 240px;
+  background-color: var(--sunk); border: 1px solid var(--line-2);
+  color: var(--ink); font-size: 13.5px;
+}
+
+@media (max-width: 900px) {
+  .ad__h { padding-left: 18px; padding-right: 18px; }
+  .ad__b { padding-left: 18px; padding-right: 18px; }
+  .ad__m { display: none; }
+}
+
+/* 刪除按下第一次：變成確認狀態 */
+.del--sure { opacity: 1; font-weight: 600; text-decoration-color: var(--down); }
+
+
+/* ============================================================
+   圖示模式：一律用下拉，不用抽屜
+   ------------------------------------------------------------
+   規則是「圖示 ⇒ 下拉」「文字 ⇒ 抽屜」。
+   帳本和通知已經處理了，搜尋先前漏掉——它在圖示模式下
+   還是整條拉開，跟旁邊兩個不一致。
+   ============================================================ */
+
+/* ⚠️ 不要把 .search 也設成 relative——#searchDrawer 本身就是 .search，
+   那樣會把它自己的 absolute 蓋掉，下拉就定位不了。
+   它靠 .top（sticky，算是定位過的祖先）來對齊右緣就好。 */
+
+
+/* ============================================================
+   重大操作的確認視窗
+   ============================================================ */
+.dg__w { font-size: 14.5px; color: var(--ink-soft); line-height: 1.95; margin-bottom: 20px; }
+.dg__w b { color: var(--down); font-weight: 600; }
+
+.dg .fld { margin-bottom: 16px; }
+
+/* 那段 64 碼：粗體、可選取。故意不給複製按鈕——
+   要使用者自己圈起來複製，那個動作本身就是一道減速帶。 */
+.dg__code {
+  background: var(--card-3); border-left: 3px solid var(--warn);
+  padding: 14px 16px; margin-bottom: 16px;
+}
+.dg__code > span {
+  display: block; font-size: 12px; color: var(--ink-faint); margin-bottom: 8px;
+}
+.dg__code b {
+  display: block; font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+  color: var(--ink); line-height: 1.8; word-break: break-all;
+  user-select: all; cursor: text;
+}
+.dg #dgCode { font-family: var(--code); font-size: 12.5px; }
+
+.dg__err { color: var(--down); font-size: 13px; margin-top: 4px; }
+.dg .hp__d { justify-content: flex-end; gap: 10px; }
+.btn--danger {
+  background: var(--down); border-color: var(--down); color: var(--card);
+}
+.btn--danger:hover { background: color-mix(in srgb, var(--down) 86%, #000); border-color: color-mix(in srgb, var(--down) 86%, #000); color: var(--on-accent); }
+
+/* 寫入前的二次確認：按鈕上直接顯示要寫什麼 */
+.btn--sure {
+  background: var(--warn); border-color: var(--warn); color: var(--card);
+}
+.btn--sure:hover { background: var(--warn); border-color: var(--warn); color: var(--card); }
+
+
+/* ============================================================
+   窄螢幕的頂欄
+   ------------------------------------------------------------
+   文字方案在 375px 上擺不下：標題 ＋ 帳本名稱 ＋ 230px 的行內搜尋
+   ＋ 鈴鐺，加起來超出畫面 147px。
+
+   所以窄螢幕不管選了哪個方案，頂欄一律用圖示——
+   空間不夠的時候，能按到比看得懂名字更重要。
+   ============================================================ */
+@media (max-width: 760px) {
+
+  /* ⚠️ 帳本名稱在窄螢幕一定要留著。
+     以前這裡把名稱和箭頭都藏掉，只剩一個方形圖示配右下角一顆小點——
+     使用者看不出那是什麼，也看不出它可以按。點下去面板從頂欄下面展開，
+     因為沒有任何線索指向那顆按鈕，感覺就像「按了沒反應」。
+
+     空間是從**頁面標題**讓出來的：左邊的導覽列已經把目前頁面標亮了，
+     頂欄再寫一次是重複的；而「現在在哪一本帳」沒有別的地方會說。 */
+      /* 箭頭 = 這會展開 */
+         /* 有名字了，小點是多餘的 */
+
+  /* 標題讓位給帳本名稱：導覽列已經標亮目前頁面了 */
+
+  .ic, .bell { width: 48px; }
+
+  /* 提示訊息不要比畫面寬 */
+  .toasts { max-width: calc(100vw - 24px); right: 12px; left: auto; }
+  .toast { max-width: 100%; }
+}
+
+
+/* ============================================================
+   抽屜是推開，不是蓋住
+   ------------------------------------------------------------
+   面板絕對定位貼在頂欄下緣，本來會浮在內容上面，
+   把下面那一列切掉一半——看起來像壞掉。
+
+   改成把內容區往下推出同樣的高度（--dw-h 由 JS 量好），
+   抽屜拉開時下面的東西整個讓開，一列都不會被遮到。
+   ============================================================ */
+body.dw-push #view { padding-top: var(--dw-h, 0px); }
+#view { transition: padding-top .24s var(--out); }
+
+/* 推開之後就不需要壓暗了——沒有東西被蓋住 */
+body.dw-on #view { opacity: 1; pointer-events: auto; }
+
+
+/* ============================================================
+   新手導覽
+   ------------------------------------------------------------
+   用一個方框把目標圈起來、其餘變暗。
+   暗的部分是用 box-shadow 往外撐 9999px 做出來的——
+   比 clip-path 相容性好，而且邊緣是直角，跟整體一致。
+   ============================================================ */
+.tour { position: fixed; inset: 0; z-index: 300; pointer-events: none; }
+body.tour-on { overflow: hidden; }
+
+.tour__hole {
+  position: fixed; pointer-events: none;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--shade-deep) 55%, transparent);
+  transition: left .28s var(--out), top .28s var(--out),
+              width .28s var(--out), height .28s var(--out);
+}
+
+.tour__box {
+  position: fixed; width: 300px; pointer-events: auto;
+  background: var(--card); border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-pop); padding: 18px 20px 16px;
+  transition: left .28s var(--out), top .28s var(--out);
+}
+.tour__n {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  letter-spacing: .1em; margin-bottom: 8px;
+}
+.tour__box h4 { font-family: var(--serif); font-size: 16px; margin-bottom: 8px; }
+.tour__box p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.9; }
+.tour__a {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.tour__skip {
+  margin-right: auto; font-size: 12px; color: var(--ink-dim);
+  background: transparent; border: 0; padding: 4px 0;
+}
+.tour__skip:hover { color: var(--ink); }
+
+/* 詢問視窗比說明彈窗窄一點，像一句問話 */
+.tw2 .hp__c { width: min(380px, 100%); }
+.tw2 .hp__b p { font-size: 14.5px; }
+
+@media (max-width: 560px) {
+  .tour__box { width: calc(100vw - 24px); left: 12px !important; }
+}
+
+
+/* ============================================================
+   抽屜是版面的一部分，不是浮層
+   ------------------------------------------------------------
+   用 padding 把內容往下推只在捲到最上面時有用；捲動之後，
+   視窗停在原本的文件位置，看到的還是被蓋住的那一段。
+
+   所以面板直接放進版面裡（頂欄與內容之間），佔真實的空間——
+   不管捲到哪裡都不會壓到任何東西。
+   ============================================================ */
+.gsw__p.inflow,
+.bell__panel.inflow,
+#searchDrawer.inflow {
+  position: static; width: auto; left: auto; right: auto;
+  max-height: none; box-shadow: none;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-2);
+  border-left: 0; border-right: 0;
+}
+/* 版面裡的東西不需要再讓位 */
+body.dw-push #view { padding-top: 0; }
+
+/* ============================================================
+   收合區塊的開關
+   ------------------------------------------------------------
+   放在區塊標題那一列的右邊，不佔自己的一行。
+   全直角、無外框——它是一個動作，不是一顆方塊。
+   ============================================================ */
+.fold__b {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; border: 0; border-radius: var(--r-input); padding: 6px 2px;
+  color: var(--accent); font-size: 13.5px; font-weight: 500; cursor: pointer;
+  transition: color .16s var(--ease);
+}
+.fold__b:hover { color: var(--accent-hi); }
+
+/* ＋ 用兩條線畫，展開時轉成 ×——同一顆按鈕，狀態看得出來 */
+.fold__x {
+  position: relative; width: 13px; height: 13px; flex: 0 0 13px;
+  transition: transform .22s var(--back);
+}
+.fold__x::before, .fold__x::after {
+  content: ''; position: absolute; left: 0; top: 6px;
+  width: 13px; height: 1.5px; background: currentColor;
+}
+.fold__x::after { transform: rotate(90deg); }
+.fold__b.on .fold__x { transform: rotate(45deg); }
+
+.fold__p { animation: foldIn .22s var(--out); }
+@keyframes foldIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 區塊標題那一列的 kicker 本來用 margin-left:auto 推到右邊，
+   現在右邊是開關，kicker 要讓開 */
+.sec:has(.fold__b) .sec__n { margin-left: 0; }
+
+/* ============================================================
+   誰花的：堆疊條 ＋ 名單
+   ============================================================ */
+.mshare { padding: 18px 20px 20px; }
+.mshare__b {
+  display: flex; height: 14px; width: 100%; overflow: hidden;
+  background: var(--sunk); margin-bottom: 16px;
+}
+.mshare__b i { display: block; height: 100%; transition: width .4s var(--out); }
+.mshare__i {
+  display: grid; grid-template-columns: 10px 1fr auto auto;
+  align-items: center; gap: 10px;
+  padding: 9px 0; border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.mshare__i:first-of-type { border-top: 0; }
+.mshare__n { color: var(--ink); min-width: 0; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; }
+.mshare__p { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.mshare__v { color: var(--ink); }
+
+@media (max-width: 760px) {
+  .charts { grid-template-columns: 1fr; }
+}
+
+/* 家庭總覽的建議摘要 */
+.fad { padding: 16px 20px; border-top: 1px solid var(--line); border-left: 3px solid var(--line-2); }
+.fad:first-child { border-top: 0; }
+.fad--warn { border-left-color: var(--warn); }
+.fad--ok { border-left-color: var(--up); }
+.fad--info { border-left-color: var(--info); }
+.fad__t { font-size: 14.5px; font-weight: 500; color: var(--ink); margin-bottom: 5px; }
+.fad__b { font-size: 13px; color: var(--ink-soft); line-height: 1.85; margin: 0; }
+.fad__more {
+  display: block; padding: 14px 20px; border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--accent);
+}
+.fad__more:hover { background: var(--card-2); }
+
+/* 帳本卡片上的「有動靜通知我」 */
+.gnot {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
+  padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--ink-dim); cursor: pointer;
+}
+.gnot input { width: 14px; height: 14px; accent-color: var(--accent); margin: 0; }
+.gnot:hover { color: var(--ink-soft); }
+
+/* 結算：主要動作，但仍然不做成方塊 */
+.gx--go { color: var(--accent); }
+.gx--go:hover { color: var(--accent-hi); border-color: var(--accent-line); }
+
+/* ============================================================
+   理財習慣
+   ============================================================ */
+.finf { display: grid; gap: 22px; padding: 22px 28px 26px; }
+.finf__g { display: grid; gap: 10px; }
+.finf__k { font-size: 12px; color: var(--ink-faint); }
+.finf__o { display: grid; gap: 8px; }
+.finf__o--row { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+
+/* 全直角，選中用底色與左邊一條線表示，不用圓框 */
+.pick {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 11px 14px; cursor: pointer;
+  background: var(--sunk); border: 1px solid var(--line-2);
+  border-left-width: 3px; border-left-color: var(--line-2);
+  transition: border-color .16s var(--ease), background-color .16s var(--ease);
+}
+.pick:hover { border-left-color: var(--accent-line); }
+.pick input { margin: 0; accent-color: var(--accent); flex: 0 0 auto; }
+.pick b { font-weight: 500; font-size: 14px; color: var(--ink); }
+.pick i { font-style: normal; font-size: 12px; color: var(--ink-dim); }
+.pick:has(input:checked) {
+  background: var(--accent-wash); border-color: var(--accent-line);
+  border-left-color: var(--accent);
+}
+.pick--sm { padding: 9px 12px; }
+
+.finf textarea {
+  width: 100%; padding: 10px 12px; resize: vertical;
+  background: var(--sunk); border: 1px solid var(--line-2); border-radius: var(--r-input);
+  color: var(--ink); font-family: var(--sans); font-size: 13.5px; line-height: 1.8;
+}
+.finf textarea:focus { outline: none; border-color: var(--accent); }
+
+/* ============================================================
+   登入前的主頁
+   ------------------------------------------------------------
+   左邊講話，右邊是一頁帳簿。
+
+   插圖用 SVG 不用圖檔：它要跟著米白主題走、放大不能糊，
+   而且一張畫上去的插畫會是整頁最不搭的東西——
+   這個系統的調性是文件感，不是插畫感。
+   ============================================================ */
+.lp {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 64px; align-items: center;
+  max-width: 1020px; margin: 0 auto; padding: 72px 32px 88px;
+}
+
+.lp__k {
+  display: block; font-family: var(--mono); font-size: 11px;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 22px;
+}
+/* 專題名稱。11 個字，字級要讓它在 446px 的欄寬裡放得下一行 */
+.lp__t {
+  font-family: var(--serif); font-size: 34px; font-weight: 700;
+  line-height: 1.35; color: var(--ink); margin-bottom: 18px;
+  letter-spacing: .02em;
+}
+.lp__rule {
+  width: 56px; height: 2px; background: var(--accent); margin-bottom: 18px;
+}
+/* 標語。比名稱小，但仍然是第二眼會看到的東西 */
+.lp__tag {
+  font-family: var(--serif); font-size: 21px; font-weight: 600;
+  color: var(--accent); margin-bottom: 16px; letter-spacing: .02em;
+}
+.lp__s {
+  font-size: 15px; line-height: 2.05; color: var(--ink-soft);
+  margin-bottom: 34px; max-width: 30em;
+}
+
+/* 主要動作。一條底線、一個箭頭，不用方塊也不用膠囊 */
+.lp__go {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 14px 2px 13px; background: transparent;
+  border: 0; border-bottom: 2px solid var(--accent);
+  border-radius: var(--r-input); cursor: pointer;
+  font-family: var(--serif); font-size: 18px; font-weight: 600;
+  color: var(--accent);
+  transition: gap .2s var(--out), color .16s var(--ease);
+}
+.lp__go svg { width: 20px; height: 20px; transition: transform .2s var(--out); }
+.lp__go:hover { gap: 18px; color: var(--accent-hi); }
+.lp__go:hover svg { transform: translateX(3px); }
+.lp__go:active { transform: translateY(1px); }
+
+/* 三點式賣點。上框線分隔，不做成卡片——一堆方塊就是這個專題一路在拿掉的東西 */
+.lp__f { list-style: none; margin: 0 0 34px; padding: 0; }
+.lp__f li {
+  display: grid; gap: 3px; padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.lp__f li:last-child { border-bottom: 1px solid var(--line); }
+.lp__f b {
+  font-family: var(--serif); font-size: 15px; font-weight: 600; color: var(--ink);
+}
+.lp__f i {
+  font-style: normal; font-size: 13px; line-height: 1.85; color: var(--ink-soft);
+}
+
+.lp__n { margin-top: 26px; font-size: 12px; color: var(--ink-dim); }
+
+/* 右邊：帳簿。底下墊一張，看起來是一疊紙而不是一個方框 */
+.lp__r { position: relative; }
+.lp__r::before {
+  content: ''; position: absolute; inset: 14px -12px -14px 12px;
+  background: var(--card-2); border: 1px solid var(--line);
+  box-shadow: var(--shadow-flat);
+}
+.lg {
+  position: relative; display: block; width: 100%; height: auto;
+  filter: drop-shadow(0 14px 30px color-mix(in srgb, var(--shade) 10%, transparent));
+}
+
+.lg__paper { fill: var(--card); stroke: var(--line); stroke-width: 1; }
+.lg__bind { stroke: var(--accent-line); stroke-width: 1; }
+
+.lg__h {
+  font-family: var(--sans); font-size: 10px; letter-spacing: .1em;
+  fill: var(--ink-dim);
+}
+.lg__h--r { text-anchor: end; }
+
+.lg__d { font-family: var(--mono); font-size: 11px; fill: var(--ink-dim); }
+.lg__m { font-family: var(--sans); font-size: 12.5px; fill: var(--ink); }
+.lg__v {
+  font-family: var(--mono); font-size: 12.5px; fill: var(--ink);
+  text-anchor: end;
+}
+
+/* 格線自己畫出來。⚠️ dasharray 要比線長，不然收尾會露出一截 */
+.lg__rule {
+  stroke: var(--line); stroke-width: 1;
+  stroke-dasharray: 380; stroke-dashoffset: 380;
+  animation: ruleIn .5s var(--out) forwards;
+}
+.lg__rule--head { stroke: var(--line-2); animation-delay: 120ms; }
+
+.lg__row { opacity: 0; animation: rowIn .42s var(--out) forwards; }
+.lg__row .lg__rule { animation-delay: inherit; }
+
+.lg__dbl {
+  stroke: var(--ink-faint); stroke-width: 1;
+  opacity: 0; animation: fadeIn .4s ease 760ms forwards;
+}
+.lg__t {
+  font-family: var(--sans); font-size: 12px; fill: var(--ink-soft);
+  opacity: 0; animation: fadeIn .4s ease 820ms forwards;
+}
+.lg__sum {
+  font-family: var(--mono); font-size: 15px;
+  fill: var(--ink-soft); text-anchor: end;
+  opacity: 0; animation: fadeIn .4s ease 820ms forwards;
+}
+
+/* 還能花：整頁的主角。這類 App 都用一個大數字當視覺重心 */
+.lg__hi { fill: var(--accent-line); opacity: 0; animation: fadeIn .4s ease 900ms forwards; }
+.lg__lt {
+  font-family: var(--sans); font-size: 12.5px; fill: var(--ink-soft);
+  opacity: 0; animation: fadeIn .4s ease 960ms forwards;
+}
+.lg__lv {
+  font-family: var(--mono); font-size: 26px; font-weight: 500;
+  fill: var(--accent); text-anchor: end;
+  opacity: 0; animation: fadeIn .5s ease 960ms forwards;
+}
+
+@keyframes ruleIn { to { stroke-dashoffset: 0; } }
+@keyframes rowIn { from { opacity: 0; transform: translateX(-6px); }
+                   to { opacity: 1; transform: none; } }
+@keyframes fadeIn { to { opacity: 1; } }
+
+@media (max-width: 900px) {
+  .lp { grid-template-columns: 1fr; gap: 44px; padding: 46px 22px 64px; }
+  .lp__t { font-size: 30px; }
+  /* 手機上先看到字，帳簿放後面 */
+  .lp__r { order: 2; }
+  .lp__l { order: 1; }
+  .lp__r::before { inset: 10px -8px -10px 8px; }
+}
+
+@media (max-width: 480px) {
+  .lp__t { font-size: 25px; }
+  .lp__tag { font-size: 18px; }
+  .lp__s { font-size: 14px; }
+}
+
+/* 會暈的人就不要動 */
+@media (prefers-reduced-motion: reduce) {
+  .lg__rule, .lg__row, .lg__dbl, .lg__t, .lg__sum {
+    animation: none; opacity: 1; stroke-dashoffset: 0;
+  }
+}
+
+/* ============================================================
+   設計系統：儀表板
+   ------------------------------------------------------------
+   取代原本的「一張紙」。那一版把卡片、數字、清單全部壓平成
+   細線加留白，結果整個畫面沒有區塊，三層標題也分不出來。
+
+   現在的做法：
+     · 側欄是深玉綠的「銀行 App」儀表板，跟米白的內容區明顯分開
+     · 內容是浮在格子紙上的白色卡片，一群相關的資料一張卡
+     · 三層標題用字級、字體、位置、裝飾同時拉開
+     · 內容有最大寬度，右邊的按鈕不會飄到螢幕最右邊
+
+   ⚠️ 內容區的規則一律掛在 #view 底下。這個檔案前面疊了好幾代的規則，
+   掛在 #view 底下優先度比較高，不需要 !important 也蓋得過。
+   ============================================================ */
+
+
+/* ============================================================
+   骨架
+   ============================================================ */
+.app { display: block; min-height: 100vh; }
+
+.main {
+  margin-left: var(--rail); padding: 0; min-width: 0;
+  min-height: 100vh; background: transparent; border: 0;
+}
+
+/* ---------- 最常用的動作 ---------- */
+
+
+/* ---------- 選單 ---------- */
+
+
+/* ---------- 底部：說明與登出 ---------- */
+
+
+/* ---------- 收合：只剩圖示 ---------- */
+
+
+/* ---------- 平台管理員：側欄只有一項 ---------- */
+/* ⚠️ 只在「不是管理員」時藏起來，**不要**替管理員指定 display——
+   指定了會蓋掉窄螢幕與收合時的規則，導覽列上會冒出直排的「平／台」。 */
+
+body.is-admin #gsw,
+body.is-admin #searchBtn,
+body.is-admin .search,
+body.is-admin .bell__wrap { display: none; }
+
+/* ============================================================
+   第一層：頁面標題 ＋ 工具
+   ------------------------------------------------------------
+   標題在左，右邊是「我｜全家」、帳本、搜尋、通知，全部同一行。
+   ⚠️ 原本工具在另一條獨立的頂列上，兩個橫幅疊在一起，中間空一大塊。
+   ============================================================ */
+.phead {
+  max-width: var(--page-w); margin: 0 auto;
+  padding: 26px var(--page-x) 6px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap;
+}
+/* margin-right: auto ＝ 讓標題那一塊吃掉中間的空白，右邊的工具才會貼到底。
+   ⚠️ 不能只靠 .phead 的 space-between：總覽多了頭貼之後變成三格，
+      space-between 會把標題推到正中間，跟頭貼中間裂出一條縫。 */
+.phead__m { min-width: 0; margin-right: auto; }
+/* 總覽的問候區：頭貼 ＋「嗨，名字」＋ 哪個家庭的誰。
+   頭貼不參與伸縮（flex: 0 0 auto），名字再長也不會把它壓扁。 */
+.phead__av { flex: 0 0 auto; display: block; align-self: center; }
+.phead__av[hidden] { display: none; }
+/* 這一顆要看得出是「你」，所以用主色實心，不是清單裡那種淡的。
+   有上傳頭貼的話 .ava--img 會蓋掉背景，只留下圓角與外框。 */
+.phead__av .ava {
+  width: 52px; height: 52px; font-size: 20px;
+  background: var(--accent); border-color: var(--accent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+@media (max-width: 560px) {
+  .phead__av .ava { width: 44px; height: 44px; font-size: 17px; }
+}
+.phead__k { font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--accent); margin-bottom: 6px; }
+.phead__k:empty { display: none; }
+.phead__t {
+  font-family: var(--serif); font-size: var(--h1); font-weight: 700;
+  line-height: 1.2; letter-spacing: .01em; color: var(--ink);
+}
+.phead__s { margin-top: 8px; font-size: 14px; color: var(--ink-faint); }
+.phead__r { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.phead__a { display: flex; align-items: center; gap: 10px; }
+.phead__tools { display: flex; align-items: center; gap: 8px; }
+body.is-out .phead { display: none; }
+
+/* ---------- 三個工具：同一個高度、同一種外框 ---------- */
+.phead__tools .gsw,
+.phead__tools .bell__wrap { position: relative; flex: 0 0 auto; border: 0; }
+.phead__tools .gsw[hidden], .phead__tools .bell__wrap[hidden] { display: none; }
+
+.phead__tools .gsw__b {
+  display: inline-flex; align-items: center; gap: 8px;
+  width: auto; height: var(--ctl); padding: 0 12px;
+  background: var(--card); border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 13.5px; font-weight: 600; box-shadow: none;
+}
+.phead__tools .gsw__b:hover { background: var(--card); border-color: var(--accent-line); color: var(--ink); }
+.phead__tools .gsw__b.open { border-color: var(--accent); background: var(--card); color: var(--ink); }
+.phead__tools .gsw__ic, .phead__tools .ic__d { display: none; }
+.phead__tools .gsw__b .gsw__d { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; }
+.phead__tools .gsw__n { display: inline; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.phead__tools .gsw__cv { display: block; width: 14px; height: 14px; opacity: .55; transition: transform .2s var(--ease); }
+.phead__tools .gsw__b.open .gsw__cv { transform: rotate(180deg); }
+
+.phead__tools #searchBtn,
+.phead__tools .bell {
+  position: relative; display: grid; place-items: center;
+  width: var(--ctl); height: var(--ctl); padding: 0; align-self: center;
+  background: var(--card); border: 1px solid var(--line-2); color: var(--ink-soft); box-shadow: none;
+}
+.phead__tools #searchBtn svg, .phead__tools .bell svg { width: 18px; height: 18px; }
+.phead__tools #searchBtn:hover, .phead__tools .bell:hover { border-color: var(--accent-line); color: var(--ink); background: var(--card); }
+.phead__tools .bell.open, .phead__tools #searchBtn.open { border-color: var(--accent); color: var(--accent); }
+.phead__tools .bell__n {
+  position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center; font-size: 10.5px; font-weight: 700; line-height: 1;
+  background: var(--badge); color: var(--badge-ink); border: 2px solid var(--paper);
+}
+.phead__tools .bell__n[hidden] { display: none; }
+
+/* 電腦版：搜尋是一直都在的輸入框，不需要那顆圖示 */
+.phead__tools #searchBtn { display: none; }
+.phead__tools #searchDrawer {
+  position: relative; display: flex; align-items: center; align-self: center;
+  width: 230px; min-width: 0; max-width: none; height: var(--ctl); margin: 0; padding: 0 12px 0 34px;
+  background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239DA2A9' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px 50% / 15px 15px;
+  border: 1px solid var(--line-2); box-shadow: none; animation: none;
+}
+.phead__tools #searchDrawer:focus-within { border-color: var(--accent); }
+.phead__tools #searchDrawer input {
+  width: 100%; height: 100%; padding: 0; border: 0; background: transparent;
+  font-size: 13.5px; color: var(--ink);
+}
+.phead__tools #searchDrawer input:focus { outline: none; }
+
+/* ---------- 下拉面板：從按鈕正下方浮出來，不推動任何內容 ---------- */
+/* 對齊按鈕右緣往左展開，所以不會蓋到同一行右邊的按鈕；
+   項目太多就在面板裡自己捲（max-height ＋ overflow），頁面不會被撐長。 */
+.phead__tools .gsw__p,
+.phead__tools .bell__panel {
+  position: absolute; top: calc(100% + 8px); right: 0; left: auto; z-index: 65;
+  display: block; width: 320px; max-height: min(64vh, 460px); overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 6px 0;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop); animation: popIn .18s var(--out) both;
+}
+.phead__tools .gsw__p[hidden], .phead__tools .bell__panel[hidden] { display: none; }
+.phead__tools .bell__panel { width: 380px; padding: 0; }
+
+.phead__tools .gsw__i {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 10px 16px; margin: 0; border: 0; background: transparent; text-align: left; box-shadow: none;
+}
+.phead__tools .gsw__i:hover { background: var(--card-2); padding-left: 16px; }
+.phead__tools .gsw__i.on { background: var(--accent-wash); }
+.phead__tools .gsw__i .gsw__d { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; }
+.phead__tools .gsw__m { display: flex; flex-direction: column; min-width: 0; line-height: 1.4; }
+.phead__tools .gsw__m b { font-size: 14px; font-weight: 600; color: var(--ink); }
+.phead__tools .gsw__m i { font-style: normal; font-size: 12px; color: var(--ink-faint); }
+.phead__tools .gsw__more {
+  display: block; margin-top: 4px; padding: 10px 16px; border-top: 1px solid var(--line);
+  font-size: 13px; font-weight: 700; color: var(--accent);
+}
+
+.phead__tools .bell__h {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--line);
+}
+.phead__tools .bell__t { margin-right: auto; font-family: var(--sans); font-size: 14px; font-weight: 700; }
+.phead__tools .bell__list { max-height: none; overflow: visible; }
+.phead__tools .bell__i { padding: 12px 16px; }
+.phead__tools .bell__i:hover { padding-left: 16px; background: var(--card-2); }
+.phead__tools .bell__empty { padding: 28px 16px; }
+
+/* 面板開著時不要把內容壓暗、也不要擋住操作 */
+body.dw-on #view { opacity: 1; pointer-events: auto; }
+
+/* ============================================================
+   內容
+   ============================================================ */
+#view .page {
+  max-width: var(--page-w); margin: 0 auto;
+  padding: 20px var(--page-x) 72px; animation: fadeIn .3s var(--ease);
+}
+.foot {
+  max-width: var(--page-w); margin: 0 auto;
+  padding: 22px var(--page-x) 30px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--ink-dim);
+}
+body.is-out .foot { display: none; }
+
+/* ---------- 第二層：區塊標題（白色卡片的外面） ---------- */
+#view .sec {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+  min-height: var(--ctl); margin: 36px 0 14px; padding: 0; border: 0;
+}
+#view .page > .sec:first-child,
+#view .page > .back + .sec,
+#view .duo__c > .sec:first-child { margin-top: 0; }
+#view .sec__t {
+  position: relative; display: inline-flex; align-items: center; gap: 4px;
+  padding-left: 14px;
+  font-family: var(--sans); font-size: var(--h2); font-weight: 700;
+  line-height: 1.3; letter-spacing: .02em; color: var(--ink);
+}
+#view .sec__t::before {
+  content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 4px;
+  background: var(--accent);
+}
+#view .sec__n {
+  margin: 0; padding: 2px 9px;
+  font-family: var(--sans); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none;
+  color: var(--ink-faint); background: color-mix(in srgb, var(--card) 70%, transparent); border: 1px solid var(--line);
+}
+#view .sec__tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+#view .sec .fold__b, #view .sec__link { margin-left: auto; }
+#view .sec__tools ~ .fold__b { margin-left: 0; }
+#view .sec__x { display: flex; }
+#view .pk__t { min-width: 6.4em; justify-content: center; }
+#view .sec__x ~ .fold__b { margin-left: 0; }
+/* 篩選的標題（收支、來源）不可以斷行——擠的時候斷成一個字一行 */
+#view .fsel > span { white-space: nowrap; flex: none; }
+#view .sec__link { font-size: 13.5px; font-weight: 600; color: var(--accent); text-decoration: none; }
+#view .sec__link:hover { color: var(--accent-hi); }
+
+/* 展開鍵：看起來就是一顆按鈕 */
+#view .fold__b {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: var(--ctl); padding: 0 14px;
+  border: 1px solid var(--accent-line); background: var(--card); color: var(--accent);
+  font-size: 13.5px; font-weight: 700;
+  transition: background-color .16s var(--ease), border-color .16s var(--ease), color .16s var(--ease);
+}
+#view .fold__b:hover { background: var(--accent-wash); border-color: var(--accent); color: var(--accent-hi); }
+#view .fold__b.on { color: var(--ink-soft); border-color: var(--line-2); }
+#view .fold__p { margin: 0 0 var(--gap); }
+#view .fold__p > .card:last-child { margin-bottom: 0; }
+
+/* ---------- 左右兩欄 ---------- */
+#view .duo {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px; align-items: start; margin-top: 36px;
+}
+#view .page > .duo:first-child,
+#view .page > .back + .duo,
+#view .kpis + .duo { margin-top: 0; }
+#view .kpis + .duo { margin-top: 32px; }
+#view .duo__c { min-width: 0; }
+#view .duo > .duo__c:only-child { grid-column: 1 / -1; }
+
+/* ---------- 第三層：卡片 ---------- */
+#view .card {
+  position: relative; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  box-shadow: var(--shadow-block);
+  padding: var(--pad); margin: 0 0 var(--gap);
+}
+#view .card--flush { padding: 0; overflow: hidden; }
+#view .card__h {
+  display: flex; align-items: center; gap: 8px;
+  margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) var(--pad);
+  padding: 13px var(--pad); background: var(--card-2); border-bottom: 1px solid var(--line);
+}
+#view .card--flush > .card__h { margin: 0; }
+#view .card__t {
+  font-family: var(--sans); font-size: var(--h3); font-weight: 700;
+  letter-spacing: .03em; color: var(--ink-soft);
+}
+#view .card__s { margin-left: auto; font-size: 12px; color: var(--ink-faint); }
+
+/* ---------- 數字卡 ---------- */
+#view .kpis {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px; margin: 0; border: 0;
+}
+#view .kpi {
+  position: relative; overflow: hidden; border-radius: var(--r-card);
+  background: var(--card); border: 1px solid var(--line);
+  box-shadow: var(--shadow-block); padding: 16px 18px 16px; transform: none;
+  animation: riseIn .45s var(--out) both;
+}
+#view .kpi:nth-child(2) { animation-delay: 50ms; }
+#view .kpi:nth-child(3) { animation-delay: 100ms; }
+#view .kpi:nth-child(4) { animation-delay: 150ms; }
+#view .kpi::before { display: none; }
+#view .kpi:hover { transform: none; background: var(--card); }
+#view .kpi__top { display: flex; align-items: center; gap: 9px; }
+#view .kpi__ic {
+  width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center;
+  background: var(--accent-wash); color: var(--accent);
+}
+#view .kpi__ic svg { width: 17px; height: 17px; }
+#view .kpi--ok .kpi__ic { background: var(--up-wash); color: var(--up); }
+#view .kpi--warn .kpi__ic { background: var(--warn-wash); color: var(--warn); }
+#view .kpi--crit .kpi__ic { background: var(--down-wash); color: var(--down); }
+#view .kpi__k { font-size: 13.5px; font-weight: 500; color: var(--ink-soft); letter-spacing: .02em; }
+#view .kpi__v {
+  margin: 12px 0 2px; font-family: var(--sans); font-variant-numeric: normal;
+  font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--ink);
+  letter-spacing: -.01em; white-space: nowrap;
+}
+#view .kpi--crit .kpi__v { color: var(--down); }
+#view .kpi__s { font-size: 12px; color: var(--ink-faint); }
+
+/* 金額：幣別小一號、淡一點 */
+.amt { white-space: nowrap; }
+.amt > i {
+  font-style: normal; font-size: .52em; font-weight: 600; letter-spacing: .04em;
+  color: var(--ink-dim); margin-right: 4px; vertical-align: .32em;
+}
+
+/* 狀態小膠囊（直角） */
+.pill {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 10px;
+  font-size: 12px; font-weight: 700; letter-spacing: .02em; white-space: nowrap;
+}
+.pill--safe { background: var(--up-wash); color: var(--up); }
+.pill--near { background: var(--warn-wash); color: var(--warn); }
+.pill--over { background: var(--down-wash); color: var(--down); }
+
+/* ---------- 存款目標卡 ---------- */
+#view .goal__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+#view .goal__main { display: flex; align-items: center; gap: 12px; }
+#view .goal__ic {
+  width: 40px; height: 40px; display: grid; place-items: center;
+  background: var(--accent-wash); color: var(--accent);
+}
+#view .goal__ic svg { width: 22px; height: 22px; }
+#view .goal__k { font-size: 13px; color: var(--ink-faint); }
+#view .goal__v { font-size: 28px; font-weight: 700; line-height: 1.2; color: var(--ink); }
+#view .goal__track { position: relative; height: 10px; margin: 22px 0 10px; background: var(--sunk); }
+#view .goal__track i { display: block; height: 100%; background: var(--up); animation: growW .9s var(--out) both; }
+#view .goal--near .goal__track i { background: var(--warn); }
+#view .goal--over .goal__track i { background: var(--down); }
+#view .goal__ends { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--ink-faint); }
+#view .goal__ends b { color: var(--ink); font-weight: 700; font-size: 14px; }
+#view .goal__pct { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+
+/* ---------- 卡片裡的表格 ---------- */
+#view .dt { width: 100%; border-collapse: collapse; font-size: 14px; }
+#view .dt th {
+  padding: 12px 16px; text-align: left; white-space: nowrap;
+  font-size: var(--lbl); font-weight: 600; letter-spacing: .06em; color: var(--ink-faint);
+  background: var(--card-2); border-bottom: 1px solid var(--line);
+}
+#view .dt td { padding: 13px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--ink-soft); }
+#view .dt tbody tr:last-child td { border-bottom: 0; }
+#view .dt tbody tr { transition: background-color .14s var(--ease); }
+#view .dt tbody tr:hover { background: var(--card-2); }
+#view .dt .rt { text-align: right; }
+#view .dt .num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+#view .dt .num small { display: inline; color: var(--ink-dim); font-size: 12px; }
+#view .dt .is-up { color: var(--up); font-weight: 600; }
+#view .dt .is-down { color: var(--down); font-weight: 600; }
+#view .dt td > b { color: var(--ink); }
+#view .dt td:first-child > b { white-space: nowrap; }   /* 「09 月」這種短標籤不要被擠成兩行 */
+#view .dt td > small { display: block; font-size: 12px; color: var(--ink-dim); }
+#view .dt__name { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+#view .dt__name b { display: block; color: var(--ink); font-weight: 600; }
+#view .dt__name small { display: block; font-size: 12px; color: var(--ink-faint); }
+#view .dt__bar { white-space: nowrap; min-width: 120px; }
+#view .dt__bar em { font-style: normal; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); margin-left: 10px; }
+#view .is-over .dt__bar em { color: var(--down); }
+#view .mbar {
+  display: inline-block; width: calc(100% - 56px); min-width: 60px; max-width: 160px; height: 8px;
+  vertical-align: middle; background: var(--sunk);
+}
+#view .mbar i { display: block; height: 100%; background: var(--accent); animation: growW .8s var(--out) both; }
+#view .dt__go { cursor: pointer; }
+#view .dt__why { display: block; margin-top: 4px; font-size: 12px; color: var(--ink-faint); }
+
+/* 明細表：也放進卡片 */
+#view .txw { overflow-x: auto; border-top: 0; }
+#view .txt thead th {
+  font-family: var(--sans); font-size: var(--lbl); font-weight: 600; letter-spacing: .06em;
+  color: var(--ink-faint); background: var(--card-2); padding: 12px 14px;
+}
+#view .txr td { padding: 12px 14px; }
+#view .txr:last-child { border-bottom: 0; }
+
+/* ---------- 全家：誰花的 ---------- */
+#view .mshare-card { padding: 18px var(--pad); }
+#view .mshare { padding: 0; }
+
+/* ---------- 空狀態：置中 ---------- */
+#view .empty { padding: 36px 16px; }
+#view .empty__ic { width: 40px; height: 40px; margin-bottom: 12px; color: var(--line-3); }
+#view .empty__t { font-family: var(--sans); font-size: 15px; font-weight: 700; }
+#view .empty__s { font-size: 13px; }
+
+/* ---------- 切換鍵：我／全家、按月／按年 ---------- */
+.seg { display: inline-flex; border: 1px solid var(--line-2); background: var(--card); }
+.seg__b {
+  height: calc(var(--ctl) - 2px); padding: 0 16px;
+  font-size: 13.5px; font-weight: 600; color: var(--ink-faint); background: transparent;
+  transition: background-color .16s var(--ease), color .16s var(--ease);
+}
+.seg__b + .seg__b { border-left: 1px solid var(--line-2); }
+.seg__b:hover { color: var(--ink); background: var(--card-2); }
+.seg__b.on { background: var(--accent); color: var(--on-accent); }
+.seg__b[disabled] { color: var(--ink-dim); cursor: not-allowed; background: transparent; }
+
+/* ---------- 控制項：統一高度，不要比標題還大 ---------- */
+#view .bar--inline { display: flex; align-items: center; gap: 10px; padding: 0; margin: 0; border: 0; }
+#view .fsel { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; }
+#view .fsel > span {
+  font-family: var(--sans); font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--ink-faint);
+}
+#view .fsel select, #view .fsel input {
+  height: var(--ctl); min-height: 0; width: auto; min-width: 92px;
+  padding: 0 30px 0 10px; font-size: 13.5px;
+  background-color: var(--card); border: 1px solid var(--line-2);
+}
+#view .fsel input[type="search"] { min-width: 220px; padding: 0 12px; }
+#view .btn { height: 40px; padding: 0 18px; font-weight: 600; box-shadow: none; }
+#view .btn--sm { height: var(--ctl); padding: 0 14px; font-size: 13.5px; }
+#view .btn--go { box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent); }
+#view .btn--ghost { border-color: transparent; color: var(--ink-faint); }
+#view .btn--ghost:hover { color: var(--down); background: var(--down-wash); border-color: transparent; }
+.phead__a .btn { height: 40px; padding: 0 18px; font-weight: 700; }
+.phead__a .btn--go { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 25%, transparent); }
+
+#view .fld { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#view .fld > span { font-size: var(--lbl); font-weight: 600; letter-spacing: .04em; color: var(--ink-faint); }
+#view .fld input, #view .fld select {
+  height: 42px; min-height: 0; padding: 0 12px; font-size: 14.5px;
+  background: var(--card-2); border: 1px solid var(--line-2); color: var(--ink);
+}
+#view .fld input:focus, #view .fld select:focus { outline: none; border-color: var(--accent); background: var(--card); }
+#view .fld input[disabled] { color: var(--ink-faint); background: var(--sunk); }
+
+/* 表單排成兩欄，按鈕靠右跟欄位對齊——不再自己一整行置中 */
+#view .grid-form, #view .gnew {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; align-items: end;
+}
+#view .fld--wide { grid-column: 1 / -1; }
+#view .form__act { grid-column: 1 / -1; display: flex; justify-content: flex-end; width: auto; }
+#view .form__act .btn { min-width: 0; }
+
+/* ---------- 金額輸入：前面帶 NT$ ---------- */
+#view .money {
+  display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 14px;
+  background: var(--card-2); border: 1px solid var(--line-2);
+  transition: border-color .16s var(--ease), background-color .16s var(--ease);
+}
+#view .money:focus-within { border-color: var(--accent); background: var(--card); }
+#view .money > i { font-style: normal; font-size: 13px; font-weight: 700; color: var(--ink-dim); }
+#view .money input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent;
+  font-size: 22px; font-weight: 700; color: var(--ink); font-family: var(--sans);
+}
+#view .money input:focus { outline: none; }
+#view .money--lg { height: 60px; }
+#view .money--lg input { font-size: 30px; }
+
+/* ---------- 個人資料 ---------- */
+#view .me__top { display: flex; align-items: center; gap: 18px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+#view .me__n { font-size: 20px; font-weight: 700; color: var(--ink); }
+#view .me__r { font-size: 13px; color: var(--ink-faint); margin-top: 2px; }
+#view .me__do { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+#view .plan__k { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; color: var(--ink-soft); margin-bottom: 12px; }
+#view .plan__h { margin-top: 10px; font-size: 12.5px; color: var(--ink-faint); }
+
+/* 花到幾成提醒我 */
+#view .alist { display: block; margin: 0; }
+#view .ai {
+  display: flex; align-items: center; gap: 14px; margin: 0;
+  padding: 12px var(--pad); background: transparent; border: 0; border-bottom: 1px solid var(--line);
+}
+#view .ai.off { opacity: .55; }
+#view .ai__p { font-size: 22px; font-weight: 700; color: var(--warn); min-width: 64px; font-family: var(--sans); }
+#view .ai__p i { font-style: normal; font-size: 13px; margin-left: 1px; }
+#view .ai__s { flex: 1; font-size: 14px; color: var(--ink-soft); }
+#view .ai__x { border: 0; background: transparent; color: var(--ink-dim); font-size: 20px; padding: 0 4px; }
+#view .ai__x:hover { color: var(--down); }
+#view .alist__empty { padding: 18px var(--pad); color: var(--ink-faint); font-size: 13.5px; border-bottom: 1px solid var(--line); }
+#view .anew {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 14px var(--pad); margin: 0; border: 0; background: var(--card-2);
+}
+#view .anew__t { font-size: 14px; color: var(--ink-soft); }
+#view .anew input, #view .anew select {
+  height: var(--ctl); min-height: 0; padding: 0 10px; font-size: 14px;
+  background: var(--card); border: 1px solid var(--line-2); color: var(--ink);
+}
+#view .anew input { width: 70px; font-weight: 700; }
+#view .anew select { flex: 1 1 140px; min-width: 0; }
+
+/* 開關 */
+.sw {
+  position: relative; width: 42px; height: 24px; flex: 0 0 42px;
+  background: var(--line-2); border: 0; padding: 0; transition: background-color .18s var(--ease);
+}
+.sw i { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: var(--knob); transition: transform .18s var(--out); }
+.sw.on { background: var(--accent); }
+.sw.on i { transform: translateX(18px); }
+
+/* ---------- 成員卡片牆：置中、上下排 ---------- */
+#view .mtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+#view .mt {
+  position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 26px 18px 20px; background: var(--card); border: 1px solid var(--line);
+  box-shadow: var(--shadow-block); animation: riseIn .45s var(--out) both;
+  transition: transform .18s var(--out), box-shadow .18s var(--out), border-color .18s var(--ease);
+}
+#view .mt--go { cursor: pointer; }
+#view .mt--go:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); border-color: var(--accent-line); }
+#view .mt .ava { width: 64px; height: 64px; font-size: 24px; }
+#view .mt__me {
+  position: absolute; top: 12px; right: 12px; padding: 1px 8px;
+  font-size: 11.5px; font-weight: 700; background: var(--accent); color: var(--on-accent);
+}
+#view .mt__n { margin-top: 12px; font-size: 17px; font-weight: 700; color: var(--ink); }
+#view .mt__r { font-size: 13px; color: var(--ink-faint); }
+#view .mt__rel { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; min-height: 20px; font-size: 12.5px; color: var(--ink-soft); }
+#view .mt__go { margin-top: 14px; font-size: 13px; font-weight: 700; color: var(--accent); }
+
+/* ---------- 成員紀錄：身分卡 ＋ 零用金 ---------- */
+#view .pcard { display: flex; align-items: center; gap: 18px; }
+#view .pcard__m { flex: 1; min-width: 0; }
+#view .pcard__n { font-size: 21px; font-weight: 700; color: var(--ink); }
+#view .pcard__r { font-size: 13px; color: var(--ink-faint); }
+#view .pcard__h { margin-top: 6px; font-size: 12.5px; color: var(--warn); }
+#view .pcard__stat { display: flex; flex-direction: column; align-items: center; padding-left: 18px; border-left: 1px solid var(--line); }
+#view .pcard__stat b { font-size: 30px; line-height: 1.1; color: var(--ink); }
+#view .pcard__stat span { font-size: 12px; color: var(--ink-faint); }
+#view .allow__k { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; color: var(--ink-soft); margin-bottom: 12px; }
+#view .allow__h { margin-top: 8px; font-size: 12.5px; color: var(--ink-faint); }
+#view .back { display: inline-flex; margin-bottom: 14px; font-size: 13.5px; font-weight: 600; color: var(--ink-faint); }
+#view .back:hover { color: var(--accent); }
+
+/* ---------- 財務建議 ---------- */
+#view .adl .ad { border-bottom: 1px solid var(--line); }
+#view .adl .ad:last-child { border-bottom: 0; }
+#view .adl .ad__h { padding: 15px var(--pad); gap: 14px; }
+#view .adl .ad__lv { min-width: 52px; font-weight: 700; }
+#view .adl .ad__t { font-size: 15px; font-weight: 600; }
+#view .adl .ad__b { padding: 0 var(--pad) 20px calc(var(--pad) + 66px); }
+#view .nudge {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 14px var(--pad); margin-bottom: 22px; text-decoration: none;
+  background: linear-gradient(90deg, var(--accent-wash), var(--card)); border: 1px solid var(--accent-line);
+}
+#view .nudge b { color: var(--accent-hi); font-size: 14.5px; }
+#view .nudge span { color: var(--accent); font-size: 13.5px; font-weight: 600; }
+
+/* ---------- 帳本：收合列 ---------- */
+#view .lgl { background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-block); margin: 0 0 var(--gap); }
+#view .lg { border-bottom: 1px solid var(--line); }
+#view .lg:last-child { border-bottom: 0; }
+#view .lg__h {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 15px var(--pad); text-align: left; background: transparent;
+  transition: background-color .14s var(--ease);
+}
+#view .lg__h:hover { background: var(--card-2); }
+#view .lg.on .lg__h { background: var(--card-2); }
+#view .lg__dot { width: 12px; height: 12px; flex: 0 0 12px; }
+#view .lg__t { font-size: 15.5px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+#view .lg__tags { display: inline-flex; gap: 8px; flex: 0 0 auto; }
+#view .lg__m {
+  flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--ink-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#view .lg__c { flex: 0 0 auto; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+#view .lg__cv { width: 16px; height: 16px; flex: 0 0 16px; color: var(--ink-dim); transition: transform .2s var(--back); }
+#view .lg.on .lg__cv { transform: rotate(180deg); color: var(--accent); }
+#view .lg__b { padding: 4px var(--pad) 18px calc(var(--pad) + 24px); animation: riseIn .25s var(--out) both; }
+#view .lg__note { font-size: 13.5px; color: var(--ink-soft); margin-bottom: 12px; }
+#view .lg__f { display: grid; grid-template-columns: 64px 1fr; gap: 12px 14px; align-items: center; margin: 0; }
+#view .lg__f dt { font-size: 12.5px; font-weight: 600; color: var(--ink-faint); }
+#view .lg__f dd { margin: 0; min-width: 0; }
+#view .lg__who { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#view .lg__who .chip { height: 30px; padding: 0 10px; gap: 6px; font-size: 13px; background: var(--card-2); }
+#view .chip--own i { font-style: normal; font-size: 11px; color: var(--accent); }
+#view .lg__add { height: 30px; padding: 0 8px; font-size: 13px; border: 1px dashed var(--accent-line); background: var(--card); color: var(--accent); }
+#view .lg__hint { margin-top: 6px; font-size: 12px; color: var(--ink-dim); }
+#view .lg__f .goal__i { width: 150px; height: 36px; padding: 0 10px; background: var(--card-2); border: 1px solid var(--line-2); font-family: var(--sans); font-size: 15px; font-weight: 700; }
+#view .lg__chk { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-soft); cursor: pointer; }
+#view .lg__chk input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+#view .lg__acts { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+#view .lg__sp { flex: 1; }
+#view .arch { display: block; margin: 0; }
+#view .arch__i { display: flex; align-items: center; gap: 10px; padding: 12px var(--pad); border-bottom: 1px solid var(--line); }
+#view .arch__i:last-child { border-bottom: 0; }
+#view .arch__n { flex: 1; font-size: 14.5px; color: var(--ink); }
+#view .arch__c { font-size: 12.5px; color: var(--ink-faint); }
+
+/* ---------- 平台管理：稽核 ---------- */
+#view .audl { list-style: none; margin: 0; padding: 0; }
+#view .audl__i { padding: 13px var(--pad); border-bottom: 1px solid var(--line); }
+#view .audl__i:last-child { border-bottom: 0; }
+#view .audl__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+#view .audl__top b { font-size: 14px; color: var(--ink); }
+#view .audl__top time { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+#view .audl__s { margin-top: 2px; font-size: 13px; color: var(--ink-soft); }
+.gx--warn { color: var(--down); border-color: var(--down-wash); }
+.gx--warn:hover { color: var(--down); border-color: var(--down); }
+
+/* ============================================================
+   手機：底部分頁 ＋ 更多面板
+   ============================================================ */
+
+
+@media (max-width: 1080px) {
+  #view .duo { grid-template-columns: minmax(0, 1fr); }
+  #view .duo__c + .duo__c { margin-top: 32px; }
+  #view .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  :root { --page-x: 16px; --pad: 16px; --h1: 25px; --h2: 17.5px; }
+  .main { margin-left: 0; padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom, 0px)); }
+
+  /* 標題一行，工具另起一行排滿；下拉面板用整行的寬度 */
+  .phead { padding-top: 18px; align-items: flex-start; }
+  .phead__r { width: 100%; justify-content: space-between; }
+  .phead__tools { margin-left: auto; }
+  .toasts { bottom: calc(var(--tabs-h) + 16px); }
+}
+
+@media (max-width: 760px) {
+  /* 工具攤平到同一排；搜尋打開時自己佔下一整行，把內容往下推一行——
+     ⚠️ 不要做成浮層：浮在內容上會蓋住底下的標題和篩選。 */
+  .phead__r { flex-wrap: wrap; }
+  .phead__tools { display: contents; }
+  .phead__tools .gsw { margin-left: auto; }
+  .phead__tools #searchBtn { display: grid; }
+  .phead__tools #searchDrawer {
+    order: 9; flex: 1 0 100%; position: static;
+    width: 100%; max-width: none; height: 44px; box-shadow: none;
+  }
+  .phead__tools #searchDrawer[hidden] { display: none; }
+  .phead__tools .gsw__n { max-width: 96px; }
+  /* 手機上下拉面板用整排的寬度，不然右邊對齊按鈕會超出螢幕 */
+  .phead__tools .gsw, .phead__tools .bell__wrap { position: static; }
+  .phead__tools .gsw__p, .phead__tools .bell__panel { left: 0; right: 0; width: auto; }
+}
+
+@keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (max-width: 640px) {
+  #view .kpis { gap: 10px; }
+  #view .kpi { padding: 13px 13px 12px; }
+  #view .kpi__v { font-size: 21px; margin-top: 10px; }
+  #view .kpi__ic { width: 26px; height: 26px; flex-basis: 26px; }
+  #view .kpi__k { font-size: 12.5px; }
+  #view .grid-form, #view .gnew { grid-template-columns: minmax(0, 1fr); }
+  /* 標題和主要按鈕在第一行，篩選整行排在下面 */
+  #view .sec__tools { order: 3; margin-left: 0; width: 100%; }
+  #view .sec .fold__b { margin-left: auto; }
+  #view .sec__x { margin-left: auto; }
+  #view .sec__x ~ .fold__b { margin-left: 0; }
+  #view .bar--inline { width: 100%; flex-wrap: nowrap; }
+  #view .bar--inline .fsel { flex: 1 1 0; min-width: 0; }
+  #view .bar--inline .fsel select { flex: 1 1 auto; width: 100%; min-width: 0; }
+  #view .sec__tools .fsel--q, #view .sec__tools .fsel--q input { width: 100%; min-width: 0; }
+  #view .lg__m { display: none; }
+  #view .lg__b { padding-left: var(--pad); }
+  #view .lg__f { grid-template-columns: 1fr; gap: 4px; }
+  #view .lg__f dd { margin-bottom: 10px; }
+  #view .adl .ad__b { padding-left: var(--pad); }
+  #view .adl .ad__m, #view .adl .ad__p { display: none; }
+  #view .pcard__stat { padding-left: 12px; }
+  #view .dt th, #view .dt td { padding-left: 12px; padding-right: 12px; }
+  #view .dt__bar { min-width: 96px; }
+  #view .mbar { width: 48px; min-width: 48px; }
+  #view .card--flush { overflow-x: auto; }
+  #view .goal__v { font-size: 24px; }
+}
+
+/* ============================================================
+   家庭：建立、加入、邀請
+   ============================================================ */
+.ava--md { width: 36px; height: 36px; font-size: 14px; flex: 0 0 36px; }
+.ava--lg { width: 64px; height: 64px; font-size: 24px; flex: 0 0 64px; }
+#view .duo--tight { margin: 0; }
+#view .page > .duo--first { margin-top: 0; }
+
+/* 還沒有家庭：兩張置中的卡 */
+#view .fam0 {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 34px 28px 30px; min-height: 100%;
+}
+#view .fam0__ic {
+  width: 56px; height: 56px; display: grid; place-items: center;
+  font-size: 28px; font-weight: 700; color: var(--on-accent); background: var(--accent);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+#view .fam0__ic--key { background: var(--accent-2); color: var(--on-accent); box-shadow: 0 8px 20px color-mix(in srgb, var(--warn) 20%, transparent); }
+#view .fam0__t { margin-top: 16px; font-family: var(--sans); font-size: 19px; font-weight: 700; color: var(--ink); }
+#view .fam0__s { margin-top: 6px; font-size: 14px; color: var(--ink-faint); }
+#view .fam0__f { display: flex; gap: 8px; width: 100%; max-width: 360px; margin-top: 22px; }
+#view .fam0__f input {
+  flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 14px;
+  font-size: 15px; background: var(--card-2); border: 1px solid var(--line-2); color: var(--ink);
+}
+#view .fam0__f input:focus { outline: none; border-color: var(--accent); background: var(--card); }
+#view .fam0__f .btn { height: 44px; }
+#view .codein { font-family: var(--code); font-size: 18px !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; text-align: center; }
+
+/* 收到的邀請 */
+#view .invc {
+  display: flex; align-items: center; gap: 16px;
+  border-left: 4px solid var(--accent); background: linear-gradient(90deg, var(--accent-wash), var(--card) 55%);
+}
+#view .invc__mark {
+  width: 48px; height: 48px; flex: 0 0 48px; display: grid; place-items: center;
+  font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--on-accent); background: var(--accent-hi);
+}
+#view .invc__m { flex: 1 1 auto; min-width: 0; }
+#view .invc__t { font-size: 16px; color: var(--ink); }
+#view .invc__t b { font-weight: 700; }
+#view .invc__s { margin-top: 2px; font-size: 13px; color: var(--ink-faint); }
+#view .invc__a { display: flex; gap: 8px; flex: 0 0 auto; }
+
+/* 等待回覆 */
+#view .pend__i { display: flex; align-items: center; gap: 12px; padding: 12px var(--pad); border-bottom: 1px solid var(--line); }
+#view .pend__i:last-child { border-bottom: 0; }
+#view .pend__m { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+#view .pend__m b { font-size: 14.5px; color: var(--ink); }
+#view .pend__m small { font-size: 12.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#view .mt__go--part { color: var(--ink-soft); }
+
+/* 邀請家人的面板 */
+#view .invp { display: flex; flex-direction: column; gap: 14px; min-height: 100%; }
+#view .invp__h { display: flex; align-items: center; gap: 10px; font-size: 16px; color: var(--ink); }
+#view .invp__n {
+  width: 26px; height: 26px; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--on-accent); background: var(--accent);
+}
+#view .invp__f { display: flex; gap: 8px; }
+#view .invp__f input {
+  flex: 1 1 auto; min-width: 0; height: var(--ctl); padding: 0 12px;
+  font-size: 14.5px; background: var(--card-2); border: 1px solid var(--line-2); color: var(--ink);
+}
+#view .invp__f input:focus { outline: none; border-color: var(--accent); background: var(--card); }
+#view .invp__hint { font-size: 13px; color: var(--ink-faint); }
+#view .invp__row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#view .invp__k { font-size: 13px; color: var(--ink-faint); }
+#view .invp__row .btn { margin-left: auto; }
+
+#view .found {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 14px; background: var(--card-2); border: 1px solid var(--line);
+}
+#view .found__m { flex: 1 1 120px; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+#view .found__m b { font-size: 15px; color: var(--ink); }
+#view .found__m small { font-size: 12.5px; color: var(--ink-faint); }
+#view .found__a { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* 邀請碼清單。一個身分可以有好幾組，所以外層自己捲——
+   數量多了不會把整頁撐長，旁邊的「用帳號邀請」也不會被推走。
+   max-height 用 rem：使用者把字級調大時，框也跟著長高，不會擠成一條縫。 */
+#view .codes {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 13rem; overflow-y: auto; margin-top: 10px;
+  padding-right: 4px;                      /* 捲軸不要壓到刪除鈕 */
+  overscroll-behavior: contain;            /* 捲到底不要順手把整頁帶著捲 */
+}
+/* 一組一列，比原本那張大卡矮很多：名字最重要，碼是遮起來的，不需要佔版面 */
+#view .code {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; background: var(--card-2); border: 1px solid var(--line);
+}
+#view .code__m { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+#view .code__n { font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#view .code__d { font-size: 11.5px; color: var(--ink-faint); }
+#view .code__v {
+  margin-left: auto; font-family: var(--code); font-size: 13px; letter-spacing: .1em;
+  color: var(--ink-dim); white-space: nowrap;
+}
+/* 過期的還留在清單上（家長要自己刪），但整列變淡，不要跟還能用的混在一起 */
+#view .code.is-gone { opacity: .55; }
+#view .code.is-gone .code__d { color: var(--down); }
+#view .ic--sm { width: 28px; height: 28px; flex: 0 0 28px; }
+/* 窄螢幕把遮起來的碼藏掉：它一個字都沒帶資訊（每一組長得一樣），
+   佔掉的寬度讓名字與到期日被擠成兩行反而更難讀。 */
+@media (max-width: 480px) {
+  #view .code__v { display: none; }
+}
+
+/* 產生邀請碼的對話框 */
+.cg__note { margin: 14px 0 0; font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; }
+.cg__lab { margin: 0 0 10px; font-size: 13px; color: var(--ink-soft); }
+.cg__code {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 16px; background: var(--sunk); border: 1px solid var(--line-2);
+}
+.cg__code code {
+  font-family: var(--code); font-size: 24px; font-weight: 700; letter-spacing: .14em;
+  color: var(--ink); word-break: break-all;
+}
+.cg__warn {
+  margin: 12px 0 0; padding: 10px 12px; font-size: 12.5px; line-height: 1.7;
+  color: var(--ink-soft); background: var(--warn-wash);
+  border: 1px dashed color-mix(in srgb, var(--warn) 55%, transparent);
+}
+
+@media (max-width: 640px) {
+  #view .invc { flex-wrap: wrap; }
+  #view .invc__a { width: 100%; justify-content: flex-end; }
+  #view .fam0 { padding: 26px 18px 22px; }
+  .cg__code code { font-size: 20px; }
+  #view .found__a { width: 100%; justify-content: space-between; margin-left: 0; }
+}
+
+
+/* ============================================================
+   展開與收起：由 app.js 的 slideOpen／slideClose 播
+   ------------------------------------------------------------
+   原本這幾個元素各自掛著「出現」的 CSS 動畫（riseIn、popIn、foldIn），
+   只有打開有效果、收起是瞬間消失。現在兩個方向都交給 JS，
+   這裡把舊的拿掉，不然打開時會同時播兩種動畫。
+   ============================================================ */
+#view .fold__p,
+#view .lg__b,
+#view .adl .ad__b,
+.mbar__p,
+.phead__tools .gsw__p,
+.phead__tools .bell__panel,
+.phead__tools #searchDrawer { animation: none; }
+
+/* 家庭成員：移出、退出 */
+#view .mt__x {
+  margin-top: 10px; padding: 4px 10px; font-size: 12.5px; font-weight: 600;
+  color: var(--ink-faint); background: transparent; border: 1px solid transparent;
+  transition: color .16s var(--ease), border-color .16s var(--ease), background-color .16s var(--ease);
+}
+#view .mt__x:hover { color: var(--down); border-color: var(--down-wash); background: var(--down-wash); }
+/* 子女卡片上的三顆：照看、設為家長、移出。會折行，不要擠出卡片 */
+#view .mt__acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin-top: 10px; }
+#view .mt__acts .mt__x { margin-top: 0; }
+#view .mt__x--go:hover { color: var(--accent); border-color: var(--accent-line); background: var(--accent-wash); }
+
+/* 家庭自訂分類 */
+#view .fcat { display: flex; flex-direction: column; gap: 12px; }
+#view .fcat__h, #view .fcat__e { margin: 0; font-size: 13px; color: var(--ink-faint); line-height: 1.7; }
+#view .fcat__l { display: flex; flex-wrap: wrap; gap: 8px; }
+#view .fcat__l .chip small { margin-left: 6px; font-size: 11px; color: var(--ink-dim); }
+#view .fcat__f { display: flex; flex-wrap: wrap; gap: 8px; }
+#view .fcat__f input { flex: 1 1 140px; min-width: 0; }
+#view .fcat__f input, #view .fcat__f select {
+  height: var(--ctl); padding: 0 12px; font-size: 13.5px; color: var(--ink);
+  background: var(--sunk); border: 1px solid var(--line-2); border-radius: var(--r-input);
+}
+
+/* 每月預算：一個分類一格 */
+#view .bud { display: flex; flex-direction: column; gap: 12px; }
+#view .bud__h { margin: 0; font-size: 13px; color: var(--ink-faint); line-height: 1.7; }
+#view .bud__g { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+#view .bud__i { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#view .bud__i > span:first-child { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+#view .bud__i .money { height: 42px; }
+#view .bud__i .money input { font-size: 17px; }
+
+/* 登入中的裝置 */
+#view .sess { display: flex; flex-direction: column; }
+#view .sess__i { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 12px var(--pad, 18px); border-bottom: 1px solid var(--line); }
+#view .sess__i b { font-size: 14px; color: var(--ink); }
+#view .sess__i small { flex-basis: 100%; font-size: 12px; color: var(--ink-faint); }
+#view .sess__a { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px var(--pad, 18px); }
+#view .sess__a small { flex: 1 1 200px; font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; }
+
+/* 總覽沒有預算時整張卡可以點 */
+#view a.bnone { display: block; color: inherit; text-decoration: none; }
+#view a.bnone:hover { border-color: var(--accent-line); }
+#view .leave {
+  display: flex; align-items: center; gap: 16px; margin-top: 32px;
+  background: var(--card-2); box-shadow: none; border-style: dashed;
+}
+#view .leave__m { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.5; }
+#view .leave__m b { font-size: 15px; color: var(--ink); }
+#view .leave__m small { font-size: 13px; color: var(--ink-faint); }
+@media (max-width: 640px) {
+  #view .leave { flex-direction: column; align-items: stretch; }
+  #view .leave .btn { align-self: flex-end; }
+}
+
+
+/* ============================================================
+   銀行 App：色帶、疊卡、常用功能、底部分頁
+   ------------------------------------------------------------
+   參考富邦新版的首頁：
+     · 頁面最上面一條淡色帶，問候語就寫在上面
+     · 數字卡疊在一起，像皮夾裡的卡片——後面兩張露出一截
+     · 常用功能收在一張白色圓角卡片裡，圖示放在圓形底上
+     · 手機底部是分頁列，中間那顆是「記一筆」
+
+   ⚠️ 這一層只准用變數：顏色、圓角、陰影、字體都交給主題。
+   換膚只換 tokens.css / themes.css，不改這裡。
+   ============================================================ */
+.app { position: relative; display: block; min-height: 100vh; isolation: isolate; }
+.app::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 480px; z-index: -1;
+  background: var(--band-bg); pointer-events: none;
+}
+body.is-out .app::before { display: none; }
+.main { margin-left: 0; padding: 0; min-width: 0; min-height: 100vh; background: transparent; border: 0; }
+
+/* ---------- 頂列：浮在色帶上，捲動時半透明 ---------- */
+.appbar {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--band) 80%, transparent);
+  -webkit-backdrop-filter: saturate(1.3) blur(14px); backdrop-filter: saturate(1.3) blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+body.is-out .appbar { display: none; }
+.appbar__in {
+  max-width: var(--page-w); margin: 0 auto; height: 62px; padding: 0 var(--page-x);
+  display: flex; align-items: center; gap: 10px;
+}
+.appbar__brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
+.appbar__brand:hover { color: var(--ink); }
+.appbar__home {
+  display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 14px 0 8px; margin-left: 6px;
+  font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: none;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-pill); box-shadow: var(--shadow-flat);
+  transition: color .16s var(--ease), border-color .16s var(--ease);
+}
+.appbar__home:hover { color: var(--accent); border-color: var(--accent-line); }
+.appbar__home[hidden] { display: none; }
+.appbar__ic { width: 18px; height: 18px; }
+.appbar__sp { flex: 1 1 auto; }
+
+.appbar__add {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px 0 12px;
+  font-size: 14px; font-weight: 700; color: var(--on-accent); background: var(--accent); border: 0;
+  border-radius: var(--r-pill); box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 28%, transparent);
+  transition: background-color .16s var(--ease), transform .18s var(--back);
+}
+.appbar__add:hover { background: var(--accent-hi); transform: translateY(-1px); }
+.appbar__add svg { width: 16px; height: 16px; }
+body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__add { display: none; }
+
+/* 通知 */
+.appbar .bell__wrap { position: relative; border: 0; }
+.appbar .bell__wrap[hidden] { display: none; }
+.appbar .bell {
+  position: relative; width: 42px; height: 42px; display: grid; place-items: center; padding: 0;
+  color: var(--ink); background: transparent; border: 0; border-radius: var(--r-pill); box-shadow: none;
+}
+.appbar .bell:hover, .appbar .bell.open { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.appbar .bell svg { width: 22px; height: 22px; }
+.appbar .bell__n {
+  position: absolute; top: 4px; left: 22px; right: auto; min-width: 18px; height: 18px; padding: 0 5px;
+  display: grid; place-items: center; font-size: 10.5px; font-weight: 700; line-height: 1;
+  background: var(--badge); color: var(--badge-ink); border: 2px solid var(--band);
+  border-radius: var(--r-pill); box-shadow: none; transform: none;
+}
+.appbar .bell__n[hidden] { display: none; }
+.appbar .bell__panel {
+  position: absolute; top: calc(100% + 10px); right: 0; left: auto; z-index: 65;
+  width: 380px; max-height: min(64vh, 460px); overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 0; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop); animation: none;
+}
+.appbar .bell__panel[hidden] { display: none; }
+.appbar .bell__h { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--line); }
+.appbar .bell__t { margin-right: auto; font-family: var(--sans); font-size: 14px; font-weight: 700; color: var(--ink); }
+.appbar .bell__list { max-height: none; overflow: visible; }
+.appbar .bell__i { padding: 12px 16px; color: var(--ink); }
+.appbar .bell__i:hover { padding-left: 16px; background: var(--card-2); }
+.appbar .bell__empty { padding: 28px 16px; color: var(--ink-soft); }
+#who { display: inline-flex; align-items: center; gap: 8px; width: auto; }
+
+.phead { padding-top: 22px; }
+.phead__t { font-family: var(--display); }
+
+/* ---------- 首頁上半部：左邊疊卡，右邊常用功能 ---------- */
+#view .dash {
+  display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  gap: var(--gap) 24px; align-items: stretch; margin: 0 0 8px;
+}
+
+/* 疊在一起的數字卡 */
+#view .wal { position: relative; display: flex; flex-direction: column; min-width: 0; animation: riseIn .45s var(--out) both; }
+#view .wal__strip {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  min-height: 62px; padding: 13px 22px 31px; margin-bottom: -20px;
+  color: var(--stack-ink); text-decoration: none;
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  box-shadow: 0 -3px 14px color-mix(in srgb, var(--shade) 10%, transparent);
+  transition: transform .2s var(--out);
+}
+#view .wal__strip--1 { background: var(--stack-1); }
+#view .wal__strip--2 { background: var(--stack-2); }
+#view .wal__strip:hover { color: var(--stack-ink); transform: translateY(-3px); }
+#view .wal__strip > span { font-size: 14px; font-weight: 600; }
+#view .wal__strip small { font-size: 12px; font-weight: 500; opacity: .85; margin-left: 4px; }
+#view .wal__strip b { margin-left: auto; font-size: 17px; font-weight: 700; }
+#view .wal__strip .amt > i { color: inherit; opacity: .72; }
+#view .wal__cv { width: 16px; height: 16px; flex: 0 0 16px; opacity: .75; }
+
+#view .wal__card {
+  position: relative; flex: 1 1 auto; display: flex; flex-direction: column;
+  padding: 22px 24px 18px; overflow: hidden;
+  color: var(--ink); background: var(--stack-3);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--r-card); box-shadow: var(--shadow-card);
+}
+#view .wal__k { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+#view .wal__v {
+  margin: 4px 0 14px; font-family: var(--display); font-size: 42px; font-weight: 700;
+  line-height: 1.15; letter-spacing: -.01em; color: var(--ink);
+}
+#view .wal--over .wal__v { color: var(--down); }
+#view .wal__bar { height: 10px; overflow: hidden; background: var(--sunk); border-radius: var(--r-bar); }
+#view .wal__bar i { display: block; height: 100%; background: var(--up); border-radius: inherit; animation: growW .9s var(--out) both; }
+#view .wal--near .wal__bar i { background: var(--warn); }
+#view .wal--over .wal__bar i { background: var(--down); }
+#view .wal__meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; font-size: 13px; color: var(--ink-faint); }
+#view .wal__meta b { color: var(--ink); font-weight: 700; }
+#view .wal__foot {
+  display: flex; align-items: center; gap: 24px; margin-top: auto; padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+#view .wal__meta + .wal__foot { margin-top: 16px; }
+#view .wal__f { display: flex; flex-direction: column; line-height: 1.35; }
+#view .wal__f span { font-size: 12.5px; color: var(--ink-faint); }
+#view .wal__f b { font-size: 17px; font-weight: 700; color: var(--ink); }
+#view .wal__go {
+  margin-left: auto; width: 42px; height: 42px; display: grid; place-items: center;
+  color: var(--accent); background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-sm); box-shadow: var(--shadow-flat);
+  transition: background-color .16s var(--ease), color .16s var(--ease), border-color .16s var(--ease);
+}
+#view .wal__go:hover { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+#view .wal__go svg { width: 18px; height: 18px; }
+
+/* 常用功能 */
+#view .qk {
+  display: flex; flex-direction: column; min-width: 0; padding: 18px 16px 12px;
+  background: var(--card); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--r-card); box-shadow: var(--shadow-card);
+  animation: riseIn .45s var(--out) 60ms both;
+}
+#view .qk__h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 8px 6px; }
+#view .qk__t { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink); }
+#view .qk__s { font-size: 12.5px; color: var(--ink-faint); }
+#view .dgrid {
+  flex: 1 1 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-content: space-evenly; gap: 4px; margin: 0; padding: 0; background: transparent; border: 0; box-shadow: none;
+}
+#view .dtile {
+  --tone: var(--accent);
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px;
+  min-width: 0; padding: 10px 2px 8px; text-align: center; text-decoration: none;
+  color: var(--ink); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer;
+  transition: background-color .16s var(--ease);
+}
+#view .dtile:hover { background: var(--card-2); color: var(--ink); transform: none; }
+#view .dtile__ic {
+  width: 52px; height: 52px; display: grid; place-items: center;
+  color: var(--tone); background: color-mix(in srgb, var(--tone) 9%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--tone) 22%, var(--card)); border-radius: var(--r-icon);
+  transition: transform .18s var(--back), border-color .16s var(--ease);
+}
+#view .dtile:hover .dtile__ic { transform: translateY(-2px); border-color: var(--tone); }
+#view .dtile__ic svg { width: 24px; height: 24px; }
+#view .dtile__t { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+#view .dtile__b { margin-top: -5px; font-size: 11.5px; color: var(--ink-faint); white-space: nowrap; }
+#view .dtile--add .dtile__ic {
+  color: var(--on-accent); background: var(--accent); border-color: var(--accent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+#view .dtile--warn .dtile__b { color: var(--warn-ink); font-weight: 600; }
+
+/* ---------- 預算小卡 ---------- */
+#view .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin: 0 0 var(--gap); }
+#view .bcard {
+  padding: 16px 18px; background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--r-card); box-shadow: var(--shadow-block); animation: riseIn .45s var(--out) both;
+}
+#view .bcard__top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#view .bcard__top b { font-size: 15px; color: var(--ink); }
+#view .bcard__top small { font-size: 12px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view .bcard__p { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+#view .bcard.is-over .bcard__p { color: var(--down); }
+#view .bcard__bar { height: 8px; margin: 12px 0 10px; overflow: hidden; background: var(--sunk); border-radius: var(--r-bar); }
+#view .bcard__bar i { display: block; height: 100%; border-radius: inherit; animation: growW .8s var(--out) both; }
+#view .bcard__v { font-size: 18px; font-weight: 700; color: var(--ink); }
+#view .bcard__v small { font-size: 13px; font-weight: 500; color: var(--ink-faint); }
+
+/* ---------- 主題設定：左右滑的預覽 ---------- */
+#view .thm { margin: 0 0 var(--gap); }
+#view .thm__row {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 172px; gap: 14px;
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-behavior: smooth;
+  padding: 4px 2px 12px; scrollbar-width: thin;
+}
+#view .thm__i {
+  scroll-snap-align: start; display: flex; flex-direction: column; gap: 10px; padding: 8px 8px 12px;
+  color: var(--ink); text-align: left; cursor: pointer;
+  background: var(--card); border: 2px solid var(--line); border-radius: var(--r-card);
+  transition: border-color .16s var(--ease), transform .18s var(--out), box-shadow .18s var(--out);
+}
+#view .thm__i:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+#view .thm__i.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+#view .thm__m { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 4px; }
+#view .thm__n { font-size: 14.5px; font-weight: 700; }
+#view .thm__st { font-size: 12px; font-weight: 700; color: var(--ink-faint); }
+#view .thm__i.on .thm__st { color: var(--accent); }
+#view .thm__d { display: block; padding: 0 4px; font-size: 12px; line-height: 1.45; color: var(--ink-faint); }
+#view .thm__nav { display: inline-flex; gap: 6px; margin-left: auto; }
+#view .thm__nav button {
+  width: var(--ctl); height: var(--ctl); display: grid; place-items: center; padding: 0;
+  color: var(--ink-soft); background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-pill);
+}
+#view .thm__nav button:hover { color: var(--accent); border-color: var(--accent); }
+#view .thm__nav svg { width: 16px; height: 16px; }
+
+/* 預覽本身掛著 data-theme，裡面拿到的變數就是那一套主題的 */
+.thm__pv {
+  position: relative; display: block; height: 190px; overflow: hidden; isolation: isolate;
+  background-color: var(--paper); background-image: var(--bg-art); background-size: var(--bg-size);
+  border-radius: calc(var(--r-card) * .75); font-family: var(--sans); color: var(--ink);
+}
+.thm__pv::before { content: ''; position: absolute; inset: 0 0 auto; height: 70%; background: var(--band-bg); z-index: -1; }
+.thm__hi { position: absolute; left: 12px; top: 12px; font-family: var(--display); font-size: 13px; font-weight: 700; color: var(--ink); }
+.thm__s { position: absolute; left: 10px; right: 10px; height: 34px; border-radius: calc(var(--r-card) * .6) calc(var(--r-card) * .6) 0 0; }
+.thm__s--1 { top: 40px; background: var(--stack-1); }
+.thm__s--2 { top: 56px; background: var(--stack-2); }
+.thm__c {
+  position: absolute; left: 10px; right: 10px; top: 72px; height: 56px; padding: 8px 10px;
+  background: var(--stack-3); border-radius: calc(var(--r-card) * .6); box-shadow: var(--shadow-card);
+  font-family: var(--display); font-size: 19px; font-weight: 700; line-height: 1.1; color: var(--ink);
+}
+.thm__c i { display: block; height: 5px; margin-top: 8px; background: var(--sunk); border-radius: var(--r-bar); overflow: hidden; }
+.thm__c i::after { content: ''; display: block; width: 62%; height: 100%; background: var(--accent); border-radius: inherit; }
+.thm__q {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; height: 44px;
+  display: flex; align-items: center; justify-content: space-around;
+  background: var(--card); border-radius: calc(var(--r-card) * .6); box-shadow: var(--shadow-block);
+}
+.thm__q b { width: 22px; height: 22px; border-radius: var(--r-icon); background: color-mix(in srgb, var(--accent) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--card)); }
+.thm__q b:first-child { background: var(--accent); border-color: var(--accent); }
+
+/* ---------- 形狀：跟著主題的圓角 ----------
+   前面幾代規則裡的直角都已經換成變數；這裡補上後來新增、原本沒寫圓角的元件。 */
+#view .card, #view .lgl, #view .mt, #view .found, #view .invc, #view .leave, #view .nudge,
+#view .pcard, #view .fam0, .gate__c, .hp__c { border-radius: var(--r-card); }
+#view .card--flush, #view .lgl, #view .txw { overflow: hidden; }
+/* ⚠️ 上面這條會蓋掉窄螢幕「卡片裡的表格可以左右滑」的規則，表格最右一欄就被切掉了。
+   overflow-x: auto 一樣會把內容裁在圓角裡，所以窄螢幕改回可以滑 */
+@media (max-width: 640px) {
+  #view .card--flush { overflow-x: auto; }
+}
+/* 手機：收支對照的「存下」只留百分比，五欄才放得進 375 寬 */
+@media (max-width: 420px) {
+  #view .dt th, #view .dt td { padding-left: 10px; padding-right: 10px; }
+  #view .dt__bar { min-width: 0; }
+  #view .dt__bar .mbar { display: none; }
+  #view .dt__bar em { margin-left: 0; }
+}
+.seg { overflow: hidden; border-radius: var(--r-input); }
+.seg__b { border-radius: var(--r-card); }
+#view .btn, .btn, #view .fold__b, #view .fsel select, #view .fsel input, #view .fld input, #view .fld select,
+#view .money, #view .anew input, #view .anew select, #view .fam0__f input, #view .invp__f input,
+#view .lg__add, #view .mt__x, #view .lg__f .goal__i, #view .code,
+.phead__tools .gsw__b, .phead__tools #searchBtn, .phead__tools #searchDrawer { border-radius: var(--r-input); }
+.pill, #view .sec__n, #view .mt__me, #view .lg__who .chip, .sw { border-radius: var(--r-pill); }
+.sw i { border-radius: var(--r-pill); }
+#view .mbar, #view .mbar i, #view .goal__track, #view .goal__track i { border-radius: var(--r-bar); }
+#view .kpi__ic, #view .goal__ic, #view .fam0__ic, #view .invc__mark, #view .invp__n { border-radius: var(--r-sm); }
+#view .sec__t::before { border-radius: var(--r-pill); }
+.phead__tools .gsw__p { border-radius: var(--r-panel); }
+.dot, .gsw__d, .lg__dot { border-radius: var(--r-dot); }
+
+/* ---------- 手機底部分頁 ---------- */
+.tabbar { display: none; }
+
+/* ---------- RWD ---------- */
+@media (max-width: 1080px) {
+  #view .dash { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--gap) 18px; }
+}
+@media (max-width: 900px) {
+  .appbar__in { height: 58px; }
+  .appbar__add { display: none; }
+  .phead { padding-top: 16px; }
+  #view .dash { grid-template-columns: minmax(0, 1fr); }
+  #view .dtile--add { display: none; }   /* 這兩種情況沒有分頁列 */
+  .appbar .bell__panel { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; }
+
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch;
+    height: calc(64px + env(safe-area-inset-bottom, 0px)); padding: 0 6px env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--card) 94%, transparent);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 20px color-mix(in srgb, var(--shade) 8%, transparent);
+  }
+  .tabbar__i {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-width: 0; padding: 0; font-size: 11.5px; font-weight: 600; line-height: 1.2;
+    color: var(--ink-faint); background: transparent; border: 0; text-decoration: none;
+  }
+  .tabbar__i svg { width: 23px; height: 23px; }
+  .tabbar__i.on { color: var(--accent); }
+  .tabbar__o {
+    width: 52px; height: 52px; margin-top: -24px; display: grid; place-items: center;
+    color: var(--on-accent); background: var(--accent); border: 4px solid var(--card);
+    border-radius: var(--r-pill); box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .tabbar__o svg { width: 24px; height: 24px; }
+  .tabbar__add span:last-child { color: var(--ink-soft); }
+  body.in-family .tabbar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  body.in-family .tabbar__add { display: none; }
+  body.is-out .tabbar, body.is-admin .tabbar { display: none; }
+  .main { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  body.is-out .main, body.is-admin .main { padding-bottom: 0; }
+  /* 分頁列上面。錯誤匣在這個寬度是整排的，所以還要再讓開它
+ */
+  .toasts { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 560px) {
+  #view .wal__strip { padding: 12px 18px 30px; }
+  #view .wal__card { padding: 18px 18px 16px; }
+  #view .wal__v { font-size: 34px; }
+  #view .wal__foot { gap: 16px; }
+  #view .qk { padding: 14px 6px 8px; }
+  #view .dtile { padding: 8px 0 6px; gap: 6px; }
+  #view .dtile__ic { width: 46px; height: 46px; }
+  #view .dtile__t { font-size: 12.5px; }
+  #view .dtile__b { font-size: 10.5px; }
+  #view .bgrid { grid-template-columns: minmax(0, 1fr); }
+  #view .thm__row { grid-auto-columns: 150px; }
+  .thm__pv { height: 176px; }
+}
+
+/* ============================================================
+   總覽：今天的紀錄
+   ============================================================ */
+#view .tdy { margin-bottom: var(--gap); }
+#view .tdy__sum {
+  display: flex; align-items: baseline; gap: 6px 18px; flex-wrap: wrap;
+  padding: 12px var(--pad); font-size: 13px; color: var(--ink-faint);
+  background: var(--card-2); border-bottom: 1px solid var(--line);
+}
+#view .tdy__day { margin-right: auto; font-weight: 700; color: var(--ink-soft); }
+#view .tdy__sum b { margin-left: 4px; font-size: 15px; font-weight: 700; color: var(--ink); }
+#view .tdy__sum b.is-out { color: var(--down); }
+#view .tdy__sum b.is-in { color: var(--up); }
+#view .tdy__l { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+#view .tdy__l li { border-bottom: 1px solid var(--line); }
+#view .tdy__l li:nth-child(odd) { border-right: 1px solid var(--line); }
+#view .tdy__i {
+  display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px var(--pad);
+  color: var(--ink); text-decoration: none; transition: background-color .14s var(--ease);
+}
+#view .tdy__i:hover { background: var(--card-2); color: var(--ink); }
+#view .tdy__ic {
+  width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center;
+  font-size: 14px; font-weight: 700; color: var(--c);
+  background: color-mix(in srgb, var(--c) 13%, var(--card)); border-radius: var(--r-icon);
+}
+#view .tdy__m { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+#view .tdy__m b { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view .tdy__m small { font-size: 12px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view .tdy__a { flex: 0 0 auto; font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+#view .tdy__a.is-expense { color: var(--down); }
+#view .tdy__a.is-income { color: var(--up); }
+#view .tdy__more {
+  display: block; padding: 12px var(--pad); text-align: center;
+  font-size: 13.5px; font-weight: 600; color: var(--accent); text-decoration: none;
+}
+#view .tdy__more:hover { background: var(--card-2); }
+#view .tdy--empty { text-align: center; }
+#view .tdy__go { margin-top: -8px; padding-bottom: 8px; }
+
+/* 手機、平板：面板固定在畫面上，但要貼著右邊的頭貼，不要跑到左邊去 */
+@media (max-width: 900px) {
+}
+@media (max-width: 760px) {
+  #view .tdy__l { grid-template-columns: minmax(0, 1fr); }
+  #view .tdy__l li:nth-child(odd) { border-right: 0; }
+}
+
+/* ============================================================
+   品牌在各處的大小（元件本身在 tokens.css 的 .brand）
+   ============================================================ */
+.appbar__brand.brand { font-size: 28px; }
+.gate__b .brand { font-size: 32px; }
+@media (max-width: 560px) {
+  .appbar__brand.brand { font-size: 24px; }
+}
+
+/* 閒置太久的問話框。沿用 .hp 那一套，只多一行倒數的樣子。
+   倒數的數字用等寬數字，9→8→7 的時候整行不會左右跳動。 */
+.idle .hp__b p { margin: 0 0 8px; }
+.idle__n { color: var(--ink-soft); font-size: var(--fs-sm); }
+.idle__n b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* 登出那一格：跟其他功能不一樣，它是「離開」，所以顏色壓低、不搶位置。
+   ⚠️ 不要做成紅色的——登出不是危險動作，紅色會跟刪除那類混在一起。 */
+#view .dtile--out .dtile__ic { background: var(--sunk); color: var(--ink-faint); border-color: var(--line); }
+#view .dtile--out .dtile__t { color: var(--ink-soft); }

@@ -1,0 +1,45 @@
+# 本機的資料庫：python run.py 會自己跑 docker compose up -d --wait db
+#
+# ⚠️ 平常只開 db 就好。直接打 docker compose up（不加 db）會連同下面的 api、web 一起起來，
+#    跟 run.py 搶 8000 與 5174 埠。
+#
+# 專案名稱固定成 fambudget：不然 Docker 會拿資料夾名稱當名字，同一台電腦 clone 兩份
+# 就會開出兩顆 PostgreSQL 搶 5432。固定之後容器名稱一律是 fambudget-db-1。
+name: fambudget
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fambudget
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: fambudget
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fambudget"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql+psycopg://fambudget:devpassword@db:5432/fambudget
+      JWT_SECRET: dev-only-secret-change-in-production
+      ALLOWED_ORIGINS: http://localhost:5174
+    ports: ["8000:8000"]
+    volumes: ["./backend:/app"]
+    # 先建表／升級（alembic upgrade head），再啟動
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  web:
+    image: python:3.12-alpine
+    working_dir: /site
+    volumes: ["./frontend:/site"]
+    ports: ["5174:5174"]
+    command: python -m http.server 5174
+
+volumes:
+  pgdata:
