@@ -34,8 +34,11 @@ pydantic-settings 的做法是：把所有設定寫成一個類別的欄位，
 ⚠️ 前端要連哪個後端，不在這裡：改 `frontend/index.html` 的 `<meta name="api-base">`。
 """
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+#: MODEL_PROVIDER=anthropic 而 MODEL_NAME 沒改（不是 claude- 開頭）時用這一顆
+CLAUDE_DEFAULT = "claude-opus-5-5"
 
 
 class Settings(BaseSettings):
@@ -192,6 +195,20 @@ class Settings(BaseSettings):
                 'python -c "import secrets;print(secrets.token_urlsafe(48))"'
             )
         return v
+
+    @model_validator(mode="after")
+    def _claude_needs_a_claude_model(self) -> "Settings":
+        """用 Claude 卻沒改 MODEL_NAME：換成 CLAUDE_DEFAULT。
+
+        不在這裡換的話，nlp_parses.model_ver、advices.model_ver 會記成 qwen2.5-1.5b-fambudget，
+        報告裡「哪個模型的成績」就對不上了。
+        """
+        if self.model_provider.strip().lower() == "anthropic" and not self.model_name.startswith("claude-"):
+            self.model_name = CLAUDE_DEFAULT
+        if (self.advice_provider.strip().lower() == "anthropic"
+                and not (self.advice_model_name or self.model_name).startswith("claude-")):
+            self.advice_model_name = CLAUDE_DEFAULT
+        return self
 
     @property
     def allowed_origins_list(self) -> list[str]:

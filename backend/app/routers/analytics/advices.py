@@ -278,7 +278,9 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         6 存      crud.remove(Advice, {"period_type": "month", "period_key": …, "user_id": …}, db=db)  先刪同月同範圍的舊建議
                   crud.save(Advice, [{…}, {…}], db=db)                         一次新增很多列，回傳物件清單（有 id）
                   db.commit()                                                  刪舊、存新一起寫進去
-        第三步    client.complete_json(prompt, system=…, max_tokens=800, temperature=0.3)  叫模型，要 JSON
+        第三步    build_prompt(numbers, block)                                 組 system 與 prompt（數字、derive() 換算好的比例、邊界規則）
+                  client.complete_json(prompt, system=…, purpose="advice", schema=ADVICE_SCHEMA)  叫模型，要 JSON（ADVICE_* 那組設定）
+                  grounded(item, allowed_numbers(numbers))                     每一個數字都找得到出處？找不到的信心度壓到 0.3
                   catalog.ADVICE_RULES                                         邊界規則一起放進 system，跟畫面上顯示的是同一份
         ⚠️ 為什麼要把 basis_json 存成 {"lines", "numbers"}：lines 給人看，numbers 是這次餵給模型的數字，事後可以驗算。
 
@@ -291,7 +293,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         5. 每一則用 AdviceItem 驗證，不合格的丟掉；一則都不剩 → 503
         6. 刪掉同月同範圍的舊建議，存新的（family 的 user_id 是 NULL），db.commit()
         7. 回傳 {generatedAt, advices}
-        第三步 write_advices() 裡面：組 system（格式＋邊界規則）與 prompt（算好的數字 JSON ＋ 理財背景）→ complete_json → 只留物件、只留需要的欄位
+        第三步 write_advices() 裡面：build_prompt（格式＋邊界規則；算好的數字與比例＋理財背景）→ complete_json → 只留物件、只留需要的欄位 → 數字找不到出處的壓低信心度
 
     【完整寫法】照下面三步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -389,7 +391,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                 "basis_json": {"lines": it.basis, "numbers": numbers},
                 "suggestions_json": it.suggest,
                 "confidence": it.conf,
-                "model_ver": settings.advice_model_name or settings.model_name,
+                "model_ver": client.model_name("advice"),
                 "generated_at": now,
             } for it in items], db=db)
             db.commit()
@@ -410,41 +412,40 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                 "generatedAt": stamp,
             } for r in rows]}
 
-        第三步：打開 app/services/llm/advice.py，把 write_advices() 整個換成這段（函式裡那兩行 import 不用搬到檔案最上面）
+        第三步：打開 app/services/llm/advice.py，把 write_advices() 整個換成這段
+        （build_prompt、allowed_numbers、grounded、ADVICE_SCHEMA 已經寫在同一個檔案裡，直接用）
 
             def write_advices(numbers: dict[str, Any], finance_block: str = "") -> list[dict[str, Any]]:
                 '''numbers 是 analytics 算好的數字。回傳 [{level, title, body, basis, suggest, conf}]。'''
-                import json
-
-                from app import catalog
-
                 if not client.is_configured():
                     raise client.ModelError("模型服務還沒接上")
 
-                # a. 組 prompt：格式、邊界規則、算好的數字、使用者的理財背景
-                system = chr(10).join([
-                    "你是家庭記帳的財務助理。根據使用者「已經算好的數字」寫 2 到 4 則建議，只回 JSON，不要其他文字。",
-                    '格式：{"advices": [{"level": "ok、info、warn 其中一個", "title": "20 字內", "body": "80 字內",',
-                    '"basis": ["依據：用下面給的數字寫成的算式"], "suggest": ["具體可以做的事"], "conf": 0 到 1 的數字}]}',
-                    "任何數字都只能照抄下面給的，不可以自己計算或編造。",
-                    "規則：",
-                ] + ["- " + r["rule"] for r in catalog.ADVICE_RULES])
-                prompt = chr(10).join([
-                    "【算好的數字（JSON）】",
-                    json.dumps(numbers, ensure_ascii=False),
-                    finance_block,
-                    "請寫建議：",
-                ])
+                # a. 組 prompt：格式、邊界規則、算好的數字與比例、使用者的理財背景
+                system, prompt = build_prompt(numbers, finance_block)
 
-                # b. 叫模型
-                data = client.complete_json(prompt, system=system, max_tokens=800, temperature=0.3)
+                # b. 叫模型（用 ADVICE_* 那組設定；格式由結構化輸出保證）
+                data = client.complete_json(prompt, system=system, max_tokens=800, temperature=0.3,
+                                            purpose="advice", schema=ADVICE_SCHEMA)
                 items = data.get("advices") if isinstance(data, dict) else data
                 if not isinstance(items, list):
                     raise client.ModelError("模型回來的格式不對")
 
-                # c. 只留物件、只留需要的欄位（每一欄的檢查在路由裡用 AdviceItem 做）
+                # c. 只留物件、只留需要的欄位（每一欄的檢查在路由裡用 AdviceItem 做）；
+                #    數字找不到出處的，信心度壓低，讓使用者知道這一則要自己驗算
+                allowed = allowed_numbers(numbers)
                 keys = ("level", "title", "body", "basis", "suggest", "conf")
-                return [{k: it[k] for k in keys if k in it} for it in items if isinstance(it, dict)]
+                out = []
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    one = {k: it[k] for k in keys if k in it}
+                    if not grounded(one, allowed):
+                        try:
+                            one["conf"] = min(float(one.get("conf", 1)), UNGROUNDED_CONF)
+                        except (TypeError, ValueError):
+                            one["conf"] = UNGROUNDED_CONF
+                    out.append(one)
+                return out
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -533,7 +534,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         "basis_json": {"lines": it.basis, "numbers": numbers},
         "suggestions_json": it.suggest,
         "confidence": it.conf,
-        "model_ver": settings.advice_model_name or settings.model_name,
+        "model_ver": client.model_name("advice"),
         "generated_at": now,
     } for it in items], db=db)
     db.commit()

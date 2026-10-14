@@ -28,6 +28,7 @@ tool 是一個 {"name", "description", "input_schema"}（JSON Schema）。
   · openai     送 tools ＋ tool_choice="required"，回來的 tool_calls[0].function.arguments 就是答案
   · anthropic  送 tools（strict：參數一定符合 schema），從 tool_use 區塊拿 input
   · 服務不支援工具呼叫、模型改用一般文字回 JSON 的話，一樣接得住（退回去解析文字）
+  · 服務回 400 說不收某個參數（max_tokens、temperature、tools、response_format），拿掉或換掉再送一次
 
 ⚠️ 叫不動的時候路由要回 **503**（errors.service_unavailable），不是 500——那是外部問題，不是我們的 bug。
 """
@@ -40,12 +41,13 @@ from typing import Any
 
 import httpx
 
+from app.toolkit import config
 from app.toolkit.config import settings
 
 __all__ = ["ModelError", "is_configured", "complete", "complete_json", "model_name"]
 
-#: MODEL_PROVIDER=anthropic 而 MODEL_NAME 不是 claude- 開頭時用這一顆
-CLAUDE_DEFAULT = "claude-opus-5-5"
+#: MODEL_PROVIDER=anthropic 而 MODEL_NAME 不是 claude- 開頭時用這一顆（定義在 config，nlp_parses.model_ver 才記得對）
+CLAUDE_DEFAULT = config.CLAUDE_DEFAULT
 
 #: 這幾顆支援伺服器端的 refusal fallback：模型婉拒時，伺服器自動換一顆能回答的模型重跑同一個請求
 _CLAUDE_FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5")
@@ -120,7 +122,7 @@ def complete_json(
     """跟 complete 一樣，但要 JSON。
 
     tool    要模型用工具呼叫交出結果，回傳工具的參數（dict）
-    schema  只要一段符合這個 JSON Schema 的 JSON（Claude 會用結構化輸出保證格式）
+    schema  只要一段符合這個 JSON Schema 的 JSON（Claude 用 output_config.format、OpenAI 用 response_format 保證格式）
     模型常在 JSON 外面包 ```json，這裡會剝掉。解析不了丟 ModelError。
     """
     out = _call(prompt, tool=tool, schema=schema, purpose=purpose, **kwargs)
@@ -143,10 +145,10 @@ def _call(prompt, *, system="", max_tokens=512, temperature=0.1, retries=1, purp
         return _call_anthropic(c, prompt, system=system, max_tokens=max_tokens, retries=retries,
                                tool=tool, schema=schema)
     return _call_openai(c, prompt, system=system, max_tokens=max_tokens, temperature=temperature,
-                        retries=retries, tool=tool, client=client)
+                        retries=retries, tool=tool, schema=schema, client=client)
 
 
-def _call_openai(c, prompt, *, system, max_tokens, temperature, retries, tool, client):
+def _call_openai(c, prompt, *, system, max_tokens, temperature, retries, tool, schema, client):
     url = c["base_url"].rstrip("/") + "/v1/chat/completions"
     headers = {"content-type": "application/json"}
     if c["api_key"]:
@@ -158,21 +160,29 @@ def _call_openai(c, prompt, *, system, max_tokens, temperature, retries, tool, c
         body["tools"] = [{"type": "function", "function": {
             "name": tool["name"], "description": tool.get("description", ""), "parameters": tool["input_schema"]}}]
         body["tool_choice"] = "required"
+    elif schema:
+        body["response_format"] = {"type": "json_schema",
+                                   "json_schema": {"name": "result", "schema": schema, "strict": True}}
 
     own = client is None
     client = client or httpx.Client(timeout=settings.model_timeout_seconds)
     try:
-        for attempt in range(retries + 1):
+        attempt = 0
+        while attempt <= retries:
             try:
                 res = client.post(url, json=body, headers=headers)
             except httpx.HTTPError as exc:
                 if attempt < retries:
-                    time.sleep(0.5 * (attempt + 1))
+                    attempt += 1
+                    time.sleep(0.5 * attempt)
                     continue
                 raise ModelError("模型服務沒有回應：%s" % exc.__class__.__name__) from None
             if res.status_code >= 500 and attempt < retries:
-                time.sleep(0.5 * (attempt + 1))
+                attempt += 1
+                time.sleep(0.5 * attempt)
                 continue
+            if res.status_code == 400 and _adapt(body, res.text):
+                continue                          # 這個服務不收某個參數：拿掉或換掉再送一次，不算重試
             if res.status_code != 200:
                 raise ModelError("模型服務回 %d" % res.status_code)
             try:
@@ -189,6 +199,30 @@ def _call_openai(c, prompt, *, system, max_tokens, temperature, retries, tool, c
         if own:
             client.close()
     return None
+
+
+def _adapt(body: dict[str, Any], error: str) -> bool:
+    """OpenAI 相容的服務各自少支援一些參數。回 400 時看錯誤訊息，拿掉／換掉那個參數；改了回 True。
+
+    · 推理型模型（例如 gpt-5 系列）不收 max_tokens、temperature：換成 max_completion_tokens、拿掉 temperature
+      （思考也算在 max_completion_tokens 裡，所以順便放寬）
+    · 不支援工具呼叫或結構化輸出的服務：拿掉，靠 prompt 裡「只回 JSON」與 _parse_json_text 接住
+    """
+    low = (error or "").lower()
+    if "max_tokens" in low and "max_tokens" in body:
+        body["max_completion_tokens"] = max(body.pop("max_tokens") * 4, 4096)
+        return True
+    if "temperature" in low and "temperature" in body:
+        body.pop("temperature")
+        return True
+    if "response_format" in low and "response_format" in body:
+        body.pop("response_format")
+        return True
+    if ("tool" in low or "function" in low) and "tools" in body:
+        body.pop("tools")
+        body.pop("tool_choice", None)
+        return True
+    return False
 
 
 def _call_anthropic(c, prompt, *, system, max_tokens, retries, tool, schema):
