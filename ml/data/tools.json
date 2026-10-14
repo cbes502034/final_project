@@ -1,0 +1,102 @@
+[
+ {
+  "type": "function",
+  "function": {
+   "name": "record_transactions",
+   "description": "把使用者的一段話切成一筆一筆的收支交出來。抽不到的欄位填 null，不要猜。",
+   "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "span",
+        "date",
+        "amount",
+        "kind",
+        "cat",
+        "merchant",
+        "note",
+        "conf"
+       ],
+       "properties": {
+        "span": {
+         "type": "string",
+         "description": "原句裡對應這一筆的那一段，一字不改"
+        },
+        "date": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "YYYY-MM-DD。沒講日期就是今天；「昨天」「9/17」要換算"
+        },
+        "amount": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "正數；中文數字要換成阿拉伯數字；沒講金額就 null，不要猜"
+        },
+        "kind": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "expense（支出）或 income（收入）"
+        },
+        "cat": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "分類清單裡的 id，挑不出來就 null"
+        },
+        "merchant": {
+         "type": "string",
+         "description": "店家，例如 全家、全聯；沒有就空字串"
+        },
+        "note": {
+         "type": "string",
+         "description": "買了什麼，例如 早餐、加油；沒有就空字串"
+        },
+        "conf": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "date",
+          "amount",
+          "kind",
+          "cat"
+         ],
+         "properties": {
+          "date": {
+           "type": "number"
+          },
+          "amount": {
+           "type": "number"
+          },
+          "kind": {
+           "type": "number"
+          },
+          "cat": {
+           "type": "number"
+          }
+         },
+         "description": "四個欄位各自的信心度，0 到 1"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+]

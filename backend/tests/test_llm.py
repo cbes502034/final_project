@@ -275,3 +275,22 @@ def test_數字對不上的那一則_信心度壓到_0_3_其他照舊(monkeypatc
     prompt, kw = calls[0]
     assert kw["purpose"] == "advice" and kw["schema"] is advice.ADVICE_SCHEMA
     assert "換算好的比例" in prompt and "43.0" in prompt
+
+
+def test_微調的訓練資料_prompt_跟上線一字不差():
+    """改了 parse.build_prompt 卻沒重跑 ml/build_sft.py，微調出來的模型上線時看到的就是沒看過的 prompt。"""
+    import io
+
+    ml = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "ml", "data")
+    with io.open(os.path.join(ml, "train.jsonl"), encoding="utf-8") as f:
+        train = {r["id"]: r for r in map(json.loads, filter(str.strip, f))}
+    with io.open(os.path.join(ml, "sft.jsonl"), encoding="utf-8") as f:
+        sft = [json.loads(next(f)) for _ in range(5)]
+    with io.open(os.path.join(ml, "tools.json"), encoding="utf-8") as f:
+        tools = json.load(f)
+    assert tools[0]["function"]["parameters"] == parse.RECORD_TOOL["input_schema"], "重跑 python ml/build_sft.py"
+    for row in sft:
+        ex = train[row["id"]]
+        system, prompt = parse.build_prompt(ex["text"], ex["categories"], ex["today"])
+        assert row["messages"][0]["content"] == system, "重跑 python ml/build_sft.py"
+        assert row["messages"][1]["content"] == prompt, "重跑 python ml/build_sft.py"
