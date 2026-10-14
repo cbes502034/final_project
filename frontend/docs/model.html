@@ -90,6 +90,15 @@ pre i { color: var(--ink-faint); font-style: normal; }
     </section>
 
 
+<!-- ============ 定案的改變 ============ -->
+<div class="note">
+  <div class="note__k">10/14 定案：上線改用商業 API，微調變成對照組</div>
+  <p>時間只剩一週，課程也允許彈性，所以<b>上線的段落解析與財務建議改用商業 API（Claude 或 OpenAI）</b>。
+    這一頁的微調方案保留下來當<b>對照組（加分項）</b>：<code>ml/</code> 裡有全套，跑得出來就跟商業 API、
+    前端規則放在同一張對照表。下面的「前提 1」因此不再成立；function calling、日期由程式算、三層退路照舊。
+    實際做法見 <code>docs/03-LLM實作規劃.md</code>。</p>
+</div>
+
 <!-- ============ 前提 ============ -->
 <div class="note note--warn">
   <div class="note__k">這份方案的三個前提</div>

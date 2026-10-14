@@ -157,7 +157,7 @@ PostgreSQL
             <tr><td class="tight"><b style="color:var(--up)">綠字</b></td>
                 <td><b>已經寫好、完整可用</b>，直接 import，不要改</td></tr>
             <tr><td class="tight"><b style="color:var(--warn)">黃字刪除線</b></td>
-                <td><b>骨架在、內容要你們做</b>：路由還回 501（<code>@stub</code>）、services 裡有 <code>TODO(成員N)</code></td></tr>
+                <td><b>骨架在、內容還沒做</b>：路由還回 501（<code>@stub</code>）。<b>現在已經沒有了</b>——70 支路由都做完了</td></tr>
           </tbody>
         </table>
       </div>
@@ -210,24 +210,29 @@ PostgreSQL
 │   │   ├── <em>toolkit/</em>          <em>已經寫好的工具（見 03）</em>
 │   │   ├── <em>models/</em>           <em>20 張表，跟 data.js 的 schema 逐欄對齊</em>
 │   │   ├── <em>schemas/</em>          <em>請求主體，欄位名字跟前端送的一樣</em>
-│   │   ├── <s>routers/</s>          <s>70 支路由：一個領域一個資料夾，守衛與說明寫好，內容要做（還回 501）</s>
-│   │   │   ├── <s>auth/</s>         <s>認證</s>
-│   │   │   ├── <s>ledger/</s>       <s>記帳</s>
-│   │   │   ├── <s>analytics/</s>    <s>數字</s>
-│   │   │   └── <s>access/</s>       <s>家庭</s>
-│   │   └── <s>services/</s>         <s>llm/client 已完成；parse、advice、analytics 要做</s>
+│   │   ├── <em>routers/</em>          <em>70 支路由：一個領域一個資料夾（全部做完）</em>
+│   │   │   ├── <em>auth/</em>         <em>認證</em>
+│   │   │   ├── <em>ledger/</em>       <em>記帳</em>
+│   │   │   ├── <em>analytics/</em>    <em>數字</em>
+│   │   │   └── <em>access/</em>       <em>家庭</em>
+│   │   └── <em>services/</em>         <em>llm/（client、parse、advice）、analytics、evaluation</em>
 │   ├── alembic/              <i>資料庫遷移（versions/ 第一版 = 20 張表）</i>
 │   ├── alembic.ini           <i>⚠️ 只能有英文</i>
 │   ├── tests/                <i>一致性、工具箱、後端核心、前端代勞；fixtures/ 放測試資料</i>
-│   ├── tools/                <i>sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生</i>
+│   ├── tools/                <i>eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生</i>
+│   ├── eval/                 <i>留出集 heldout.jsonl 與每次的評測結果 results/</i>
 │   ├── requirements.txt      <i>要裝哪些套件</i>
 │   ├── Dockerfile            <i>啟動前先 alembic upgrade head</i>
-│   └── .env.example          <i>設定範本：依成員分段，機密留空</i>
+│   └── .env.example          <i>設定範本：依領域分段，機密留空</i>
 │
 ├── <b>docs/</b>                    <i>規格文件（Markdown）</i>
 │   ├── 01-tech-stack-and-api.md
 │   ├── <u>02-前後端串接契約.md</u> ★  <i>動工前一定要看</i>
-│   └── 分工心智圖.svg
+│   ├── 03-LLM實作規劃.md     <i>模型怎麼接、怎麼評</i>
+│   ├── 04-最後一週分工.md    <i>10/14～10/23 誰做什麼</i>
+│   └── 分工/                 <i>每個人的任務檔</i>
+│
+├── <b>ml/</b>                      <i>微調（加分項）：訓練資料、Colab 筆記本、Hugging Face Space</i>
 │
 ├── docker-compose.yml        <i>本機一鍵起整套</i>
 ├── render.yaml               <i>部署設定</i>
@@ -310,12 +315,12 @@ PostgreSQL
       <pre class="tree" style="margin-top:18px">python -c "from app.toolkit import alerts; help(alerts.crossed)"</pre>
 
       <div class="note" style="margin-top:18px">
-        <div class="note__k">tools/：產生文件的程式，不是給路由用的</div>
-        <p><span class="fname">tools/sync_spec.py</span>　把 <code>docs/01</code> 與兩份 README 的分工總表、各領域路由清單，從 <code>ownership.py</code> 重新產生一次。<br>
+        <div class="note__k">tools/：評測與產生文件的程式，不是給路由用的</div>
+        <p><span class="fname">tools/eval_nlp.py</span>　用留出集（<code>eval/heldout.jsonl</code>）量記帳解析的成績，結果存在 <code>eval/results/</code>；
+        <code>--rules</code> 跑前端規則當基準線、<code>--compare</code> 把幾次的結果排成一張表。<br>
+        <span class="fname">tools/rules_baseline.js</span>　讓 node 跑 <code>api.js</code> 的規則解析，給 <code>--rules</code> 用。<br>
         <span class="fname">tools/sync_schema.py</span>　把手冊的「各表欄位」從 <code>data.js</code> 的 schema 重新產生一次。<br>
-        <span class="fname">tools/sync_mindmap.py</span>　分工心智圖（<code>docs/分工心智圖.svg</code> 與手冊第 10 節）從 <code>ownership.py</code> 與 <code>models/</code> 重新產生一次。<br>
-        搬了一支路由之後跑 <code>python backend/tools/sync_spec.py</code>；忘了跑，pytest 會紅燈。<br>
-        ⚠️ 這兩段手動維護過，結果文件停在 8/8/10/9，實際已經 17/18/13/15。<b>跨檔案的數字不要靠人記。</b></p>
+        ⚠️ 跨檔案的數字（例如各領域幾支路由）一律從 <code>ownership.py</code> 算，<b>不要靠人記</b>：<code>python -m app.ownership</code>。</p>
       </div>
     </section>
 

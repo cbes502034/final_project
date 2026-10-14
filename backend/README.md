@@ -78,7 +78,8 @@ backend/
 ├── alembic/               ← 資料庫結構的版本控制（versions/ 第一版就是 20 張表）
 ├── alembic.ini            ← ⚠️ 只能有英文（Windows 的 alembic 用 cp950 讀它）
 ├── tests/                 ← pytest；fixtures/ 放測試用的一家人與假後端
-├── tools/                 ← sync_spec.py、sync_schema.py、sync_mindmap.py、sync_devguide.py：文件從程式產生
+├── tools/                 ← eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生
+├── eval/                  ← 留出集與評測結果
 ├── requirements.txt
 ├── Dockerfile             ← 啟動前先 alembic upgrade head
 └── .env.example           ← 設定範本，依成員分段，機密一律留空
@@ -182,7 +183,7 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
 ### 設定：`.env`
 
 `python -m app.cli init-env` 會從 `.env.example` 建出 `.env`。檔案依成員分段，**改自己那一段就好**；
-機密（`JWT_SECRET`、`BREVO_API_KEY`、`MODEL_BASE_URL`、`MODEL_API_KEY`、`MAIL_FROM`）在 Render 後台填，**不可以 commit**。
+機密（`JWT_SECRET`、`BREVO_API_KEY`、`MODEL_API_KEY`、`ADVICE_API_KEY`、`MAIL_FROM`）在 Render 後台填，**不可以 commit**。
 程式裡一律 `from app.toolkit.config import settings`，不要自己讀 `os.environ`。
 
 ---
@@ -232,17 +233,19 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
 | 認證 | `MAIL_FROM_NAME` |  | 預設 `家庭記帳`。收件人看到的寄件人名稱。 |
 | 認證 | `APP_BASE_URL` |  | 預設 `https://fambudget-web.onrender.com`。前端網址。重設密碼信裡的連結會長成「這個網址/#/reset/token」。本機改成 http://localhost:5174。 |
 | 認證 | `ADMIN_EMAILS` |  | 平台管理員的 email，逗號分隔。`python -m app.cli make-admin` 會把這些帳號設成平台管理員。 |
-| 記帳 | `MODEL_BASE_URL` |  | 我們自己微調的 Qwen2.5-1.5B 模型服務網址（GGUF + llama.cpp，跑在 Hugging Face Space）。 |
-| 記帳 | `MODEL_API_KEY` |  | 模型服務要驗證時用（例如私有的 Hugging Face Space 的 token）。公開的就留空。**不可以 commit**。 |
-| 記帳 | `MODEL_NAME` |  | 預設 `qwen2.5-1.5b-fambudget`。寫進 nlp_parses.model_ver，換模型才分得開成績。 |
-| 記帳 | `MODEL_TIMEOUT_SECONDS` |  | 預設 `30.0`。呼叫模型的逾時秒數。一定要設——模型卡住時，沒有逾時的 API 會跟著一起卡死。 |
-| 數字 | `ADVICE_MODEL_NAME` |  | 產生財務建議用的模型名稱（寫進 advices.model_ver）。留空就跟記帳用同一個模型服務。 |
+| 記帳 | `MODEL_PROVIDER` |  | 預設 `openai`。`anthropic`＝Claude（官方套件）；`openai`＝OpenAI 或任何 OpenAI 相容服務（含我們微調後放在 Hugging Face Space 的模型）。 |
+| 記帳 | `MODEL_BASE_URL` |  | `openai` 才要填：`https://api.openai.com` 或 Space 的網址（不含 /v1）。Claude 留空。 |
+| 記帳 | `MODEL_API_KEY` |  | 商業 API 的金鑰，或私有 Space 的 token。**不可以 commit**。 |
+| 記帳 | `MODEL_NAME` |  | 預設 `qwen2.5-1.5b-fambudget`。用 Claude 而沒改（不是 claude- 開頭）時自動換成 `claude-opus-5-5`。寫進 nlp_parses.model_ver。 |
+| 記帳 | `MODEL_EFFORT` |  | 預設 `low`。只有 Claude 用：思考深度。解析是抽欄位，low 最快。 |
+| 記帳 | `MODEL_TIMEOUT_SECONDS` |  | 預設 `30.0`，商業 API 建議 `60`。一定要設——模型卡住時，沒有逾時的 API 會跟著一起卡死。 |
+| 數字 | `ADVICE_PROVIDER`、`ADVICE_BASE_URL`、`ADVICE_API_KEY`、`ADVICE_MODEL_NAME` |  | 財務建議想用另一組模型時才填；每一個留空就沿用上面記帳那一組。`ADVICE_API_KEY` **不可以 commit**。 |
+| 數字 | `ADVICE_EFFORT` |  | 預設 `medium`。只有 Claude 用：建議要寫成人話，比解析多想一點。 |
 | 數字 | `SAVINGS_WARN_RATIO` |  | 預設 `0.8`。支出達可支配上限的幾成算「接近上限」。前端 data.js 的 savingsRule 要一致。 |
 | 數字 | `SAVINGS_OVER_RATIO` |  | 預設 `1.0`。幾成算「超過」。 |
 | 家庭 | `INVITE_TTL_DAYS` |  | 預設 `7`。邀請與邀請碼幾天後失效。產生時呼叫 family.expires_at(days=settings.invite_ttl_days)。 |
 
-`MODEL_BASE_URL` 留空時 `services/llm/client.py` 回 `None`：解析與建議的路由回 **503**，前端用規則頂著，畫面照常能用。
-這是刻意的：第 1 週模型還沒訓練完，但前端已經要串了。等模型好了把網址填上去，其他程式碼一行都不用改。
+模型服務沒設定時（Claude 沒填金鑰、OpenAI 相容的沒填網址）`services/llm/client.py` 回 `None`：解析與建議的路由回 **503**，前端用規則頂著，畫面照常能用。三種填法（Claude／OpenAI／我們微調的模型）見 `docs/03-LLM實作規劃.md` 第 2 節，換來換去程式碼一行都不用改。
 
 寄信用 **Brevo 的 HTTP API**，不是 SMTP——Render 免費方案擋掉了 25／465／587 埠，
 用 smtplib 在本機會通、部署上去就永遠逾時。填好金鑰後先試寄一封給自己：

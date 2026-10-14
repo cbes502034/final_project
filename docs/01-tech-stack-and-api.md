@@ -167,7 +167,8 @@ final_project/
 │   │       └── evaluation.py    模型評測指標
 │   ├── alembic/                 資料庫遷移（versions/ 第一版就是 20 張表）
 │   ├── tests/                   pytest（routes/：每一支路由的驗收測試；fixtures/：假後端）
-│   ├── tools/                   sync_spec.py、sync_schema.py、sync_mindmap.py、sync_devguide.py：文件從程式產生
+│   ├── tools/                   eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生
+│   ├── eval/                    留出集與評測結果
 │   ├── requirements.txt
 │   ├── Dockerfile               啟動前先 alembic upgrade head
 │   └── .env.example             設定範本，依成員分段

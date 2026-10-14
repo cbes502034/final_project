@@ -13,7 +13,7 @@
 | **API 瀏覽** | <https://fambudget-web.onrender.com/docs/api.html> |
 | **前後端串接契約** | `docs/02-前後端串接契約.md` ← 動工前一定要看 |
 | **模型設計** | <https://fambudget-web.onrender.com/docs/model.html> |
-| **LLM 實作規劃** | `docs/03-LLM實作規劃.md` ← 模型線的每一步、誰做、怎麼算過關 |
+| **LLM 實作規劃** | `docs/03-LLM實作規劃.md` ← 模型怎麼接（商業 API）、怎麼評、微調對照 |
 
 ---
 
@@ -55,19 +55,21 @@ final_project/
 │   │   │   ├── analytics/   數字
 │   │   │   └── access/      家庭
 │   │   └── services/
-│   │       ├── llm/         client 已完成 · parse 記帳 · advice 數字
+│   │       ├── llm/         client 呼叫層 · parse 記帳 · advice 數字
 │   │       ├── permission.py    家庭
 │   │       ├── analytics.py     數字
 │   │       └── evaluation.py    評測指標
 │   ├── alembic/             資料庫遷移（第一版 = 20 張表）
 │   ├── tests/               含 routes/：每一支路由的驗收測試（說明裡的寫法也跑一遍）
-│   ├── tools/               文件從程式產生：sync_spec.py · sync_schema.py · sync_mindmap.py · sync_devguide.py
-│   ├── .env.example         設定範本，依成員分段
+│   ├── tools/               評測：eval_nlp.py · rules_baseline.js；文件從程式產生：sync_schema.py
+│   ├── eval/                留出集與評測結果
+│   ├── .env.example         設定範本，依領域分段
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── README.md          ← 後端的詳細說明在這
 │
-├── docs/                  規格文件（Markdown / SVG）
+├── docs/                  規格文件（Markdown）與每個人的任務檔 分工/
+├── ml/                    微調（加分項）：訓練資料、Colab 筆記本、Hugging Face Space
 ├── run.py                 ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
 ├── docker-compose.yml     本機的 PostgreSQL（db）；run.py 會自己開
 └── render.yaml            部署設定
@@ -246,8 +248,11 @@ http://localhost:5174/?api=                         切回 mock
 | 變數 | 說明 |
 |---|---|
 | `JWT_SECRET` | 簽 JWT 用的密鑰。拿到它的人可以偽造任何人的登入權杖 |
-| `MODEL_BASE_URL` | 我們自己微調的模型服務網址 |
-| `MODEL_API_KEY` | 模型服務要驗證時的 token（公開的 Space 留空） |
+| `MODEL_PROVIDER` | `anthropic`（Claude）或 `openai`（OpenAI，以及我們微調後放在 Hugging Face Space 的模型） |
+| `MODEL_API_KEY` | 商業 API 的金鑰（Claude／OpenAI）；公開的 Space 留空 |
+| `MODEL_BASE_URL` | `openai` 才要填：`https://api.openai.com` 或 Space 的網址；Claude 留空 |
+| `MODEL_NAME` | 模型名稱；Claude 留空就用 `claude-opus-5-5` |
+| `ADVICE_*` | 財務建議想用另一組模型時才填，留空就跟記帳同一組 |
 | `BREVO_API_KEY` | 忘記密碼的寄信服務金鑰（Brevo 後台 → SMTP & API → API keys） |
 | `MAIL_FROM` | 寄件信箱，要先在 Brevo 的 Senders 驗證過 |
 
@@ -277,8 +282,8 @@ http://localhost:5174/?api=                         切回 mock
    | 變數 | 填什麼 |
    |---|---|
    | `JWT_SECRET` | 隨機長字串。產生方式：`python -c "import secrets;print(secrets.token_urlsafe(48))"` |
-   | `MODEL_BASE_URL` | **先留空**。模型還沒訓練完，留空時解析與建議的路由回 503，前端用規則頂著，畫面照常能用 |
-   | `MODEL_API_KEY` | 公開的 Hugging Face Space 留空 |
+   | `MODEL_PROVIDER`、`MODEL_API_KEY` | 商業 API，見 `docs/03-LLM實作規劃.md` 第 2 節。**先留空也可以**：解析與建議的路由回 503，前端用規則頂著，畫面照常能用 |
+   | `MODEL_BASE_URL`、`MODEL_NAME`、`ADVICE_*` | 用 Claude 的話都留空 |
    | `BREVO_API_KEY` | Brevo 的 API 金鑰。⚠️ 不能改用 Gmail SMTP：Render 免費方案擋掉了 SMTP 埠 |
    | `MAIL_FROM` | 在 Brevo 驗證過的寄件信箱。填好後本機先試寄：`python -m app.toolkit.mailer --to 你的信箱` |
 
