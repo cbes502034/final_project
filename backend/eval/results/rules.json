@@ -1,0 +1,3308 @@
+{
+ "label": "rules",
+ "model": "frontend rules (api.js parseLine)",
+ "set": "eval\\heldout.jsonl",
+ "when": "2026-10-14T22:08:23",
+ "filters": {
+  "only": "",
+  "limit": 0
+ },
+ "report": {
+  "cases": 101,
+  "items": 125,
+  "errors": 0,
+  "split_acc": 0.9604,
+  "case_exact": 0.6337,
+  "item_exact": 0.696,
+  "field_acc": {
+   "date": 0.848,
+   "amount": 0.904,
+   "kind": 0.952,
+   "cat": 0.864
+  },
+  "cat_macro_f1": 0.791,
+  "extra_items": 2,
+  "no_amount": {
+   "items": 6,
+   "filled": 0,
+   "hallucination": 0.0
+  },
+  "latency_p50": null,
+  "latency_p95": null
+ },
+ "by_tag": {
+  "abs-date": {
+   "cases": 7,
+   "items": 8,
+   "errors": 0,
+   "split_acc": 1.0,
+   "case_exact": 0.0,
+   "item_exact": 0.0,
+   "field_acc": {
+    "date": 0.0,
+    "amount": 0.25,
+    "kind": 1.0,
+    "cat": 1.0
+   },
+   "cat_macro_f1": 1.0,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 0,
+    "filled": 0,
+    "hallucination": null
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "hard": {
+   "cases": 9,
+   "items": 9,
+   "errors": 0,
+   "split_acc": 0.8889,
+   "case_exact": 0.2222,
+   "item_exact": 0.3333,
+   "field_acc": {
+    "date": 1.0,
+    "amount": 0.6667,
+    "kind": 0.7778,
+    "cat": 0.6667
+   },
+   "cat_macro_f1": 0.3571,
+   "extra_items": 1,
+   "no_amount": {
+    "items": 1,
+    "filled": 0,
+    "hallucination": 0.0
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "income": {
+   "cases": 16,
+   "items": 17,
+   "errors": 0,
+   "split_acc": 1.0,
+   "case_exact": 0.6875,
+   "item_exact": 0.7059,
+   "field_acc": {
+    "date": 0.8824,
+    "amount": 0.9412,
+    "kind": 0.8235,
+    "cat": 0.8235
+   },
+   "cat_macro_f1": 0.6277,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 0,
+    "filled": 0,
+    "hallucination": null
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "merchant": {
+   "cases": 9,
+   "items": 14,
+   "errors": 0,
+   "split_acc": 1.0,
+   "case_exact": 0.7778,
+   "item_exact": 0.7857,
+   "field_acc": {
+    "date": 1.0,
+    "amount": 1.0,
+    "kind": 1.0,
+    "cat": 0.7857
+   },
+   "cat_macro_f1": 0.614,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 0,
+    "filled": 0,
+    "hallucination": null
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "multi": {
+   "cases": 18,
+   "items": 42,
+   "errors": 0,
+   "split_acc": 0.8889,
+   "case_exact": 0.6111,
+   "item_exact": 0.7857,
+   "field_acc": {
+    "date": 0.8571,
+    "amount": 0.9286,
+    "kind": 0.9524,
+    "cat": 0.881
+   },
+   "cat_macro_f1": 0.7455,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 1,
+    "filled": 0,
+    "hallucination": 0.0
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "no-amount": {
+   "cases": 6,
+   "items": 7,
+   "errors": 0,
+   "split_acc": 0.8333,
+   "case_exact": 0.6667,
+   "item_exact": 0.8571,
+   "field_acc": {
+    "date": 0.8571,
+    "amount": 1.0,
+    "kind": 1.0,
+    "cat": 1.0
+   },
+   "cat_macro_f1": 0.6,
+   "extra_items": 1,
+   "no_amount": {
+    "items": 6,
+    "filled": 0,
+    "hallucination": 0.0
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "no-punct": {
+   "cases": 3,
+   "items": 6,
+   "errors": 0,
+   "split_acc": 0.3333,
+   "case_exact": 0.3333,
+   "item_exact": 0.6667,
+   "field_acc": {
+    "date": 0.6667,
+    "amount": 0.6667,
+    "kind": 0.6667,
+    "cat": 0.6667
+   },
+   "cat_macro_f1": 0.6167,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 0,
+    "filled": 0,
+    "hallucination": null
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "rel-date": {
+   "cases": 9,
+   "items": 14,
+   "errors": 0,
+   "split_acc": 1.0,
+   "case_exact": 0.6667,
+   "item_exact": 0.7857,
+   "field_acc": {
+    "date": 0.7857,
+    "amount": 1.0,
+    "kind": 1.0,
+    "cat": 1.0
+   },
+   "cat_macro_f1": 1.0,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 1,
+    "filled": 0,
+    "hallucination": 0.0
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "single": {
+   "cases": 83,
+   "items": 83,
+   "errors": 0,
+   "split_acc": 0.9759,
+   "case_exact": 0.6386,
+   "item_exact": 0.6506,
+   "field_acc": {
+    "date": 0.8434,
+    "amount": 0.8916,
+    "kind": 0.9518,
+    "cat": 0.8554
+   },
+   "cat_macro_f1": 0.7891,
+   "extra_items": 2,
+   "no_amount": {
+    "items": 5,
+    "filled": 0,
+    "hallucination": 0.0
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "weekday": {
+   "cases": 6,
+   "items": 6,
+   "errors": 0,
+   "split_acc": 1.0,
+   "case_exact": 0.0,
+   "item_exact": 0.0,
+   "field_acc": {
+    "date": 0.0,
+    "amount": 1.0,
+    "kind": 1.0,
+    "cat": 1.0
+   },
+   "cat_macro_f1": 1.0,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 1,
+    "filled": 0,
+    "hallucination": 0.0
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  },
+  "zh-num": {
+   "cases": 15,
+   "items": 16,
+   "errors": 0,
+   "split_acc": 1.0,
+   "case_exact": 0.7333,
+   "item_exact": 0.75,
+   "field_acc": {
+    "date": 0.875,
+    "amount": 0.9375,
+    "kind": 1.0,
+    "cat": 0.875
+   },
+   "cat_macro_f1": 0.8,
+   "extra_items": 0,
+   "no_amount": {
+    "items": 0,
+    "filled": 0,
+    "hallucination": null
+   },
+   "latency_p50": null,
+   "latency_p95": null
+  }
+ },
+ "cases": [
+  {
+   "id": "h001",
+   "text": "早餐55",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐55",
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h002",
+   "text": "午餐吃便當95",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 95,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "午餐吃便當95",
+     "date": "2026-10-14",
+     "amount": 95,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h003",
+   "text": "晚上加油1200",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "晚上加油1200",
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h004",
+   "text": "宵夜鹽酥雞150",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "宵夜鹽酥雞150",
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h005",
+   "text": "飲料 60",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "飲料 60",
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h006",
+   "text": "停車 40",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 40,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "停車 40",
+     "date": "2026-10-14",
+     "amount": 40,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h007",
+   "text": "機車加油 180",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 180,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "機車加油 180",
+     "date": "2026-10-14",
+     "amount": 180,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h008",
+   "text": "Uber 回家 270",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 270,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "Uber 回家 270",
+     "date": "2026-10-14",
+     "amount": 270,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h009",
+   "text": "悠遊卡儲值500",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 500,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "悠遊卡儲值500",
+     "date": "2026-10-14",
+     "amount": 500,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h010",
+   "text": "瓦斯費 850 元",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 850,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "瓦斯費 850 元",
+     "date": "2026-10-14",
+     "amount": 850,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h011",
+   "text": "衛生紙一串 299",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 299,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "pred": [
+    {
+     "span": "衛生紙一串 299",
+     "date": "2026-10-14",
+     "amount": 299,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h012",
+   "text": "洗衣精補充包 159",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 159,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "pred": [
+    {
+     "span": "洗衣精補充包 159",
+     "date": "2026-10-14",
+     "amount": 159,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h013",
+   "text": "看牙醫掛號費150",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "pred": [
+    {
+     "span": "看牙醫掛號費150",
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h014",
+   "text": "藥局買感冒藥280",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 280,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "pred": [
+    {
+     "span": "藥局買感冒藥280",
+     "date": "2026-10-14",
+     "amount": 280,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h015",
+   "text": "兒科診所 150",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "pred": [
+    {
+     "span": "兒科診所 150",
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h016",
+   "text": "掛急診 800",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 800,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "pred": [
+    {
+     "span": "掛急診 800",
+     "date": "2026-10-14",
+     "amount": 800,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h017",
+   "text": "健檢自費 2500",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 2500,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "pred": [
+    {
+     "span": "健檢自費 2500",
+     "date": "2026-10-14",
+     "amount": 2500,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h018",
+   "text": "線上英文課 1200",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "pred": [
+    {
+     "span": "線上英文課 1200",
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h019",
+   "text": "小孩的參考書 450",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 450,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "pred": [
+    {
+     "span": "小孩的參考書 450",
+     "date": "2026-10-14",
+     "amount": 450,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h020",
+   "text": "Netflix 月費390",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 390,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "Netflix 月費390",
+     "date": "2026-10-14",
+     "amount": 390,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h021",
+   "text": "Spotify 訂閱149",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 149,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "Spotify 訂閱149",
+     "date": "2026-10-14",
+     "amount": 149,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h022",
+   "text": "買遊戲點數1000",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1000,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "買遊戲點數1000",
+     "date": "2026-10-14",
+     "amount": 1000,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h023",
+   "text": "演唱會門票 3800",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 3800,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "演唱會門票 3800",
+     "date": "2026-10-14",
+     "amount": 3800,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h024",
+   "text": "去 KTV 1200",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "去 KTV 1200",
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h025",
+   "text": "寄包裹運費 60",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "pred": [
+    {
+     "span": "寄包裹運費 60",
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h026",
+   "text": "朋友結婚包禮金 3600",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 3600,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "pred": [
+    {
+     "span": "朋友結婚包禮金 3600",
+     "date": "2026-10-14",
+     "amount": 3600,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h027",
+   "text": "捐款給慈善團體1000",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1000,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "pred": [
+    {
+     "span": "捐款給慈善團體1000",
+     "date": "2026-10-14",
+     "amount": 1000,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h028",
+   "text": "在全家買早餐65",
+   "tags": [
+    "single",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 65,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "在全家買早餐65",
+     "date": "2026-10-14",
+     "amount": 65,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h029",
+   "text": "全聯買衛生紙跟洗衣精共389",
+   "tags": [
+    "single",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 389,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "pred": [
+    {
+     "span": "全聯買衛生紙跟洗衣精共389",
+     "date": "2026-10-14",
+     "amount": 389,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h030",
+   "text": "7-11 咖啡 55",
+   "tags": [
+    "single",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "7-11 咖啡 55",
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h031",
+   "text": "全家一起吃火鍋 1800",
+   "tags": [
+    "single",
+    "merchant",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1800,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "全家一起吃火鍋 1800",
+     "date": "2026-10-14",
+     "amount": 1800,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h032",
+   "text": "中午麥當勞 159",
+   "tags": [
+    "single",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 159,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "中午麥當勞 159",
+     "date": "2026-10-14",
+     "amount": 159,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h033",
+   "text": "星巴克拿鐵一百四",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 140,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "星巴克拿鐵一百四",
+     "date": "2026-10-14",
+     "amount": 140,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h034",
+   "text": "繳電費兩千三",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 2300,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "繳電費兩千三",
+     "date": "2026-10-14",
+     "amount": 2300,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h035",
+   "text": "這個月房租一萬八",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 18000,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "這個月房租一萬八",
+     "date": "2026-10-14",
+     "amount": 18000,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h036",
+   "text": "小孩補習費四千五",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 4500,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "pred": [
+    {
+     "span": "小孩補習費四千五",
+     "date": "2026-10-14",
+     "amount": 4500,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h037",
+   "text": "早餐三十五",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 35,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐三十五",
+     "date": "2026-10-14",
+     "amount": 35,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h038",
+   "text": "晚餐兩百五",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 250,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "晚餐兩百五",
+     "date": "2026-10-14",
+     "amount": 250,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h039",
+   "text": "繳學費三萬二",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 32000,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "pred": [
+    {
+     "span": "繳學費三萬二",
+     "date": "2026-10-14",
+     "amount": 32000,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h040",
+   "text": "水費四百零五",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 405,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "水費四百零五",
+     "date": "2026-10-14",
+     "amount": 405,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h041",
+   "text": "午餐花了大概一百二",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 120,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "午餐花了大概一百二",
+     "date": "2026-10-14",
+     "amount": 120,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h042",
+   "text": "房租 1.2 萬",
+   "tags": [
+    "single",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 12000,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "房租 1.2 萬",
+     "date": "2026-10-14",
+     "amount": 12000,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h043",
+   "text": "加油 1,250",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1250,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "加油 1",
+     "date": "2026-10-14",
+     "amount": 1,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "span": "250",
+     "date": "2026-10-14",
+     "amount": 250,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h044",
+   "text": "早餐 NT$80",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 80,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐 NT$80",
+     "date": "2026-10-14",
+     "amount": 80,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h045",
+   "text": "晚餐 $420",
+   "tags": [
+    "single"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 420,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "晚餐 $420",
+     "date": "2026-10-14",
+     "amount": 420,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h046",
+   "text": "公司發薪水 52000",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 52000,
+     "kind": "income",
+     "cat": "薪資"
+    }
+   ],
+   "pred": [
+    {
+     "span": "公司發薪水 52000",
+     "date": "2026-10-14",
+     "amount": 52000,
+     "kind": "income",
+     "cat": "薪資"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h047",
+   "text": "年終獎金入帳六萬",
+   "tags": [
+    "single",
+    "income",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 60000,
+     "kind": "income",
+     "cat": "獎金"
+    }
+   ],
+   "pred": [
+    {
+     "span": "年終獎金入帳六萬",
+     "date": "2026-10-14",
+     "amount": 60000,
+     "kind": "income",
+     "cat": "獎金"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h048",
+   "text": "年終 8 萬",
+   "tags": [
+    "single",
+    "income",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 80000,
+     "kind": "income",
+     "cat": "獎金"
+    }
+   ],
+   "pred": [
+    {
+     "span": "年終 8 萬",
+     "date": "2026-10-14",
+     "amount": 80000,
+     "kind": "income",
+     "cat": "獎金"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h049",
+   "text": "媽媽給零用錢500",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 500,
+     "kind": "income",
+     "cat": "零用金"
+    }
+   ],
+   "pred": [
+    {
+     "span": "媽媽給零用錢500",
+     "date": "2026-10-14",
+     "amount": 500,
+     "kind": "income",
+     "cat": "零用金"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h050",
+   "text": "爸爸給零用金 2000",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 2000,
+     "kind": "income",
+     "cat": "零用金"
+    }
+   ],
+   "pred": [
+    {
+     "span": "爸爸給零用金 2000",
+     "date": "2026-10-14",
+     "amount": 2000,
+     "kind": "income",
+     "cat": "零用金"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h051",
+   "text": "媽媽給我 1000",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1000,
+     "kind": "income",
+     "cat": "零用金"
+    }
+   ],
+   "pred": [
+    {
+     "span": "媽媽給我 1000",
+     "date": "2026-10-14",
+     "amount": 1000,
+     "kind": "income",
+     "cat": "零用金"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h052",
+   "text": "網購退款 1290",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1290,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "pred": [
+    {
+     "span": "網購退款 1290",
+     "date": "2026-10-14",
+     "amount": 1290,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h053",
+   "text": "今天收到退款 480",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 480,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "pred": [
+    {
+     "span": "今天收到退款 480",
+     "date": "2026-10-14",
+     "amount": 480,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h054",
+   "text": "賣二手相機賺了3500",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 3500,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "pred": [
+    {
+     "span": "賣二手相機賺了3500",
+     "date": "2026-10-14",
+     "amount": 3500,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h055",
+   "text": "今天賣舊書 300",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 300,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "pred": [
+    {
+     "span": "今天賣舊書 300",
+     "date": "2026-10-14",
+     "amount": 300,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h056",
+   "text": "中發票200元",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 200,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "pred": [
+    {
+     "span": "中發票200元",
+     "date": "2026-10-14",
+     "amount": 200,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h057",
+   "text": "銀行利息入帳 35",
+   "tags": [
+    "single",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 35,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "pred": [
+    {
+     "span": "銀行利息入帳 35",
+     "date": "2026-10-14",
+     "amount": 35,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h058",
+   "text": "晚上加油",
+   "tags": [
+    "single",
+    "no-amount"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "晚上加油",
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h059",
+   "text": "早餐",
+   "tags": [
+    "single",
+    "no-amount"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐",
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h060",
+   "text": "中午跟同事吃飯，忘記多少錢",
+   "tags": [
+    "single",
+    "no-amount",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "中午跟同事吃飯",
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "忘記多少錢",
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h061",
+   "text": "昨天晚上吃宵夜",
+   "tags": [
+    "single",
+    "no-amount",
+    "rel-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-13",
+     "amount": null,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "昨天晚上吃宵夜",
+     "date": "2026-10-13",
+     "amount": null,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h062",
+   "text": "上禮拜三繳了管理費",
+   "tags": [
+    "single",
+    "no-amount",
+    "weekday"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-07",
+     "amount": null,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "上禮拜三繳了管理費",
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h063",
+   "text": "昨天晚餐火鍋花了680",
+   "tags": [
+    "single",
+    "rel-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-13",
+     "amount": 680,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "昨天晚餐火鍋花了680",
+     "date": "2026-10-13",
+     "amount": 680,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h064",
+   "text": "前天搭計程車320",
+   "tags": [
+    "single",
+    "rel-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-12",
+     "amount": 320,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "前天搭計程車320",
+     "date": "2026-10-12",
+     "amount": 320,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h065",
+   "text": "大前天加油九百",
+   "tags": [
+    "single",
+    "rel-date",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-11",
+     "amount": 900,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "大前天加油九百",
+     "date": "2026-10-12",
+     "amount": 900,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h066",
+   "text": "禮拜一買文具150",
+   "tags": [
+    "single",
+    "weekday"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-12",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "pred": [
+    {
+     "span": "禮拜一買文具150",
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h067",
+   "text": "上週五晚餐吃麥當勞189",
+   "tags": [
+    "single",
+    "weekday"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-09",
+     "amount": 189,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "上週五晚餐吃麥當勞189",
+     "date": "2026-10-14",
+     "amount": 189,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h068",
+   "text": "上禮拜六去好市多買日用品3260",
+   "tags": [
+    "single",
+    "weekday"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-10",
+     "amount": 3260,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "pred": [
+    {
+     "span": "上禮拜六去好市多買日用品3260",
+     "date": "2026-10-14",
+     "amount": 3260,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h069",
+   "text": "上禮拜三看電影300",
+   "tags": [
+    "single",
+    "weekday"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-07",
+     "amount": 300,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "上禮拜三看電影300",
+     "date": "2026-10-14",
+     "amount": 300,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h070",
+   "text": "這禮拜一領薪水 51000",
+   "tags": [
+    "single",
+    "weekday",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-12",
+     "amount": 51000,
+     "kind": "income",
+     "cat": "薪資"
+    }
+   ],
+   "pred": [
+    {
+     "span": "這禮拜一領薪水 51000",
+     "date": "2026-10-14",
+     "amount": 51000,
+     "kind": "income",
+     "cat": "薪資"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h071",
+   "text": "10/1 繳網路費699",
+   "tags": [
+    "single",
+    "abs-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-01",
+     "amount": 699,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "10/1 繳網路費699",
+     "date": "2026-10-14",
+     "amount": 10,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h072",
+   "text": "9/28 高鐵來回2980",
+   "tags": [
+    "single",
+    "abs-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-09-28",
+     "amount": 2980,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "9/28 高鐵來回2980",
+     "date": "2026-10-14",
+     "amount": 9,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h073",
+   "text": "5號付了管理費2500",
+   "tags": [
+    "single",
+    "abs-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-05",
+     "amount": 2500,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "5號付了管理費2500",
+     "date": "2026-10-14",
+     "amount": 5,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h074",
+   "text": "20號買了一套課程4990",
+   "tags": [
+    "single",
+    "abs-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-09-20",
+     "amount": 4990,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "pred": [
+    {
+     "span": "20號買了一套課程4990",
+     "date": "2026-10-14",
+     "amount": 20,
+     "kind": "expense",
+     "cat": "教育"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h075",
+   "text": "九月三十號 KTV 唱歌 860",
+   "tags": [
+    "single",
+    "abs-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-09-30",
+     "amount": 860,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "九月三十號 KTV 唱歌 860",
+     "date": "2026-10-14",
+     "amount": 860,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h076",
+   "text": "十月一日領了績效獎金一萬二",
+   "tags": [
+    "single",
+    "abs-date",
+    "income",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-01",
+     "amount": 12000,
+     "kind": "income",
+     "cat": "獎金"
+    }
+   ],
+   "pred": [
+    {
+     "span": "十月一日領了績效獎金一萬二",
+     "date": "2026-10-14",
+     "amount": 10,
+     "kind": "income",
+     "cat": "獎金"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h077",
+   "text": "買生日蛋糕 680",
+   "tags": [
+    "single",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 680,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "買生日蛋糕 680",
+     "date": "2026-10-14",
+     "amount": 680,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h078",
+   "text": "一日遊門票 1200",
+   "tags": [
+    "single",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "一日遊門票 1200",
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h079",
+   "text": "坐155公車15元",
+   "tags": [
+    "single",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 15,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "坐155公車15元",
+     "date": "2026-10-14",
+     "amount": 155,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h080",
+   "text": "買了 3 杯飲料共 165",
+   "tags": [
+    "single",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 165,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "買了 3 杯飲料共 165",
+     "date": "2026-10-14",
+     "amount": 3,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h081",
+   "text": "2 張電影票 640",
+   "tags": [
+    "single",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 640,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "pred": [
+    {
+     "span": "2 張電影票 640",
+     "date": "2026-10-14",
+     "amount": 2,
+     "kind": "expense",
+     "cat": "娛樂"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h082",
+   "text": "給小孩零用錢 500",
+   "tags": [
+    "single",
+    "hard"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 500,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "pred": [
+    {
+     "span": "給小孩零用錢 500",
+     "date": "2026-10-14",
+     "amount": 500,
+     "kind": "income",
+     "cat": "零用金"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h083",
+   "text": "收到房客的房租 15000",
+   "tags": [
+    "single",
+    "hard",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 15000,
+     "kind": "income",
+     "cat": "其他收入"
+    }
+   ],
+   "pred": [
+    {
+     "span": "收到房客的房租 15000",
+     "date": "2026-10-14",
+     "amount": 15000,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h084",
+   "text": "早上買早餐55，中午吃飯120，晚上加油1200",
+   "tags": [
+    "multi"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 120,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早上買早餐55",
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "中午吃飯120",
+     "date": "2026-10-14",
+     "amount": 120,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "晚上加油1200",
+     "date": "2026-10-14",
+     "amount": 1200,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h085",
+   "text": "捷運30，午餐85，下午咖啡60",
+   "tags": [
+    "multi"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 30,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 85,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "捷運30",
+     "date": "2026-10-14",
+     "amount": 30,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "span": "午餐85",
+     "date": "2026-10-14",
+     "amount": 85,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "下午咖啡60",
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h086",
+   "text": "昨天停車費100，晚餐350",
+   "tags": [
+    "multi",
+    "rel-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-13",
+     "amount": 100,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "date": "2026-10-13",
+     "amount": 350,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "昨天停車費100",
+     "date": "2026-10-13",
+     "amount": 100,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "span": "晚餐350",
+     "date": "2026-10-14",
+     "amount": 350,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h087",
+   "text": "今天薪水入帳48000，繳房租15000",
+   "tags": [
+    "multi",
+    "income"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 48000,
+     "kind": "income",
+     "cat": "薪資"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 15000,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "今天薪水入帳48000",
+     "date": "2026-10-14",
+     "amount": 48000,
+     "kind": "income",
+     "cat": "薪資"
+    },
+    {
+     "span": "繳房租15000",
+     "date": "2026-10-14",
+     "amount": 15000,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h088",
+   "text": "早餐45然後坐公車15",
+   "tags": [
+    "multi",
+    "no-punct"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 45,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 15,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐45",
+     "date": "2026-10-14",
+     "amount": 45,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "坐公車15",
+     "date": "2026-10-14",
+     "amount": 15,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h089",
+   "text": "全家飯糰35、全聯洗髮精189",
+   "tags": [
+    "multi",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 35,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 189,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "pred": [
+    {
+     "span": "全家飯糰35",
+     "date": "2026-10-14",
+     "amount": 35,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "全聯洗髮精189",
+     "date": "2026-10-14",
+     "amount": 189,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h090",
+   "text": "前天看診掛號200，藥費150",
+   "tags": [
+    "multi",
+    "rel-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-12",
+     "amount": 200,
+     "kind": "expense",
+     "cat": "醫療"
+    },
+    {
+     "date": "2026-10-12",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "pred": [
+    {
+     "span": "前天看診掛號200",
+     "date": "2026-10-12",
+     "amount": 200,
+     "kind": "expense",
+     "cat": "醫療"
+    },
+    {
+     "span": "藥費150",
+     "date": "2026-10-14",
+     "amount": 150,
+     "kind": "expense",
+     "cat": "醫療"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h091",
+   "text": "早上咖啡75，中午便當90，晚上全聯買牙膏衛生紙420",
+   "tags": [
+    "multi",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 75,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 90,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 420,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早上咖啡75",
+     "date": "2026-10-14",
+     "amount": 75,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "中午便當90",
+     "date": "2026-10-14",
+     "amount": 90,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "晚上全聯買牙膏衛生紙420",
+     "date": "2026-10-14",
+     "amount": 420,
+     "kind": "expense",
+     "cat": "日用品"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h092",
+   "text": "昨天搭高鐵1490，今天計程車250",
+   "tags": [
+    "multi",
+    "rel-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-13",
+     "amount": 1490,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 250,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "昨天搭高鐵1490",
+     "date": "2026-10-13",
+     "amount": 1490,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "span": "今天計程車250",
+     "date": "2026-10-14",
+     "amount": 250,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h093",
+   "text": "前天電影票340、昨天晚餐520",
+   "tags": [
+    "multi",
+    "rel-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-12",
+     "amount": 340,
+     "kind": "expense",
+     "cat": "娛樂"
+    },
+    {
+     "date": "2026-10-13",
+     "amount": 520,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "前天電影票340",
+     "date": "2026-10-12",
+     "amount": 340,
+     "kind": "expense",
+     "cat": "娛樂"
+    },
+    {
+     "span": "昨天晚餐520",
+     "date": "2026-10-13",
+     "amount": 520,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h094",
+   "text": "早餐蛋餅三十，豆漿二十五",
+   "tags": [
+    "multi",
+    "zh-num"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 30,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 25,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐蛋餅三十",
+     "date": "2026-10-14",
+     "amount": 30,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "豆漿二十五",
+     "date": "2026-10-14",
+     "amount": 25,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h095",
+   "text": "繳電費1830和水費412",
+   "tags": [
+    "multi",
+    "no-punct"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 1830,
+     "kind": "expense",
+     "cat": "居住"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 412,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "pred": [
+    {
+     "span": "繳電費1830和水費412",
+     "date": "2026-10-14",
+     "amount": 1830,
+     "kind": "expense",
+     "cat": "居住"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h096",
+   "text": "早餐55，捷運20，午餐100，咖啡65，晚餐200",
+   "tags": [
+    "multi"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 20,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 100,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 65,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 200,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐55",
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "捷運20",
+     "date": "2026-10-14",
+     "amount": 20,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "span": "午餐100",
+     "date": "2026-10-14",
+     "amount": 100,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "咖啡65",
+     "date": "2026-10-14",
+     "amount": 65,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "晚餐200",
+     "date": "2026-10-14",
+     "amount": 200,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h097",
+   "text": "中午麥當勞 159，下午手搖 55",
+   "tags": [
+    "multi",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 159,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "中午麥當勞 159",
+     "date": "2026-10-14",
+     "amount": 159,
+     "kind": "expense",
+     "cat": "其他"
+    },
+    {
+     "span": "下午手搖 55",
+     "date": "2026-10-14",
+     "amount": 55,
+     "kind": "expense",
+     "cat": "其他"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h098",
+   "text": "9/30 午餐 110，晚餐 260",
+   "tags": [
+    "multi",
+    "abs-date"
+   ],
+   "gold": [
+    {
+     "date": "2026-09-30",
+     "amount": 110,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-09-30",
+     "amount": 260,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "9/30 午餐 110",
+     "date": "2026-10-14",
+     "amount": 9,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "晚餐 260",
+     "date": "2026-10-14",
+     "amount": 260,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h099",
+   "text": "昨天全家咖啡45，今天全家咖啡45",
+   "tags": [
+    "multi",
+    "rel-date",
+    "merchant"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-13",
+     "amount": 45,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 45,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "昨天全家咖啡45",
+     "date": "2026-10-13",
+     "amount": 45,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "span": "今天全家咖啡45",
+     "date": "2026-10-14",
+     "amount": 45,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h100",
+   "text": "早餐 50 午餐 100",
+   "tags": [
+    "multi",
+    "no-punct"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": 50,
+     "kind": "expense",
+     "cat": "餐飲"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 100,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "pred": [
+    {
+     "span": "早餐 50 午餐 100",
+     "date": "2026-10-14",
+     "amount": 50,
+     "kind": "expense",
+     "cat": "餐飲"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  },
+  {
+   "id": "h101",
+   "text": "晚上加油，還有停車 60",
+   "tags": [
+    "multi",
+    "no-amount"
+   ],
+   "gold": [
+    {
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "pred": [
+    {
+     "span": "晚上加油",
+     "date": "2026-10-14",
+     "amount": null,
+     "kind": "expense",
+     "cat": "交通"
+    },
+    {
+     "span": "停車 60",
+     "date": "2026-10-14",
+     "amount": 60,
+     "kind": "expense",
+     "cat": "交通"
+    }
+   ],
+   "seconds": null,
+   "error": ""
+  }
+ ]
+}
