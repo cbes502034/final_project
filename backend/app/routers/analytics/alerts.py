@@ -138,17 +138,6 @@ def list_alerts(me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    from fastapi import APIRouter, Depends
-    from sqlalchemy.orm import Session
-
-    from app.guards import block_admin, own
-    from app.models import AlertRule, Group, GroupMember, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import AlertIn, AlertPatchIn
-    from app.toolkit import alerts, crud, errors
-    from app.toolkit.db import get_db
-
-
 
     # 1. 我的門檻，百分比由小到大
     rows = crud.find(AlertRule, {"user_id": me.id}, order_by=("percent", "id"), db=db)
@@ -296,18 +285,6 @@ def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
     """
     # raise not_ready("POST /api/alerts", OWNER)
     
-    from fastapi import APIRouter, Depends
-    from sqlalchemy.orm import Session
-
-    from app.guards import block_admin, own
-    from app.models import AlertRule, Group, GroupMember, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import AlertIn, AlertPatchIn
-    from app.toolkit import alerts, crud, errors
-    from app.toolkit.db import get_db
-
-
-
     # 1. 門檻要是 1～200 的整數
     try:
         percent = alerts.validate_percent(body.percent)
@@ -466,16 +443,6 @@ def update_alert(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    from fastapi import APIRouter, Depends
-    from sqlalchemy.orm import Session
-
-    from app.guards import block_admin, own
-    from app.models import AlertRule, Group, GroupMember, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import AlertIn, AlertPatchIn
-    from app.toolkit import alerts, crud, errors
-    from app.toolkit.db import get_db
-
 
     if body.percent is None and body.enabled is None:
         raise errors.bad_request("沒有要改的欄位")
@@ -590,17 +557,6 @@ def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_d
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     # raise not_ready("DELETE /api/alerts/{aid}", OWNER)
-
-    from fastapi import APIRouter, Depends
-    from sqlalchemy.orm import Session
-
-    from app.guards import block_admin, own
-    from app.models import AlertRule, Group, GroupMember, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import AlertIn, AlertPatchIn
-    from app.toolkit import alerts, crud, errors
-    from app.toolkit.db import get_db
-
 
     alert_id = row.id
     crud.remove(AlertRule, id=alert_id, db=db)

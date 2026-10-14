@@ -177,17 +177,6 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    from datetime import datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
 
     # 1. 這個月的起訖（台灣時間）
     this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
@@ -356,18 +345,6 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
     """
     # raise not_ready("PUT /api/budgets", OWNER)
 
-    from datetime import datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
-
     # 1. 只能設在支出分類（系統的或我們家的）
     category_id = int(body.cat) if body.cat.isdigit() else 0
     category = crud.get(Category, where={
@@ -522,18 +499,6 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     # raise not_ready("PUT /api/savings-goal", OWNER)
-
-    from datetime import datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-    
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
     
     # 1. 只有本人能設（userId 不帶 = 自己）
     try:
@@ -666,18 +631,6 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
     # raise not_ready("GET /api/savings-goals", OWNER)
-    
-    from datetime import datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-    
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
     
     # 1. 我的每一筆目標由舊到新：後面的蓋掉前面的，每本帳留下最新的（整體的鍵是 None）
     latest = {}

@@ -178,29 +178,7 @@ def list_advices(me: User, scope: str | None = None, db: Session = Depends(get_d
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("GET /api/advices", OWNER)
-
-    from __future__ import annotations
-
-    # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
-    # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
-    from datetime import datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from fastapi.encoders import jsonable_encoder
-    from pydantic import ValidationError
-    from sqlalchemy.orm import Session
-
-    from app import catalog
-    from app.guards import block_admin, visible_scope
-    from app.models import Advice, Category, Guardianship, SavingsGoal, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.advice import AdviceItem, GenerateIn
-    from app.services import analytics
-    from app.services.llm import advice, client
-    from app.toolkit import crud, errors, money, period, profile
-    from app.toolkit.config import settings
-    from app.toolkit.db import get_db
+    # raise not_ready("GET /api/advices", OWNER)
 
     # 1. family：我看得到的別人的個人建議＋我們家的家庭建議（只給家長；子女拿不到）
     users, _ = visible_scope(me, db)
@@ -236,7 +214,7 @@ def list_advices(me: User, scope: str | None = None, db: Session = Depends(get_d
     
 @router.post("/advices/generate", status_code=201, summary="產生這個月的建議")
 @block_admin
-@stub
+# @stub
 def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
     """產生這個月的建議
 
@@ -485,29 +463,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/advices/generate", OWNER)
-
-    from __future__ import annotations
-    
-    # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
-    # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
-    from datetime import datetime, timedelta, timezone
-    
-    from fastapi import APIRouter, Depends, Query
-    from fastapi.encoders import jsonable_encoder
-    from pydantic import ValidationError
-    from sqlalchemy.orm import Session
-    
-    from app import catalog
-    from app.guards import block_admin, visible_scope
-    from app.models import Advice, Category, Guardianship, SavingsGoal, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.advice import AdviceItem, GenerateIn
-    from app.services import analytics
-    from app.services.llm import advice, client
-    from app.toolkit import crud, errors, money, period, profile
-    from app.toolkit.config import settings
-    from app.toolkit.db import get_db
+    # raise not_ready("POST /api/advices/generate", OWNER)
 
     # 1. 全家的建議：只有家長、而且看得到家人時才能產生
     users, _ = visible_scope(me, db)
