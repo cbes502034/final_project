@@ -1,7 +1,7 @@
 """
 帳本：開、改、封存、移除、成員、結算、通知。
 
-負責人：成員2（記帳）　✦ 分支：m2-ledger
+領域：記帳
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -36,7 +36,7 @@ from app.toolkit import crud, errors, ledger
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["帳本"])
-OWNER = "成員2"
+OWNER = "記帳"
 
 
 @router.get("/groups", summary="我加入的帳本")

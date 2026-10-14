@@ -1,9 +1,9 @@
 """
 自然語言記帳：一句話 → 一筆、一段話 → 好幾筆。**只解析，不寫入。**
 
-負責人：成員2（記帳）　✦ 分支：m2-ledger
+領域：記帳
 
-要做的事（成員2 的 LLM 工作）：
+要做的事（記帳 的 LLM 工作）：
   1. 組 prompt：分類清單（GET /api/categories 那一份）、今天日期（「昨天」要換算）、few-shot 範例
   2. 呼叫 services/llm/client.complete_json()
   3. 驗證：金額 > 0、日期 YYYY-MM-DD、cat 在清單裡；缺的欄位放進 missing、信心度放進 conf

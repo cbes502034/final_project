@@ -1,7 +1,7 @@
 """
 所有資料表。import 這個套件，Base.metadata 就認得全部 20 張表（Alembic 與 create_all 都靠它）。
 
-負責人：共用（改之前在群組講一聲）。每個檔案的主人寫在檔頭。
+領域：共用（改之前在群組講一聲）。每個檔案的主人寫在檔頭。
 """
 
 from app.models.advice import Advice  # noqa: F401

@@ -15,10 +15,10 @@
   --void: var(--paper);
   --code-bg: var(--card-2);
   --code-ink: var(--ink-soft);
-  --m1: var(--cat-transit);          /* 成員1 認證 */
-  --m2: var(--cat-home);             /* 成員2 記帳 */
-  --m3: var(--cat-health);           /* 成員3 數字 */
-  --m4: var(--up);                   /* 成員4 家庭 */
+  --m1: var(--cat-transit);          /* 認證 認證 */
+  --m2: var(--cat-home);             /* 記帳 記帳 */
+  --m3: var(--cat-health);           /* 數字 數字 */
+  --m4: var(--up);                   /* 家庭 家庭 */
   --rail-bg: var(--accent-hi);
   --rail-bg-2: var(--accent);
   --rail-ink: var(--on-accent);

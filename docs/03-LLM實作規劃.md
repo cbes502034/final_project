@@ -12,7 +12,7 @@
 | | 段落記帳解析 | 財務建議 |
 |---|---|---|
 | 路由 | `POST /api/nlp/parse-batch`（`parse` 單句版共用） | `POST /api/advices/generate` |
-| 負責 | 成員2 | 成員3 |
+| 負責 | 記帳 | 數字 |
 | 任務性質 | **抽取**：一段話 → 結構化的好幾筆 | **生成**：算好的數字 → 一段人話 |
 | 有沒有標準答案 | 有（日期、金額、收支、分類） | 沒有 |
 | 要不要微調 | **要**，這是專題的主要成果 | **不要**，沒有訓練資料、也沒有標準答案可以評 |
@@ -114,7 +114,7 @@ llama-server 支援用 `--lora` 載入 adapter、並在**每一個請求**指定
 | # | 位置 | 現況 | 改成 |
 |---|---|---|---|
 | 1 | `model.html` 第 05 節 | 兩輪工具呼叫 | 單輪（D1） |
-| 2 | `model.html` 第 06 節 | 「四人各寫 100 段種子」**又寫**「留出集交給成員4，因為他不寫種子」——互相矛盾 | **成員1～3 寫種子**（每人約 130 段），**成員4 標留出集**（第 5 節） |
+| 2 | `model.html` 第 06 節 | 「四人各寫 100 段種子」**又寫**「留出集交給家庭，因為他不寫種子」——互相矛盾 | **認證～3 寫種子**（每人約 130 段），**家庭 標留出集**（第 5 節） |
 | 3 | `model.html` 第 04 節 | 建議用 `get_month_summary`、`get_savings_status` 兩個工具 | 建議的規格已經改成直接把算好的數字放進 prompt，比讓模型呼叫工具少一次推論、也少一個出錯點。文件跟上規格 |
 | 4 | `services/llm/parse.py` | 模型自己換算日期、回分類 id、自己報 confidence | 回 `date_expr` 與分類名稱；可信度由 Python 算（第 3-4 節） |
 | 5 | `services/llm/client.py` | 只會送純文字 prompt | 要能帶 `tools`、`tool_choice`、`response_format`、逐請求 LoRA（第 9 節） |
@@ -309,9 +309,9 @@ def grounded(text, numbers):
 
 | 資料 | 量 | 誰 | 用途 | 規則 |
 |---|---|---|---|---|
-| 種子 | 約 400 段 | **成員1～3**，每人約 130 段 | 訓練 | 寫自己真實的講法；三個人的語言習慣不同，正是要的多樣性 |
+| 種子 | 約 400 段 | **認證～3**，每人約 130 段 | 訓練 | 寫自己真實的講法；三個人的語言習慣不同，正是要的多樣性 |
 | 擴增 | 3,000～5,000 段 | 程式（`ml/augment.py`） | 訓練 | 台灣店家 × 金額寫法 × 時間詞 × 句型組合；難例過取樣 |
-| 留出集 | 200 段 | **成員4**，100% 人工 | **只拿來評測** | 永遠不進訓練、不給商業模型碰、不給寫種子的人看 |
+| 留出集 | 200 段 | **家庭**，100% 人工 | **只拿來評測** | 永遠不進訓練、不給商業模型碰、不給寫種子的人看 |
 
 > 第 2 節的矛盾在這裡解掉：**標訓練集的人不標測試集**，同一個人標會用同一套判斷，評測會偏樂觀。
 
@@ -501,15 +501,15 @@ P0 量出 p50／p95 之後再決定：要不要縮短工具定義的說明文字
 
 | 檔案 | 改什麼 | 建議負責 |
 |---|---|---|
-| `services/llm/client.py` | `complete()` 多收 `tools`、`tool_choice`、`response_format`、`lora`；有 `tool_calls` 時回傳它 | 成員1（共用元件） |
-| `toolkit/config.py` | `advice_model_name` 換成 `advice_use_lora: bool = False`（D3） | 成員1 |
-| `toolkit/dates.py`（新） | `resolve(expr, today)` ＋ 單元測試 | 成員2 |
-| `services/llm/parse.py` | 單輪工具呼叫、後處理五個工具、組訊息函式給訓練共用 | 成員2 |
-| `services/llm/advice.py` | 只寫三欄、`grounded()`、邊界詞檢查 | 成員3 |
-| `routers/analytics/advices.py` | level 與 basis 改由 Python 決定（D5） | 成員3 |
-| `services/evaluation.py` | 補配對、切分、硬猜率 | 成員4 |
-| `tools/eval_nlp.py`（新） | 評測腳本（7-3） | 成員4 |
-| `app/cli.py` | `export-nlp` 指令（5-6） | 成員2 |
+| `services/llm/client.py` | `complete()` 多收 `tools`、`tool_choice`、`response_format`、`lora`；有 `tool_calls` 時回傳它 | 認證（共用元件） |
+| `toolkit/config.py` | `advice_model_name` 換成 `advice_use_lora: bool = False`（D3） | 認證 |
+| `toolkit/dates.py`（新） | `resolve(expr, today)` ＋ 單元測試 | 記帳 |
+| `services/llm/parse.py` | 單輪工具呼叫、後處理五個工具、組訊息函式給訓練共用 | 記帳 |
+| `services/llm/advice.py` | 只寫三欄、`grounded()`、邊界詞檢查 | 數字 |
+| `routers/analytics/advices.py` | level 與 basis 改由 Python 決定（D5） | 數字 |
+| `services/evaluation.py` | 補配對、切分、硬猜率 | 家庭 |
+| `tools/eval_nlp.py`（新） | 評測腳本（7-3） | 家庭 |
+| `app/cli.py` | `export-nlp` 指令（5-6） | 記帳 |
 | `ml/`（新資料夾） | `GUIDELINE.md`、`data/`、`augment.py`、`train_qlora.ipynb`、`space/` | 四人 |
 | `frontend/docs/model.html` | 第 2 節的 1～3 | 寫這份規劃的人 |
 

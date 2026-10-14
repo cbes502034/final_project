@@ -1,7 +1,7 @@
 """
 收支明細：查、記、改、刪。
 
-負責人：成員2（記帳）　✦ 分支：m2-ledger
+領域：記帳
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -34,7 +34,7 @@ from app.toolkit import crud, errors, ledger, money, notify
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["記帳"])
-OWNER = "成員2"
+OWNER = "記帳"
 
 
 @router.get("/transactions", summary="收支明細")

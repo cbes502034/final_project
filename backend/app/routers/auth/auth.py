@@ -1,7 +1,7 @@
 """
 身分認證：註冊、登入、token、個人資料、忘記密碼。
 
-負責人：成員1（認證）　✦ 分支：m1-auth
+領域：認證
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -41,7 +41,7 @@ from app.toolkit.db import get_db
 from app.toolkit.deps import current_token_payload
 
 router = APIRouter(tags=["身分認證"])
-OWNER = "成員1"
+OWNER = "認證"
 
 
 @router.post("/auth/register", status_code=201, summary="註冊：名字、email、密碼")

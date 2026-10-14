@@ -1,7 +1,7 @@
 """
 設定集中管理。**所有環境變數都在這裡讀進來**，其他檔案一律 `from app.toolkit.config import settings`。
 
-✦ 負責人：成員1（認證與基礎建設）　✦ 分支：m1-auth
+✦ 領域：認證與基礎建設
 ✦ 各段的設定歸誰管，下面用分隔線標出來；**改自己那一段就好，別人的段落先在群組講一聲**。
 
 ===========================================================================
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 共用（成員1 維護；四個人都會用到，改之前先講）
+    # 共用（認證 維護；四個人都會用到，改之前先講）
     # =======================================================================
     app_env: str = Field(
         default="development",
@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 成員1　認證：登入、JWT、忘記密碼寄信、平台管理員
+    # 認證　認證：登入、JWT、忘記密碼寄信、平台管理員
     # =======================================================================
     jwt_secret: str = Field(
         description=(
@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 成員2　記帳：自然語言解析用的模型服務
+    # 記帳　記帳：自然語言解析用的模型服務
     # =======================================================================
     model_base_url: str = Field(
         default="",
@@ -133,7 +133,7 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 成員3　數字：財務建議
+    # 數字　數字：財務建議
     # =======================================================================
     advice_model_name: str = Field(
         default="",
@@ -143,7 +143,7 @@ class Settings(BaseSettings):
     savings_over_ratio: float = Field(default=1.0, description="幾成算「超過」。")
 
     # =======================================================================
-    # 成員4　家庭：邀請、通知
+    # 家庭　家庭：邀請、通知
     # =======================================================================
     invite_ttl_days: int = Field(
         default=7,
@@ -188,14 +188,14 @@ class Settings(BaseSettings):
 
         flag("共用", "database_url", bool(self.database_url), "必填，服務起不來")
         flag("共用", "allowed_origins", bool(self.allowed_origins_list), "前端會被 CORS 擋住")
-        flag("成員1", "jwt_secret", bool(self.jwt_secret), "必填，服務起不來")
-        flag("成員1", "brevo_api_key", bool(self.brevo_api_key), "忘記密碼寄不出信")
-        flag("成員1", "mail_from", bool(self.mail_from), "忘記密碼寄不出信")
-        flag("成員1", "admin_emails", bool(self.admin_email_list), "沒有平台管理員（可以之後再設）")
-        flag("成員2", "model_base_url", bool(self.model_base_url), "記帳解析改用規則（前後端照樣能串）")
-        flag("成員3", "advice_model_name", True, "",
+        flag("認證", "jwt_secret", bool(self.jwt_secret), "必填，服務起不來")
+        flag("認證", "brevo_api_key", bool(self.brevo_api_key), "忘記密碼寄不出信")
+        flag("認證", "mail_from", bool(self.mail_from), "忘記密碼寄不出信")
+        flag("認證", "admin_emails", bool(self.admin_email_list), "沒有平台管理員（可以之後再設）")
+        flag("記帳", "model_base_url", bool(self.model_base_url), "記帳解析改用規則（前後端照樣能串）")
+        flag("數字", "advice_model_name", True, "",
              ok_msg=("已設定" if self.advice_model_name else "留空：跟記帳用同一個模型服務"))
-        flag("成員4", "invite_ttl_days", self.invite_ttl_days > 0, "要大於 0", ok_msg="邀請 %d 天後失效" % self.invite_ttl_days)
+        flag("家庭", "invite_ttl_days", self.invite_ttl_days > 0, "要大於 0", ok_msg="邀請 %d 天後失效" % self.invite_ttl_days)
         return rows
 
 

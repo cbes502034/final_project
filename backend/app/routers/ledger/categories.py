@@ -1,7 +1,7 @@
 """
 分類體系。
 
-負責人：成員2（記帳）　✦ 分支：m2-ledger
+領域：記帳
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -33,7 +33,7 @@ from app.toolkit import crud, errors
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["分類體系"])
-OWNER = "成員2"
+OWNER = "記帳"
 
 
 @router.get("/categories", summary="分類（系統預設＋我們家自訂）")
@@ -46,7 +46,7 @@ def list_categories(me: User, db: Session = Depends(get_db)):
 
     【這支做什麼】
         回傳我能用的分類：系統預設的（family_id 是 NULL）＋ 我們家自訂的。別人家的自訂分類不回。
-        ⚠️ 這份清單是跨模組的契約：記帳的下拉選單、模型挑分類（成員2）、評測（成員4）都用它。
+        ⚠️ 這份清單是跨模組的契約：記帳的下拉選單、模型挑分類（記帳）、評測（家庭）都用它。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.categories()

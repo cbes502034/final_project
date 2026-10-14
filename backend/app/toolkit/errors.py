@@ -6,10 +6,10 @@
 ===========================================================================
 不統一的話會變成這樣：
 
-    成員1 回 {"error": "找不到"}
-    成員2 回 {"message": "not found"}
-    成員3 回 {"detail": "查無資料", "code": 404}
-    成員4 直接 raise，回一串 Python 的錯誤堆疊
+    認證 回 {"error": "找不到"}
+    記帳 回 {"message": "not found"}
+    數字 回 {"detail": "查無資料", "code": 404}
+    家庭 直接 raise，回一串 Python 的錯誤堆疊
 
 前端要為每支路由寫不同的錯誤處理，而且第四種還會**把內部細節吐給攻擊者**。
 
@@ -209,10 +209,10 @@ def not_implemented(route: str, owner: str = "") -> HTTPException:
 
     參數
         route (str): 例如 "GET /api/summary"
-        owner (str): 例如 "成員3"
+        owner (str): 例如 "數字"
 
     範例
-        >>> not_implemented("GET /api/summary", "成員3").status_code
+        >>> not_implemented("GET /api/summary", "數字").status_code
         501
     """
     who = "（%s）" % owner if owner else ""

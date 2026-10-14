@@ -1,7 +1,7 @@
 """
 自然語言記帳：解析（不寫入）與確認後寫入。
 
-負責人：成員2（記帳）　✦ 分支：m2-ledger
+領域：記帳
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -36,7 +36,7 @@ from app.toolkit.config import settings
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["段落記帳"])
-OWNER = "成員2"
+OWNER = "記帳"
 
 
 @router.post("/nlp/parse", summary="單句解析（不寫入）")

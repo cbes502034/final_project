@@ -9,7 +9,7 @@
    後端契約（由 backend/tools/sync_spec.py 從 ownership.py 產生，不要手改）
    每一支的完整形狀：docs/02-前後端串接契約.md；前端函式與路由的對照：本檔的 FN。
 
-   成員1 · 認證（19 支）
+   認證（19 支）
    POST   /api/auth/register                   註冊：名字、email、密碼
    POST   /api/auth/login                      登入
    POST   /api/auth/refresh                    用 refresh token 換新的 access token
@@ -30,7 +30,7 @@
    POST   /api/admin/users/{user_id}/suspend   停權
    DELETE /api/admin/users/{user_id}/suspend   解除停權
 
-   成員2 · 記帳（19 支）
+   記帳（19 支）
    GET    /api/transactions                     收支明細
    POST   /api/transactions                     手動新增一筆
    PATCH  /api/transactions/{tx_id}             修改一筆
@@ -51,7 +51,7 @@
    POST   /api/groups/{gid}/settle              結算活動帳本
    PATCH  /api/groups/{gid}/notify              這本帳有動靜要不要通知我
 
-   成員3 · 數字（11 支）
+   數字（11 支）
    GET    /api/summary            個人／家庭摘要
    GET    /api/budgets            預算與已花
    PUT    /api/budgets            設定預算（limit 0 = 拿掉）
@@ -64,7 +64,7 @@
    GET    /api/advices            財務建議清單
    POST   /api/advices/generate   產生這個月的建議
 
-   成員4 · 家庭（21 支）
+   家庭（21 支）
    GET    /api/family                              家庭、成員、監管關係
    POST   /api/family                              建立家庭（建立的人是家長）
    DELETE /api/family                              解散家庭（唯一的家長）
@@ -2971,7 +2971,7 @@
      每一支都登記「打哪條路由、歸哪位成員」。出錯的時候，錯誤上會帶著：
        e.fn     'API.summary'
        e.route  'GET /api/summary'
-       e.owner  '成員3'
+       e.owner  '數字'
        e.kind   'business'  後端照規則擋下來（400／403／409…），訊息就是給使用者看的
                 'backend'   後端壞了或還沒做（5xx、404／405 路由不存在、501）
                 'network'   連不上後端
@@ -2983,83 +2983,83 @@
         路由與負責人跟 backend/app/ownership.py 對齊，有測試擋。
      ============================================================ */
   var FN = {
-    me:                 ['GET /api/auth/me', '成員1'],
+    me:                 ['GET /api/auth/me', '認證'],
     authState:          [null, '前端'],
     renew:              [null, '前端'],
     ttl:                [null, '前端'],
-    login:              ['POST /api/auth/login', '成員1'],
-    register:           ['POST /api/auth/register', '成員1'],
-    logout:             ['POST /api/auth/logout', '成員1'],
-    updateProfile:      ['PATCH /api/auth/me', '成員1'],
-    uploadAvatar:       ['PUT /api/auth/me/avatar', '成員1'],
-    deleteAvatar:       ['DELETE /api/auth/me/avatar', '成員1'],
-    financeProfile:     ['GET /api/auth/me/finance', '成員1'],
-    setFinanceProfile:  ['PUT /api/auth/me/finance', '成員1'],
-    changePassword:     ['PATCH /api/auth/password', '成員1'],
-    verifyPassword:     ['POST /api/auth/verify-password', '成員1'],
-    requestPasswordReset: ['POST /api/auth/password-reset', '成員1'],
-    confirmPasswordReset: ['POST /api/auth/password-reset/confirm', '成員1'],
-    sessions:           ['GET /api/auth/sessions', '成員1'],
-    logoutAll:          ['POST /api/auth/logout-all', '成員1'],
-    adminUsers:         ['GET /api/admin/users', '成員1'],
-    suspendUser:        ['POST /api/admin/users/{user_id}/suspend', '成員1'],
-    unsuspendUser:      ['DELETE /api/admin/users/{user_id}/suspend', '成員1'],
+    login:              ['POST /api/auth/login', '認證'],
+    register:           ['POST /api/auth/register', '認證'],
+    logout:             ['POST /api/auth/logout', '認證'],
+    updateProfile:      ['PATCH /api/auth/me', '認證'],
+    uploadAvatar:       ['PUT /api/auth/me/avatar', '認證'],
+    deleteAvatar:       ['DELETE /api/auth/me/avatar', '認證'],
+    financeProfile:     ['GET /api/auth/me/finance', '認證'],
+    setFinanceProfile:  ['PUT /api/auth/me/finance', '認證'],
+    changePassword:     ['PATCH /api/auth/password', '認證'],
+    verifyPassword:     ['POST /api/auth/verify-password', '認證'],
+    requestPasswordReset: ['POST /api/auth/password-reset', '認證'],
+    confirmPasswordReset: ['POST /api/auth/password-reset/confirm', '認證'],
+    sessions:           ['GET /api/auth/sessions', '認證'],
+    logoutAll:          ['POST /api/auth/logout-all', '認證'],
+    adminUsers:         ['GET /api/admin/users', '認證'],
+    suspendUser:        ['POST /api/admin/users/{user_id}/suspend', '認證'],
+    unsuspendUser:      ['DELETE /api/admin/users/{user_id}/suspend', '認證'],
 
-    transactions:       ['GET /api/transactions', '成員2'],
-    createTransaction:  ['POST /api/transactions', '成員2'],
-    updateTransaction:  ['PATCH /api/transactions/{tx_id}', '成員2'],
-    deleteTransaction:  ['DELETE /api/transactions/{tx_id}', '成員2'],
-    deleteTransactions: ['DELETE /api/transactions', '成員2'],
-    nlpParse:           ['POST /api/nlp/parse', '成員2'],
-    nlpParseBatch:      ['POST /api/nlp/parse-batch', '成員2'],
-    nlpConfirm:         ['POST /api/nlp/confirm', '成員2'],
-    nlpConfirmBatch:    ['POST /api/nlp/confirm-batch', '成員2'],
-    categories:         ['GET /api/categories', '成員2'],
-    createCategory:     ['POST /api/categories', '成員2'],
-    groups:             ['GET /api/groups', '成員2'],
-    createGroup:        ['POST /api/groups', '成員2'],
-    updateGroup:        ['PATCH /api/groups/{gid}', '成員2'],
-    archiveGroup:       ['DELETE /api/groups/{gid}', '成員2'],
-    removeGroup:        ['DELETE /api/groups/{gid}', '成員2'],
-    addGroupMember:     ['POST /api/groups/{gid}/members', '成員2'],
-    removeGroupMember:  ['DELETE /api/groups/{gid}/members/{user_id}', '成員2'],
-    settleGroup:        ['POST /api/groups/{gid}/settle', '成員2'],
-    setGroupNotify:     ['PATCH /api/groups/{gid}/notify', '成員2'],
+    transactions:       ['GET /api/transactions', '記帳'],
+    createTransaction:  ['POST /api/transactions', '記帳'],
+    updateTransaction:  ['PATCH /api/transactions/{tx_id}', '記帳'],
+    deleteTransaction:  ['DELETE /api/transactions/{tx_id}', '記帳'],
+    deleteTransactions: ['DELETE /api/transactions', '記帳'],
+    nlpParse:           ['POST /api/nlp/parse', '記帳'],
+    nlpParseBatch:      ['POST /api/nlp/parse-batch', '記帳'],
+    nlpConfirm:         ['POST /api/nlp/confirm', '記帳'],
+    nlpConfirmBatch:    ['POST /api/nlp/confirm-batch', '記帳'],
+    categories:         ['GET /api/categories', '記帳'],
+    createCategory:     ['POST /api/categories', '記帳'],
+    groups:             ['GET /api/groups', '記帳'],
+    createGroup:        ['POST /api/groups', '記帳'],
+    updateGroup:        ['PATCH /api/groups/{gid}', '記帳'],
+    archiveGroup:       ['DELETE /api/groups/{gid}', '記帳'],
+    removeGroup:        ['DELETE /api/groups/{gid}', '記帳'],
+    addGroupMember:     ['POST /api/groups/{gid}/members', '記帳'],
+    removeGroupMember:  ['DELETE /api/groups/{gid}/members/{user_id}', '記帳'],
+    settleGroup:        ['POST /api/groups/{gid}/settle', '記帳'],
+    setGroupNotify:     ['PATCH /api/groups/{gid}/notify', '記帳'],
 
-    summary:            ['GET /api/summary', '成員3'],
-    budgets:            ['GET /api/budgets', '成員3'],
-    setBudget:          ['PUT /api/budgets', '成員3'],
-    savingsGoals:       ['GET /api/savings-goals', '成員3'],
-    setSavingsGoal:     ['PUT /api/savings-goal', '成員3'],
-    alerts:             ['GET /api/alerts', '成員3'],
-    createAlert:        ['POST /api/alerts', '成員3'],
-    updateAlert:        ['PATCH /api/alerts/{aid}', '成員3'],
-    deleteAlert:        ['DELETE /api/alerts/{aid}', '成員3'],
-    advices:            ['GET /api/advices', '成員3'],
-    generateAdvices:    ['POST /api/advices/generate', '成員3'],
+    summary:            ['GET /api/summary', '數字'],
+    budgets:            ['GET /api/budgets', '數字'],
+    setBudget:          ['PUT /api/budgets', '數字'],
+    savingsGoals:       ['GET /api/savings-goals', '數字'],
+    setSavingsGoal:     ['PUT /api/savings-goal', '數字'],
+    alerts:             ['GET /api/alerts', '數字'],
+    createAlert:        ['POST /api/alerts', '數字'],
+    updateAlert:        ['PATCH /api/alerts/{aid}', '數字'],
+    deleteAlert:        ['DELETE /api/alerts/{aid}', '數字'],
+    advices:            ['GET /api/advices', '數字'],
+    generateAdvices:    ['POST /api/advices/generate', '數字'],
 
-    members:            ['GET /api/family', '成員4'],
-    createFamily:       ['POST /api/family', '成員4'],
-    dissolveFamily:     ['DELETE /api/family', '成員4'],
-    createInviteCode:   ['POST /api/family/invite', '成員4'],
-    joinFamily:         ['POST /api/family/join', '成員4'],
-    lookupUser:         ['GET /api/family/lookup', '成員4'],
-    invites:            ['GET /api/family/invites', '成員4'],
-    sendInvite:         ['POST /api/family/invites', '成員4'],
-    acceptInvite:       ['POST /api/family/invites/{invite_id}/accept', '成員4'],
-    declineInvite:      ['DELETE /api/family/invites/{invite_id}', '成員4'],
-    changeMemberRole:   ['PATCH /api/family/members/{user_id}', '成員4'],
-    removeMember:       ['DELETE /api/family/members/{user_id}', '成員4'],
-    leaveFamily:        ['DELETE /api/family/members/{user_id}', '成員4'],
-    guardianships:      ['GET /api/guardianships', '成員4'],
-    createGuardianship: ['POST /api/guardianships', '成員4'],
-    endGuardianship:    ['DELETE /api/guardianships/{gid}', '成員4'],
-    notifications:      ['GET /api/notifications', '成員4'],
-    readNotification:   ['PATCH /api/notifications/{nid}', '成員4'],
-    readNotifications:  ['PATCH /api/notifications', '成員4'],
-    allowances:         ['GET /api/allowances', '成員4'],
-    setAllowance:       ['PUT /api/allowance', '成員4'],
-    audit:              ['GET /api/audit', '成員4'],
+    members:            ['GET /api/family', '家庭'],
+    createFamily:       ['POST /api/family', '家庭'],
+    dissolveFamily:     ['DELETE /api/family', '家庭'],
+    createInviteCode:   ['POST /api/family/invite', '家庭'],
+    joinFamily:         ['POST /api/family/join', '家庭'],
+    lookupUser:         ['GET /api/family/lookup', '家庭'],
+    invites:            ['GET /api/family/invites', '家庭'],
+    sendInvite:         ['POST /api/family/invites', '家庭'],
+    acceptInvite:       ['POST /api/family/invites/{invite_id}/accept', '家庭'],
+    declineInvite:      ['DELETE /api/family/invites/{invite_id}', '家庭'],
+    changeMemberRole:   ['PATCH /api/family/members/{user_id}', '家庭'],
+    removeMember:       ['DELETE /api/family/members/{user_id}', '家庭'],
+    leaveFamily:        ['DELETE /api/family/members/{user_id}', '家庭'],
+    guardianships:      ['GET /api/guardianships', '家庭'],
+    createGuardianship: ['POST /api/guardianships', '家庭'],
+    endGuardianship:    ['DELETE /api/guardianships/{gid}', '家庭'],
+    notifications:      ['GET /api/notifications', '家庭'],
+    readNotification:   ['PATCH /api/notifications/{nid}', '家庭'],
+    readNotifications:  ['PATCH /api/notifications', '家庭'],
+    allowances:         ['GET /api/allowances', '家庭'],
+    setAllowance:       ['PUT /api/allowance', '家庭'],
+    audit:              ['GET /api/audit', '家庭'],
 
     reset:              [null, '前端']
   };

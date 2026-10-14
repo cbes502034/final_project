@@ -1,7 +1,7 @@
 """
 模型評測：留出集、零樣本 vs few-shot 對照、完全正確率與分類 Macro-F1。
 
-負責人：成員2（記帳；與成員4 的評測工作一起）　✦ 分支：m2-ledger
+領域：記帳；與家庭 的評測工作一起
 
 ⚠️ 留出集必須 100% 人工標註，否則量到的是「多像那個老師」而不是「多正確」。
 資料來源：nlp_parses（raw_text、parsed_json、user_corrected）。user_corrected 有值的就是模型抓錯的標註。

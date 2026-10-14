@@ -1,7 +1,7 @@
 """
 統計摘要。
 
-負責人：成員3（數字）　✦ 分支：m3-analytics
+領域：數字
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -36,7 +36,7 @@ from app.toolkit.config import settings
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["統計"])
-OWNER = "成員3"
+OWNER = "數字"
 
 
 @router.get("/summary", summary="個人／家庭摘要")

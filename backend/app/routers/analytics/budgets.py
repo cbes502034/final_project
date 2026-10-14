@@ -1,7 +1,7 @@
 """
 預算與每月存款目標。
 
-負責人：成員3（數字）　✦ 分支：m3-analytics
+領域：數字
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -34,12 +34,11 @@ from app.toolkit import crud, errors, money, period, roles
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["預算與存款目標"])
-OWNER = "成員3"
+OWNER = "數字"
  
 
 @router.get("/budgets", summary="預算與已花")
 @block_admin
-# @stub
 def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get_db)):
     """預算與已花
 
@@ -237,7 +236,6 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
 
 @router.put("/budgets", summary="設定預算（limit 0 = 拿掉）")
 @block_admin
-# @stub
 def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
     """設定預算（limit 0 = 拿掉）
 
@@ -396,7 +394,6 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
 
 @router.put("/savings-goal", summary="設定每月存款目標")
 @block_admin
-# @stub
 def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db)):
     """設定每月存款目標
 
@@ -567,8 +564,6 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
 
 @router.get("/savings-goals", summary="整體＋各帳本的存款目標")
 @block_admin
-# @stub
-@stub
 def list_savings_goals(me: User, db: Session = Depends(get_db)):
     """整體＋各帳本的存款目標
 
@@ -665,20 +660,7 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    # raise not_ready("GET /api/savings-goals", OWNER)
-    
-    from datetime import datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-    
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
-    
     # 1. 我的每一筆目標由舊到新：後面的蓋掉前面的，每本帳留下最新的（整體的鍵是 None）
     latest = {}
     for row in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):

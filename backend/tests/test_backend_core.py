@@ -571,16 +571,26 @@ def test_一次性連結_找不到_過期_用過都回同一句(sqlite):
 # ===========================================================================
 # 真正的 app：還沒做的路由
 # ===========================================================================
-def test_還沒做的路由_沒登入先被守衛擋_登入後回_501_講出是哪一支誰負責(sqlite):
-    from app.main import app
+def test_還沒做的路由_沒登入先被守衛擋_登入後回_501_講出是哪一支屬於哪個領域(sqlite):
+    """70 支都做完了，所以自己掛一支 @stub 的路由來測這套機制——
+    之後新增路由時，還是靠它讓前端知道「這一支還沒做」。"""
+    from app.guards import block_admin
+    from app.routers._stub import not_ready, stub
 
-    c = TestClient(app)
-    assert c.get("/api/family").status_code == 401
+    a = FastAPI()
+
+    @a.get("/api/demo")
+    @block_admin
+    @stub
+    def demo(me: User):
+        raise not_ready("GET /api/demo", "家庭")
+
+    c = TestClient(a)
+    assert c.get("/api/demo").status_code == 401
     u = _user()
-    r = c.get("/api/family", headers=_auth(u))
+    r = c.get("/api/demo", headers=_auth(u))
     assert r.status_code == 501
-    body = r.text
-    assert "GET /api/family" in body and "成員4" in body
+    assert "GET /api/demo" in r.text and "家庭" in r.text
 
 
 def test_每一支還沒做的路由都寫著自己的路徑與負責人():
@@ -709,7 +719,7 @@ def test_env_example_列出每一個設定_分成共用與四個成員_機密一
     text = io.open(os.path.join(BACKEND, ".env.example"), encoding="utf-8").read()
     keys = dict(re.findall(r"^([A-Z_][A-Z0-9_]*)=(.*)$", text, re.M))
     assert set(keys) == {name.upper() for name in Settings.model_fields}
-    for section in ("共用", "成員1", "成員2", "成員3", "成員4"):
+    for section in ("共用", "認證", "記帳", "數字", "家庭"):
         assert section in text
     for secret in ("JWT_SECRET", "BREVO_API_KEY", "MODEL_API_KEY", "MODEL_BASE_URL", "MAIL_FROM"):
         assert keys[secret].strip() == "", "%s 在 .env.example 裡不可以有值" % secret
@@ -729,7 +739,7 @@ def test_存款門檻前後端一致():
 
 def test_設定檔的每一段都標了是誰的():
     src = io.open(os.path.join(BACKEND, "app", "toolkit", "config.py"), encoding="utf-8").read()
-    for section in ("共用", "成員1", "成員2", "成員3", "成員4"):
+    for section in ("共用", "認證", "記帳", "數字", "家庭"):
         assert re.search(r"^\s*# " + section, src, re.M), section
 
 

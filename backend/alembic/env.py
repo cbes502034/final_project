@@ -1,7 +1,7 @@
 """
 Alembic 的進入點：告訴它「連哪顆資料庫」「要跟哪些表比對」。
 
-負責人：成員1（共用元件）。一般不需要改這個檔案。
+領域：認證（共用元件）。一般不需要改這個檔案。
 
 - 連線網址：讀 app/toolkit/config.py 的 DATABASE_URL（跟 FastAPI 同一份設定，密碼不進 repo）。
   臨時要對別顆資料庫跑：alembic -x url=sqlite:///./dev.db upgrade head

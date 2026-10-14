@@ -1,7 +1,7 @@
 """
 資料表共用的型別。PostgreSQL 與 SQLite 各用各的最佳型別，模型只寫一次。
 
-負責人：成員1（共用元件）
+領域：認證（共用元件）
 """
 
 from __future__ import annotations

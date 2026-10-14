@@ -1,13 +1,13 @@
 """
 還沒做的路由用的兩個小工具。
 
-負責人：成員1（共用）
+領域：認證（共用）
 
     @router.get("/summary")
     @block_admin
     @stub                               ← 還沒做：ownership.progress() 會算成「待辦」
     def get_summary(me: User, db: Session = Depends(get_db)):
-        raise not_ready("GET /api/summary", "成員3")   ← 回 501，前端會講出是哪一支、誰負責
+        raise not_ready("GET /api/summary", "數字")   ← 回 501，前端會講出是哪一支、誰負責
 
 做完之後把 @stub 和 raise not_ready 一起拿掉。
 """
