@@ -37,7 +37,7 @@ OWNER = "成員3"
 
 @router.get("/alerts", summary="我設的提醒門檻")
 @block_admin
-@stub
+# @stub
 def list_alerts(me: User, db: Session = Depends(get_db)):
     """我設的提醒門檻
 
@@ -138,12 +138,45 @@ def list_alerts(me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("GET /api/alerts", OWNER)
+    # raise not_ready("GET /api/alerts", OWNER)
 
+    from __future__ import annotations
+
+    # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+    # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+    
+    from app.guards import block_admin, own
+    from app.models import AlertRule, Group, GroupMember, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import AlertIn, AlertPatchIn
+    from app.toolkit import alerts, crud, errors
+    from app.toolkit.db import get_db
+
+    # 1. 我的門檻，百分比由小到大
+    rows = crud.find(AlertRule, {"user_id": me.id}, order_by=("percent", "id"), db=db)
+    
+    # 2. 針對帳本的門檻，一次查出帳本名字
+    group_ids = {r.group_id for r in rows if r.group_id}
+    names = {g.id: g.name for g in crud.find(Group, {"id__in": group_ids}, db=db)}
+    
+    # 3. 轉成前端要的樣子
+    out = []
+    for r in rows:
+        out.append({
+            "id": str(r.id),
+            "percent": r.percent,
+            "groupId": str(r.group_id) if r.group_id else None,
+            "groupName": names.get(r.group_id, "") if r.group_id else "整體",
+            "enabled": r.enabled,
+            "firedPeriod": r.fired_period,
+            })
+        return {"alerts": out}
 
 @router.post("/alerts", status_code=201, summary="新增門檻")
 @block_admin
-@stub
+# @stub
 def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
     """新增門檻
 
@@ -265,11 +298,44 @@ def create_alert(body: AlertIn, me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("POST /api/alerts", OWNER)
+    # raise not_ready("POST /api/alerts", OWNER)
+    
+    from __future__ import annotations
 
+    # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+    # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+    
+    from app.guards import block_admin, own
+    from app.models import AlertRule, Group, GroupMember, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import AlertIn, AlertPatchIn
+    from app.toolkit import alerts, crud, errors
+    from app.toolkit.db import get_db
+
+     # 1. 我的門檻，百分比由小到大
+    rows = crud.find(AlertRule, {"user_id": me.id}, order_by=("percent", "id"), db=db)
+     
+    # 2. 針對帳本的門檻，一次查出帳本名字
+    group_ids = {r.group_id for r in rows if r.group_id}
+    names = {g.id: g.name for g in crud.find(Group, {"id__in": group_ids}, db=db)}
+     
+     # 3. 轉成前端要的樣子
+    out = []
+    for r in rows:
+        out.append({
+            "id": str(r.id),
+            "percent": r.percent,
+            "groupId": str(r.group_id) if r.group_id else None,
+            "groupName": names.get(r.group_id, "") if r.group_id else "整體",
+            "enabled": r.enabled,
+            "firedPeriod": r.fired_period,
+            })
+        return {"alerts": out}
 
 @router.patch("/alerts/{aid}", summary="改門檻或暫停")
-@stub
+# @stub
 def update_alert(
     body: AlertPatchIn,
     row=Depends(own(AlertRule, "aid")),
@@ -394,11 +460,56 @@ def update_alert(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("PATCH /api/alerts/{aid}", OWNER)
+    # raise not_ready("PATCH /api/alerts/{aid}", OWNER)
 
+    from __future__ import annotations
+
+    # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+    # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+    
+    from app.guards import block_admin, own
+    from app.models import AlertRule, Group, GroupMember, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import AlertIn, AlertPatchIn
+    from app.toolkit import alerts, crud, errors
+    from app.toolkit.db import get_db
+
+    if body.percent is None and body.enabled is None:
+        raise errors.bad_request("沒有要改的欄位")
+    changes = {}
+
+    # 1. 改百分比：不能跟自己的其他門檻重複；換了門檻就當作這個月還沒響過
+    if body.percent is not None and body.percent != row.percent:
+        if crud.exists(AlertRule, {"user_id": row.user_id, "group_id": row.group_id,
+                                   "percent": body.percent, "id__ne": row.id}, db=db):
+            raise errors.conflict("這個門檻已經設過了")
+            changes["percent"] = body.percent
+            changes["fired_period"] = None
+
+     # 2. 暫停／恢復（關掉不刪）
+    if body.enabled is not None:
+        changes["enabled"] = body.enabled
+
+    # 3. 寫回去
+    if changes:
+     crud.save(AlertRule, {"id": row.id, **changes}, db=db)
+     db.commit()
+
+    # 4. 回傳改完的樣子
+    group = crud.get(Group, row.group_id, db=db) if row.group_id else None
+    return {
+       "id": str(row.id),
+       "percent": row.percent,
+       "groupId": str(row.group_id) if row.group_id else None,
+       "groupName": group.name if group else "整體",
+       "enabled": row.enabled,
+       "firedPeriod": row.fired_period,
+       }
 
 @router.delete("/alerts/{aid}", summary="刪門檻")
-@stub
+# @stub
 def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_db)):
     """刪門檻
 
@@ -477,4 +588,23 @@ def delete_alert(row=Depends(own(AlertRule, "aid")), db: Session = Depends(get_d
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("DELETE /api/alerts/{aid}", OWNER)
+    # raise not_ready("DELETE /api/alerts/{aid}", OWNER)
+
+    from __future__ import annotations
+
+    # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+    # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+    from fastapi import APIRouter, Depends
+    from sqlalchemy.orm import Session
+    
+    from app.guards import block_admin, own
+    from app.models import AlertRule, Group, GroupMember, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import AlertIn, AlertPatchIn
+    from app.toolkit import alerts, crud, errors
+    from app.toolkit.db import get_db
+    
+    alert_id = row.id
+    crud.remove(AlertRule, id=alert_id, db=db)
+    db.commit()
+    return {"id": str(alert_id), "deleted": True}

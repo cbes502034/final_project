@@ -237,7 +237,7 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
 
 @router.put("/budgets", summary="設定預算（limit 0 = 拿掉）")
 @block_admin
-@stub
+# @stub
 def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
     """設定預算（limit 0 = 拿掉）
 
@@ -354,12 +354,49 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("PUT /api/budgets", OWNER)
+    # raise not_ready("PUT /api/budgets", OWNER)
 
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+
+    from app.guards import block_admin, visible_scope
+    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import BudgetIn, SavingsGoalIn
+    from app.toolkit import crud, errors, money, period, roles
+    from app.toolkit.db import get_db
+
+    # 1. 只能設在支出分類（系統的或我們家的）
+    category_id = int(body.cat) if body.cat.isdigit() else 0
+    category = crud.get(Category, where={
+        "id": category_id,
+        "kind": "expense",
+        "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
+        }, db=db)
+    if category is None:
+        raise errors.bad_request("預算只能設在支出分類")
+        
+    # 2. 同一個人、分類、週期只有一列
+    where = {"user_id": me.id, "category_id": category.id, "period_type": body.period}
+    out = {"user": str(me.id), "period": body.period, "cat": str(category.id), "catName": category.name}
+
+    # 3. limit 0 = 拿掉這個分類的預算（刪掉那一列，不是存一個 0）
+    if body.limit == 0:
+        crud.remove(Budget, where, db=db)
+        db.commit()
+        return {**out, "limit": 0, "deleted": True}
+
+    # 4. 有就改、沒有就新增
+    crud.save(Budget, {"limit_amount": money.quantize(body.limit), "family_id": me.family_id,
+                       "created_by": me.id}, where=where, upsert=True, db=db)
+    db.commit()
+    return {**out, "limit": body.limit}
 
 @router.put("/savings-goal", summary="設定每月存款目標")
 @block_admin
-@stub
+# @stub
 def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db)):
     """設定每月存款目標
 
@@ -484,11 +521,53 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("PUT /api/savings-goal", OWNER)
+    # raise not_ready("PUT /api/savings-goal", OWNER)
 
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+    
+    from app.guards import block_admin, visible_scope
+    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import BudgetIn, SavingsGoalIn
+    from app.toolkit import crud, errors, money, period, roles
+    from app.toolkit.db import get_db
+    
+    # 1. 只有本人能設（userId 不帶 = 自己）
+    try:
+        roles.require_set_goal(str(me.id), body.userId or str(me.id))
+    except PermissionError as exc:
+        raise errors.forbidden(str(exc)) from None
+
+    # 2. 帶了 groupId：那本帳的目標，要是我加入、沒移除的帳本
+    group = None
+    if body.groupId:
+        group_id = int(body.groupId) if body.groupId.isdigit() else 0
+        if crud.exists(GroupMember, {"group_id": group_id, "user_id": me.id}, db=db):
+            group = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
+        if group is None:
+            raise errors.forbidden("你不在這本帳裡")
+
+    # 3. 一個月一列：這個月改好幾次只改同一列，以前月份的不動
+    this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
+    crud.save(SavingsGoal, {"goal_amount": money.quantize(body.goal), "created_by": me.id},
+              where={"user_id": me.id, "group_id": group.id if group else None, "period_key": this_month},
+              upsert=True, db=db)
+    db.commit()
+
+    # 4. 回傳：整體目標前端讀 name，帳本目標讀 groupName
+    out = {"id": str(me.id), "name": me.display_name, "userId": str(me.id), "goal": body.goal}
+    if group:
+        out.update({"groupId": str(group.id), "groupName": group.name})
+    else:
+        out.update({"groupId": None, "savingsGoal": body.goal})
+    return out
 
 @router.get("/savings-goals", summary="整體＋各帳本的存款目標")
 @block_admin
+# @stub
 @stub
 def list_savings_goals(me: User, db: Session = Depends(get_db)):
     """整體＋各帳本的存款目標
@@ -586,4 +665,32 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    raise not_ready("GET /api/savings-goals", OWNER)
+    # raise not_ready("GET /api/savings-goals", OWNER)
+    
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi import APIRouter, Depends, Query
+    from sqlalchemy.orm import Session
+    
+    from app.guards import block_admin, visible_scope
+    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
+    from app.routers._stub import not_ready, stub
+    from app.schemas.stats import BudgetIn, SavingsGoalIn
+    from app.toolkit import crud, errors, money, period, roles
+    from app.toolkit.db import get_db
+    
+    # 1. 我的每一筆目標由舊到新：後面的蓋掉前面的，每本帳留下最新的（整體的鍵是 None）
+    latest = {}
+    for row in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
+        latest[row.group_id] = row.goal_amount
+
+    # 2. 我加入、還在用的帳本
+    my_groups = crud.find(GroupMember, {"user_id": me.id}, fields="group_id", db=db)
+    groups = crud.find(Group, {"id__in": my_groups, "removed_at__isnull": True, "archived_at__isnull": True},
+                       order_by="id", db=db)
+
+    # 3. 第一列是整體，後面一本一列
+    goals = [{"groupId": None, "groupName": "整體", "goal": latest.get(None, 0)}]
+    for g in groups:
+        goals.append({"groupId": str(g.id), "groupName": g.name, "goal": latest.get(g.id, 0)})
+    return {"goals": goals}
