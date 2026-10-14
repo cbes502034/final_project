@@ -1,16 +1,34 @@
 """
-共用的模型呼叫層：逾時、重試、把回來的 JSON 交出去。**記帳 的解析、數字 的建議都呼叫它。**
+共用的模型呼叫層：逾時、重試、工具呼叫、把回來的 JSON 交出去。**記帳解析、財務建議都呼叫它。**
 
-領域：認證（共用元件，第 1 週先做出來）
+領域：認證（共用元件）
 
     from app.services.llm import client
 
     out = client.complete(prompt, system="你是記帳助理……", max_tokens=400)
-    if out is None:                  # 沒設定模型服務（MODEL_BASE_URL 留空）
+    if out is None:                  # 沒設定模型服務
         ...                          # 呼叫的人自己決定：回 503，或用規則頂著
-    data = client.complete_json(prompt)   # 要 JSON 的時候用這支，解析失敗丟 ModelError
+    data = client.complete_json(prompt)                    # 要 JSON 的時候用這支，解析失敗丟 ModelError
+    data = client.complete_json(prompt, tool=SOME_TOOL)    # 要模型用「工具呼叫」交出結果（function calling）
+    data = client.complete_json(prompt, purpose="advice")  # 財務建議用 ADVICE_* 那一組設定
 
-模型服務是 llama.cpp 的 OpenAI 相容介面（POST {MODEL_BASE_URL}/v1/chat/completions）。
+===========================================================================
+兩種模型服務（MODEL_PROVIDER）
+===========================================================================
+openai     OpenAI 相容的 POST {MODEL_BASE_URL}/v1/chat/completions。
+           OpenAI、我們微調後放在 Hugging Face Space 的 llama-server、Colab 上臨時開的服務都走這條。
+anthropic  Claude，走官方的 anthropic 套件。
+
+兩條路對呼叫的人完全一樣：同一個 complete_json(prompt, tool=…)，拿回同一個 dict。
+
+===========================================================================
+工具呼叫（function calling）
+===========================================================================
+tool 是一個 {"name", "description", "input_schema"}（JSON Schema）。
+  · openai     送 tools ＋ tool_choice="required"，回來的 tool_calls[0].function.arguments 就是答案
+  · anthropic  送 tools（strict：參數一定符合 schema），從 tool_use 區塊拿 input
+  · 服務不支援工具呼叫、模型改用一般文字回 JSON 的話，一樣接得住（退回去解析文字）
+
 ⚠️ 叫不動的時候路由要回 **503**（errors.service_unavailable），不是 500——那是外部問題，不是我們的 bug。
 """
 
@@ -24,17 +42,57 @@ import httpx
 
 from app.toolkit.config import settings
 
-__all__ = ["ModelError", "is_configured", "complete", "complete_json"]
+__all__ = ["ModelError", "is_configured", "complete", "complete_json", "model_name"]
+
+#: MODEL_PROVIDER=anthropic 而 MODEL_NAME 不是 claude- 開頭時用這一顆
+CLAUDE_DEFAULT = "claude-opus-5-5"
+
+#: 這幾顆支援伺服器端的 refusal fallback：模型婉拒時，伺服器自動換一顆能回答的模型重跑同一個請求
+_CLAUDE_FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5")
 
 
 class ModelError(RuntimeError):
     """模型服務沒回應、回錯誤、或回來的不是要的格式。路由接到轉成 503。"""
 
 
-def is_configured() -> bool:
-    return bool(settings.model_base_url.strip())
+# ===========================================================================
+# 設定：記帳一組、建議一組（建議的每一欄留空就沿用記帳那一組）
+# ===========================================================================
+def _cfg(purpose: str) -> dict[str, str]:
+    base = {
+        "provider": (settings.model_provider or "openai").strip().lower(),
+        "base_url": settings.model_base_url.strip(),
+        "api_key": settings.model_api_key.strip(),
+        "model": settings.model_name.strip(),
+        "effort": settings.model_effort.strip(),
+    }
+    if purpose == "advice":
+        over = {
+            "provider": settings.advice_provider.strip().lower(),
+            "base_url": settings.advice_base_url.strip(),
+            "api_key": settings.advice_api_key.strip(),
+            "model": settings.advice_model_name.strip(),
+            "effort": settings.advice_effort.strip(),
+        }
+        base.update({k: v for k, v in over.items() if v})
+    if base["provider"] == "anthropic" and not base["model"].startswith("claude-"):
+        base["model"] = CLAUDE_DEFAULT
+    return base
 
 
+def is_configured(purpose: str = "parse") -> bool:
+    c = _cfg(purpose)
+    return bool(c["api_key"]) if c["provider"] == "anthropic" else bool(c["base_url"])
+
+
+def model_name(purpose: str = "parse") -> str:
+    """這次實際會用的模型名稱（寫進 nlp_parses.model_ver、advices.model_ver）。"""
+    return _cfg(purpose)["model"]
+
+
+# ===========================================================================
+# 對外的兩支
+# ===========================================================================
 def complete(
     prompt: str,
     *,
@@ -42,20 +100,64 @@ def complete(
     max_tokens: int = 512,
     temperature: float = 0.1,
     retries: int = 1,
+    purpose: str = "parse",
     client: httpx.Client | None = None,
 ) -> str | None:
-    """送一段 prompt，回模型寫的文字。沒設定 MODEL_BASE_URL 回 None。
+    """送一段 prompt，回模型寫的文字。沒設定模型服務回 None。"""
+    out = _call(prompt, system=system, max_tokens=max_tokens, temperature=temperature,
+                retries=retries, purpose=purpose, tool=None, schema=None, client=client)
+    return None if out is None else out["text"]
 
-    retries：逾時或 5xx 再試幾次（中間等 0.5、1 秒）。4xx 不重試——那是我們送錯了。
+
+def complete_json(
+    prompt: str,
+    *,
+    tool: dict[str, Any] | None = None,
+    schema: dict[str, Any] | None = None,
+    purpose: str = "parse",
+    **kwargs: Any,
+) -> Any:
+    """跟 complete 一樣，但要 JSON。
+
+    tool    要模型用工具呼叫交出結果，回傳工具的參數（dict）
+    schema  只要一段符合這個 JSON Schema 的 JSON（Claude 會用結構化輸出保證格式）
+    模型常在 JSON 外面包 ```json，這裡會剝掉。解析不了丟 ModelError。
     """
-    if not is_configured():
+    out = _call(prompt, tool=tool, schema=schema, purpose=purpose, **kwargs)
+    if out is None:
         return None
-    url = settings.model_base_url.rstrip("/") + "/v1/chat/completions"
+    if out.get("args") is not None:
+        return out["args"]
+    return _parse_json_text(out["text"])
+
+
+# ===========================================================================
+# 內部
+# ===========================================================================
+def _call(prompt, *, system="", max_tokens=512, temperature=0.1, retries=1, purpose="parse",
+          tool=None, schema=None, client=None):
+    c = _cfg(purpose)
+    if not (c["api_key"] if c["provider"] == "anthropic" else c["base_url"]):
+        return None
+    if c["provider"] == "anthropic":
+        return _call_anthropic(c, prompt, system=system, max_tokens=max_tokens, retries=retries,
+                               tool=tool, schema=schema)
+    return _call_openai(c, prompt, system=system, max_tokens=max_tokens, temperature=temperature,
+                        retries=retries, tool=tool, client=client)
+
+
+def _call_openai(c, prompt, *, system, max_tokens, temperature, retries, tool, client):
+    url = c["base_url"].rstrip("/") + "/v1/chat/completions"
     headers = {"content-type": "application/json"}
-    if settings.model_api_key:
-        headers["authorization"] = "Bearer " + settings.model_api_key
+    if c["api_key"]:
+        headers["authorization"] = "Bearer " + c["api_key"]
     messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
-    body = {"model": settings.model_name, "messages": messages, "max_tokens": max_tokens, "temperature": temperature}
+    body: dict[str, Any] = {"model": c["model"], "messages": messages, "max_tokens": max_tokens,
+                            "temperature": temperature}
+    if tool:
+        body["tools"] = [{"type": "function", "function": {
+            "name": tool["name"], "description": tool.get("description", ""), "parameters": tool["input_schema"]}}]
+        body["tool_choice"] = "required"
 
     own = client is None
     client = client or httpx.Client(timeout=settings.model_timeout_seconds)
@@ -74,21 +176,85 @@ def complete(
             if res.status_code != 200:
                 raise ModelError("模型服務回 %d" % res.status_code)
             try:
-                return res.json()["choices"][0]["message"]["content"]
+                msg = res.json()["choices"][0]["message"]
             except (ValueError, KeyError, IndexError):
                 raise ModelError("模型服務回來的格式看不懂") from None
+            calls = msg.get("tool_calls") or []
+            if tool and calls:
+                raw = (calls[0].get("function") or {}).get("arguments")
+                args = raw if isinstance(raw, dict) else _parse_json_text(raw or "")
+                return {"text": msg.get("content") or "", "args": args}
+            return {"text": msg.get("content") or "", "args": None}
     finally:
         if own:
             client.close()
     return None
 
 
-def complete_json(prompt: str, **kwargs: Any) -> Any:
-    """跟 complete 一樣，但要求回 JSON 並解析。模型常在 JSON 外面包 ```json，這裡會剝掉。"""
-    text = complete(prompt, **kwargs)
-    if text is None:
-        return None
-    raw = text.strip()
+def _call_anthropic(c, prompt, *, system, max_tokens, retries, tool, schema):
+    try:
+        import anthropic
+    except ImportError:
+        raise ModelError("後端沒有安裝 anthropic 套件（pip install -r requirements.txt）") from None
+
+    sdk = anthropic.Anthropic(api_key=c["api_key"], timeout=settings.model_timeout_seconds,
+                              max_retries=retries)
+    output_config: dict[str, Any] = {}
+    if c["effort"] and not c["model"].startswith("claude-haiku-4"):
+        output_config["effort"] = c["effort"]
+    if schema and not tool:
+        output_config["format"] = {"type": "json_schema", "schema": schema}
+
+    kwargs: dict[str, Any] = {
+        "model": c["model"],
+        # Claude 會先思考再回答，這部分也算在 max_tokens 裡，給寬一點才不會被截斷
+        "max_tokens": max(max_tokens * 4, 4096),
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if system:
+        kwargs["system"] = system
+    if tool:
+        # 這幾顆模型不能強制指定工具（tool_choice 只能 auto），所以在 prompt 裡講清楚要用它；
+        # strict 保證參數一定符合 schema
+        kwargs["tools"] = [{"name": tool["name"], "description": tool.get("description", ""),
+                            "strict": True, "input_schema": tool["input_schema"]}]
+        kwargs["messages"] = [{"role": "user", "content":
+                               prompt + "\n\n請用 %s 工具交出結果。" % tool["name"]}]
+    extra: dict[str, Any] = {}
+    if output_config:
+        extra["output_config"] = output_config
+    betas: list[str] = []
+    if c["model"] in _CLAUDE_FALLBACK_MODELS:
+        # 模型婉拒時，伺服器自動換一顆能回答的模型重跑——記帳的句子幾乎不會碰到，但開著不吃虧
+        betas.append("server-side-fallback-2026-07-01")
+        extra["fallbacks"] = "default"
+
+    try:
+        if betas:
+            res = sdk.beta.messages.create(betas=betas, extra_body=extra or None, **kwargs)
+        else:
+            res = sdk.messages.create(extra_body=extra or None, **kwargs)
+    except anthropic.AuthenticationError:
+        raise ModelError("模型服務的金鑰不對（MODEL_API_KEY）") from None
+    except anthropic.RateLimitError:
+        raise ModelError("模型服務忙不過來，請稍後再試") from None
+    except anthropic.APIStatusError as exc:
+        raise ModelError("模型服務回 %d" % exc.status_code) from None
+    except anthropic.APIConnectionError:
+        raise ModelError("模型服務沒有回應") from None
+
+    if res.stop_reason == "refusal":
+        raise ModelError("模型拒絕處理這一段文字")
+    text = "".join(b.text for b in res.content if getattr(b, "type", "") == "text")
+    if tool:
+        for b in res.content:
+            if getattr(b, "type", "") == "tool_use" and b.name == tool["name"]:
+                return {"text": text, "args": dict(b.input)}
+    return {"text": text, "args": None}
+
+
+def _parse_json_text(text: str) -> Any:
+    raw = (text or "").strip()
     if raw.startswith("```"):
         raw = raw.strip("`")
         raw = raw[raw.find("\n") + 1:] if "\n" in raw else raw

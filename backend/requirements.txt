@@ -33,12 +33,15 @@ bcrypt>=4.1,<6
 python-multipart>=0.0.20          # form login
 
 # --- Model ---
-# Our model is a fine-tuned Qwen2.5-1.5B (GGUF + llama.cpp on a Hugging Face
-# Space). The backend only calls it over HTTP, so no model packages are needed
-# here; httpx (in the test section below) is enough.
+# The live system calls a hosted model (MODEL_PROVIDER in backend/.env):
+#   openai     any OpenAI-compatible /v1/chat/completions (OpenAI, or our own
+#              fine-tuned GGUF behind llama-server on a Hugging Face Space);
+#              called with httpx, no extra package
+#   anthropic  Claude, through the official SDK below
+anthropic>=0.121,<1
 #
-# Training packages (transformers / peft / bitsandbytes / trl) are left out on
-# purpose: they are only used in the Colab training notebook, and installing them
+# Training packages (transformers / peft / bitsandbytes / trl / unsloth) are left
+# out on purpose: they are only used in ml/train_colab.ipynb, and installing them
 # here would make the image several GB larger.
 
 # --- Development and tests ---

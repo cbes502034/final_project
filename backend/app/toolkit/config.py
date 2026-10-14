@@ -113,32 +113,59 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 記帳　記帳：自然語言解析用的模型服務
+    # 記帳　記帳：自然語言解析的模型服務（財務建議沒另外設定時也用這一組）
     # =======================================================================
+    model_provider: str = Field(
+        default="openai",
+        description=(
+            "要打哪一種模型服務。\n"
+            "  openai     OpenAI 相容的 /v1/chat/completions：OpenAI、我們微調後放在 Hugging Face Space 的\n"
+            "             llama-server、Colab 上臨時開的服務都走這條（MODEL_BASE_URL 必填）\n"
+            "  anthropic  Claude，用官方的 anthropic 套件（MODEL_API_KEY 必填，MODEL_BASE_URL 留空）"
+        ),
+    )
     model_base_url: str = Field(
         default="",
         description=(
-            "我們自己微調的 Qwen2.5-1.5B 模型服務網址（GGUF + llama.cpp，跑在 Hugging Face Space）。\n"
-            "留空時 services/llm/client.py 回 None：解析與建議的路由回 503，前端用規則頂著，前後端照樣串得起來。"
+            "OpenAI 相容服務的網址，例如 https://api.openai.com 或 Hugging Face Space 的網址（不含 /v1）。\n"
+            "MODEL_PROVIDER=anthropic 時留空。\n"
+            "都沒設定時 services/llm/client.py 回 None：解析與建議的路由回 503，前端用規則頂著。"
         ),
     )
     model_api_key: str = Field(
         default="",
-        description="模型服務要驗證時用（例如私有的 Hugging Face Space 的 token）。公開的就留空。**不可以 commit**。",
+        description="模型服務的金鑰（OpenAI／Anthropic 的 API key，或私有 Space 的 token）。**不可以 commit**。",
     )
-    model_name: str = Field(default="qwen2.5-1.5b-fambudget", description="寫進 nlp_parses.model_ver，換模型才分得開成績。")
+    model_name: str = Field(
+        default="qwen2.5-1.5b-fambudget",
+        description=(
+            "要用的模型名稱，也會寫進 nlp_parses.model_ver，換模型才分得開成績。\n"
+            "MODEL_PROVIDER=anthropic 而這裡沒改（不是 claude- 開頭）時，自動用 claude-opus-5-5。"
+        ),
+    )
+    model_effort: str = Field(
+        default="low",
+        description="只有 Claude 用：思考的深度（low／medium／high／xhigh／max）。記帳解析是抽欄位，low 就夠，也最快。",
+    )
     model_timeout_seconds: float = Field(
         default=30.0,
         description="呼叫模型的逾時秒數。一定要設——模型卡住時，沒有逾時的 API 會跟著一起卡死。",
     )
 
     # =======================================================================
-    # 數字　數字：財務建議
+    # 數字　數字：財務建議、儲蓄目標
     # =======================================================================
+    # 財務建議可以用另一組模型設定；每一欄留空就沿用上面記帳那一組。
+    # 典型用法：記帳換成我們微調的模型（Space），建議繼續用商業 API。
+    advice_provider: str = Field(default="", description="建議用的 MODEL_PROVIDER。留空＝跟記帳一樣。")
+    advice_base_url: str = Field(default="", description="建議用的 MODEL_BASE_URL。留空＝跟記帳一樣。")
+    advice_api_key: str = Field(default="", description="建議用的 MODEL_API_KEY。留空＝跟記帳一樣。**不可以 commit**。")
     advice_model_name: str = Field(
         default="",
-        description="產生財務建議用的模型名稱（寫進 advices.model_ver）。留空就跟記帳用同一個模型服務。",
+        description="建議用的模型名稱（寫進 advices.model_ver）。留空＝跟記帳一樣。",
     )
+    advice_effort: str = Field(default="medium", description="只有 Claude 用：建議要寫成人話，比解析多想一點。")
+
     savings_warn_ratio: float = Field(default=0.8, description="支出達可支配上限的幾成算「接近上限」。前端 data.js 的 savingsRule 要一致。")
     savings_over_ratio: float = Field(default=1.0, description="幾成算「超過」。")
 
@@ -192,9 +219,12 @@ class Settings(BaseSettings):
         flag("認證", "brevo_api_key", bool(self.brevo_api_key), "忘記密碼寄不出信")
         flag("認證", "mail_from", bool(self.mail_from), "忘記密碼寄不出信")
         flag("認證", "admin_emails", bool(self.admin_email_list), "沒有平台管理員（可以之後再設）")
-        flag("記帳", "model_base_url", bool(self.model_base_url), "記帳解析改用規則（前後端照樣能串）")
-        flag("數字", "advice_model_name", True, "",
-             ok_msg=("已設定" if self.advice_model_name else "留空：跟記帳用同一個模型服務"))
+        ready = bool(self.model_api_key) if self.model_provider == "anthropic" else bool(self.model_base_url)
+        flag("記帳", "model_api_key" if self.model_provider == "anthropic" else "model_base_url", ready,
+             "記帳解析改用規則（前後端照樣能串）", ok_msg="已設定（%s）" % self.model_provider)
+        own = any((self.advice_provider, self.advice_base_url, self.advice_api_key, self.advice_model_name))
+        flag("數字", "advice_*", True, "",
+             ok_msg=("另外設定了一組" if own else "留空：跟記帳用同一個模型服務"))
         flag("家庭", "invite_ttl_days", self.invite_ttl_days > 0, "要大於 0", ok_msg="邀請 %d 天後失效" % self.invite_ttl_days)
         return rows
 

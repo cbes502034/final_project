@@ -61,15 +61,34 @@ services:
           property: connectionString
       - key: ALLOWED_ORIGINS
         value: https://fambudget-web.onrender.com,http://localhost:5174
-      # JWT_SECRET、MODEL_BASE_URL、MODEL_API_KEY 要在 Render 後台自行填入，不要寫進 repo
+      # JWT_SECRET 與模型服務的金鑰要在 Render 後台自行填入，不要寫進 repo
       - key: JWT_SECRET
         sync: false
-      # 我們自己微調的模型服務網址。留空時後端會回傳假資料，
-      # 前後端仍然串得起來。
+      # ---- 模型服務（記帳解析；財務建議沒另外設定時也用這一組）----
+      # 三種填法，見 docs/03-LLM實作規劃.md：
+      #   Claude   MODEL_PROVIDER=anthropic、MODEL_API_KEY=sk-ant-…、MODEL_BASE_URL 留空
+      #   OpenAI   MODEL_PROVIDER=openai、MODEL_BASE_URL=https://api.openai.com、MODEL_API_KEY=sk-…、MODEL_NAME=模型名稱
+      #   自己的   MODEL_PROVIDER=openai、MODEL_BASE_URL=Hugging Face Space 的網址、MODEL_NAME=qwen2.5-1.5b-fambudget
+      # 都留空時解析與建議的路由回 503，前端照樣能用（解析改用規則）
+      - key: MODEL_PROVIDER
+        sync: false
       - key: MODEL_BASE_URL
         sync: false
-      # 模型服務要驗證時的 token（私有的 Hugging Face Space）。公開的就留空
       - key: MODEL_API_KEY
+        sync: false
+      - key: MODEL_NAME
+        sync: false
+      # 商業 API 偶爾要十幾秒，30 秒太緊
+      - key: MODEL_TIMEOUT_SECONDS
+        value: "60"
+      # 財務建議想用另一組模型時才填（例如解析換成我們微調的模型、建議繼續用商業 API）
+      - key: ADVICE_PROVIDER
+        sync: false
+      - key: ADVICE_BASE_URL
+        sync: false
+      - key: ADVICE_API_KEY
+        sync: false
+      - key: ADVICE_MODEL_NAME
         sync: false
       # 忘記密碼的寄信服務（Brevo HTTP API）。⚠️ 免費方案擋 SMTP 埠，不要改用 SMTP。
       # 金鑰與寄件信箱都在 Render 後台自行填入，不要寫進 repo
