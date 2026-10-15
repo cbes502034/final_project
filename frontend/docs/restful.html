@@ -643,7 +643,7 @@ DELETE /books/5
       <div class="note note--warn">
         <div class="note__k">改不改？</div>
         <p>這幾支<b>前端都已經在用了</b>，後端則都還沒實作（回 501）。所以現在改的成本是：
-        改 <code>ownership.py</code> 與路由檔的路徑、改 <code>api.js</code> 的 FN 與 http 轉接器各一行、更新文件裡的路由清單——
+        改 <code>ownership.py</code> 與路由檔的路徑、改 <code>api.js</code> 的 FN 與 http 轉接器各一行、跑 <code>sync_spec.py</code> 更新文件——
         <b>要改就在各自實作之前一次改完</b>，做完再改就要動到測試與實作。<br>
         也不是非改不可——<b>一致性比正確性重要</b>。
         如果決定不改，就在報告裡誠實寫「我們知道這裡不是嚴格的 REST，理由是 X」，那比假裝沒發現好得多。</p>

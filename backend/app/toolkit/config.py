@@ -1,7 +1,7 @@
 """
 設定集中管理。**所有環境變數都在這裡讀進來**，其他檔案一律 `from app.toolkit.config import settings`。
 
-✦ 領域：認證與基礎建設
+✦ 負責人：成員1（認證與基礎建設）　✦ 分支：m1-auth
 ✦ 各段的設定歸誰管，下面用分隔線標出來；**改自己那一段就好，別人的段落先在群組講一聲**。
 
 ===========================================================================
@@ -34,11 +34,8 @@ pydantic-settings 的做法是：把所有設定寫成一個類別的欄位，
 ⚠️ 前端要連哪個後端，不在這裡：改 `frontend/index.html` 的 `<meta name="api-base">`。
 """
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-#: MODEL_PROVIDER=anthropic 而 MODEL_NAME 沒改（不是 claude- 開頭）時用這一顆
-CLAUDE_DEFAULT = "claude-opus-5-5"
 
 
 class Settings(BaseSettings):
@@ -56,7 +53,7 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 共用（認證 維護；四個人都會用到，改之前先講）
+    # 共用（成員1 維護；四個人都會用到，改之前先講）
     # =======================================================================
     app_env: str = Field(
         default="development",
@@ -80,7 +77,7 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 認證　認證：登入、JWT、忘記密碼寄信、平台管理員
+    # 成員1　認證：登入、JWT、忘記密碼寄信、平台管理員
     # =======================================================================
     jwt_secret: str = Field(
         description=(
@@ -116,71 +113,37 @@ class Settings(BaseSettings):
     )
 
     # =======================================================================
-    # 記帳　記帳：自然語言解析的模型服務（財務建議沒另外設定時也用這一組）
+    # 成員2　記帳：自然語言解析用的模型服務
     # =======================================================================
-    model_provider: str = Field(
-        default="openai",
-        description=(
-            "要打哪一種模型服務。\n"
-            "  openai     OpenAI 相容的 /v1/chat/completions：OpenAI、我們微調後放在 Hugging Face Space 的\n"
-            "             llama-server、Colab 上臨時開的服務都走這條（MODEL_BASE_URL 必填）\n"
-            "  anthropic  Claude，用官方的 anthropic 套件（MODEL_API_KEY 必填，MODEL_BASE_URL 留空）"
-        ),
-    )
     model_base_url: str = Field(
         default="",
         description=(
-            "OpenAI 相容服務的網址，例如 https://api.openai.com 或 Hugging Face Space 的網址（不含 /v1）。\n"
-            "MODEL_PROVIDER=anthropic 時留空。\n"
-            "都沒設定時 services/llm/client.py 回 None：解析與建議的路由回 503，前端用規則頂著。"
+            "我們自己微調的 Qwen2.5-1.5B 模型服務網址（GGUF + llama.cpp，跑在 Hugging Face Space）。\n"
+            "留空時 services/llm/client.py 回 None：解析與建議的路由回 503，前端用規則頂著，前後端照樣串得起來。"
         ),
     )
     model_api_key: str = Field(
         default="",
-        description="模型服務的金鑰（OpenAI／Anthropic 的 API key，或私有 Space 的 token）。**不可以 commit**。",
+        description="模型服務要驗證時用（例如私有的 Hugging Face Space 的 token）。公開的就留空。**不可以 commit**。",
     )
-    model_name: str = Field(
-        default="qwen2.5-1.5b-fambudget",
-        description=(
-            "要用的模型名稱，也會寫進 nlp_parses.model_ver，換模型才分得開成績。\n"
-            "MODEL_PROVIDER=anthropic 而這裡沒改（不是 claude- 開頭）時，自動用 claude-opus-5-5。"
-        ),
-    )
-    model_effort: str = Field(
-        default="low",
-        description="只有 Claude 用：思考的深度（low／medium／high／xhigh／max）。記帳解析是抽欄位，low 就夠，也最快。",
-    )
-    model_max_tokens: int = Field(
-        default=0,
-        description=(
-            "模型一次最多寫多少 token。0＝用程式各處自己給的（解析 1024、建議 800）。\n"
-            "本機跑推理型模型（例如 Ollama 的 deepseek-r1）會先想一大段才回答，要調高，例如 4096。"
-        ),
-    )
+    model_name: str = Field(default="qwen2.5-1.5b-fambudget", description="寫進 nlp_parses.model_ver，換模型才分得開成績。")
     model_timeout_seconds: float = Field(
         default=30.0,
         description="呼叫模型的逾時秒數。一定要設——模型卡住時，沒有逾時的 API 會跟著一起卡死。",
     )
 
     # =======================================================================
-    # 數字　數字：財務建議、儲蓄目標
+    # 成員3　數字：財務建議
     # =======================================================================
-    # 財務建議可以用另一組模型設定；每一欄留空就沿用上面記帳那一組。
-    # 典型用法：記帳換成我們微調的模型（Space），建議繼續用商業 API。
-    advice_provider: str = Field(default="", description="建議用的 MODEL_PROVIDER。留空＝跟記帳一樣。")
-    advice_base_url: str = Field(default="", description="建議用的 MODEL_BASE_URL。留空＝跟記帳一樣。")
-    advice_api_key: str = Field(default="", description="建議用的 MODEL_API_KEY。留空＝跟記帳一樣。**不可以 commit**。")
     advice_model_name: str = Field(
         default="",
-        description="建議用的模型名稱（寫進 advices.model_ver）。留空＝跟記帳一樣。",
+        description="產生財務建議用的模型名稱（寫進 advices.model_ver）。留空就跟記帳用同一個模型服務。",
     )
-    advice_effort: str = Field(default="medium", description="只有 Claude 用：建議要寫成人話，比解析多想一點。")
-
     savings_warn_ratio: float = Field(default=0.8, description="支出達可支配上限的幾成算「接近上限」。前端 data.js 的 savingsRule 要一致。")
     savings_over_ratio: float = Field(default=1.0, description="幾成算「超過」。")
 
     # =======================================================================
-    # 家庭　家庭：邀請、通知
+    # 成員4　家庭：邀請、通知
     # =======================================================================
     invite_ttl_days: int = Field(
         default=7,
@@ -202,20 +165,6 @@ class Settings(BaseSettings):
                 'python -c "import secrets;print(secrets.token_urlsafe(48))"'
             )
         return v
-
-    @model_validator(mode="after")
-    def _claude_needs_a_claude_model(self) -> "Settings":
-        """用 Claude 卻沒改 MODEL_NAME：換成 CLAUDE_DEFAULT。
-
-        不在這裡換的話，nlp_parses.model_ver、advices.model_ver 會記成 qwen2.5-1.5b-fambudget，
-        報告裡「哪個模型的成績」就對不上了。
-        """
-        if self.model_provider.strip().lower() == "anthropic" and not self.model_name.startswith("claude-"):
-            self.model_name = CLAUDE_DEFAULT
-        if (self.advice_provider.strip().lower() == "anthropic"
-                and not (self.advice_model_name or self.model_name).startswith("claude-")):
-            self.advice_model_name = CLAUDE_DEFAULT
-        return self
 
     @property
     def allowed_origins_list(self) -> list[str]:
@@ -239,17 +188,14 @@ class Settings(BaseSettings):
 
         flag("共用", "database_url", bool(self.database_url), "必填，服務起不來")
         flag("共用", "allowed_origins", bool(self.allowed_origins_list), "前端會被 CORS 擋住")
-        flag("認證", "jwt_secret", bool(self.jwt_secret), "必填，服務起不來")
-        flag("認證", "brevo_api_key", bool(self.brevo_api_key), "忘記密碼寄不出信")
-        flag("認證", "mail_from", bool(self.mail_from), "忘記密碼寄不出信")
-        flag("認證", "admin_emails", bool(self.admin_email_list), "沒有平台管理員（可以之後再設）")
-        ready = bool(self.model_api_key) if self.model_provider == "anthropic" else bool(self.model_base_url)
-        flag("記帳", "model_api_key" if self.model_provider == "anthropic" else "model_base_url", ready,
-             "記帳解析改用規則（前後端照樣能串）", ok_msg="已設定（%s）" % self.model_provider)
-        own = any((self.advice_provider, self.advice_base_url, self.advice_api_key, self.advice_model_name))
-        flag("數字", "advice_*", True, "",
-             ok_msg=("另外設定了一組" if own else "留空：跟記帳用同一個模型服務"))
-        flag("家庭", "invite_ttl_days", self.invite_ttl_days > 0, "要大於 0", ok_msg="邀請 %d 天後失效" % self.invite_ttl_days)
+        flag("成員1", "jwt_secret", bool(self.jwt_secret), "必填，服務起不來")
+        flag("成員1", "brevo_api_key", bool(self.brevo_api_key), "忘記密碼寄不出信")
+        flag("成員1", "mail_from", bool(self.mail_from), "忘記密碼寄不出信")
+        flag("成員1", "admin_emails", bool(self.admin_email_list), "沒有平台管理員（可以之後再設）")
+        flag("成員2", "model_base_url", bool(self.model_base_url), "記帳解析改用規則（前後端照樣能串）")
+        flag("成員3", "advice_model_name", True, "",
+             ok_msg=("已設定" if self.advice_model_name else "留空：跟記帳用同一個模型服務"))
+        flag("成員4", "invite_ttl_days", self.invite_ttl_days > 0, "要大於 0", ok_msg="邀請 %d 天後失效" % self.invite_ttl_days)
         return rows
 
 

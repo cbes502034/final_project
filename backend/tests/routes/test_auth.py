@@ -1,4 +1,4 @@
-"""身分認證與平台管理（認證）。怎麼跑、兩種對象的差別：看 conftest.py 的檔頭。"""
+"""身分認證與平台管理（成員1）。怎麼跑、兩種對象的差別：看 conftest.py 的檔頭。"""
 
 import base64
 from datetime import timedelta

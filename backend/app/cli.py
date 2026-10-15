@@ -10,7 +10,7 @@
     python -m app.cli db "SELECT …"       自己寫查詢（只能查，不能改）
     python -m app.cli seed-team           建立四位成員的開發用帳號（只在本機，正式環境會拒絕）
 
-領域：認證（共用元件）
+負責人：成員1（共用元件）
 
 ⚠️ 正式環境建表用 Alembic：`alembic upgrade head`。init-db 的 create_all 不會幫你改既有的表。
 """
@@ -104,10 +104,10 @@ def make_admin(email: str | None) -> int:
 TEAM_PASSWORD = "abcd1234"
 
 TEAM: list[tuple[str, str, str]] = [
-    ("auth", "成員一", "認證"),
-    ("ledger", "成員二", "記帳"),
-    ("analytics", "成員三", "數字"),
-    ("access", "成員四", "家庭"),
+    ("auth", "成員一", "成員1 · 認證"),
+    ("ledger", "成員二", "成員2 · 記帳"),
+    ("analytics", "成員三", "成員3 · 數字"),
+    ("access", "成員四", "成員4 · 家庭"),
     ("admin", "管理員", "平台管理員（測 admin/ 那三支用）"),
 ]
 TEAM_DOMAIN = "fambudget.tw"

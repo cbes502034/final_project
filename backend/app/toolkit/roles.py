@@ -1,7 +1,7 @@
 """
 角色：誰能做哪些「治理動作」。
 
-領域：家庭與可見範圍
+負責人：成員4（家庭與可見範圍）
 
 ===========================================================================
 一句話
@@ -57,7 +57,7 @@
 
     roles.require_platform("suspend_user", me.is_platform_admin)
 
-    # 停權路由（認證）
+    # 停權路由（成員1）
     why = roles.clean_suspend_reason(body.reason)      # 理由太短就丟 ValueError → 422
     roles.require_suspendable(target.is_platform_admin)
 

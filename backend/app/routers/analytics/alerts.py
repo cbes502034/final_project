@@ -1,7 +1,7 @@
 """
 階段性提醒門檻。
 
-領域：數字
+負責人：成員3（數字）　✦ 分支：m3-analytics
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -32,7 +32,7 @@ from app.toolkit import alerts, crud, errors
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["提醒"])
-OWNER = "數字"
+OWNER = "成員3"
 
 
 @router.get("/alerts", summary="我設的提醒門檻")

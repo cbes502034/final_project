@@ -44,9 +44,9 @@ def _cn(n: int) -> str:
     return d[n // 10] + "十" + (d[n % 10] if n % 10 else "")
 
 
-def test_每個領域的路由數在各份文件裡一致():
+def test_每位成員的路由數在四份文件裡一致():
     """
-    ownership.py 說數字 有 10 支，那另外三個地方也必須說 10 支。
+    ownership.py 說成員3 有 10 支，那另外三個地方也必須說 10 支。
 
     這是最容易走散的一項：有人搬動了一支路由，改了程式卻忘了改文件。
     """
@@ -70,6 +70,17 @@ def test_每個領域的路由數在各份文件裡一致():
         # 規格文件的 API 目錄：負責人欄
         got = len(re.findall(r"\| %s(?: ★)? \|" % m.label, spec))
         assert got == n, f"規格文件的 {m.label} 有 {got} 列，ownership.py 說 {n} 支"
+
+
+def test_分支名稱到處都一樣():
+    """分支名稱錯了，組員會 checkout 到不存在的分支。"""
+    from app.ownership import MEMBERS
+
+    for src in ("frontend/docs/api.html", "frontend/docs/index.html",
+                "README.md", "backend/README.md", "docs/01-tech-stack-and-api.md"):
+        text = read(src)
+        for m in MEMBERS:
+            assert m.branch in text, f"{src} 裡找不到分支名稱 {m.branch}"
 
 
 def test_工具箱的檔案都在():
@@ -138,9 +149,9 @@ def test_工具箱沒有留下未完成的東西():
     assert not bad, "工具箱不該有未完成的東西：" + "、".join(bad)
 
 
-def test_已建立的檔案都標了領域():
+def test_已建立的檔案都標了負責人():
     """
-    ownership.py 列到、而且**已經建立**的檔案，檔頭要寫它屬於哪個領域。
+    分工表裡列到、而且**已經建立**的檔案，檔頭要寫負責人。
 
     還沒建立的跳過——那是進度。
     """
@@ -156,10 +167,10 @@ def test_已建立的檔案都標了領域():
         p = os.path.join(REPO, "backend", f)
         if not os.path.exists(p):
             continue
-        if "領域：" not in io.open(p, encoding="utf-8").read()[:600]:
+        if "負責人" not in io.open(p, encoding="utf-8").read()[:600]:
             missing.append(f)
 
-    assert not missing, "檔頭沒有標領域的檔案：" + "、".join(missing)
+    assert not missing, "檔頭沒有標負責人的檔案：" + "、".join(missing)
 
 
 def test_前端沒有呼叫不存在的後端路由():
@@ -239,6 +250,25 @@ def test_手冊上的路由總數也要對():
     assert int(m1.group(1)) == n and int(m2.group(1)) == n,         "API 瀏覽頁寫 %s／%s 支，ownership.py 是 %d 支" % (m1.group(1), m2.group(1), n)
 
 
+def test_心智圖的路由數也要對():
+    """手冊底部的心智圖用另一種寫法標路由數（api: '8 支'），
+    上面那條測試的正規表達式抓不到它——所以它真的飄掉過。
+    """
+    from app.ownership import MEMBERS
+
+    handbook = read("frontend/docs/index.html")
+    for m in MEMBERS:
+        want = "{ dom: '%s'" % m.domain
+        i = handbook.find(want)
+        assert i >= 0, "心智圖裡找不到 %s" % m.domain
+        node = handbook[i:i + 200]
+        mo = re.search(r"api: '(\d+) 支'", node)
+        assert mo, "%s 的節點沒寫路由數" % m.domain
+        assert int(mo.group(1)) == len(m.routes), \
+            "心智圖說 %s 有 %s 支，ownership.py 說 %d 支" % (
+                m.domain, mo.group(1), len(m.routes))
+
+
 def test_資料表張數在三份文件裡一致():
     """手冊的資料庫那節列了幾張表，其他地方就要寫幾張。
 
@@ -298,6 +328,26 @@ def test_切換身分已經從前端絕跡():
         src = read(rel)
         assert "前端專用、後端不實作" not in src, "%s 的說法過時了" % rel
         assert "示範模式專用" not in src, "%s 的說法過時了" % rel
+
+
+def test_規格文件的分工總表也要對():
+    """docs/01 的分工總表用第三種寫法標路由數（`| 8 支 |`）。
+
+    前兩條測試數的是路由明細表的列數，抓不到這張總表——
+    所以它也飄掉過：成員1 停在 8 支（實際 11）、成員4 停在 9 支（實際 12）。
+    """
+    from app.ownership import MEMBERS
+
+    spec = read("docs/01-tech-stack-and-api.md")
+    for m in MEMBERS:
+        mo = re.search(
+            r"\| \*\*%s\*\* \| \*\*%s\*\* \| `%s` \| (\d+) 支 \|"
+            % (re.escape(m.label), re.escape(m.domain), re.escape(m.branch)),
+            spec)
+        assert mo, "分工總表裡找不到 %s" % m.label
+        assert int(mo.group(1)) == len(m.routes), \
+            "分工總表說 %s 有 %s 支，ownership.py 說 %d 支" % (
+                m.label, mo.group(1), len(m.routes))
 
 
 def test_可見範圍只有三條路_角色只打開家長之間():
@@ -1469,6 +1519,21 @@ def test_mock_存檔與讀檔的欄位要成對():
     assert mo2, "api.js 裡找不到 save()"
     missing = [k for k in restored if not re.search(r"\b%s:" % k, mo2.group(1))]
     assert not missing, "load() 會讀回、但 save() 沒有寫出：" + "、".join(missing)
+
+
+def test_規格文件的路由清單由_ownership_產生():
+    """docs/01 的 6-2 總表與 6-3 各領域清單，一律由 tools/sync_spec.py 產生。
+
+    這兩段手動維護過，結果 ownership.py 已經 17/18/13/15，
+    文件還停在 8/8/10/9——差了一倍，而且沒有任何測試抓到。
+    """
+    import subprocess
+    import sys
+
+    res = subprocess.run(
+        [sys.executable, os.path.join(REPO, "backend", "tools", "sync_spec.py"), "--check"],
+        capture_output=True, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+    assert res.returncode == 0, res.stdout.decode("utf-8", "replace")
 
 
 def test_輸入框不可以留著星空主題的深色底():
@@ -2929,6 +2994,20 @@ def test_前端的_API_清單跟分工表一對一():
             assert re.search(r"^    %s:\s+function \(" % name, api[api.index("  var http = {"):], re.M), "http 轉接器少了 " + name
 
 
+def test_分工心智圖由_ownership_與_models_產生():
+    """docs/分工心智圖.svg 和手冊第 10 節的互動版，都由 tools/sync_mindmap.py 產生。
+
+    SVG 手改過，停在「8／8／10／9 支」「core/ 設定」好幾天，沒有任何測試抓到。
+    """
+    import subprocess
+    import sys
+
+    res = subprocess.run(
+        [sys.executable, os.path.join(REPO, "backend", "tools", "sync_mindmap.py"), "--check"],
+        capture_output=True, env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+    assert res.returncode == 0, res.stdout.decode("utf-8", "replace")
+
+
 def _ownership_keys():
     from app.ownership import MEMBERS
     return {(v, p): m.label for m in MEMBERS for v, p in m.routes}
@@ -2941,7 +3020,7 @@ def test_手冊的_API_目錄照_ownership_分組_一支不少():
     sec = hb[hb.index('id="api"'):hb.index('id="arch"')]
     seen, wrong, current = {}, [], None
     for line in sec.splitlines():
-        mo = re.search(r'<h3 class="sub"[^>]*>(認證|記帳|數字|家庭)', line)
+        mo = re.search(r'<h3 class="sub"[^>]*>(成員\d)', line)
         if mo:
             current = mo.group(1)
         if "共用 · 系統" in line:
@@ -2960,11 +3039,11 @@ def test_規格與_API_瀏覽頁的路徑_就是後端的路徑():
     """路徑參數的名字也要一樣：文件寫 {id}、後端是 {tx_id}，組員照文件找會找不到。"""
     own = _ownership_keys()
     spec = read("docs/01-tech-stack-and-api.md")
-    rows = re.findall(r"^\| (\d+) \| (GET|POST|PUT|PATCH|DELETE) \| `([^`?]+)[^`]*` \| (認證|記帳|數字|家庭)", spec, re.M)
+    rows = re.findall(r"^\| (\d+) \| (GET|POST|PUT|PATCH|DELETE) \| `([^`?]+)[^`]*` \| (成員\d)", spec, re.M)
     got = {(v, p): who for _, v, p, who in rows}
     assert got == own, sorted(set(got.items()) ^ set(own.items()))
     api = read("frontend/docs/api.html")
-    labels = {"m1": "認證", "m2": "記帳", "m3": "數字", "m4": "家庭"}
+    labels = {"m1": "成員1", "m2": "成員2", "m3": "成員3", "m4": "成員4"}
     rows = re.findall(r"\{ n: \d+, o: '(m\d)', m: '(\w+)', p: '([^']+)'", api)
     got = {(v, p): labels[o] for o, v, p in rows}
     assert got == own, sorted(set(got.items()) ^ set(own.items()))
@@ -2989,7 +3068,7 @@ def test_文件的權限欄三份一致():
     hb = read("frontend/docs/index.html")
     diff = []
     for v, p in own:
-        a = re.search(r"^\| \d+ \| %s \| `%s(?:\?[^`]*)?` \| (?:認證|記帳|數字|家庭)[^|]* \| ([^|]+) \|" % (v, re.escape(p)), spec, re.M)
+        a = re.search(r"^\| \d+ \| %s \| `%s(?:\?[^`]*)?` \| 成員\d[^|]* \| ([^|]+) \|" % (v, re.escape(p)), spec, re.M)
         b = re.search(r"m: '%s', p: '%s', a: '([^']+)'" % (v, re.escape(p)), api)
         c = re.search(r'<td class="tight">%s</td><td class="rt">%s(?:\?[^<]*)?(?: <span[^<]*</span>)?</td><td class="tight">([^<]*)</td>'
                       % (v, re.escape(p)), hb)
@@ -3016,6 +3095,21 @@ def test_RESTful_說明書逐支檢查的清單就是現在的路由():
     assert not dup, "出現不只一次：%s" % dup
     assert set(found) == set(own), "少了：%s" % sorted(set(own) - set(found))
     assert "誠實檢查我們自己的 %d 支" % len(own) in sec
+
+
+def test_四份開發說明跟_ownership_沒有走散():
+    """app/routers/<領域>/README.md 由 tools/sync_devguide.py 產生。
+
+    四份的「怎麼啟動、怎麼測試、怎麼看資料」是同一件事，手寫四份一定會走散：
+    有人改了啟動指令，只會記得改自己在看的那一份。所以改完 ownership.py 或那支工具，
+    要重跑一次把四份重新產生出來。
+    """
+    import subprocess
+
+    out = subprocess.run(
+        [sys.executable, os.path.join(REPO, "backend", "tools", "sync_devguide.py"), "--check"],
+        capture_output=True, cwd=REPO)
+    assert out.returncode == 0, out.stdout.decode("utf-8", "replace")
 
 
 def test_稽核動作都要有中文對照():

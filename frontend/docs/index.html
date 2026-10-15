@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>家庭記帳專題手冊</title>
-<meta name="description" content="家庭記帳與財務控管系統的專題總文件：源起、功能清單、按領域分類的 API、系統架構、MVC 流程與資料庫設計。">
+<meta name="description" content="家庭記帳與財務控管系統的專題總文件：源起、功能清單、按人員分類的 API、系統架構、MVC 流程、資料庫設計與分工心智圖。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -43,6 +43,7 @@
       <a href="#mvc"><i>07</i>MVC 流程</a>
       <a href="#db"><i>08</i>資料庫設計</a>
       <a href="#llm"><i>09</i>LLM 設計</a>
+      <a href="#mindmap"><i>10</i>分工心智圖</a>
       <a class="nav__out" href="fastapi.html"><i>&#8599;</i>FastAPI 說明書</a>
       <a class="nav__out" href="restful.html"><i>&#8599;</i>RESTful 說明書</a>
       <a class="nav__out" href="files.html"><i>&#8599;</i>檔案系統說明書</a>
@@ -260,9 +261,9 @@
 
       <div class="note note--warn">
         <div class="note__k">第 1 週要凍結的三份契約</div>
-        <p><b>分類體系</b>（數字 定義並提供 <code>GET /api/categories</code>，記帳 寫進 prompt、家庭 評測要用）—— 這是唯一的跨模組阻塞點。<br>
+        <p><b>分類體系</b>（成員3 定義並提供 <code>GET /api/categories</code>，成員2 寫進 prompt、成員4 評測要用）—— 這是唯一的跨模組阻塞點。<br>
         <b>API 回應形狀</b>（各模組自己定，但要寫進 <code>js/api.js</code>）<br>
-        <b>解析結果的 JSON Schema</b>（記帳 定在 <code>schemas/nlp.py</code>，認證 的模型呼叫層要照這個驗）</p>
+        <b>解析結果的 JSON Schema</b>（成員2 定在 <code>schemas/nlp.py</code>，成員1 的模型呼叫層要照這個驗）</p>
       </div>
     </section>
 
@@ -577,22 +578,22 @@
 
       <div class="grid grid--2" style="margin-bottom:8px">
         <div class="card" style="border-top:2px solid var(--m1)">
-          <div class="mvc__k" style="color:var(--m1)">認證</div>
+          <div class="mvc__k" style="color:var(--m1)">成員1　<span style="opacity:.7">m1-auth</span></div>
           <div class="mvc__t">認證 · 19 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">他負責「你是誰」，也負責維護<b>所有人都要用的地基</b>（設定、資料庫、增刪改查、路由守衛、模型呼叫層）——這一版已經先做好了。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m2)">
-          <div class="mvc__k" style="color:var(--m2)">記帳</div>
+          <div class="mvc__k" style="color:var(--m2)">成員2　<span style="opacity:.7">m2-ledger</span></div>
           <div class="mvc__t">記帳 · 19 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">四支 nlp 路由是<b>整個系統的核心</b>。解析與寫入刻意分兩步，模型永遠不碰資料庫。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m3)">
-          <div class="mvc__k" style="color:var(--m3)">數字</div>
+          <div class="mvc__k" style="color:var(--m3)">成員3　<span style="opacity:.7">m3-analytics</span></div>
           <div class="mvc__t">數字 · 11 支</div>
           <p style="font-size:13px;color:var(--ink-soft)"><b>整個系統只有這裡加總錢</b>——前端只補衍生值（結餘、比例）。財務建議的 prompt 與邊界規則也在這裡。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m4)">
-          <div class="mvc__k" style="color:var(--m4)">家庭</div>
+          <div class="mvc__k" style="color:var(--m4)">成員4　<span style="opacity:.7">m4-access</span></div>
           <div class="mvc__t">家庭 · 21 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">回答「你能看到什麼」。可見範圍的規則（<code>toolkit/scope.py</code>）已經寫好，他負責家庭、監管、通知與模型評測。</p>
         </div>
@@ -603,7 +604,7 @@
         <p>歸屬寫在 <code>backend/app/ownership.py</code>，而且 <code>pytest</code> 會檢查它有沒有跟程式碼走散——有人新增路由卻沒認領、或兩個人宣告同一支，測試就會紅燈。<br>完整的 API 清單與篩選在 <a href="api.html">API 瀏覽</a>。</p>
       </div>
 
-      <h3 class="sub" style="border-left-color:var(--m1)">認證</h3>
+      <h3 class="sub" style="border-left-color:var(--m1)">成員1 · 認證　<span style="font-family:var(--code);font-size:12px;opacity:.6">m1-auth</span></h3>
       <div class="tw">
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
@@ -631,7 +632,7 @@
         </table>
       </div>
 
-      <h3 class="sub" style="border-left-color:var(--m2)">記帳</h3>
+      <h3 class="sub" style="border-left-color:var(--m2)">成員2 · 記帳　<span style="font-family:var(--code);font-size:12px;opacity:.6">m2-ledger</span></h3>
       <div class="tw">
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
@@ -645,7 +646,7 @@
             <tr><td class="num">20</td><td class="tight">POST</td><td class="rt">/api/nlp/parse-batch <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td><b>段落：一段話 → 切成 N 筆</b>。只解析，不寫入</td></tr>
             <tr><td class="num">21</td><td class="tight">POST</td><td class="rt">/api/nlp/confirm <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td>單筆確認後寫入，同時記錄修正。<code>source</code> 記成 <code>nlp</code></td></tr>
             <tr><td class="num">22</td><td class="tight">POST</td><td class="rt">/api/nlp/confirm-batch <span class="tag tag--llm">★</span></td><td class="tight">登入</td><td>批次確認後一次寫入 N 筆。要嘛全成功要嘛全不寫</td></tr>
-            <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約（記帳 定義）</td></tr>
+            <tr><td class="num">23</td><td class="tight">GET</td><td class="rt">/api/categories</td><td class="tight">登入</td><td>分類體系（系統預設 + 家庭自訂）。⚑ 第 1 週要凍結的契約（成員2 定義）</td></tr>
             <tr><td class="num">24</td><td class="tight">POST</td><td class="rt">/api/categories</td><td class="tight">家長</td><td>新增家庭自訂分類。body: { name, kind }</td></tr>
             <tr><td class="num">25</td><td class="tight">GET</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>我加入的群組（帳本）</td></tr>
             <tr><td class="num">26</td><td class="tight">POST</td><td class="rt">/api/groups</td><td class="tight">登入</td><td>建立一個群組，建立者自動加入</td></tr>
@@ -664,7 +665,7 @@
         → <b>回 403 而不是空陣列</b>。空陣列會讓人以為對方沒記帳。</p>
       </div>
 
-      <h3 class="sub" style="border-left-color:var(--m3)">數字</h3>
+      <h3 class="sub" style="border-left-color:var(--m3)">成員3 · 數字　<span style="font-family:var(--code);font-size:12px;opacity:.6">m3-analytics</span></h3>
       <div class="tw">
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
@@ -684,7 +685,7 @@
         </table>
       </div>
 
-      <h3 class="sub" style="border-left-color:var(--m4)">家庭</h3>
+      <h3 class="sub" style="border-left-color:var(--m4)">成員4 · 家庭　<span style="font-family:var(--code);font-size:12px;opacity:.6">m4-access</span></h3>
       <div class="tw">
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
@@ -778,9 +779,9 @@
             <div class="box"><b>toolkit/</b> 設定 · 資料庫 · 增刪改查 · 密碼 · JWT · 規則</div>
           </div>
           <div class="boxes">
-            <div class="box box--hi"><b>services/llm/</b> client 認證 · parse 記帳 · advice 數字</div>
-            <div class="box"><b>services/permission.py</b> 可見範圍　<em style="color:var(--m4)">家庭</em></div>
-            <div class="box"><b>services/analytics.py</b> 唯一算錢的地方　<em style="color:var(--m3)">數字</em></div>
+            <div class="box box--hi"><b>services/llm/</b> client 成員1 · parse 成員2 · advice 成員3</div>
+            <div class="box"><b>services/permission.py</b> 可見範圍　<em style="color:var(--m4)">成員4</em></div>
+            <div class="box"><b>services/analytics.py</b> 唯一算錢的地方　<em style="color:var(--m3)">成員3</em></div>
           </div>
           <p style="margin-top:12px;font-size:13px;color:var(--ink-soft)">
             <b>分層原則：routers 只負責接收與回傳，規則放 toolkit，加總與模型放 services。</b>
@@ -990,6 +991,48 @@
       </div>
     </section>
 
+    <!-- ============ 09 心智圖 ============ -->
+    <section class="sec" id="mindmap">
+      <div class="sec__h"><span class="sec__n">10</span><h2>分工心智圖</h2></div>
+      <p class="sec__lead">
+        不是「一個做前端、一個做後端」，而是<b>每人吃一條完整的功能模組</b>——
+        從資料表、API、畫面，一路到該模組自己的 LLM。
+        <b>填上名字後按儲存</b>（存在你自己的瀏覽器）。要給組員看，按<b>複製分享連結</b>，對方打開就會帶著這份名單。
+      </p>
+
+      <div class="mmwrap">
+        <div class="mmc" id="mmc"></div>
+      </div>
+
+      <div class="mmhint">
+        <span>連線上的數字是該分支的 API 支數</span>
+        <span style="color:var(--warn)">橘色＝該模組自己的 LLM 工作</span>
+        <span style="color:var(--warn)">⚑ 第 1 週要凍結的跨模組契約</span>
+      </div>
+
+      <div class="mm__bar">
+        <button class="btn" id="save">儲存分工</button>
+        <button class="btn btn--ghost" id="share">複製分享連結</button>
+          <button class="btn btn--ghost" id="clear">清空名字</button>
+        <span class="mm__state" id="state">尚未儲存過</span>
+      </div>
+
+      <div class="note">
+        <div class="note__k">這樣切的三個好處</div>
+        <p><b>責任清楚</b>——某個畫面壞了，知道找誰。<br>
+        <b>可以平行動工</b>——四個人各改各的檔案，衝突少。<br>
+        <b>每個人都碰得到 LLM</b>——這是任務的硬性要求，垂直切片自然做到，
+        不需要另外指派一個「模型負責人」。LLM 的部分各自在自己的分支下微調，
+        <b>主要的分工還是落在後端模組上</b>。</p>
+      </div>
+
+      <div class="note note--warn">
+        <div class="note__k">⚑ 分類體系是唯一的跨模組阻塞點</div>
+        <p>成員3 定的分類體系，成員2 要寫進 prompt、成員4 做建議時要用。
+        <b>第 1 週就要凍結</b>，其他兩份契約各模組自己就能定。</p>
+      </div>
+    </section>
+
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · 四人 × 一個月專題</div>
       <div class="mono">70 API · 20 TABLES · 14 SCREENS</div>
@@ -998,6 +1041,234 @@
   </div>
   </main>
 </div>
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     心智圖：一個節點一則資訊，層級靠連線串起來
+     葉節點先各佔一格，父節點取子節點的中線，所以連線不會交叉
+     ============================================================ */
+  var TREE = [
+    { dom: '認證', c: 'var(--m1)', api: '19 支', branch: 'm1-auth', groups: [
+      { k: '資料表', items: ['users', 'sessions', 'password_resets'] },
+      { k: 'API', items: ['註冊／登入／登出', '密碼與忘記密碼（寄信）', '個人資料與理財習慣', '登入裝置', '平台管理員停權'] },
+      { k: '畫面', items: ['註冊與登入', '個人化設定', '忘記與重設密碼', '個人資料', '平台管理'] },
+      { k: '共用', items: ['設定與資料庫連線', '增刪改查 crud', '路由守衛 guards', '資料表與 Alembic'] },
+      { k: 'LLM', llm: true, items: ['模型呼叫層（逾時、重試）', '回傳 JSON 交給 Pydantic'] }
+    ]},
+    { dom: '記帳', c: 'var(--m2)', api: '19 支', branch: 'm2-ledger', groups: [
+      { k: '資料表', items: ['categories', 'accounts', 'transactions', 'nlp_parses', 'groups', 'group_members'] },
+      { k: 'API', items: ['明細增刪改查', 'nlp 單句／段落解析', 'nlp 確認寫入', { t: '分類體系 ⚑', flag: true }, '帳本：開、封存、結算'] },
+      { k: '畫面', items: ['段落記帳', '單筆手動', '收支明細', '帳本'] },
+      { k: 'LLM', llm: true, items: ['段落切分策略', '欄位抽取 prompt', '低信心判準'] }
+    ]},
+    { dom: '數字', c: 'var(--m3)', api: '11 支', branch: 'm3-analytics', groups: [
+      { k: '資料表', items: ['budgets', 'savings_goals', 'alert_rules', 'advices'] },
+      { k: 'API', items: ['摘要與統計', '預算與存款目標', '階段性提醒', '財務建議'] },
+      { k: '畫面', items: ['總覽（我／全家）', '統計圖表', '建議卡片'] },
+      { k: 'LLM', llm: true, items: ['建議生成 prompt', '邊界規則'] }
+    ]},
+    { dom: '家庭', c: 'var(--m4)', api: '21 支', branch: 'm4-access', groups: [
+      { k: '資料表', items: ['families', 'family_members', 'family_invites', 'guardianships', 'allowances', 'notifications', 'audit_logs'] },
+      { k: 'API', items: ['家庭綁定與解散', '成員角色', '監管關係與零用金', '通知', '稽核紀錄'] },
+      { k: '畫面', items: ['家庭成員與邀請', '成員紀錄（唯讀）', '通知鈴鐺'] },
+      { k: 'LLM', llm: true, items: ['留出集人工標註', '零樣本 vs few-shot', '正確率與 Macro-F1'] }
+    ]}
+  ];
+
+  var COL = { root: 10, rootW: 176, mem: 248, memW: 178, cat: 496, leaf: 622 };
+  var LEAF_H = 28, CAT_GAP = 14, MEM_GAP = 40, PAD = 26, WIDTH = 836;
+
+  function buildTree() {
+    var host = document.getElementById('mmc');
+    if (!host) return;
+
+    /* --- 先排葉節點，父節點取中線 --- */
+    var y = PAD;
+    TREE.forEach(function (m, mi) {
+      if (mi) y += MEM_GAP;
+      m.groups.forEach(function (g, gi) {
+        if (gi) y += CAT_GAP;
+        g.nodes = g.items.map(function (it) {
+          var o = typeof it === 'string' ? { t: it } : it;
+          o.y = y + LEAF_H / 2;
+          y += LEAF_H;
+          return o;
+        });
+        g.y = (g.nodes[0].y + g.nodes[g.nodes.length - 1].y) / 2;
+      });
+      m.y = (m.groups[0].y + m.groups[m.groups.length - 1].y) / 2;
+    });
+    var H = y + PAD;
+    var rootY = (TREE[0].y + TREE[TREE.length - 1].y) / 2;
+
+    /* --- 連線 --- */
+    function edge(x1, y1, x2, y2, color, w, op) {
+      var mx = (x1 + x2) / 2;
+      return '<path d="M ' + x1 + ' ' + y1 + ' C ' + mx + ' ' + y1 + ', ' +
+        mx + ' ' + y2 + ', ' + x2 + ' ' + y2 + '" fill="none" style="stroke:' + color +
+        '" stroke-width="' + w + '" opacity="' + op + '" stroke-linecap="round"/>';
+    }
+
+    var nodes = [], labels = [];
+    var rootRight = COL.root + COL.rootW;
+    var memRight = COL.mem + COL.memW;
+
+    nodes.push('<div class="n n--root" style="left:' + COL.root + 'px;top:' + rootY +
+      'px;width:' + COL.rootW + 'px">家庭記帳與財務控管系統</div>');
+
+    TREE.forEach(function (m, mi) {
+      labels.push('<span class="elab" style="left:' + ((rootRight + COL.mem) / 2) +
+        'px;top:' + ((rootY + m.y) / 2) + 'px">' + m.api + '</span>');
+
+      nodes.push('<div class="n n--mem" style="--c:' + m.c + ';left:' + COL.mem +
+        'px;top:' + m.y + 'px;width:' + COL.memW + 'px">' +
+        '<input class="mm__name" type="text" placeholder="成員' + (mi + 1) +
+        '" aria-label="成員' + (mi + 1) + ' 的姓名" maxlength="20">' +
+        '<span class="dom">' + m.dom + '</span></div>');
+
+      m.groups.forEach(function (g, gi) {
+        var col = g.llm ? 'var(--warn)' : m.c;
+        g.cid = 'c' + mi + '-' + gi;
+        nodes.push('<div class="n n--cat' + (g.llm ? ' is-llm' : '') + '" id="' + g.cid +
+          '" style="--c:' + col + ';left:' + COL.cat + 'px;top:' + g.y + 'px">' +
+          g.k + (g.llm ? ' ★' : '') + '</div>');
+
+        g.nodes.forEach(function (o) {
+          nodes.push('<div class="n n--leaf' + (g.llm ? ' is-llm' : '') +
+            (o.flag ? ' is-flag' : '') + '" style="--c:' + col + ';left:' + COL.leaf +
+            'px;top:' + o.y + 'px">' + o.t + '</div>');
+        });
+      });
+    });
+
+    host.style.width = WIDTH + 'px';
+    host.style.height = H + 'px';
+    host.innerHTML = nodes.join('') + labels.join('');
+
+    /* 節點放進 DOM 之後才量得到分類藥丸的真實寬度，連線起點用量到的值 */
+    var paths = [];
+    TREE.forEach(function (m) {
+      paths.push(edge(rootRight, rootY, COL.mem, m.y, m.c, 2.4, .8));
+      m.groups.forEach(function (g) {
+        var col = g.llm ? 'var(--warn)' : m.c;
+        paths.push(edge(memRight, m.y, COL.cat, g.y, col, 1.6, .55));
+        var pill = document.getElementById(g.cid);
+        var catRight = COL.cat + (pill ? pill.offsetWidth : 62);
+        g.nodes.forEach(function (o) {
+          paths.push(edge(catRight, g.y, COL.leaf, o.y, col, 1, .34));
+        });
+      });
+    });
+
+    host.insertAdjacentHTML('afterbegin',
+      '<svg class="mm-edges" width="' + WIDTH + '" height="' + H + '" aria-hidden="true">' +
+      paths.join('') + '</svg>');
+  }
+
+  buildTree();
+
+  var KEY = 'fambudget.mindmap.v1';
+  var dirty = false;
+
+  var $save = document.getElementById('save');
+  var $clear = document.getElementById('clear');
+  var $share = document.getElementById('share');
+  var $state = document.getElementById('state');
+
+  function names() {
+    return Array.prototype.slice.call(document.querySelectorAll('.mm__name'));
+  }
+
+  function say(text, kind) {
+    $state.className = 'mm__state' + (kind ? ' is-' + kind : '');
+    $state.innerHTML = text;
+  }
+
+  function when(ts) {
+    var d = new Date(ts);
+    if (!ts || isNaN(d.getTime())) return '';
+    var p = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + '/' + p(d.getMonth() + 1) + '/' + p(d.getDate()) +
+      ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function apply(list) {
+    if (!list || !list.length) return;
+    names().forEach(function (el, i) {
+      if (typeof list[i] === 'string' && document.activeElement !== el) el.value = list[i];
+    });
+  }
+
+  function current() {
+    return names().map(function (el) { return el.value.trim(); });
+  }
+
+  function markDirty() {
+    if (dirty) return;
+    dirty = true;
+    say('有還沒儲存的修改', 'warn');
+  }
+
+  names().forEach(function (el) { el.addEventListener('input', markDirty); });
+
+  /* 網址帶名字時優先用它，分享連結打開就看得到 */
+  function fromHash() {
+    var m = location.hash.match(/[#&]who=([^&]+)/);
+    if (!m) return null;
+    try { return decodeURIComponent(m[1]).split('|'); } catch (e) { return null; }
+  }
+
+  var shared = fromHash();
+  if (shared) {
+    apply(shared);
+    say('這份名單來自<b>分享連結</b>。按儲存就會留在這台裝置', 'ok');
+  } else {
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (saved && saved.members) {
+      apply(saved.members);
+      say('上次儲存於 ' + when(saved.updatedAt));
+    } else {
+      say('還沒填過，填好按儲存');
+    }
+  }
+
+  $save.addEventListener('click', function () {
+    var p = { members: current(), updatedAt: Date.now() };
+    try {
+      localStorage.setItem(KEY, JSON.stringify(p));
+      dirty = false;
+      say('<b>已儲存</b>於這台裝置 · ' + when(p.updatedAt) +
+        '。要給組員看請按「複製分享連結」', 'ok');
+    } catch (e) {
+      say('這個瀏覽器不允許儲存，請改用<b>複製分享連結</b>', 'warn');
+    }
+  });
+
+  $share.addEventListener('click', function () {
+    var v = current();
+    if (!v.join('')) { say('先填至少一個名字再分享', 'warn'); return; }
+    var url = location.origin + location.pathname +
+      '#mindmap&who=' + encodeURIComponent(v.join('|'));
+    function ok() { say('<b>分享連結已複製</b>，貼給組員就看得到這份名單', 'ok'); }
+    function manual() { say('請手動複製：<br><code>' + url + '</code>', 'warn'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(ok)['catch'](manual);
+    } else {
+      manual();
+    }
+  });
+
+  $clear.addEventListener('click', function () {
+    names().forEach(function (el) { el.value = ''; });
+    markDirty();
+    names()[0].focus();
+  });
+})();
+
+</script>
 <script src="docs.js?v=5"></script>
 </body>
 </html>

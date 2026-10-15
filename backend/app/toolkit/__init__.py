@@ -13,7 +13,7 @@
 ===========================================================================
 有哪些工具
 ===========================================================================
-    config      設定（環境變數，分領域）  settings.database_url；python -m app.cli check-config
+    config      設定（環境變數，分成員）  settings.database_url；python -m app.cli check-config
     db          資料庫連線與交易          get_db / session_scope / @db_transaction / create_all
     crud        增刪改查（任何一張表）    get / find / save / remove / to_dict
     passwords   密碼雜湊                hash_password / verify_password
@@ -21,7 +21,6 @@
     deps        FastAPI 依賴            current_user_id / paging
     errors      統一的錯誤回應          not_found / forbidden / unauthorized
     period      期間與日期              month_range / recent_months
-    dates       時間詞換成日期          resolve（「昨天」→ 日期）/ find（在整句裡找）
     money       金額（Decimal）         to_decimal / ratio / quantize
     images      大頭貼驗證              validate_avatar / to_data_uri
     alerts      階段性提醒的門檻計算    usage_percent / crossed / should_fire

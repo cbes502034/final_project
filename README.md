@@ -13,7 +13,7 @@
 | **API 瀏覽** | <https://fambudget-web.onrender.com/docs/api.html> |
 | **前後端串接契約** | `docs/02-前後端串接契約.md` ← 動工前一定要看 |
 | **模型設計** | <https://fambudget-web.onrender.com/docs/model.html> |
-| **LLM 實作規劃** | `docs/03-LLM實作規劃.md` ← 模型怎麼接（商業 API）、怎麼評、微調對照 |
+| **LLM 實作規劃** | `docs/03-LLM實作規劃.md` ← 模型線的每一步、誰做、怎麼算過關 |
 
 ---
 
@@ -50,26 +50,24 @@ final_project/
 │   │   ├── models/          20 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/         請求主體（Pydantic，一個檔案一個主人）
 │   │   ├── routers/         70 支路由，**一個領域一個資料夾**；還沒做的回 501
-│   │   │   ├── auth/        認證（登入那幾支已經做好）　← 每個資料夾裡都有 README.md
-│   │   │   ├── ledger/      記帳
-│   │   │   ├── analytics/   數字
-│   │   │   └── access/      家庭
+│   │   │   ├── auth/        成員1 · 認證（登入那幾支已經做好）　← 每個資料夾裡都有 README.md
+│   │   │   ├── ledger/      成員2 · 記帳
+│   │   │   ├── analytics/   成員3 · 數字
+│   │   │   └── access/      成員4 · 家庭
 │   │   └── services/
-│   │       ├── llm/         client 呼叫層 · parse 記帳 · advice 數字
-│   │       ├── permission.py    家庭
-│   │       ├── analytics.py     數字
+│   │       ├── llm/         client 已完成 · parse 成員2 · advice 成員3
+│   │       ├── permission.py    成員4
+│   │       ├── analytics.py     成員3
 │   │       └── evaluation.py    評測指標
 │   ├── alembic/             資料庫遷移（第一版 = 20 張表）
 │   ├── tests/               含 routes/：每一支路由的驗收測試（說明裡的寫法也跑一遍）
-│   ├── tools/               評測：eval_nlp.py · rules_baseline.js；文件從程式產生：sync_schema.py
-│   ├── eval/                留出集與評測結果
-│   ├── .env.example         設定範本，依領域分段
+│   ├── tools/               文件從程式產生：sync_spec.py · sync_schema.py · sync_mindmap.py · sync_devguide.py
+│   ├── .env.example         設定範本，依成員分段
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── README.md          ← 後端的詳細說明在這
 │
-├── docs/                  規格文件（Markdown）與每個人的任務檔 分工/
-├── ml/                    微調（加分項）：訓練資料、Colab 筆記本、Hugging Face Space
+├── docs/                  規格文件（Markdown / SVG）
 ├── run.py                 ★ 一鍵啟動：裝套件、建 .env、建表、同時起前後端
 ├── docker-compose.yml     本機的 PostgreSQL（db）；run.py 會自己開
 └── render.yaml            部署設定
@@ -110,10 +108,10 @@ python run.py
 
 | 帳號 | 誰用 |
 |---|---|
-| `auth@fambudget.tw` | 認證 |
-| `ledger@fambudget.tw` | 記帳 |
-| `analytics@fambudget.tw` | 數字 |
-| `access@fambudget.tw` | 家庭 |
+| `auth@fambudget.tw` | 成員1 · 認證 |
+| `ledger@fambudget.tw` | 成員2 · 記帳 |
+| `analytics@fambudget.tw` | 成員3 · 數字 |
+| `access@fambudget.tw` | 成員4 · 家庭 |
 | `admin@fambudget.tw` | 平台管理員 |
 
 密碼改壞了就 `cd backend && python -m app.cli seed-team` 重設。
@@ -248,11 +246,8 @@ http://localhost:5174/?api=                         切回 mock
 | 變數 | 說明 |
 |---|---|
 | `JWT_SECRET` | 簽 JWT 用的密鑰。拿到它的人可以偽造任何人的登入權杖 |
-| `MODEL_PROVIDER` | `anthropic`（Claude）或 `openai`（OpenAI，以及我們微調後放在 Hugging Face Space 的模型） |
-| `MODEL_API_KEY` | 商業 API 的金鑰（Claude／OpenAI）；公開的 Space 留空 |
-| `MODEL_BASE_URL` | `openai` 才要填：`https://api.openai.com` 或 Space 的網址；Claude 留空 |
-| `MODEL_NAME` | 模型名稱；Claude 留空就用 `claude-opus-5-5` |
-| `ADVICE_*` | 財務建議想用另一組模型時才填，留空就跟記帳同一組 |
+| `MODEL_BASE_URL` | 我們自己微調的模型服務網址 |
+| `MODEL_API_KEY` | 模型服務要驗證時的 token（公開的 Space 留空） |
 | `BREVO_API_KEY` | 忘記密碼的寄信服務金鑰（Brevo 後台 → SMTP & API → API keys） |
 | `MAIL_FROM` | 寄件信箱，要先在 Brevo 的 Senders 驗證過 |
 
@@ -282,8 +277,8 @@ http://localhost:5174/?api=                         切回 mock
    | 變數 | 填什麼 |
    |---|---|
    | `JWT_SECRET` | 隨機長字串。產生方式：`python -c "import secrets;print(secrets.token_urlsafe(48))"` |
-   | `MODEL_PROVIDER`、`MODEL_API_KEY` | 商業 API，見 `docs/03-LLM實作規劃.md` 第 2 節。**先留空也可以**：解析與建議的路由回 503，前端用規則頂著，畫面照常能用 |
-   | `MODEL_BASE_URL`、`MODEL_NAME`、`ADVICE_*` | 用 Claude 的話都留空 |
+   | `MODEL_BASE_URL` | **先留空**。模型還沒訓練完，留空時解析與建議的路由回 503，前端用規則頂著，畫面照常能用 |
+   | `MODEL_API_KEY` | 公開的 Hugging Face Space 留空 |
    | `BREVO_API_KEY` | Brevo 的 API 金鑰。⚠️ 不能改用 Gmail SMTP：Render 免費方案擋掉了 SMTP 埠 |
    | `MAIL_FROM` | 在 Brevo 驗證過的寄件信箱。填好後本機先試寄：`python -m app.toolkit.mailer --to 你的信箱` |
 
@@ -313,18 +308,252 @@ http://localhost:5174/?api=                         切回 mock
 
 ---
 
-## 領域與分工
+## 分工
 
-| 領域 | 資料夾 | 路由 |
-|---|---|---|
-| 認證 | `backend/app/routers/auth/` | 19 支 |
-| 記帳 | `backend/app/routers/ledger/` | 19 支 |
-| 數字 | `backend/app/routers/analytics/` | 11 支 |
-| 家庭 | `backend/app/routers/access/` | 21 支 |
+分工的**單一事實來源是 `backend/app/ownership.py`**，不是這份文件。
+那個檔案是程式讀得到的，而且 `pytest` 會檢查它有沒有跟程式碼走散——
+有人新增路由卻沒認領、或兩個人宣告同一支，測試就會紅燈。
 
-路由屬於哪個領域，寫在 `backend/app/ownership.py`（`python -m app.ownership` 會印出各領域的完成度）。
+```bash
+cd backend
+python -m app.ownership      # 印出分工表並檢查一致性
+```
 
-**最後一週的分工與時程**在 `docs/04-最後一週分工.md`，每個人的任務檔在 `docs/分工/`。
+### 四個領域
+
+| 成員 | 領域 | 分支 | 路由 | 獨佔檔案 | 共用元件（要最先完成） |
+|---|---|---|---|---|---|
+| **成員1** | **認證** | `m1-auth` | 19 支 | `routers/auth/auth.py`<br>`routers/auth/admin.py`<br>`models/user.py`<br>`schemas/auth.py` | `services/llm/client.py`<br>`guards.py`<br>`cli.py`<br>`routers/_stub.py`<br>`models/_types.py` |
+| **成員2** | **記帳** | `m2-ledger` | 19 支 | `routers/ledger/transactions.py`<br>`routers/ledger/nlp.py`<br>`routers/ledger/categories.py`<br>`routers/ledger/groups.py`<br>`models/category.py`<br>`models/group.py`<br>`schemas/group.py`<br>`services/evaluation.py`<br>`models/transaction.py`<br>`models/nlp.py`<br>`schemas/transaction.py`<br>`schemas/nlp.py`<br>`services/llm/parse.py` | — |
+| **成員3** | **數字** | `m3-analytics` | 11 支 | `routers/analytics/stats.py`<br>`routers/analytics/alerts.py`<br>`models/alert.py`<br>`routers/analytics/budgets.py`<br>`routers/analytics/advices.py`<br>`models/budget.py`<br>`models/advice.py`<br>`schemas/stats.py`<br>`schemas/advice.py`<br>`services/llm/advice.py` | `services/analytics.py` |
+| **成員4** | **家庭** | `m4-access` | 21 支 | `routers/access/family.py`<br>`routers/access/notifications.py`<br>`models/family.py`<br>`models/guardianship.py`<br>`models/notification.py`<br>`models/audit.py`<br>`schemas/family.py` | `services/permission.py` |
+
+### 切分原則
+
+1. **一個領域＝一個完整的概念**，不是一堆零散的路由湊數
+2. **一個檔案剛好一個主人**，四個人不會改到同一個檔案 → git 幾乎不衝突
+3. **會擋住別人的東西要盡量小**（`guards.py`、`toolkit/`、`permission.py`），而且這一版已經先做好了
+4. **每個人都要有一份 LLM 工作** —— 這是任務的硬性要求
+
+### 各領域的邊界
+
+#### 成員1 · 認證　`m1-auth`
+
+負責「你是誰」。
+屬於他的：註冊登入登出、密碼與忘記密碼、JWT、工作階段、個人資料與理財習慣，以及平台管理員的停權（停權擋的是登入，所以歸認證）。
+地基（設定 `toolkit/config.py`、資料庫連線 `toolkit/db.py`、增刪改查 `toolkit/crud.py`、路由守衛 `guards.py`、模型呼叫層 `services/llm/client.py`、20 張表與 Alembic）**已經做好了**，他負責維護。
+不屬於他的：家庭角色與監管關係（那是成員4）。users 表存的是登入身分，family_members 表才是家庭角色，兩者刻意分開。
+
+**LLM 工作**：共用的模型呼叫層：逾時、重試、把模型回傳的 JSON 交給 Pydantic 驗證。成員2 和成員3 都會呼叫它，所以第 1 週要先做出來。
+
+**路由（19 支）**
+
+```
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/refresh
+POST   /api/auth/logout
+POST   /api/auth/logout-all
+GET    /api/auth/me
+PATCH  /api/auth/password
+POST   /api/auth/password-reset
+POST   /api/auth/password-reset/confirm
+GET    /api/auth/me/finance
+PUT    /api/auth/me/finance
+POST   /api/auth/verify-password
+GET    /api/auth/sessions
+PATCH  /api/auth/me
+PUT    /api/auth/me/avatar
+DELETE /api/auth/me/avatar
+GET    /api/admin/users
+POST   /api/admin/users/{user_id}/suspend
+DELETE /api/admin/users/{user_id}/suspend
+```
+
+#### 成員2 · 記帳　`m2-ledger`
+
+負責「記一筆帳」這個動作，從文字進來到寫進資料庫。★ 這是整個系統的核心。
+屬於他的：明細的增刪改查、段落解析、單句解析、確認後寫入、nlp_parses 的寫入。
+帳本（開、改、封存、結算、成員）與分類也在這裡：帳本是「這筆算在哪」的容器，分類是記帳時要選的欄位，統計只是拿它分組。
+不屬於他的：統計加總（那是成員3，前端和這裡都不做任何加總）。
+
+**LLM 工作**：段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準。切分比抽欄位更難，而且切錯比抽錯更難發現。
+
+**路由（19 支）**
+
+```
+GET    /api/transactions
+POST   /api/transactions
+PATCH  /api/transactions/{tx_id}
+DELETE /api/transactions/{tx_id}
+DELETE /api/transactions
+POST   /api/nlp/parse
+POST   /api/nlp/parse-batch
+POST   /api/nlp/confirm
+POST   /api/nlp/confirm-batch
+GET    /api/categories
+POST   /api/categories
+GET    /api/groups
+POST   /api/groups
+PATCH  /api/groups/{gid}
+DELETE /api/groups/{gid}
+POST   /api/groups/{gid}/members
+DELETE /api/groups/{gid}/members/{user_id}
+POST   /api/groups/{gid}/settle
+PATCH  /api/groups/{gid}/notify
+```
+
+#### 成員3 · 數字　`m3-analytics`
+
+負責所有「算出來的東西」，以及把那些數字講成人話。
+屬於他的：月年統計、預算、每月存款目標、階段性提醒的門檻、財務建議。
+**整個系統只有這裡加總錢** —— 模型不算，前端只做衍生（結餘、比例、預算百分比）。
+不屬於他的：明細的寫入（那是成員2）；決定要算哪些人（那是成員4 的 permission）。
+
+**LLM 工作**：財務建議的 prompt 與邊界規則。順序不能顛倒：先用 analytics 算好數字，再餵給模型敘述，模型不做任何算術。
+
+**路由（11 支）**
+
+```
+GET    /api/summary
+GET    /api/budgets
+PUT    /api/budgets
+PUT    /api/savings-goal
+GET    /api/savings-goals
+GET    /api/alerts
+POST   /api/alerts
+PATCH  /api/alerts/{aid}
+DELETE /api/alerts/{aid}
+GET    /api/advices
+POST   /api/advices/generate
+```
+
+#### 成員4 · 家庭　`m4-access`
+
+負責「誰在這個家庭裡」以及「誰看得到誰的資料」，另外扛模型評測。
+屬於他的：家庭（建立、解散）、成員角色、家庭綁定（邀請碼與用帳號邀請）、監管關係、權限計算、通知、零用金、稽核紀錄、評測。
+不屬於他的：登入本身（那是成員1）。成員1 回答「你是誰」，成員4 回答「你能看到什麼」。
+
+**LLM 工作**：模型評測：建立人工標註的留出集、跑零樣本 vs few-shot 對照、算一次輸入完全正確率與分類 Macro-F1。**留出集必須 100% 人工標註**，否則量到的是「多像那個老師」而不是「多正確」。
+
+**路由（21 支）**
+
+```
+GET    /api/family
+POST   /api/family
+DELETE /api/family
+POST   /api/family/invite
+POST   /api/family/join
+GET    /api/family/lookup
+GET    /api/family/invites
+POST   /api/family/invites
+POST   /api/family/invites/{invite_id}/accept
+DELETE /api/family/invites/{invite_id}
+PATCH  /api/family/members/{user_id}
+DELETE /api/family/members/{user_id}
+GET    /api/guardianships
+POST   /api/guardianships
+DELETE /api/guardianships/{gid}
+GET    /api/notifications
+PATCH  /api/notifications/{nid}
+PATCH  /api/notifications
+GET    /api/allowances
+PUT    /api/allowance
+GET    /api/audit
+```
+
+
+### 分支規則
+
+每個人只在自己的分支上動自己清單裡的檔案。
+
+```bash
+git switch -c m2-ledger      # 換成你自己的分支名稱
+```
+
+**要改別人的檔案，先在群組講一聲。** 下面這幾個檔案沒有單一主人，
+動之前一樣要先講：
+
+- `backend/app/main.py`
+- `backend/app/ownership.py`
+- `backend/app/models/__init__.py`
+- `backend/app/schemas/__init__.py`
+- `backend/app/routers/__init__.py`
+- `backend/app/services/__init__.py`
+- `backend/app/services/llm/__init__.py`
+
+### 第 1 週的相依順序
+
+原本會擋住別人的地基**已經做好了**，四個人第一天就能開工：
+
+```
+✅ 路由守衛         app/guards.py（@login_required、own()、in_group()、can_see_user()）
+✅ 資料庫與增刪改查  app/toolkit/db.py、crud.py、models/（20 張表）、alembic/
+✅ 可見範圍         app/guards.py 的 visible_scope()、services/permission.py 的 visible()
+✅ 模型呼叫層       app/services/llm/client.py
+```
+
+還剩一件跨模組的事**要最優先**：
+
+```
+成員2  分類體系（GET /api/categories）  ← 成員2 寫 prompt、成員4 評測、成員3 統計分組都要用
+```
+
+### 六週排程
+
+總長六週 = **實作四週 + 測試不到一週 + 報告簡報**。
+
+⚠️ **後端線與模型線並行，不是接力。** 標註資料不用寫程式，第 1 週就能開始。
+
+| 週 | 主題 | 後端線 | 模型線 |
+|---|---|---|---|
+| **1** | 地基與標註同時開始 | 地基已經做好（toolkit、guards、models）：每個人拿掉前幾支的 @stub、打得通 | 標註 150 筆（不用寫程式，每人每天 1 小時） |
+| **2** | 前後端串通 | 後端完成，**關掉 mock 畫面還能動** | 標註到 300 筆、Colab 環境先跑通一次 |
+| **3** | 基準線與第一輪微調 | 補洞、修 bug、**四個人開始自己用這個系統** | few-shot 基準線 ＋ 第一輪 QLoRA |
+| **4** | 第二輪微調 | 功能凍結 | 第二輪微調（用第 3 週收集到的真實修正）＋ 接回系統 |
+| **5** | 測試 | 全系統測試、四個角色各走一遍、權限反向測試 | 評測數字定稿 |
+| **6** | 報告與緩衝 | 報告、簡報 | 對照表、圖表 |
+
+**三條硬線**
+
+- ⚠️ 硬檢查點：沒串通的話第 3 週不要碰微調，先把串接做完
+- ⚠️ 硬切線：週末沒有第一輪的數字，第 4 週就放棄第二輪，用 few-shot 收尾
+- ⚠️ 最後兩天不准改模型，留給「接回去 + 確認沒壞」
+
+**測試不能留到第 5 週。** 每支路由寫完當下就用 `/docs` 試打，不要累積。
+第 5 週要走過的清單：
+
+1. 三個層級各走一遍：平台 master / 家長 parent / 子女 child
+2. 權限的**反向測試** —— 子女切不到「全家」、直接打全家的 summary 也要被擋，這比正向測試重要
+3. 段落記帳的邊界：缺欄位、低信心、切分錯誤、空輸入、超長輸入
+4. 金額邊界：0、負數、小數、很大的數字
+5. 年度統計的「未完整」標示有沒有出現
+6. 帳號不存在與密碼錯誤，回的訊息要一樣
+7. 批次寫入寫到一半失敗，要全部不寫（不可以留下半筆）
+
+### 找到自己要做的事
+
+```bash
+cd backend && python -m app.ownership
+```
+
+會印出每個人負責哪幾支、已經做完幾支、還差哪幾支。
+`app/ownership.py` 是分工的**唯一事實來源**——路由歸屬、分支名稱、
+共用檔案、時程，全部在那一個檔案裡，`pytest` 會拿它去對文件。
+
+**70 支路由已經全部掛好了**（`app/routers/` 底下，一個領域一個資料夾）：守衛、請求主體、說明字串都寫好，函式裡只有
+`raise not_ready(...)`（回 501）。做一支 = 刪掉 `@stub`、把 `raise not_ready(...)` 那一行換成說明字串的第二步。
+裝飾器、參數、import 都已經放好最終版本，不用動。
+
+**先讀那一支的說明字串**——它就是那一支的規格書，十一個段落：這支做什麼、前端怎麼打、誰能打、
+請求、成功回應、錯誤回應、會用到的資料表、每一步用的工具與資料庫方法、寫法步驟、
+**完整寫法**（第二步就是要貼上去的程式，只有函式內容）、做完怎麼確認。
+照著改完，跑 `pytest tests/routes -k "函式名 and u4f60" -v` 就知道對不對
+（`u4f60` 是標籤「你的」的跳脫碼——pytest 會把中文標籤轉成跳脫碼，直接打中文會 `0 selected`）
+（同一組測試也會拿說明裡的程式跑一遍，所以說明不會跟實作走散）。
+
+增刪改查用 `app/toolkit/crud.py`、身分與權限用 `app/guards.py`、規則用 `app/toolkit/` 對應的模組——
+都是測好的工具，直接用，不用重寫。每支路由的輸入輸出也寫在 `docs/02-前後端串接契約.md`。
 
 ### 誰都不可以實作的路由
 

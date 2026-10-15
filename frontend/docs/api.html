@@ -104,11 +104,11 @@
   'use strict';
 
   var OWNERS = [
-    { id: 'm1', name: '認證', dom: '認證', c: 'var(--m1)' },
-    { id: 'm2', name: '記帳', dom: '記帳', c: 'var(--m2)' },
-    { id: 'm3', name: '數字', dom: '數字', c: 'var(--m3)' },
-    { id: 'm4', name: '家庭', dom: '家庭', c: 'var(--m4)' },
-    { id: 'sys', name: '共用', dom: '系統', c: 'var(--ink-soft)' }
+    { id: 'm1', name: '成員1', dom: '認證', branch: 'm1-auth', c: 'var(--m1)' },
+    { id: 'm2', name: '成員2', dom: '記帳', branch: 'm2-ledger', c: 'var(--m2)' },
+    { id: 'm3', name: '成員3', dom: '數字', branch: 'm3-analytics', c: 'var(--m3)' },
+    { id: 'm4', name: '成員4', dom: '家庭', branch: 'm4-access', c: 'var(--m4)' },
+    { id: 'sys', name: '共用', dom: '系統', branch: '—', c: 'var(--ink-soft)' }
   ];
 
   /* 路由與回應形狀取自 frontend/js/api.js 的契約定義 */
@@ -230,7 +230,7 @@
     { n: 23, o: 'm2', m: 'GET', p: '/api/categories', a: '登入',
       d: '分類體系（系統預設 + 家庭自訂）',
       res: '{\n  "categories": [\n    {\n      "custom": false,\n      "id": "C01",\n      "name": "餐飲",\n      "kind": "expense",\n      "color": "cat-food",\n      "icon": "食"\n    },\n    …\n  ]\n}',
-      note: '系統預設 ＋ 我們家的自訂分類。<code>color</code> 是代號不是色碼。⚠️ 分類清單是唯一的跨模組契約：記帳 寫進 prompt、數字 統計分組、家庭 評測都要用，第 1 週就要凍結。系統預設分類由 <code>python -m app.cli init-db</code> 放進去。' },
+      note: '系統預設 ＋ 我們家的自訂分類。<code>color</code> 是代號不是色碼。⚠️ 分類清單是唯一的跨模組契約：成員2 寫進 prompt、成員3 統計分組、成員4 評測都要用，第 1 週就要凍結。系統預設分類由 <code>python -m app.cli init-db</code> 放進去。' },
     { n: 24, o: 'm2', m: 'POST', p: '/api/categories', a: '家長',
       d: '新增家庭自訂分類。body: { name, kind }',
       body: '{ "name": "寵物", "kind": "expense" }',
@@ -521,6 +521,7 @@
       h += '<section class="agroup" style="--k:' + o.c + '">' +
         '<div class="agroup__h">' +
         '<span class="agroup__t">' + o.name + ' · ' + o.dom + '</span>' +
+        '<span class="agroup__s">分支 ' + o.branch + '</span>' +
         '<span class="agroup__n">' + rs.length + ' 支</span></div><div class="rows">' +
         rs.map(function (r) { return routeHTML(r, o); }).join('') +
         '</div></section>';

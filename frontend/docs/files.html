@@ -157,7 +157,7 @@ PostgreSQL
             <tr><td class="tight"><b style="color:var(--up)">綠字</b></td>
                 <td><b>已經寫好、完整可用</b>，直接 import，不要改</td></tr>
             <tr><td class="tight"><b style="color:var(--warn)">黃字刪除線</b></td>
-                <td><b>骨架在、內容還沒做</b>：路由還回 501（<code>@stub</code>）。<b>現在已經沒有了</b>——70 支路由都做完了</td></tr>
+                <td><b>骨架在、內容要你們做</b>：路由還回 501（<code>@stub</code>）、services 裡有 <code>TODO(成員N)</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -210,29 +210,24 @@ PostgreSQL
 │   │   ├── <em>toolkit/</em>          <em>已經寫好的工具（見 03）</em>
 │   │   ├── <em>models/</em>           <em>20 張表，跟 data.js 的 schema 逐欄對齊</em>
 │   │   ├── <em>schemas/</em>          <em>請求主體，欄位名字跟前端送的一樣</em>
-│   │   ├── <em>routers/</em>          <em>70 支路由：一個領域一個資料夾（全部做完）</em>
-│   │   │   ├── <em>auth/</em>         <em>認證</em>
-│   │   │   ├── <em>ledger/</em>       <em>記帳</em>
-│   │   │   ├── <em>analytics/</em>    <em>數字</em>
-│   │   │   └── <em>access/</em>       <em>家庭</em>
-│   │   └── <em>services/</em>         <em>llm/（client、parse、advice）、analytics、evaluation</em>
+│   │   ├── <s>routers/</s>          <s>70 支路由：一個領域一個資料夾，守衛與說明寫好，內容要做（還回 501）</s>
+│   │   │   ├── <s>auth/</s>         <s>成員1 · 認證</s>
+│   │   │   ├── <s>ledger/</s>       <s>成員2 · 記帳</s>
+│   │   │   ├── <s>analytics/</s>    <s>成員3 · 數字</s>
+│   │   │   └── <s>access/</s>       <s>成員4 · 家庭</s>
+│   │   └── <s>services/</s>         <s>llm/client 已完成；parse、advice、analytics 要做</s>
 │   ├── alembic/              <i>資料庫遷移（versions/ 第一版 = 20 張表）</i>
 │   ├── alembic.ini           <i>⚠️ 只能有英文</i>
 │   ├── tests/                <i>一致性、工具箱、後端核心、前端代勞；fixtures/ 放測試資料</i>
-│   ├── tools/                <i>eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生</i>
-│   ├── eval/                 <i>留出集 heldout.jsonl 與每次的評測結果 results/</i>
+│   ├── tools/                <i>sync_spec.py、sync_schema.py、sync_mindmap.py：文件從程式產生</i>
 │   ├── requirements.txt      <i>要裝哪些套件</i>
 │   ├── Dockerfile            <i>啟動前先 alembic upgrade head</i>
-│   └── .env.example          <i>設定範本：依領域分段，機密留空</i>
+│   └── .env.example          <i>設定範本：依成員分段，機密留空</i>
 │
 ├── <b>docs/</b>                    <i>規格文件（Markdown）</i>
 │   ├── 01-tech-stack-and-api.md
 │   ├── <u>02-前後端串接契約.md</u> ★  <i>動工前一定要看</i>
-│   ├── 03-LLM實作規劃.md     <i>模型怎麼接、怎麼評</i>
-│   ├── 04-最後一週分工.md    <i>10/14～10/23 誰做什麼</i>
-│   └── 分工/                 <i>每個人的任務檔</i>
-│
-├── <b>ml/</b>                      <i>微調（加分項）：訓練資料、Colab 筆記本、Hugging Face Space</i>
+│   └── 分工心智圖.svg
 │
 ├── docker-compose.yml        <i>本機一鍵起整套</i>
 ├── render.yaml               <i>部署設定</i>
@@ -260,10 +255,10 @@ PostgreSQL
             <tr><td><span class="fname">backend/app/cli.py</span></td><td>小工具指令：建 .env、檢查設定、建表放系統分類、設定平台管理員</td><td class="tight">已交付</td></tr>
             <tr><td><span class="fname">backend/app/models/</span></td><td>20 張表。<b>資料庫裡存什麼</b>。改欄位三處一起改：data.js → models → Alembic</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/schemas/</span></td><td>請求主體的形狀。<b>API 收什麼</b>——回應用 <code>crud.to_dict</code>，密碼雜湊預設就不會送出去</td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/app/routers/</span></td><td>70 支路由，<b>一個領域一個資料夾</b>（<code>auth/</code> 認證、<code>ledger/</code> 記帳、<code>analytics/</code> 數字、<code>access/</code> 家庭）。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/routers/</span></td><td>70 支路由，<b>一個領域一個資料夾</b>（<code>auth/</code> 成員1、<code>ledger/</code> 成員2、<code>analytics/</code> 成員3、<code>access/</code> 成員4）。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/services/</span></td><td>加總與模型。<code>llm/client.py</code> 已完成；<code>parse</code>、<code>advice</code>、<code>analytics.summary</code> 要做。<b>不碰 HTTP</b>，所以可以直接測</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/alembic/</span></td><td>資料庫結構的版本。部署時啟動前自動 <code>alembic upgrade head</code></td><td class="tight">共同</td></tr>
-            <tr><td><span class="fname">backend/.env.example</span></td><td>設定範本，依「共用／認證～4」分段；<code>python -m app.cli init-env</code> 從它建出 .env</td><td class="tight">共同</td></tr>
+            <tr><td><span class="fname">backend/.env.example</span></td><td>設定範本，依「共用／成員1～4」分段；<code>python -m app.cli init-env</code> 從它建出 .env</td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">backend/tests/</span></td><td>一致性測試（改了路由沒改文件會紅）、工具箱、後端核心（模型、增刪改查、守衛、遷移）、前端代勞與錯誤訊息</td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">docs/02-前後端串接契約.md</span></td><td>★ 每一支 API 的請求與回應形狀，以及踩過的坑</td><td class="tight">共同</td></tr>
           </tbody>
@@ -289,7 +284,6 @@ PostgreSQL
             <tr><td><span class="fname">deps.py</span></td><td>FastAPI 依賴</td><td><code>current_user_id</code>、<code>paging</code></td></tr>
             <tr><td><span class="fname">errors.py</span></td><td>HTTPException</td><td><code>not_found</code>、<code>forbidden</code>、<code>unauthorized</code></td></tr>
             <tr><td><span class="fname">period.py</span></td><td>日期計算</td><td><code>month_range</code>、<code>recent_months</code></td></tr>
-            <tr><td><span class="fname">dates.py</span></td><td>時間詞換算</td><td><code>resolve</code>（「昨天」→ 日期）、<code>find</code>（在整句裡找）</td></tr>
             <tr><td><span class="fname">money.py</span></td><td>Decimal</td><td><code>to_decimal</code>、<code>ratio</code>、<code>quantize</code></td></tr>
             <tr><td><span class="fname">images.py</span></td><td>圖片驗證</td><td><code>validate_avatar</code>、<code>from_data_uri</code></td></tr>
             <tr><td><span class="fname">alerts.py</span></td><td>階段性提醒的門檻計算</td><td><code>usage_percent</code>、<code>crossed</code>、<code>should_fire</code></td></tr>
@@ -315,12 +309,12 @@ PostgreSQL
       <pre class="tree" style="margin-top:18px">python -c "from app.toolkit import alerts; help(alerts.crossed)"</pre>
 
       <div class="note" style="margin-top:18px">
-        <div class="note__k">tools/：評測與產生文件的程式，不是給路由用的</div>
-        <p><span class="fname">tools/eval_nlp.py</span>　用留出集（<code>eval/heldout.jsonl</code>）量記帳解析的成績，結果存在 <code>eval/results/</code>；
-        <code>--rules</code> 跑前端規則當基準線、<code>--compare</code> 把幾次的結果排成一張表。<br>
-        <span class="fname">tools/rules_baseline.js</span>　讓 node 跑 <code>api.js</code> 的規則解析，給 <code>--rules</code> 用。<br>
+        <div class="note__k">tools/：產生文件的程式，不是給路由用的</div>
+        <p><span class="fname">tools/sync_spec.py</span>　把 <code>docs/01</code> 與兩份 README 的分工總表、各領域路由清單，從 <code>ownership.py</code> 重新產生一次。<br>
         <span class="fname">tools/sync_schema.py</span>　把手冊的「各表欄位」從 <code>data.js</code> 的 schema 重新產生一次。<br>
-        ⚠️ 跨檔案的數字（例如各領域幾支路由）一律從 <code>ownership.py</code> 算，<b>不要靠人記</b>：<code>python -m app.ownership</code>。</p>
+        <span class="fname">tools/sync_mindmap.py</span>　分工心智圖（<code>docs/分工心智圖.svg</code> 與手冊第 10 節）從 <code>ownership.py</code> 與 <code>models/</code> 重新產生一次。<br>
+        搬了一支路由之後跑 <code>python backend/tools/sync_spec.py</code>；忘了跑，pytest 會紅燈。<br>
+        ⚠️ 這兩段手動維護過，結果文件停在 8/8/10/9，實際已經 17/18/13/15。<b>跨檔案的數字不要靠人記。</b></p>
       </div>
     </section>
 

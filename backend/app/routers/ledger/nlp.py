@@ -1,7 +1,7 @@
 """
 自然語言記帳：解析（不寫入）與確認後寫入。
 
-領域：記帳
+負責人：成員2（記帳）　✦ 分支：m2-ledger
 
 ===========================================================================
 現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
@@ -36,7 +36,7 @@ from app.toolkit.config import settings
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["段落記帳"])
-OWNER = "記帳"
+OWNER = "成員2"
 
 
 @router.post("/nlp/parse", summary="單句解析（不寫入）")
@@ -305,10 +305,12 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
         步驟        呼叫                                                     做什麼
         2 分類清單  crud.find(Category, {"or": [系統的, 我們家的]}, order_by="id", db=db)  模型只能從這裡挑
         3 叫模型    parse.parse_batch(text, catalog, today)                  回傳 {raw, items, note}
-        第三步      client.is_configured()                                   模型服務有沒有設定（backend/.env 的 MODEL_*）
-                    build_prompt(text, categories, today)                    組 system 與 prompt；訓練資料也用這一支，兩邊才會一字不差
-                    client.complete_json(prompt, system=…, tool=RECORD_TOOL)  叫模型用 record_transactions 工具交出結果；叫不動或格式不對丟 ModelError
-                    postprocess(data, categories, today)                     逐欄驗證：日期（span 裡的時間詞用 toolkit/dates 重算）、金額 > 0、分類在清單裡
+        第三步      client.is_configured()                                   MODEL_BASE_URL 有沒有填
+                    client.complete_json(prompt, system=…, max_tokens=1024)  送出去、等回應、把 JSON 解出來；叫不動或不是 JSON 丟 ModelError
+                    json.dumps(example, ensure_ascii=False)                  範例轉成 JSON 字串放進 prompt（中文照原樣放，不要變成一串編碼）
+                    date.fromisoformat(…)                                    日期格式不對丟 ValueError → 放進 missing
+                    money.to_decimal(…, allow_negative=False)                金額轉 Decimal；不是數字、負數丟 InvalidAmount → 放進 missing
+                    chr(10)                                                  換行字元。說明字串裡不方便寫反斜線，所以用 chr(10).join([...]) 把幾行接起來
 
     【寫法步驟】
         1. 去掉頭尾空白，空的回 422
@@ -317,11 +319,10 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
         4. 回傳 {raw, matched: false, items, note}
         第三步 parse_batch() 裡面：
         a. 組 prompt：規則（只回 JSON、抽不到填 null）、今天日期、分類清單、一組「輸入 → 輸出」的範例（few-shot）
-        b. client.complete_json 叫模型，要它用 record_transactions 工具交出結果（function calling）
-        c. 一筆一筆驗證：日期（span 裡有「昨天」這種時間詞就用 toolkit/dates 重算）、金額（> 0，跟原句的數字對不上就壓低信心度）、
-           收支、分類（要在清單裡、收支要對得上）；不對的欄位設成 null、放進 missing
+        b. client.complete_json 叫模型
+        c. 一筆一筆驗證：日期、金額（> 0）、收支、分類（要在清單裡、收支要對得上）；不對的欄位設成 null、放進 missing
         d. 信心度夾在 0～1 之間；span、店家、備註截長度
-        ⚠️ 換成自己微調的模型時，訓練資料一定要用同一支 build_prompt 產生（ml/build_sft.py 已經這樣做），b、c 不用動。
+        ⚠️ 我們的模型是自己微調的：訓練時如果用了別的 prompt 格式，a 的 prompt 換成訓練時那一套，b、c 不用動。
         ⚠️ 驗證那一段不能省：模型回什麼都有可能，沒驗證就交給前端，壞掉的是使用者的帳。
 
     【完整寫法】照下面三步改，改完這支就做好了
@@ -366,19 +367,95 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
             # 4. 回傳（不寫資料庫）
             return {"raw": text, "matched": False, "items": result["items"], "note": result.get("note", "")}
 
-        第三步：打開 app/services/llm/parse.py，把 parse_batch() 整個換成這段
-        （build_prompt、postprocess、RECORD_TOOL 已經寫在同一個檔案裡，直接用；訓練資料 ml/build_sft.py 也用同一支 build_prompt）
+        第三步：打開 app/services/llm/parse.py，把 parse_batch() 整個換成這段（函式最上面那三行 import 放在函式裡，檔案最上面不用動）
 
             def parse_batch(text: str, categories: list[dict[str, Any]], today: str) -> dict[str, Any]:
                 '''一段話 → 好幾筆。模型沒設定丟 client.ModelError（路由轉 503）。'''
+                import json
+                from datetime import date
+
+                from app.toolkit import money
+
                 if not client.is_configured():
                     raise client.ModelError(MODEL_UNAVAILABLE)
+
                 # a. 組 prompt：規則、今天日期、分類清單（模型只能從這裡挑）、一組範例
-                system, prompt = build_prompt(text, categories, today)
-                # b. 叫模型：用 record_transactions 工具交出結果（function calling）
-                data = client.complete_json(prompt, system=system, max_tokens=1024, tool=RECORD_TOOL)
+                rules = [
+                    "你是記帳助理，把使用者的一段話切成一筆一筆的收支，只回 JSON，不要任何說明文字。",
+                    "每一筆要有 span（原句裡對應的那一段）、date（YYYY-MM-DD）、amount（正數）、",
+                    "kind（expense 或 income）、cat（下面分類清單裡的 id）、merchant（店家，沒有就空字串）、",
+                    "note（備註，沒有就空字串）、conf（date、amount、kind、cat 各一個 0 到 1 的信心度）。",
+                    "抽不到的欄位填 null，不要猜。「昨天」「前天」要換算成日期。",
+                    "今天是 " + today + "。分類清單：",
+                ]
+                for c in categories:
+                    rules.append("  %s：%s（%s）" % (c["id"], c["name"], "收入" if c["kind"] == "income" else "支出"))
+                ids = {c["name"]: c["id"] for c in categories}
+                example = {"items": [
+                    {"span": "早上買早餐55", "date": today, "amount": 55, "kind": "expense", "cat": ids.get("餐飲", ""),
+                     "merchant": "", "note": "早餐", "conf": {"date": 0.9, "amount": 0.99, "kind": 0.97, "cat": 0.9}},
+                    {"span": "晚上加油", "date": today, "amount": None, "kind": "expense", "cat": ids.get("交通", ""),
+                     "merchant": "", "note": "加油", "conf": {"date": 0.9, "amount": 0, "kind": 0.95, "cat": 0.85}},
+                ]}
+                prompt = chr(10).join([
+                    "範例輸入：早上買早餐55，晚上加油",
+                    "範例輸出：" + json.dumps(example, ensure_ascii=False),
+                    "輸入：" + text,
+                    "輸出：",
+                ])
+
+                # b. 叫模型（逾時、重試、剝掉 JSON 外面的包裝，client 都做好了）
+                data = client.complete_json(prompt, system=chr(10).join(rules), max_tokens=1024)
+                raw_items = data.get("items") if isinstance(data, dict) else None
+                if not isinstance(raw_items, list):
+                    raise client.ModelError("模型回來的格式不對")
+
                 # c. 一筆一筆驗證：抽不到、不合理的欄位設成 None，放進 missing
-                items = postprocess(data, categories, today)
+                def score(value):
+                    try:
+                        return min(1.0, max(0.0, float(value)))
+                    except (TypeError, ValueError):
+                        return 0.0
+
+                kinds = {c["id"]: c["kind"] for c in categories}
+                items = []
+                for raw in raw_items:
+                    if not isinstance(raw, dict):
+                        continue
+                    missing = []
+                    try:
+                        day = date.fromisoformat(str(raw.get("date"))).isoformat()
+                    except ValueError:
+                        day = None
+                        missing.append("date")
+                    try:
+                        amount = money.to_decimal(raw.get("amount"), allow_negative=False)
+                    except money.InvalidAmount:
+                        amount = None
+                    if amount is None or amount <= 0:
+                        amount = None
+                        missing.append("amount")
+                    kind = raw.get("kind") if raw.get("kind") in ("expense", "income") else None
+                    if kind is None:
+                        missing.append("kind")
+                    cat = str(raw.get("cat") or "")
+                    if cat not in kinds or (kind is not None and kinds[cat] != kind):
+                        cat = None
+                        missing.append("cat")
+                    conf = raw.get("conf") if isinstance(raw.get("conf"), dict) else {}
+                    items.append({
+                        "seq": len(items) + 1,
+                        "span": str(raw.get("span") or "")[:100],
+                        "date": day,
+                        "amount": float(amount) if amount is not None else None,
+                        "kind": kind,
+                        "cat": cat,
+                        "merchant": str(raw.get("merchant") or "")[:50],
+                        "note": str(raw.get("note") or "")[:100],
+                        "conf": {k: score(conf.get(k)) for k in ("date", "amount", "kind", "cat")},
+                        "missing": missing,
+                        "hint": "這一筆有欄位抽不到，補上才能存" if missing else "",
+                    })
                 return {"raw": text, "items": items,
                         "note": "這段話被切成 %d 筆。切分本身也是模型的判斷，請對照原句檢查。" % len(items)}
 

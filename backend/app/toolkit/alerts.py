@@ -1,7 +1,7 @@
 """
 階段性提醒：算出「這次支出跨過了哪幾個門檻」。
 
-領域：數字與建議｜通知的寫入是家庭
+負責人：成員3（數字與建議）｜通知的寫入是成員4
 
 ===========================================================================
 這個工具在解什麼問題
@@ -36,7 +36,7 @@
         if not alerts.should_fire(rule.percent, before, after,
                                   rule.fired_period, period_key):
             continue
-        建立通知(rule)                        # ← 家庭 的 notifications
+        建立通知(rule)                        # ← 成員4 的 notifications
         rule.fired_period = period_key       # 記住這個月響過了
 
 想一次拿到所有跨過的門檻：
