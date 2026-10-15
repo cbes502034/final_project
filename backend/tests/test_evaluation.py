@@ -114,3 +114,56 @@ def test_評測腳本_用假模型跑得完(monkeypatch, tmp_path, capsys):
     assert data["cases"][0]["pred"][0]["cat"] == "餐飲"               # id 換回名稱
     assert data["report"]["errors"] == 1                               # 第 3 題「晚上加油1200」叫不動
     assert "| 題數 | 3 |" in capsys.readouterr().out
+
+
+# ===========================================================================
+# 資料本身的品質：答案要對得上句子（留出集、微調的訓練資料都檢查）
+# ===========================================================================
+def _zh_table():
+    sys.path.insert(0, os.path.join(os.path.dirname(BACKEND), "ml"))
+    from make_data import zh
+
+    table = {}
+    for n in range(1, 200001):
+        table.setdefault(zh(n), n)
+    return table
+
+
+def _amounts(text, table):
+    import re
+
+    t = text.replace("7-11", "")
+    found = set()
+    for m in re.finditer(r"(\d[\d,]*(?:\.\d+)?)\s*(萬)?", t):
+        v = float(m.group(1).replace(",", ""))
+        found.add(v * 10000 if m.group(2) else v)
+    for m in re.finditer(r"[零一二兩三四五六七八九十百千萬]+", t):
+        if m.group(0) in table:
+            found.add(float(table[m.group(0)]))
+    return found
+
+
+def test_每一題的金額都在句子裡找得到():
+    """答案寫 1200、句子卻是「一千」——這種標錯量出來的成績就是錯的。"""
+    table = _zh_table()
+    for r in (json.loads(line) for line in io.open(HELDOUT, encoding="utf-8") if line.strip()):
+        found = _amounts(r["text"], table)
+        for g in r["items"]:
+            assert g["amount"] is None or float(g["amount"]) in found, (r["id"], r["text"], g["amount"])
+
+
+def test_訓練資料的答案對得上句子():
+    """ml/data/train.jsonl：金額在 span 裡、收支跟分類一致、span 是原句的一段、有時間詞的那一筆日期跟換算一樣。"""
+    from app.toolkit import dates
+
+    table = _zh_table()
+    kinds = {n: k for n, k, _c, _i in catalog.SYSTEM_CATEGORIES}
+    path = os.path.join(os.path.dirname(BACKEND), "ml", "data", "train.jsonl")
+    for r in (json.loads(line) for line in io.open(path, encoding="utf-8") if line.strip()):
+        names = {c["name"]: c["kind"] for c in r["categories"]}
+        for g in r["items"]:
+            assert g["span"] in r["text"], r["id"]
+            assert names[g["cat"]] == g["kind"] and kinds.get(g["cat"], g["kind"]) == g["kind"], r["id"]
+            assert g["amount"] is None or float(g["amount"]) in _amounts(g["span"], table), (r["id"], g["span"])
+            said = dates.find(g["span"], r["today"])
+            assert said is None or g["date"] == said, (r["id"], g["span"], g["date"], said)
