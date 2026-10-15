@@ -15,3 +15,6 @@ ml/outputs/
 # 報告產生器的套件
 report/node_modules/
 report/package-lock.json
+
+# 評測跑到一半的暫存檔
+backend/eval/results/*.partial.jsonl

@@ -12,6 +12,8 @@
     python tools/eval_nlp.py --compare eval/results/rules.json eval/results/claude.json
                                                        # 幾次的結果排成一張表，直接貼進報告
 
+⚠️ 中斷了（關掉視窗、電腦睡著）沒關係：每跑完一題就存進 eval/results/<label>.partial.jsonl，
+   同一個 --label 再跑一次會從沒跑過的那題接下去。
 ⚠️ 會真的呼叫模型：整份留出集約 100 次。商業 API 會花錢（很少，但不是零），先用 --limit 試。
 ⚠️ 想比「零樣本 vs 我們微調的模型」：把 backend/.env 的 MODEL_* 換成另一組，換一個 --label 再跑一次。
 """
@@ -48,9 +50,18 @@ def load(path: str) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
-def run_model(cases: list[dict], pause: float) -> list[dict]:
+def run_model(cases: list[dict], pause: float, partial: str) -> list[dict]:
+    """一題一題跑，每跑完一題就寫進 partial（.partial.jsonl）。中斷了再跑一次會從沒跑過的那題接下去。"""
+    done = {}
+    if os.path.exists(partial):
+        with io.open(partial, encoding="utf-8") as f:
+            done = {r["id"]: r for r in map(json.loads, filter(str.strip, f))}
+        print("  接續上次：已經有 %d 題" % len(done), flush=True)
     out = []
     for n, c in enumerate(cases, 1):
+        if c["id"] in done:
+            out.append(done[c["id"]])
+            continue
         t0 = time.perf_counter()
         try:
             res = parse.parse_batch(c["text"], CATEGORIES, c["today"])
@@ -61,6 +72,8 @@ def run_model(cases: list[dict], pause: float) -> list[dict]:
             pred, error = [], str(exc)
         seconds = round(time.perf_counter() - t0, 3)
         out.append({**_head(c), "pred": pred, "seconds": seconds, "error": error})
+        with io.open(partial, "a", encoding="utf-8") as f:
+            f.write(json.dumps(out[-1], ensure_ascii=False) + "\n")
         print("  %3d/%d  %s  %.1fs  %s" % (n, len(cases), c["id"], seconds, error or ""), flush=True)
         if pause:
             time.sleep(pause)
@@ -150,16 +163,21 @@ def main() -> None:
         model = client.model_name()
         label = args.label or model
         print("模型 %s（%s）：%d 題，會呼叫模型 %d 次" % (model, client._cfg("parse")["provider"], len(cases), len(cases)))
-        results = run_model(cases, args.pause)
+
+    out = args.out or os.path.join("eval", "results", label + ".json")
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    partial = os.path.splitext(out)[0] + ".partial.jsonl"
+    if not args.rules:
+        results = run_model(cases, args.pause, partial)
 
     report = evaluation.score(results)
     unchecked = sum(1 for c in load(args.set) if not c.get("checked"))
-    out = args.out or os.path.join("eval", "results", label + ".json")
-    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     with io.open(out, "w", encoding="utf-8") as f:
         json.dump({"label": label, "model": model, "set": args.set, "when": datetime.now().isoformat(timespec="seconds"),
                    "filters": {"only": args.only, "limit": args.limit}, "report": report,
                    "by_tag": evaluation.by_tag(results), "cases": results}, f, ensure_ascii=False, indent=1)
+    if os.path.exists(partial):
+        os.remove(partial)                     # 整份跑完了，接續用的暫存檔不用留
 
     print()
     print(evaluation.to_markdown({label: report}))
