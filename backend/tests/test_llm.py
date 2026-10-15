@@ -294,3 +294,27 @@ def test_微調的訓練資料_prompt_跟上線一字不差():
         system, prompt = parse.build_prompt(ex["text"], ex["categories"], ex["today"])
         assert row["messages"][0]["content"] == system, "重跑 python ml/build_sft.py"
         assert row["messages"][1]["content"] == prompt, "重跑 python ml/build_sft.py"
+
+
+def test_推理型模型先想再答_只讀答案(monkeypatch):
+    """DeepSeek-R1 這類模型會先輸出 <think>…</think>，裡面可能也有大括號，不能當成答案。"""
+    content = '<think>使用者說 {早餐} 55 元……應該是餐飲</think>\n{"items": []}'
+    http, _ = _openai(monkeypatch, (200, {"choices": [{"message": {"content": content}}]}))
+    assert client.complete_json("x", client=http) == {"items": []}
+    assert client._strip_thinking("<think>a</think>答案") == "答案"
+    assert client._strip_thinking("沒有思考") == "沒有思考"
+
+
+def test_想到一半被截斷_丟_ModelError(monkeypatch):
+    http, _ = _openai(monkeypatch, (200, {"choices": [{"message": {"content": "<think>還在想……"}}]}))
+    with pytest.raises(client.ModelError):
+        client.complete_json("x", client=http)
+
+
+def test_MODEL_MAX_TOKENS_只會放寬不會縮小(monkeypatch):
+    http, sent = _openai(monkeypatch, *[(200, {"choices": [{"message": {"content": "{}"}}]})] * 2)
+    monkeypatch.setattr(settings, "model_max_tokens", 4096)
+    client.complete_json("x", max_tokens=1024, client=http)
+    monkeypatch.setattr(settings, "model_max_tokens", 100)
+    client.complete_json("x", max_tokens=1024, client=http)
+    assert [b["max_tokens"] for b in sent] == [4096, 1024]

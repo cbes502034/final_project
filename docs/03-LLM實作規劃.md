@@ -57,7 +57,17 @@ MODEL_PROVIDER=openai
 MODEL_BASE_URL=https://你的帳號-fambudget-parser.hf.space
 MODEL_NAME=qwen2.5-1.5b-fambudget
 MODEL_TIMEOUT_SECONDS=90
+
+# D. 本機的開源模型（Ollama；只有這台電腦用得到，線上站連不到）
+MODEL_PROVIDER=openai
+MODEL_BASE_URL=http://localhost:11434
+MODEL_NAME=deepseek-r1:1.5b       ← ollama pull 下載的模型名稱
+MODEL_MAX_TOKENS=4096             ← 推理型模型會先想一大段，長度要放寬
+MODEL_TIMEOUT_SECONDS=300         ← 只有 CPU 時很慢
 ```
+
+> 推理型模型（DeepSeek-R1 系列）會先輸出 `<think>…</think>` 再給答案，`client.py` 會把思考過程剝掉；
+> 它們不支援工具呼叫，服務回 400 時 `client.py` 自動改成「只回 JSON」那條路。
 
 - **財務建議想用另一組**（例如解析用 C、建議用 A）：填 `ADVICE_PROVIDER`、`ADVICE_API_KEY`、`ADVICE_MODEL_NAME`……，
   每一個留空就沿用上面那組。

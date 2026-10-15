@@ -150,6 +150,13 @@ class Settings(BaseSettings):
         default="low",
         description="只有 Claude 用：思考的深度（low／medium／high／xhigh／max）。記帳解析是抽欄位，low 就夠，也最快。",
     )
+    model_max_tokens: int = Field(
+        default=0,
+        description=(
+            "模型一次最多寫多少 token。0＝用程式各處自己給的（解析 1024、建議 800）。\n"
+            "本機跑推理型模型（例如 Ollama 的 deepseek-r1）會先想一大段才回答，要調高，例如 4096。"
+        ),
+    )
     model_timeout_seconds: float = Field(
         default=30.0,
         description="呼叫模型的逾時秒數。一定要設——模型卡住時，沒有逾時的 API 會跟著一起卡死。",

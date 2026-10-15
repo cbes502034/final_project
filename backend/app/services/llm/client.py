@@ -141,6 +141,7 @@ def _call(prompt, *, system="", max_tokens=512, temperature=0.1, retries=1, purp
     c = _cfg(purpose)
     if not (c["api_key"] if c["provider"] == "anthropic" else c["base_url"]):
         return None
+    max_tokens = max(max_tokens, settings.model_max_tokens or 0)
     if c["provider"] == "anthropic":
         return _call_anthropic(c, prompt, system=system, max_tokens=max_tokens, retries=retries,
                                tool=tool, schema=schema)
@@ -190,11 +191,12 @@ def _call_openai(c, prompt, *, system, max_tokens, temperature, retries, tool, s
             except (ValueError, KeyError, IndexError):
                 raise ModelError("模型服務回來的格式看不懂") from None
             calls = msg.get("tool_calls") or []
+            text = _strip_thinking(msg.get("content") or "")
             if tool and calls:
                 raw = (calls[0].get("function") or {}).get("arguments")
                 args = raw if isinstance(raw, dict) else _parse_json_text(raw or "")
-                return {"text": msg.get("content") or "", "args": args}
-            return {"text": msg.get("content") or "", "args": None}
+                return {"text": text, "args": args}
+            return {"text": text, "args": None}
     finally:
         if own:
             client.close()
@@ -287,8 +289,20 @@ def _call_anthropic(c, prompt, *, system, max_tokens, retries, tool, schema):
     return {"text": text, "args": None}
 
 
+def _strip_thinking(text: str) -> str:
+    """推理型模型（例如 DeepSeek-R1 系列）會先輸出 <think>…</think> 再給答案：只留答案。
+
+    只有 <think> 沒有 </think>：還在想就被 max_tokens 截斷了，答案根本還沒寫出來。
+    """
+    if "<think>" not in text and "</think>" not in text:
+        return text
+    if "</think>" not in text:
+        raise ModelError("模型想太久，還沒寫出答案就被截斷了（可以調高 MODEL_MAX_TOKENS）")
+    return text.rsplit("</think>", 1)[1].strip()
+
+
 def _parse_json_text(text: str) -> Any:
-    raw = (text or "").strip()
+    raw = _strip_thinking(text or "").strip()
     if raw.startswith("```"):
         raw = raw.strip("`")
         raw = raw[raw.find("\n") + 1:] if "\n" in raw else raw

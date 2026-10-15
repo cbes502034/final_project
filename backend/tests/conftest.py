@@ -28,6 +28,7 @@ _BLANK = {
     "advice_model_name": "",
     "model_effort": "low",
     "advice_effort": "medium",
+    "model_max_tokens": 0,
 }
 
 

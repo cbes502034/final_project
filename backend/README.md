@@ -238,6 +238,7 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
 | 記帳 | `MODEL_API_KEY` |  | 商業 API 的金鑰，或私有 Space 的 token。**不可以 commit**。 |
 | 記帳 | `MODEL_NAME` |  | 預設 `qwen2.5-1.5b-fambudget`。用 Claude 而沒改（不是 claude- 開頭）時自動換成 `claude-opus-5-5`。寫進 nlp_parses.model_ver。 |
 | 記帳 | `MODEL_EFFORT` |  | 預設 `low`。只有 Claude 用：思考深度。解析是抽欄位，low 最快。 |
+| 記帳 | `MODEL_MAX_TOKENS` |  | 預設 `0`（用程式各處給的長度）。本機跑推理型模型（Ollama 的 deepseek-r1）會先想一大段，要調高，例如 `4096`。 |
 | 記帳 | `MODEL_TIMEOUT_SECONDS` |  | 預設 `30.0`，商業 API 建議 `60`。一定要設——模型卡住時，沒有逾時的 API 會跟著一起卡死。 |
 | 數字 | `ADVICE_PROVIDER`、`ADVICE_BASE_URL`、`ADVICE_API_KEY`、`ADVICE_MODEL_NAME` |  | 財務建議想用另一組模型時才填；每一個留空就沿用上面記帳那一組。`ADVICE_API_KEY` **不可以 commit**。 |
 | 數字 | `ADVICE_EFFORT` |  | 預設 `medium`。只有 Claude 用：建議要寫成人話，比解析多想一點。 |
