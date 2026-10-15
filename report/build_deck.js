@@ -326,6 +326,8 @@ async function build() {
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "AI 功能" });
   s.addText("解析結果：人一眼看得出哪裡要補", { placeholder: "title" });
   shot(s, "parse.png", 0.7, 1.5, 7.9, 1.6, "shot-parse");
+  text(s, "截圖：本機沒接模型時，前端用規則解析的結果（標紅、標黃的方式跟接模型時一樣）",
+    { x: 0.7, y: 6.62, w: 7.9, h: 0.3, fontSize: 11, color: C.accent5 });
   const pc = [
     ["FiCornerDownRight", C.accent1, "原句對照", "每一筆都標出是原句的哪一段（span），切錯一眼就看得到"],
     ["FiAlertCircle", C.accent3, "缺的標紅", "沒講金額就是空的、標「必填」，不會猜一個數字；補上才能送出"],
@@ -423,7 +425,7 @@ async function build() {
   const series = systems.map((k) => ({ name: sysName(k), labels: M.map((m) => m[0]), values: M.map((m) => +((m[1](facts.eval[k].report) || 0) * 100).toFixed(1)) }));
   const palette = [HEX.accent5, HEX.accent1, HEX.accent2, HEX.accent3];
   s.addChart(pres.charts.BAR, series, {
-    x: 0.6, y: 1.5, w: modelSystems.length ? 12.1 : 7.6, h: 5.2, barDir: "col", barGrouping: "clustered", chartColors: palette.slice(0, series.length),
+    x: 0.6, y: 1.5, w: 7.6, h: 5.2, barDir: "col", barGrouping: "clustered", chartColors: palette.slice(0, series.length),
     showValue: true, dataLabelPosition: "outEnd", dataLabelFontSize: 11, dataLabelColor: HEX.dk1, dataLabelFontFace: "+mn-lt", dataLabelFormatCode: "0.0",
     catAxisLabelColor: HEX.dk1, catAxisLabelFontSize: 13, catAxisLabelFontFace: "+mn-lt",
     valAxisMinVal: 0, valAxisMaxVal: 100, valAxisLabelColor: HEX.accent5, valAxisLabelFontSize: 11, valAxisLabelFontFace: "+mn-lt",
@@ -440,8 +442,30 @@ async function build() {
       "模型那一欄：在 backend/ 跑\npython tools/eval_nlp.py --label <名稱>\n再跑 report/collect.py 與 build_deck.js，這張圖會自動多一欄。",
     { x: 8.9, y: 2.75, w: 3.55, h: 3.8, fontSize: 13, color: C.text1 });
   }
+  if (modelSystems.length) {
+    // 右邊：每一個模型一張小卡，數字跟規則並排
+    const rr = facts.eval.rules.report;
+    card(s, 8.6, 1.6, 4.1, 5.05, "eval-side", "F7F9FC");
+    text(s, "數字背後", { x: 8.9, y: 1.8, w: 3.6, h: 0.45, fontSize: 18, bold: true, color: C.text2 });
+    const m0 = facts.eval[modelSystems[0]].report;
+    const side = [
+      ["整題完全正確", pct(rr.case_exact) + "（規則）vs " + pct(m0.case_exact)],
+      ["分類正確率", pct(rr.field_acc.cat) + " vs " + pct(m0.field_acc.cat)],
+      ["沒講金額卻填數字", pct(rr.no_amount.hallucination) + " vs " + pct(m0.no_amount.hallucination)],
+      ["每句要等", m0.latency_p50 + " 秒（p50，本機 CPU）"],
+    ];
+    side.forEach(([k, v], i) => {
+      text(s, k, { x: 8.9, y: 2.4 + i * 0.72, w: 3.6, h: 0.3, fontSize: 13, color: C.accent5 });
+      text(s, v, { x: 8.9, y: 2.7 + i * 0.72, w: 3.6, h: 0.35, fontSize: 15, bold: true, color: C.text1 });
+    });
+    text(s, "1.5B 的推理模型零樣本做記帳抽欄位，全面輸給規則；日期差不多，是因為日期本來就由程式依原句重算。上線要用大模型（商業 API）或先微調。",
+      { x: 8.9, y: 5.35, w: 3.6, h: 1.2, fontSize: 13, color: C.text1 });
+  }
   s.addNotes("這是評測結果。前端規則的整題完全正確率是 " + pct(facts.eval.rules.report.case_exact) + "。" +
-    (modelSystems.length ? "加上模型之後……（依圖說明各欄差異）" : "模型的成績在填好模型設定後跑同一支評測腳本就會補上。"));
+    (modelSystems.length
+      ? "我們在本機用 Ollama 跑了 " + modelSystems.map(sysName).join("、") + "，整題完全正確率只有 " +
+        pct(facts.eval[modelSystems[0]].report.case_exact) + "，分類幾乎是亂挑，每一句還要等二三十秒。結論是小模型零樣本做不到，這正是為什麼上線用商業 API、並規劃微調。"
+      : "模型的成績在填好模型設定後跑同一支評測腳本就會補上。"));
 
   // ---- 錯誤分析
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "評測與測試" });
@@ -456,18 +480,21 @@ async function build() {
     picks.push(m);
     if (picks.length >= 5) break;
   }
-  const why = { "分類": "沒見過的說法（Uber、Netflix、星巴克）只能猜「其他」", "切成": "「1,250」的逗號被當成兩筆的分隔", "收支": "「賣舊書」「中發票」是收入，規則當成支出",
-    "日期": "「上禮拜三」「大前天」「10/1」規則算不出來", "金額": "「155 公車」的 155 被當成金額" };
+  const why = focus === "rules"
+    ? { "分類": "沒見過的說法（Uber、Netflix、星巴克）只能猜「其他」", "切成": "「1,250」的逗號被當成兩筆的分隔", "收支": "「賣舊書」「中發票」是收入，規則當成支出",
+      "日期": "「上禮拜三」「大前天」「10/1」規則算不出來", "金額": "「155 公車」的 155 被當成金額" }
+    : { "分類": "不會照分類清單挑，常挑到不相干的分類", "切成": "把一筆切成兩筆，或把兩筆併成一筆", "收支": "收支沒填或填反",
+      "日期": "整筆欄位都沒交出來（有時間詞的日期由程式依原句重算）", "金額": "金額漏抄或抄錯；沒講金額時反而自己補一個" };
   const trows = [[hdr("句子"), hdr("錯在哪"), hdr("原因")]].concat(picks.map((p) => [
     { text: p.text, options: { color: C.text1, valign: "middle" } },
-    { text: p.what.replace(/expense/g, "支出").replace(/income/g, "收入"), options: { color: C.accent3, valign: "middle" } },
+    { text: p.what.replace(/expense/g, "支出").replace(/income/g, "收入").replace(/None/g, "（沒填）"), options: { color: C.accent3, valign: "middle" } },
     { text: why[p.what.slice(0, 2)] || "", options: { color: C.accent5, valign: "middle" } },
   ]));
   s.addTable(trows, { x: 0.6, y: 1.55, w: 12.1, colW: [3.6, 4.0, 4.5], rowH: 0.72, fontSize: 13,
     border: { type: "solid", color: "D6E0EE", pt: 0.75 }, fill: { color: C.background1 }, objectName: "miss-table" });
   card(s, 0.6, 6.0, 12.1, 0.75, "miss-take", "F7F9FC");
   text(s, focus === "rules" ? "這幾類錯是模型擅長的語意判斷（沒見過的說法、收入還是支出、哪些數字才是金額）；日期再由程式依原句重算兜底。"
-    : "錯誤集中在哪一種題型，看 eval/results 裡的 by_tag；日期類的錯由程式依原句重算兜底。",
+    : "小模型零樣本：分類幾乎亂挑、沒講金額一半會自己補數字，還會把原句轉成簡體。上線要用大模型，或先微調。",
   { x: 0.9, y: 6.05, w: 11.5, h: 0.65, fontSize: 14, color: C.text1, valign: "middle" });
   s.addNotes("這幾題是" + (focus === "rules" ? "規則" : sysName(focus)) + "錯的例子，每一種錯誤類型挑一題。");
 
@@ -525,7 +552,8 @@ async function build() {
   s.addText("限制與下一步", { placeholder: "title" });
   const lim = [
     "留出集與訓練資料由 AI 產生；程式驗算過金額、日期、收支，但句型比真人整齊",
-    modelSystems.length ? "模型評測只跑了 " + modelSystems.length + " 個模型，樣本 " + facts.heldout.cases + " 題" : "模型的成績還沒跑，簡報上只有規則的基準線",
+    modelSystems.length ? "只在本機測了 " + modelSystems.map(sysName).join("、") + "；商業 API 與微調模型還沒跑同一份題目" : "模型的成績還沒跑，簡報上只有規則的基準線",
+    "數字出處檢查只確認數字有來源，不確認套在對的對象上（本機模型把總支出的 24.9% 說成交通）",
     "免費主機會休眠：第一次開要等一下；CPU 跑開源模型一段話要十幾秒",
     "財務建議沒有標準答案，只能用規則檢查（數字出處、邊界）加上人看",
   ];
@@ -539,7 +567,7 @@ async function build() {
     await iconCircle(s, ic, x + 0.35, 1.8, 0.65, col, HEX.lt1, "lim-ic-" + i);
     text(s, head, { x: x + 1.2, y: 1.8, w: 4.4, h: 0.65, fontSize: 20, bold: true, color: C.text2, valign: "middle" });
     s.addText(items.map((t, j) => ({ text: t, options: { bullet: true, breakLine: j < items.length - 1 } })),
-      { x: x + 0.35, y: 2.75, w: 5.3, h: 3.7, fontSize: 17, color: C.text1, paraSpaceAfter: 16, valign: "top", isTextBox: true, margin: 0 });
+      { x: x + 0.35, y: 2.75, w: 5.3, h: 3.7, fontSize: 15, color: C.text1, paraSpaceAfter: 10, valign: "top", isTextBox: true, margin: 0 });
   }
   s.addNotes("最後是限制與下一步。最重要的限制是資料由 AI 產生；下一步是把使用者真的改過的解析收回來，變成真實的評測與訓練資料。");
 
