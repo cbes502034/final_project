@@ -11,3 +11,7 @@ venv/
 *.gguf
 *.safetensors
 ml/outputs/
+
+# 報告產生器的套件
+report/node_modules/
+report/package-lock.json
