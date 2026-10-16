@@ -316,23 +316,6 @@ def get_summary(
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
-
-    from datetime import datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app import catalog
-    from app.guards import block_admin, visible_scope
-    from app.models import Allowance, FamilyMember, Guardianship, SavingsGoal, User
-    from app.routers._stub import not_ready, stub
-    from app.services import analytics
-    from app.toolkit import crud, errors, images, money, period
-    from app.toolkit.config import settings
-    from app.toolkit.db import get_db
-
-
-
     # 1. 期間：台灣的這個月
     this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
 
