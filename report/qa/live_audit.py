@@ -200,7 +200,10 @@ def main() -> int:
         report = asyncio.run(run(page["webSocketDebuggerUrl"], tokens, set(filter(None, args.only.split(",")))))
     finally:
         proc.terminate()
-        proc.wait(timeout=10)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:      # 無頭 Chrome 偶爾關不掉：強制結束
+            proc.kill()
         shutil.rmtree(profile, ignore_errors=True)
     out = os.path.join(HERE, "audit.json")
     old = {}

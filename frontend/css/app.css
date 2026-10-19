@@ -3620,6 +3620,8 @@ body[data-page="profile"] #searchBtn, body[data-page="profile"] #searchDrawer { 
   /* 底部分頁列已經有明細、統計、建議，常用功能就不再放一次；左上角的「← 總覽」也是分頁列的第一格 */
   #view .dtile--tabbar { display: none; }
   .appbar__home { display: none !important; }
+  /* 收支明細：手機的「記一筆」是分頁列中間那顆；標題列那顆只在表單打開時留著當「收起」 */
+  body[data-page="entry"] #view .fold__b[data-fold="entry"]:not(.on) { display: none; }
   .appbar .bell__panel { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; }
 
   .tabbar {

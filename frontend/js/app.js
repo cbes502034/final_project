@@ -2121,7 +2121,7 @@
         '<section class="duo__c">' +
           '<div class="sec"><h2 class="sec__t">活動帳本</h2><span class="sec__n">' + temps.length + ' 本</span>' +
             /* 活動帳本也從自己這一欄開：打開同一張表單，種類直接選好「活動」 */
-            '<button class="btn btn--sm" data-gnew-temp>開一本</button></div>' +
+            '<button class="btn btn--sm" data-gnew-temp>開活動帳本</button></div>' +
           (temps.length
             ? ledgerList(temps)
             : '<div class="card">' + emptyState('沒有進行中的活動', '出國、搬家這種有結束日的花費，開一本活動帳本來記。') + '</div>') +

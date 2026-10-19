@@ -3052,6 +3052,9 @@ def test_一個畫面不放兩個同樣的入口():
     for page in ("advice", "members", "groups", "profile"):
         assert 'body[data-page="%s"] #searchBtn' % page in css, page
     assert "wal__go" not in app and "wal__go" not in css
+    # 帳本頁兩欄的開帳本按鈕名字分開；手機明細頁的「記一筆」只留分頁列那顆
+    assert "data-gnew-temp>開活動帳本<" in app
+    assert 'body[data-page="entry"] #view .fold__b[data-fold="entry"]:not(.on) { display: none; }' in css
 
 
 def test_預算區的連結到得了設定預算的地方():
