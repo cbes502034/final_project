@@ -12,6 +12,7 @@
                     · 金額：> 0；span 裡完全沒有數字就一定是 None（不准猜）；跟原句的數字（含「1.2 萬」）對不上，信心度壓低
                     · 分類在清單裡而且收支對得上
                     · span、店家要真的出現在原句裡；找不到的店家清掉、找不到的 span 整筆標出來
+  4. apply_habits() 路由再照這個人以前的改法調整分類（他把「文具」從日用品改成教育過，下次就先用教育）
                     抽不到的欄位設成 None、放進 missing，前端會標紅要使用者補
 
 模型沒設定或叫不動（ModelError）→ 路由回 503，前端用規則頂著。
@@ -230,6 +231,55 @@ def postprocess(data: Any, categories: list[dict[str, Any]], today: str, text: s
             "missing": missing,
             "hint": INVENTED_HINT if invented else ("這一筆有欄位抽不到，補上才能存" if missing else ""),
         })
+    return items
+
+
+def _habit_key(text: object) -> str:
+    return re.sub(r"\s+", "", str(text or "")).lower()
+
+
+def habits(rows: Any) -> dict[str, str]:
+    """這個人改過分類的紀錄 → {品項: 他改成的分類 id}。
+
+    rows 是 [(parsed_json, user_corrected), ...]，新的在前（同一個品項以最新的改法為準）。
+    品項用模型當時抽出來的備註與店家（「文具」「全聯」）。
+
+    >>> habits([({"note": "文具", "merchant": ""}, {"cat": "6"}), ({"note": "文具"}, {"cat": "4"}), ({"note": "早餐"}, {"amount": 60})])
+    {'文具': '6'}
+    """
+    out: dict[str, str] = {}
+    for parsed, corrected in rows or []:
+        if not isinstance(corrected, dict) or not corrected.get("cat"):
+            continue
+        parsed = parsed if isinstance(parsed, dict) else {}
+        for word in (parsed.get("note"), parsed.get("merchant")):
+            key = _habit_key(word)
+            if key and key not in out:
+                out[key] = str(corrected["cat"])
+    return out
+
+
+def apply_habits(items: list[dict[str, Any]], habit: dict[str, str],
+                 categories: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """解析結果照使用者的習慣改分類：備註或店家對得上、而且收支對得上，才換，並在 hint 講出來。
+
+    ⚠️ 習慣只改分類，不碰金額與日期——那兩個一定要以原句為準。
+    """
+    kinds = {str(c["id"]): c["kind"] for c in categories}
+    names = {str(c["id"]): c["name"] for c in categories}
+    for it in items:
+        for word in (it.get("note"), it.get("merchant")):
+            cat = habit.get(_habit_key(word))
+            if not cat or cat not in kinds or cat == it.get("cat"):
+                continue
+            if it.get("kind") not in (None, kinds[cat]):
+                continue
+            it["cat"] = cat
+            it["conf"] = {**(it.get("conf") or {}), "cat": max(float((it.get("conf") or {}).get("cat") or 0), 0.9)}
+            it["missing"] = [m for m in it.get("missing") or [] if m != "cat"]
+            if it.get("hint") != INVENTED_HINT and not it["missing"]:
+                it["hint"] = "照你之前的改法，分類用「%s」" % names[cat]
+            break
     return items
 
 

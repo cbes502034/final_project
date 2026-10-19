@@ -103,7 +103,7 @@
           // 包 try：叮一聲或跳提示壞掉，不該連帶讓整個清單不重畫。
           // （外層那個 .catch 會把例外吃掉，下面的 render() 就不會跑）
           if (!first) {
-            try { ding(); toastNew(fresh[0], fresh.length); } catch (e) {}
+            try { ding(); toastNew(fresh[0], fresh.length, fresh); } catch (e) {}
           }
         }
         state.down = null;
@@ -196,12 +196,44 @@
     return who + ' 記了一筆 ' + what + ' ' + money(n.amount) + where;
   }
 
-  function toastNew(n, count) {
+  /* 同一個人一次記好幾筆（段落記帳一次確認、或連著手動記）會產生好幾則通知。
+     畫面上合成一則：「冠文_user 記了 4 筆，共 NT$ 285」，點一下全部標成已讀。
+     規則：記帳類（不是預算提醒）、同一個人、同一種、彼此相隔 60 秒內、在清單裡相鄰。
+     ⚠️ 只合併顯示，後端照樣一筆一則——之後要改合併規則，不用動資料。 */
+  var GROUP_MS = 60000;
+  function grouped(items) {
+    var out = [];
+    items.forEach(function (n) {
+      var last = out[out.length - 1];
+      var prev = last && last.items[last.items.length - 1];
+      if (prev && n.type !== 'budget_alert' && prev.type === n.type &&
+          String(prev.actorId) === String(n.actorId) &&
+          Math.abs(new Date(prev.createdAt) - new Date(n.createdAt)) <= GROUP_MS) {
+        last.items.push(n);
+      } else {
+        out.push({ items: [n] });
+      }
+    });
+    return out;
+  }
+
+  function groupLine(g) {
+    if (g.items.length === 1) return line(g.items[0]);
+    var n = g.items[0];
+    var total = g.items.reduce(function (sum, x) { return sum + (Number(x.amount) || 0); }, 0);
+    var cats = [];
+    g.items.forEach(function (x) { if (x.catName && cats.indexOf(x.catName) < 0) cats.push(x.catName); });
+    return esc(n.actorName || '家人') + ' 記了 <b>' + g.items.length + '</b> 筆，共 ' + money(total) +
+      (cats.length ? '<br><span class="bell__n2">' + esc(cats.join('、')) + '</span>' : '');
+  }
+
+  function toastNew(n, count, fresh) {
     if (!global.toast) return;
     // toast 會把訊息 esc 過，所以這裡要把 line() 的標籤去掉，
     // 不然畫面上會出現 <b> 這種字樣
-    var txt = line(n).replace(/<br>/g, '　').replace(/<[^>]+>/g, '');
-    global.toast(count > 1 ? txt + '　等 ' + count + ' 筆新紀錄' : txt, 'ok');
+    var gs = fresh ? grouped(fresh) : [{ items: [n] }];
+    var txt = groupLine(gs[0]).replace(/<br>/g, '　').replace(/<[^>]+>/g, '');
+    global.toast(gs.length > 1 ? txt + '　等 ' + gs.length + ' 則新通知' : txt, 'ok');
   }
 
   function render() {
@@ -217,9 +249,14 @@
     var wrap = btn.parentNode;
     if (wrap) wrap.hidden = !state.items.length && !state.unread && !state.down;
 
-    dot.textContent = state.unread > 99 ? '99+' : state.unread;
-    dot.hidden = state.unread === 0;
-    btn.classList.toggle('has', state.unread > 0);
+    /* 紅點算「則」：合併成一則的那幾筆只算一次（清單外、還沒載入的未讀照樣算進去） */
+    var groups = grouped(state.items);
+    var unreadItems = state.items.filter(function (n) { return !n.readAt; }).length;
+    var unreadGroups = groups.filter(function (g) { return g.items.some(function (n) { return !n.readAt; }); }).length;
+    var shown = Math.max(0, state.unread - unreadItems + unreadGroups);
+    dot.textContent = shown > 99 ? '99+' : shown;
+    dot.hidden = shown === 0;
+    btn.classList.toggle('has', shown > 0);
 
     var wasHidden = panel.hidden;
     btn.classList.toggle('open', state.open);
@@ -248,12 +285,15 @@
       h += '<div class="bell__empty">目前沒有通知。<br>' +
         '<span>被你監管的成員新增記帳時，這裡會即時跳出來。</span></div>';
     } else {
-      h += '<div class="bell__list">' + state.items.map(function (n) {
-        return '<button class="bell__i' + (n.readAt ? '' : ' unread') +
-          '" data-nid="' + esc(n.id) + '" data-tx="' + esc(n.txId || '') + '">' +
+      h += '<div class="bell__list">' + groups.map(function (g) {
+        var n = g.items[0];
+        var unread = g.items.some(function (x) { return !x.readAt; });
+        return '<button class="bell__i' + (unread ? ' unread' : '') +
+          '" data-nid="' + esc(g.items.map(function (x) { return x.id; }).join(',')) + '"' +
+          ' data-tx="' + esc(g.items.length === 1 ? (n.txId || '') : '') + '">' +
           '<span class="bell__dot"></span>' +
           '<span class="bell__m">' +
-            '<span class="bell__l">' + line(n) + '</span>' +
+            '<span class="bell__l">' + groupLine(g) + '</span>' +
             '<span class="bell__s">' + ago(n.createdAt) + '　·　' +
               (n.type === 'budget_alert' ? '階段性提醒' : '唯讀檢視') + '</span>' +
           '</span></button>';
@@ -296,24 +336,27 @@
 
     var item = e.target.closest && e.target.closest('.bell__i');
     if (item) {
-      var nid = item.dataset.nid;
-      var n = state.items.filter(function (x) { return String(x.id) === nid; })[0];
-      if (n && !n.readAt && global.API.readNotification) {
-        global.API.readNotification(nid).then(function () {
-          n.readAt = new Date().toISOString();
+      /* 合併的那一則帶著好幾個 id：一次全部標成已讀 */
+      var ids = String(item.dataset.nid || '').split(',');
+      var picked = state.items.filter(function (x) { return ids.indexOf(String(x.id)) >= 0; });
+      var n = picked[0];
+      picked.filter(function (x) { return !x.readAt; }).forEach(function (x) {
+        if (!global.API.readNotification) return;
+        global.API.readNotification(x.id).then(function () {
+          x.readAt = new Date().toISOString();
           state.unread = Math.max(0, state.unread - 1);
           render();
         });
-      }
+      });
       state.open = false;
       render();
-      /* 跳到那個人的記帳表單，並把這一筆標起來。
+      /* 跳到那個人的記帳表單，並把這一筆標起來（合併的那一則只跳到他的紀錄）。
          只跳到家庭總覽的話，使用者還要自己在一堆紀錄裡找是哪一筆。 */
       if (n && n.type === 'budget_alert') {
         // 提醒點下去看自己的總覽，不是別人的紀錄
         location.hash = '#/';
       } else if (n && n.actorId) {
-        location.hash = '#/member/' + n.actorId + (n.txId ? '/' + n.txId : '');
+        location.hash = '#/member/' + n.actorId + (item.dataset.tx ? '/' + item.dataset.tx : '');
       }
       return;
     }

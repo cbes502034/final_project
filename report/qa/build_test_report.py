@@ -284,8 +284,7 @@ def body():
                widths=["20%", "70%", "10%"])
 
     h += '<h2><span class="n">08</span>需要你處理的</h2><ul>'
-    h += ("<li><b>換掉 Brevo 金鑰（安全）</b>：之前貼在對話裡的那一把還有效。Brevo 建一把新的 → Render 後端的 BREVO_API_KEY 換成新的 → 刪掉舊的。</li>"
-          "<li><b>可選</b>：用 HeidiSQL 跑 report/qa/資料庫核對.sql，看「模型解析紀錄」「重設連結」兩張表（API 沒有開放讀取）。</li>"
+    h += ("<li><b>可選</b>：用 HeidiSQL 跑 report/qa/資料庫核對.sql，看「模型解析紀錄」「重設連結」兩張表（API 沒有開放讀取）。</li>"
           "<li><b>測試資料</b>：兩個測試帳號裡現在有測試用的家庭、帳、建議；要給別人展示前可以留著當示範，或由你決定是否清掉。</li>")
     h += "</ul>"
     h += '<div class="foot">產生方式：python report/qa/build_test_report.py（內容取自 report/qa/data/ 與 audit.json）</div>'

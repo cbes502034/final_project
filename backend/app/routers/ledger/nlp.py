@@ -89,6 +89,7 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
     【會用到的資料表】
         表          讀／寫  用來做什麼
         categories  讀      系統分類＋我們家的分類，交給模型挑（模型只能回清單裡的 id）
+        nlp_parses  讀      這個人以前改過的分類（user_corrected），下次同一個品項照他的習慣
         （不寫任何表）
 
     【每一步用的工具與資料庫方法】
@@ -96,6 +97,7 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
         2 分類清單  crud.find(Category, {"or": [{"family_id__isnull": True}, {"family_id": me.family_id}]}, order_by="id", db=db)  系統的＋我們家的分類
                     datetime.now(timezone(timedelta(hours=8))).date()  台灣的今天（伺服器在 UTC，早上 8 點前還是昨天）
         3 叫模型    parse.parse_one(text, catalog, today)              回傳一筆 {date, amount, kind, cat, merchant, note, conf: {…}, missing, hint}
+        3b 習慣     parse.habits(…)／parse.apply_habits(items, habit, catalog)  他改過分類的品項先照他的改法，hint 講出來
                     except client.ModelError                           模型沒設定、叫不動、格式不對
                     errors.service_unavailable("…")                    回 503
 
@@ -145,6 +147,11 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
                 raise errors.service_unavailable(str(exc)) from None
             except NotImplementedError:
                 raise errors.service_unavailable("模型解析還沒做好，先用前端的規則解析") from None
+
+            # 3b. 照這個人以前的改法：他把某個品項的分類改過，下次同一個品項先照他的習慣
+            rows = crud.find(NlpParse, {"user_id": me.id, "user_corrected__isnull": False}, order_by="-id", limit=200, db=db)
+            habit = parse.habits([(r.parsed_json, r.user_corrected) for r in rows])
+            item = parse.apply_habits([item], habit, catalog)[0]
 
             # 4. 轉成前端要的形狀（不寫資料庫）
             conf = item.get("conf") or {}
@@ -219,6 +226,11 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
         raise errors.service_unavailable(str(exc)) from None
     except NotImplementedError:
         raise errors.service_unavailable("模型解析還沒做好，先用前端的規則解析") from None
+
+    # 3b. 照這個人以前的改法：他把某個品項的分類改過，下次同一個品項先照他的習慣
+    rows = crud.find(NlpParse, {"user_id": me.id, "user_corrected__isnull": False}, order_by="-id", limit=200, db=db)
+    habit = parse.habits([(r.parsed_json, r.user_corrected) for r in rows])
+    item = parse.apply_habits([item], habit, catalog)[0]
 
     # 4. 轉成前端要的形狀（不寫資料庫）
     conf = item.get("conf") or {}
@@ -299,12 +311,14 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
     【會用到的資料表】
         表          讀／寫  用來做什麼
         categories  讀      系統分類＋我們家的分類，交給模型挑
+        nlp_parses  讀      這個人以前改過的分類（user_corrected），下次同一個品項照他的習慣
         （不寫任何表）
 
     【每一步用的工具與資料庫方法】（第三步 parse_batch 裡用的也列在這裡）
         步驟        呼叫                                                     做什麼
         2 分類清單  crud.find(Category, {"or": [系統的, 我們家的]}, order_by="id", db=db)  模型只能從這裡挑
         3 叫模型    parse.parse_batch(text, catalog, today)                  回傳 {raw, items, note}
+        3b 習慣     parse.habits(…)／parse.apply_habits(items, habit, catalog)  他改過分類的品項先照他的改法，hint 講出來
         第三步      client.is_configured()                                   模型服務有沒有設定（backend/.env 的 MODEL_*）
                     build_prompt(text, categories, today)                    組 system 與 prompt；訓練資料也用這一支，兩邊才會一字不差
                     client.complete_json(prompt, system=…, tool=RECORD_TOOL)  叫模型用 record_transactions 工具交出結果；叫不動或格式不對丟 ModelError
@@ -362,6 +376,11 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
                 raise errors.service_unavailable(str(exc)) from None
             except NotImplementedError:
                 raise errors.service_unavailable("模型解析還沒做好，先用前端的規則解析") from None
+
+            # 3b. 照這個人以前的改法：他把某個品項的分類改過，下次同一個品項先照他的習慣
+            rows = crud.find(NlpParse, {"user_id": me.id, "user_corrected__isnull": False}, order_by="-id", limit=200, db=db)
+            habit = parse.habits([(r.parsed_json, r.user_corrected) for r in rows])
+            result["items"] = parse.apply_habits(result["items"], habit, catalog)
 
             # 4. 回傳（不寫資料庫）
             return {"raw": text, "matched": False, "items": result["items"], "note": result.get("note", "")}
@@ -431,6 +450,11 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
         raise errors.service_unavailable(str(exc)) from None
     except NotImplementedError:
         raise errors.service_unavailable("模型解析還沒做好，先用前端的規則解析") from None
+
+    # 3b. 照這個人以前的改法：他把某個品項的分類改過，下次同一個品項先照他的習慣
+    rows = crud.find(NlpParse, {"user_id": me.id, "user_corrected__isnull": False}, order_by="-id", limit=200, db=db)
+    habit = parse.habits([(r.parsed_json, r.user_corrected) for r in rows])
+    result["items"] = parse.apply_habits(result["items"], habit, catalog)
 
     # 4. 回傳（不寫資料庫）
     return {"raw": text, "matched": False, "items": result["items"], "note": result.get("note", "")}

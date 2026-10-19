@@ -276,6 +276,21 @@ def test_備註填成分類名稱_清掉():
     assert item["note"] == "" and item["merchant"] == "麥當勞"
 
 
+def test_分類習慣_只在收支對得上時套用_不碰金額():
+    habit = parse.habits([({"note": "文具"}, {"cat": "2"}), ({"merchant": "全家"}, {"cat": "1"}),
+                          ({"note": "薪水"}, {"cat": "9"})])
+    items = parse.postprocess({"items": [_raw(span="文具150", amount=150, note="文具"),
+                                         _raw(span="全家飯糰35", amount=35, merchant="全家", note="飯糰", cat="2"),
+                                         _raw(span="早餐55")]}, CATS, TODAY, "文具150，全家飯糰35，早餐55")
+    out = parse.apply_habits(items, habit, CATS)
+    assert [i["cat"] for i in out] == ["2", "1", "1"] and [i["amount"] for i in out] == [150, 35, 55]
+    assert "交通" in out[0]["hint"] and out[2]["hint"] == ""
+    # 收入的習慣不會套到支出上
+    pay = parse.apply_habits([{**_raw(span="薪水?", note="薪水"), "conf": {"cat": 0.5}, "missing": [], "hint": ""}],
+                             habit, CATS)[0]
+    assert pay["cat"] == "1"
+
+
 def test_收入的分類配支出_分類放進_missing():
     item = parse.postprocess({"items": [_raw(cat="9")]}, CATS, TODAY)[0]
     assert item["cat"] is None and item["missing"] == ["cat"]

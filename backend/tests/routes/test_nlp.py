@@ -183,6 +183,30 @@ def test_confirm_batch_整批寫入_每筆都有評測資料與通知(api):
         [(mom.id, rows[0].id), (mom.id, rows[1].id)]
 
 
+@pytest.mark.route(*BATCH)
+def test_parse_batch_照使用者以前的改法調整分類(api, model):
+    """他把模型歸成「其他」的「文具」改成「餐飲」過一次，下次同一個品項先照他的改法，並在 hint 講出來。"""
+    me = user("d@x.tw", "爸爸")
+    cats = categories()
+    ledger_of(me)
+    food, other = str(cats["餐飲"].id), str(cats["其他"].id)
+    h = login(me)
+    fixed = {"span": "文具150", "date": today(), "amount": 150, "kind": "expense", "cat": food, "note": "文具",
+             "orig": {"by": "model", "date": today(), "amount": 150, "kind": "expense", "cat": other, "note": "文具"}}
+    assert api.post("/api/nlp/confirm-batch", headers=h, json={"items": [fixed]}).status_code == 201
+    model["reply"] = {"items": [_item(span="文具80", amount=80, cat=other, note="文具"),
+                                _item(span="早餐55", cat=other, note="早餐")]}
+    r = api.post("/api/nlp/parse-batch", headers=h, json={"text": "文具80，早餐55"})
+    assert r.status_code == 200, r.text
+    first, second = r.json()["items"]
+    assert first["cat"] == food and "照你之前的改法" in first["hint"] and first["conf"]["cat"] >= 0.9
+    assert second["cat"] == other and second["hint"] == ""            # 沒改過的品項照模型的
+    # 別人改過的不算：習慣是每個人自己的
+    other_user = user("o@x.tw", "別人")
+    r = api.post("/api/nlp/parse-batch", headers=login(other_user), json={"text": "文具80，早餐55"})
+    assert r.json()["items"][0]["cat"] == other
+
+
 @pytest.mark.route(*CB)
 def test_confirm_batch_有一筆不對就一筆都不寫(api):
     me, mom = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽")

@@ -695,6 +695,24 @@
       }).join('') + '</tbody></table></div>';
   }
 
+  /* 統計表：連續的空月份（收入、支出都是 0）合成一列 { gap: '05 月～09 月' }。
+     ⚠️ 正在進行的這個月就算是 0 也照常顯示——「這個月還沒記」本身就是資訊。 */
+  function collapseEmpty(rows) {
+    var out = [], run = [];
+    function flush() {
+      if (!run.length) return;
+      out.push({ gap: run.length === 1 ? run[0].label + ' ' : run[run.length - 1].label + '～' + run[0].label + ' ' });
+      run = [];
+    }
+    rows.forEach(function (r, i) {
+      // rows 是新的在前：第一列就是這個月（或今年），永遠照常顯示
+      if (i > 0 && !r.partial && !Number(r.income) && !Number(r.expense)) run.push(r);
+      else { flush(); out.push(r); }
+    });
+    flush();
+    return out;
+  }
+
   /* 圓環圖：純 SVG */
   function donut(byCat, total) {
     var R = 62, C = 2 * Math.PI * R, off = 0;
@@ -817,7 +835,7 @@
         (t.raw ? '<br><span class="txr__raw">「' + esc(t.raw) + '」</span>' : '') +
       '</td>' +
       '<td class="txr__u">' + esc(t.userName) + '</td>' +
-      '<td class="txr__s">' + (t.source === 'nlp' ? '段落' : '手動') + '</td>' +
+      '<td class="txr__s">' + (t.source === 'nlp' ? 'AI 解析' : '手動') + '</td>' +
       '<td class="txr__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
         (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</td>' +
       '<td class="txr__x">' +
@@ -1068,7 +1086,28 @@
         '<button class="btn btn--go" id="paraGo">解析這段話</button>' +
         '<button class="chip" id="paraEx">填一段範例看看</button>' +
       '</div>' +
+      '<p class="slow" id="paraSlow" hidden>模型還在想。主機閒置一陣子後第一次要多等一下，最久大約半分鐘。</p>' +
       '<div id="paraOut"></div></div>';
+  }
+
+  /* 等模型的按鈕：顯示已經等了幾秒；超過 8 秒在旁邊講原因，免得以為當掉了。
+     回傳一個函式，呼叫它就停止計時、收起說明。 */
+  function waitBtn(btn, label, slowId) {
+    var t0 = Date.now();
+    btn.disabled = true;
+    function tick() {
+      var sec = Math.floor((Date.now() - t0) / 1000);
+      btn.innerHTML = '<span class="btn__sp"></span>' + esc(label) + (sec >= 2 ? ' ' + sec + ' 秒' : '');
+      var slow = slowId && document.getElementById(slowId);
+      if (slow) slow.hidden = sec < 8;
+    }
+    tick();
+    var timer = setInterval(tick, 1000);
+    return function () {
+      clearInterval(timer);
+      var slow = slowId && document.getElementById(slowId);
+      if (slow) slow.hidden = true;
+    };
   }
 
   function renderBatch(r) {
@@ -1224,7 +1263,7 @@
     }
     return '<div class="bar bar--inline">' +
       sel('kind', '收支', [['all', '全部'], ['expense', '支出'], ['income', '收入']]) +
-      sel('source', '來源', [['all', '全部'], ['nlp', '段落記帳'], ['manual', '手動輸入']]) +
+      sel('source', '來源', [['all', '全部'], ['nlp', 'AI 解析'], ['manual', '手動輸入']]) +
       '</div>';
   }
 
@@ -1439,7 +1478,9 @@
           '<section class="duo__c"><div class="card card--flush">' +
             '<table class="dt"><thead><tr><th>' + (month ? '月份' : '年度') + '</th>' +
               '<th class="rt">收入</th><th class="rt">支出</th><th class="rt">結餘</th><th>結餘率</th></tr></thead><tbody>' +
-            rows.slice().reverse().map(function (r) {
+            /* 沒有任何紀錄的月份不畫一整排 0：連在一起的收成一行小字「05 月～09 月沒有紀錄」 */
+            collapseEmpty(rows.slice().reverse()).map(function (r) {
+              if (r.gap) return '<tr class="dt__gap"><td colspan="5">' + esc(r.gap) + '沒有紀錄</td></tr>';
               var net = r.income - r.expense, rate = r.income ? net / r.income : 0;
               var w = Math.max(0, Math.min(100, rate * 200));
               return '<tr><td><b>' + esc(r.label) + '</b>' +
@@ -1493,6 +1534,7 @@
         $view.innerHTML =
           '<div class="page">' +
             '<div id="advHint"></div>' +
+            '<p class="slow" id="advSlow" hidden>模型正在寫建議。主機閒置一陣子後第一次要多等一下，最久大約半分鐘。</p>' +
             '<div class="sec"><h2 class="sec__t">' + (sc === 'family' ? '全家的建議' : '給你的建議') + '</h2>' +
               '<span class="sec__n" id="advN">' + ADV.length + ' 則</span>' +
               '<button class="btn btn--sm btn--go" id="advGen" data-gen-scope="' + sc + '">產生這個月的建議</button>' +
@@ -2077,7 +2119,9 @@
           (gone.length ? foldBlock('garch', '已封存', '看看', archHTML, String(gone.length) + ' 本', 'archive') : '') +
         '</section>' +
         '<section class="duo__c">' +
-          '<div class="sec"><h2 class="sec__t">活動帳本</h2><span class="sec__n">' + temps.length + ' 本</span></div>' +
+          '<div class="sec"><h2 class="sec__t">活動帳本</h2><span class="sec__n">' + temps.length + ' 本</span>' +
+            /* 活動帳本也從自己這一欄開：打開同一張表單，種類直接選好「活動」 */
+            '<button class="btn btn--sm" data-gnew-temp>開一本</button></div>' +
           (temps.length
             ? ledgerList(temps)
             : '<div class="card">' + emptyState('沒有進行中的活動', '出國、搬家這種有結束日的花費，開一本活動帳本來記。') + '</div>') +
@@ -3414,7 +3458,17 @@
     if (url && /^data:image\//.test(url)) {
       return '<span class="ava ava--img' + cls + '"><img src="' + esc(url) + '" alt=""></span>';
     }
-    return '<span class="ava' + cls + '">' + esc((u && u.avatar) || '') + '</span>';
+    return '<span class="ava' + cls + '">' + esc(avaText(u)) + '</span>';
+  }
+
+  /* 文字頭像：後端給的是名字最後一個字（「王大明」→「明」）。
+     最後一個字不是中文時（「冠文_user」→「r」、「Amy Chen」→「n」）改用英文部分的第一個字母、大寫，
+     跟一般英文頭像的習慣一樣，也不會跟家人的中文頭像撞在一起。 */
+  function avaText(u) {
+    var a = String((u && u.avatar) || '');
+    if (!a || /[\u3400-\u9fff]/.test(a)) return a;
+    var latin = String((u && u.name) || '').match(/[A-Za-z]/);
+    return (latin ? latin[0] : a.charAt(0)).toUpperCase();
   }
 
   /* 帳本切換器。只有一本帳的時候不顯示——一個只有一個選項的下拉是雜訊。 */
@@ -3941,6 +3995,18 @@
       }
     }
 
+    /* 活動帳本那一欄的「開一本」：打開左邊的表單，種類先選好「活動」、結束日一起出現 */
+    if (t.closest('[data-gnew-temp]')) {
+      if (!FOLD.gnew) foldToggle('gnew');
+      var ks = document.getElementById('gnKind');
+      if (ks) { ks.value = 'temp'; }
+      var ew = document.getElementById('gnEndWrap');
+      if (ew) ew.hidden = false;
+      var nm = document.getElementById('gnName');
+      if (nm) { nm.scrollIntoView({ block: 'center', behavior: 'smooth' }); nm.focus(); }
+      return;
+    }
+
     /* 選了「活動」才要填結束日 */
     var kindSel = t.closest('#gnKind');
     if (kindSel) {
@@ -4188,8 +4254,9 @@
 
     var ag = t.closest('#advGen');
     if (ag) {
-      ag.disabled = true; ag.textContent = '產生中…';
+      var stopAdv = waitBtn(ag, '產生中', 'advSlow');
       API.generateAdvices({ scope: ag.dataset.genScope }).then(function (r) {
+        stopAdv();
         if (r.fallback) {
           /* 後端的建議還沒接上：前端用同一批數字寫的，不會存起來，所以直接畫，不重新讀 */
           ADV = r.advices || [];
@@ -4203,6 +4270,7 @@
         vAdvice();
         toast('產生了 ' + r.advices.length + ' 則建議', 'ok');
       }).catch(function (err) {
+        stopAdv();
         ag.disabled = false; ag.textContent = '產生這個月的建議';
         toast(err.message || '沒有產生成功', 'err');
       });
@@ -4221,14 +4289,15 @@
     if (pgo) {
       var txt = document.getElementById('paraText').value.trim();
       if (!txt) { toast('請先寫一段話', 'err'); return; }
-      pgo.disabled = true;
-      pgo.innerHTML = '<span class="btn__sp"></span>解析中';
+      var stopWait = waitBtn(pgo, '解析中', 'paraSlow');
       API.nlpParseBatch(txt).then(function (r) {
+        stopWait();
         pgo.disabled = false; pgo.textContent = '解析這段話';
         renderBatch(r);
         // 後端的模型還沒接上時，前端用規則頂著——講清楚，免得以為是模型的品質
         if (r.fallback) toast(r.note, 'ok');
       }).catch(function (err) {
+        stopWait();
         pgo.disabled = false; pgo.textContent = '解析這段話';
         toast('解析失敗：' + err.message, 'err');
       });
