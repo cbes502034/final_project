@@ -19,7 +19,7 @@ python -m app.cli init-env        # 從 .env.example 建出 .env，順便產生 
 python -m app.cli check-config    # 列出每一段設定填了沒、沒填會怎樣
 docker compose up -d --wait db    # 開 PostgreSQL（在專案最外層跑；要先打開 Docker Desktop）
 alembic upgrade head              # 建表
-python -m app.cli init-db         # 放入系統預設分類
+python -m app.cli init-db         # 放入系統預設分類（正式環境由 alembic 遷移 0004 放，不用跑這個）
 uvicorn app.main:app --reload
 ```
 

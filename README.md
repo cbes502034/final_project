@@ -159,7 +159,7 @@ pip install -r requirements.txt
 python -m app.cli init-env        # 建出 .env（順便產生 JWT_SECRET）
 python -m app.cli check-config    # 看哪些還沒填、沒填會怎樣
 alembic upgrade head              # 建表
-python -m app.cli init-db         # 放入系統預設分類
+python -m app.cli init-db         # 放入系統預設分類（正式環境由 alembic 遷移 0004 放，不用跑這個）
 uvicorn app.main:app --reload
 ```
 

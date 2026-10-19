@@ -747,6 +747,8 @@ def test_遷移建出來的表跟_models_一模一樣(tmp_path):
     """alembic upgrade head 之後再比對一次 models：沒有差異才代表遷移檔跟得上。"""
     from alembic import command
     from alembic.autogenerate import compare_metadata
+
+    from app import catalog
     from alembic.config import Config
     from alembic.migration import MigrationContext
     from sqlalchemy import create_engine
@@ -761,8 +763,20 @@ def test_遷移建出來的表跟_models_一模一樣(tmp_path):
         eng = create_engine(url)
         with eng.connect() as conn:
             diff = compare_metadata(MigrationContext.configure(conn, opts={"compare_type": True}), db.Base.metadata)
+            # 正式環境只跑 alembic，不跑 init-db：系統分類一定要由遷移放進去（以前漏了，線上的分類是空的）
+            seeded = [tuple(r) for r in conn.exec_driver_sql(
+                "SELECT name, kind FROM categories WHERE family_id IS NULL ORDER BY sort_order")]
         eng.dispose()
         assert diff == [], "models 改了但沒有產生遷移：alembic revision --autogenerate -m '...'\n%s" % diff
+        assert seeded == [(n, k) for n, k, _c, _i in catalog.SYSTEM_CATEGORIES], \
+            "升到最新版之後的系統分類跟 app/catalog.py 不一樣：改了 catalog 要再寫一版遷移補上"
+        command.downgrade(cfg, "0003")                   # 0004 降版不刪分類；再升一次不會多出重複的
+        command.upgrade(cfg, "head")
+        eng = create_engine(url)
+        with eng.connect() as conn:
+            again = conn.exec_driver_sql("SELECT COUNT(*) FROM categories WHERE family_id IS NULL").scalar()
+        eng.dispose()
+        assert again == len(catalog.SYSTEM_CATEGORIES)
         command.downgrade(cfg, "base")
     finally:
         if before is None:
