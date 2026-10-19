@@ -3080,10 +3080,17 @@ def test_呼叫_greet_一定要帶使用者():
 def test_網站上只放使用說明_開發文件與開發用的提示都不在前端():
     """使用者要求（2026-10-20）：前端保留完整的 UI，不放開發類型的提示文字或文件——
     那些整理成報告用的資料。開發文件搬到 docs/handbook/；出錯的函式、路由改送到平台管理頁。"""
+    # ⚠️ Render 的靜態站會留著上一版的檔案：刪掉的手冊頁網址還打得開（2026-10-20 線上實測）。
+    #    所以舊網址放一個轉到使用說明的小頁蓋過去——裡面只有轉址，沒有任何內容。
+    moved = ("index", "api", "restful", "fastapi", "files", "model")
     left = sorted(os.listdir(os.path.join(REPO, "frontend", "docs")))
-    assert left == ["docs.js", "guide.html"], left
-    for name in ("index", "api", "restful", "fastapi", "files", "model"):
+    assert set(left) == {"docs.js", "guide.html", "docs.css"} | {n + ".html" for n in moved}, left
+    for name in moved:
         assert os.path.exists(os.path.join(REPO, "docs", "handbook", name + ".html")), name
+        stub = read("frontend/docs/%s.html" % name)
+        assert len(stub.encode("utf-8")) < 400 and 'http-equiv="refresh" content="0; url=guide.html"' in stub, name
+        assert 'name="robots" content="noindex"' in stub, name
+    assert len(read("frontend/docs/docs.css")) < 200, "docs.css 只剩一行註解（手冊的樣式在 docs/handbook/）"
     app = read("frontend/js/app.js")
     for bad in ("已連接後端", "'<div class=\"err__w\">出錯的函式", "這次是前端規則解析的", "先用前端的規則寫的",
                 "後端還沒接上，不會存", "畫面程式出錯：' + ((err && err.message) || err) + (spot"):
