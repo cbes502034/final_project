@@ -92,6 +92,8 @@ def build_prompt(numbers: dict[str, Any], finance_block: str = "") -> tuple[str,
         "basis 是依據，每一條都用下面給的數字寫成算式或句子；suggest 是具體可以做的事；conf 是 0 到 1 的信心度。",
         "任何數字都只能照抄下面給的（包含換算好的比例），不可以自己計算、四捨五入成別的數或編造。",
         "沒有記帳資料（支出與收入都是 0）時，只寫一則 info 提醒先記帳。",
+        "savings.actual 是這個月到目前為止的收入減支出，不是已經存下的錢：不要寫「已存下」，寫「目前收支差額」。",
+        "比例照抄數字就好，不要加「遠低於」「大幅」這類程度詞，也不要拿兩個比例互相比較。",
         "規則：",
     ] + ["- " + r["rule"] for r in catalog.ADVICE_RULES])
     prompt = "\n".join([

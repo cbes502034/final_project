@@ -340,6 +340,8 @@ def test_數字對不上或套錯分類的那一則_不顯示_其他照舊(monke
     prompt, kw = calls[0]
     assert kw["purpose"] == "advice" and kw["schema"] is advice.ADVICE_SCHEMA
     assert "換算好的比例" in prompt and "43.0" in prompt
+    # 線上實測寫出「已存下 30140 元」「遠低於可支配上限的 68.3%」：數字對、說法錯，數字檢查抓不到，靠規則先講清楚
+    assert "不要寫「已存下」" in kw["system"] and "遠低於" in kw["system"]
     # 全部不合格：不要硬回一堆錯的數字，丟 ModelError（路由回 503，前端用同一批數字自己寫）
     monkeypatch.setattr(client, "complete_json", lambda prompt, **kw: {"advices": [made_up, swapped]})
     with pytest.raises(client.ModelError):
