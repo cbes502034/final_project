@@ -3034,3 +3034,33 @@ def test_稽核動作都要有中文對照():
     known = set(re.findall(r"(\w+):", block))
     missing = sorted(actions - known)
     assert not missing, "frontend/js/app.js 的 AUDIT_TW 少了：%s" % missing
+
+
+def test_一個畫面不放兩個同樣的入口():
+    """2026-10-19 使用者觀點逐頁檢查找到的重複：
+      · 收支明細頁有兩顆「記一筆」（右上角＋標題列）
+      · 手機的常用功能跟底部分頁列重複（明細、統計、建議），左上角「‹ 總覽」也是分頁列第一格
+      · 財務建議頁同時有「搜尋店家或備註」和「搜尋建議」兩個搜尋框
+      · 總覽皮夾卡的「→ 看統計」跟常用功能的「統計」重複
+    """
+    app = read("frontend/js/app.js")
+    css = read("frontend/css/app.css")
+    assert 'body[data-page="entry"] .appbar__add { display: none; }' in css
+    assert "document.body.dataset.page = page || 'home';" in app
+    assert "dtile--tabbar" in app and "#view .dtile--tabbar { display: none; }" in css
+    assert ".appbar__home { display: none !important; }" in css
+    for page in ("advice", "members", "groups", "profile"):
+        assert 'body[data-page="%s"] #searchBtn' % page in css, page
+    assert "wal__go" not in app and "wal__go" not in css
+
+
+def test_預算區的連結到得了設定預算的地方():
+    """總覽「預算使用狀況」以前寫「看統計 ›」，但統計頁沒有預算——預算是在個人資料設定的。"""
+    app = read("frontend/js/app.js")
+    assert '<a class="sec__link" href="#/profile/budget">調整預算 ›</a>' in app
+    assert "if (at === 'budget')" in app and "foldToggle('bud')" in app
+
+
+def test_呼叫_greet_一定要帶使用者():
+    """個人資料頁的主題預覽寫成 greet()（沒帶使用者），整頁出錯打不開。要的是 greeting()（早安／午安／晚安）。"""
+    assert not re.search(r"greet\(\s*\)", read("frontend/js/app.js"))

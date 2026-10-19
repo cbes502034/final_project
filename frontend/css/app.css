@@ -3450,14 +3450,6 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 #view .wal__f { display: flex; flex-direction: column; line-height: 1.35; }
 #view .wal__f span { font-size: 12.5px; color: var(--ink-faint); }
 #view .wal__f b { font-size: 17px; font-weight: 700; color: var(--ink); }
-#view .wal__go {
-  margin-left: auto; width: 42px; height: 42px; display: grid; place-items: center;
-  color: var(--accent); background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--r-sm); box-shadow: var(--shadow-flat);
-  transition: background-color .16s var(--ease), color .16s var(--ease), border-color .16s var(--ease);
-}
-#view .wal__go:hover { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
-#view .wal__go svg { width: 18px; height: 18px; }
 
 /* 常用功能 */
 #view .qk {
@@ -3602,6 +3594,15 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 /* ---------- 手機底部分頁 ---------- */
 .tabbar { display: none; }
 
+/* 一頁只放一個「記一筆」：收支明細自己的標題列就有，右上角那顆收起來 */
+body[data-page="entry"] .appbar__add { display: none; }
+/* 頁首的「搜尋店家或備註」是搜明細用的：財務建議頁有自己的「搜尋建議」，
+   家庭成員、帳本、個人資料跟明細無關——這幾頁收起來，不要出現兩個搜尋框 */
+body[data-page="advice"] #searchBtn, body[data-page="advice"] #searchDrawer,
+body[data-page="members"] #searchBtn, body[data-page="members"] #searchDrawer,
+body[data-page="groups"] #searchBtn, body[data-page="groups"] #searchDrawer,
+body[data-page="profile"] #searchBtn, body[data-page="profile"] #searchDrawer { display: none !important; }
+
 /* ---------- RWD ---------- */
 @media (max-width: 1080px) {
   #view .dash { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--gap) 18px; }
@@ -3612,6 +3613,9 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
   .phead { padding-top: 16px; }
   #view .dash { grid-template-columns: minmax(0, 1fr); }
   #view .dtile--add { display: none; }   /* 這兩種情況沒有分頁列 */
+  /* 底部分頁列已經有明細、統計、建議，常用功能就不再放一次；左上角的「← 總覽」也是分頁列的第一格 */
+  #view .dtile--tabbar { display: none; }
+  .appbar__home { display: none !important; }
   .appbar .bell__panel { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; }
 
   .tabbar {

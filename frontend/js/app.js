@@ -403,7 +403,7 @@
      照富邦新版的首頁：沒有側欄，所有功能都嵌在這一頁上。
        1. 疊卡       後面露出收入、支出，最前面是這個月還可以花
        2. 常用功能   收支明細、帳本、統計、財務建議、家庭成員、個人資料、使用說明（電腦版多一顆記一筆）
-       3. 預算       一個分類一張小卡，右上角「看統計 ›」
+       3. 預算       一個分類一張小卡，右上角「調整預算 ›」（預算在個人資料設定）
        4. 今天       今天記的每一筆——一打開就知道今天的動向
        全家模式在預算後面多「每個人的這個月」，今天的紀錄也換成全家的
 
@@ -459,7 +459,9 @@
     var attr = t.id ? ' id="' + t.id + '"'
       : t.quick ? ' data-quick="entry"' : t.nav !== undefined ? ' data-nav="' + t.nav + '"' : '';
     var tag = t.href ? 'a' : 'button';
-    return '<' + tag + ' class="dtile' + (t.tone ? ' dtile--' + t.tone : '') + '"' + attr + (t.href ? ' href="' + t.href + '"' : '') + '>' +
+    /* 手機的底部分頁列已經有明細、統計、建議：這三格在那個寬度收起來，不要同一個畫面兩個入口 */
+    var inBar = ['entry', 'stats', 'advice'].indexOf(t.nav) >= 0 ? ' dtile--tabbar' : '';
+    return '<' + tag + ' class="dtile' + (t.tone ? ' dtile--' + t.tone : '') + inBar + '"' + attr + (t.href ? ' href="' + t.href + '"' : '') + '>' +
       '<span class="dtile__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + TILE_IC[t.icon] + '</svg></span>' +
       '<span class="dtile__t">' + esc(t.label) + '</span>' +
@@ -566,10 +568,7 @@
               '<span>每月想存 <b>' + num(sv.goal) + '</b></span></div>' +
             '<div class="wal__foot">' +
               '<div class="wal__f"><span>結餘</span><b>' + amt(d.net) + '</b></div>' +
-              '<div class="wal__f"><span>存下</span><b>' + pct(d.rate) + '</b></div>' +
-              '<a class="wal__go" href="#/stats" aria-label="看統計" title="看統計">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
-                'stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>' +
+              '<div class="wal__f"><span>結餘率</span><b>' + pct(d.rate) + '</b></div>' +
             '</div>' +
           '</div>' +
         '</section>';
@@ -582,7 +581,7 @@
         /* 3. 預算：一個分類一張小卡 */
         h += '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
           (budgets.length ? '<span class="sec__n">' + budgets.length + ' 項</span>' : '') +
-          '<a class="sec__link" href="#/stats">看統計 ›</a></div>';
+          '<a class="sec__link" href="#/profile/budget">調整預算 ›</a></div>';
         h += b.__err ? errState(b.__err) : budgets.length
           ? '<div class="bgrid">' + budgets.map(function (x) {
               var p = Math.round(x.pct * 100);
@@ -665,9 +664,9 @@
         var sign = t.kind === 'income' ? '+' : t.kind === 'expense' ? '−' : '';
         return '<li><a class="tdy__i" href="#/entry">' +
           '<span class="tdy__ic" style="--c:' + tint(t.catColor) + '">' + esc((t.catName || '記').charAt(0)) + '</span>' +
-          '<span class="tdy__m"><b>' + esc(t.merchant || t.catName) + '</b>' +
+          '<span class="tdy__m"><b>' + esc(t.merchant || t.note || t.catName) + '</b>' +
             '<small>' + esc(t.catName) + (fam ? ' · ' + esc(t.userName) : '') +
-              (t.note ? ' · ' + esc(t.note) : '') + '</small></span>' +
+              (t.merchant && t.note && t.note !== t.catName ? ' · ' + esc(t.note) : '') + '</small></span>' +
           '<span class="tdy__a is-' + esc(t.kind) + '">' + sign + num(t.amount) + '</span>' +
         '</a></li>';
       }).join('') + '</ul>' +
@@ -1439,7 +1438,7 @@
         h += '<div class="duo">' +
           '<section class="duo__c"><div class="card card--flush">' +
             '<table class="dt"><thead><tr><th>' + (month ? '月份' : '年度') + '</th>' +
-              '<th class="rt">收入</th><th class="rt">支出</th><th class="rt">結餘</th><th>存下</th></tr></thead><tbody>' +
+              '<th class="rt">收入</th><th class="rt">支出</th><th class="rt">結餘</th><th>結餘率</th></tr></thead><tbody>' +
             rows.slice().reverse().map(function (r) {
               var net = r.income - r.expense, rate = r.income ? net / r.income : 0;
               var w = Math.max(0, Math.min(100, rate * 200));
@@ -3250,6 +3249,12 @@
         var thm = document.querySelector('.thm');
         if (thm && thm.scrollIntoView) thm.scrollIntoView({ block: 'start', behavior: 'smooth' });
       }
+      /* 從總覽的「調整預算 ›」進來的：直接打開每月預算那一段 */
+      if (at === 'budget') {
+        if (!FOLD.bud) foldToggle('bud');
+        var bud = document.getElementById('fold-bud');
+        if (bud && bud.scrollIntoView) bud.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
     });
   }
 
@@ -3294,7 +3299,7 @@
       return '<button type="button" class="thm__i' + (on ? ' on' : '') + '" data-theme-pick="' + esc(t.id) + '" ' +
           'aria-pressed="' + on + '">' +
         '<span class="thm__pv" data-theme="' + esc(t.id) + '" aria-hidden="true">' +
-          '<span class="thm__hi">' + greet() + '</span>' +
+          '<span class="thm__hi">' + greeting() + '</span>' +
           '<span class="thm__s thm__s--1"></span><span class="thm__s thm__s--2"></span>' +
           '<span class="thm__c">6,770<i></i></span>' +
           '<span class="thm__q"><b></b><b></b><b></b><b></b></span>' +
@@ -3536,6 +3541,7 @@
         var hb = document.getElementById('homeBtn');
         if (hb) hb.hidden = page === '' || page === 'admin' || OPEN.indexOf(page) >= 0;
         document.body.classList.toggle('is-home', page === '');
+        document.body.dataset.page = page || 'home';
         var tab = page === 'member' ? 'members' : page;
         Array.prototype.forEach.call(document.querySelectorAll('.tabbar__i[data-tab]'), function (b) {
           b.classList.toggle('on', b.dataset.tab === tab);
