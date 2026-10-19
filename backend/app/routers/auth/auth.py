@@ -35,7 +35,7 @@ from app.models import (
 )
 from app.routers._stub import not_ready, stub
 from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
 from app.toolkit.config import settings
 from app.toolkit.db import get_db
 from app.toolkit.deps import current_token_payload
@@ -58,6 +58,8 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         新帳號沒有家庭（role 是 null）、主題是 paper、onboardedAt 是 null——前端會帶他去「註冊後的個人化設定」。
         同時開一本「〈名字〉的帳本」：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了。
         ⚠️ 存款目標不在註冊時問：帶了 savingsGoal 回 400。默默吃掉的話，使用者會以為設好了。
+        ⚠️ 同一個來源一小時內最多註冊 REGISTER_PER_HOUR 個（預設 5）：每註冊一個就寄一封信，
+           大量註冊會把每天的寄信額度灌完，真的使用者就收不到驗證信跟重設密碼的信。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.register({ name, email, password })
@@ -97,6 +99,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         422     名字整理完是空的                    請填名字
         422     email 格式不對                      email 格式看起來不對
         422     密碼太弱                            密碼至少要 8 個字（passwords 丟出來的那句話）
+        429     同一個來源一小時內註冊太多個        這台裝置短時間內註冊太多帳號了，請一小時後再試
         ⚠️ 已經註冊過要回 409（跟現有資料衝突），不是 422。
 
     【會用到的資料表】
@@ -105,18 +108,22 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         groups         寫      第一本帳本「〈名字〉的帳本」
         group_members  寫      自己是那本帳的成員
         sessions       寫      這一台的登入工作階段（只存 refresh token 的指紋）
+        security_events  讀＋寫  這個來源一小時內註冊了幾個；註冊成功記一筆 register
 
     【每一步用的工具與資料庫方法】
         步驟     呼叫                                        做什麼
         2 email  password_reset.normalize_email(body.email)  去空白、轉小寫、檢查格式；不對丟 ValueError
                  crud.exists(User, {"email": email}, db=db)  有沒有人用過
         3 密碼   passwords.hash_password(body.password)      先檢查強度（太弱丟 WeakPassword），再算雜湊
+          限量   security.source_of(request)                 來源 IP（Render 前面有代理，不能用 request.client.host）
+                 security.register_blocked(ip, db=db)        太多了回要給使用者看的話（第一次擋下時記一筆 register_limited）
         4 帳本   crud.save(Group, {"name": …, "color": catalog.GROUP_COLORS[0], "created_by": user.id, "kind": "standing"}, db=db)
                  crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)  自己加進去
         5 登入   tokens.make_refresh_token(user.id)          回傳 (token, 到期時間)
                  tokens.fingerprint(token)                   token 的指紋（SHA-256），資料庫只存這個
                  request.headers.get("user-agent", "")       瀏覽器自己報的名字，「登入中的裝置」會用
-                 request.client.host                         連線的 IP；只存指紋，不存原文
+                 tokens.fingerprint(ip)                      連線的 IP；只存指紋，不存原文
+                 security.record("register", db=db, user_id=…, ip=ip)  記一筆，下一次數得到
                  crud.save(UserSession, {…}, db=db)          新增一列，session.id（UUID）會自動產生
                  tokens.make_access_token(user.id, extra={"sid": str(session.id)})  短效的通行證，裡面帶 sid
                  db.commit()                                 帳號與 session 一起寫進去
@@ -128,7 +135,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     【寫法步驟】
         1. 帶了 savingsGoal → 400
         2. 整理名字（422）、email（422）；email 用過 → 409
-        3. 密碼檢查強度、算雜湊（422）
+        3. 密碼檢查強度、算雜湊（422）；這個來源一小時內註冊太多個 → 429
         4. 新增帳號：主題 paper、onboarded_at 留 NULL；開一本「〈名字〉的帳本」（名字最多取 17 字，帳本名最多 20 字）
         5. 新增一列 sessions，發 refresh token 與 access token（帶 sid），db.commit()
         6. 背景寄驗證信（新增帳號時順便記下 email_verify_sent_at，重寄的冷卻從這裡算）
@@ -151,7 +158,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -180,6 +187,13 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
             except passwords.WeakPassword as exc:
                 raise errors.unprocessable(str(exc)) from None
 
+            #    同一個來源一小時內註冊太多個 → 429（大量註冊會把每天的寄信額度灌完，真的使用者就收不到信）
+            ip = security.source_of(request)
+            blocked = security.register_blocked(ip, db=db)
+            if blocked:
+                db.commit()                                     # 第一次被擋時記的那一筆要留著
+                raise HTTPException(status_code=429, detail=blocked)
+
             # 4. 新增帳號（onboarded_at 是 NULL：登入後前端會帶去個人化設定）
             now = datetime.now(timezone.utc)
             user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
@@ -192,7 +206,6 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
 
             # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
             refresh, expires = tokens.make_refresh_token(user.id)
-            ip = request.client.host if request.client else ""
             session = crud.save(UserSession, {
                 "user_id": user.id,
                 "refresh_token_hash": tokens.fingerprint(refresh),
@@ -201,6 +214,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
                 "expires_at": expires,
                 "last_seen_at": now,
             }, db=db)
+            security.record("register", db=db, user_id=user.id, ip=ip)     # 數「同一個來源註冊了幾個」用
             db.commit()
 
             # 6. 寄驗證信（背景寄，回應不等 Brevo）：點了連結才算確認 email 是本人的；寄不出去只記 log，帳號照樣建好
@@ -274,6 +288,13 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     except passwords.WeakPassword as exc:
         raise errors.unprocessable(str(exc)) from None
 
+    #    同一個來源一小時內註冊太多個 → 429（大量註冊會把每天的寄信額度灌完，真的使用者就收不到信）
+    ip = security.source_of(request)
+    blocked = security.register_blocked(ip, db=db)
+    if blocked:
+        db.commit()                                     # 第一次被擋時記的那一筆要留著
+        raise HTTPException(status_code=429, detail=blocked)
+
     # 4. 新增帳號（onboarded_at 是 NULL：登入後前端會帶去個人化設定）
     now = datetime.now(timezone.utc)
     user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
@@ -286,7 +307,6 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
 
     # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
     refresh, expires = tokens.make_refresh_token(user.id)
-    ip = request.client.host if request.client else ""
     session = crud.save(UserSession, {
         "user_id": user.id,
         "refresh_token_hash": tokens.fingerprint(refresh),
@@ -295,6 +315,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         "expires_at": expires,
         "last_seen_at": now,
     }, db=db)
+    security.record("register", db=db, user_id=user.id, ip=ip)     # 數「同一個來源註冊了幾個」用
     db.commit()
 
     # 6. 寄驗證信（背景寄，回應不等 Brevo）：點了連結才算確認 email 是本人的；寄不出去只記 log，帳號照樣建好
@@ -345,6 +366,9 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         ⚠️ 「沒有這個帳號」跟「密碼錯」回同一句話、同一個 401：分開講等於送出一支帳號列舉工具。
         ⚠️ 查無此人也要跑一次雜湊比對：不然「不存在」會比「密碼錯」快很多，用回應時間一樣問得出來。
         ⚠️ 密碼對了才看停權：順序反過來，任何人拿一個 email 亂打密碼，就能試出「這個帳號是不是被停權了」。
+        ⚠️ 防暴力猜密碼：同一個 email 15 分鐘內錯 5 次（LOGIN_MAX_FAILURES）就鎖 15 分鐘，這段時間連對的密碼也不收；
+           同一個來源錯 20 次（不管哪個帳號，撞庫）也鎖 15 分鐘。**帳號不存在也一樣算、一樣鎖**——
+           只鎖存在的帳號的話，「會不會被鎖」就洩漏了帳號在不在。每一次失敗都記進 security_events，平台管理頁看得到。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.login({ email, password })
@@ -352,7 +376,8 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
 
     【誰能打】
         任何人都能打，不用登入（上面沒有守衛）。
-        另外收一個 request（FastAPI 的 Request）：要記下這一台的瀏覽器（User-Agent）與 IP 的雜湊。
+        另外收一個 request（FastAPI 的 Request）：要記下這一台的瀏覽器（User-Agent）與 IP 的雜湊；
+        IP 用 security.source_of(request) 拿（Render 前面有代理，request.client.host 是代理的位址）。
 
     【請求主體】body 是 LoginIn（app/schemas/auth.py）
         欄位      型別  必填  說明
@@ -373,6 +398,8 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         狀態碼  什麼時候                detail
         401     沒有這個帳號、或密碼錯  email 或密碼不對
         403     密碼對，但帳號被停權    這個帳號已被停權：（停權理由）
+        429     同一個 email 錯太多次   密碼錯太多次了，請 15 分鐘後再試
+        429     同一個來源錯太多次      這台裝置登入失敗太多次了，請 15 分鐘後再試
 
     【會用到的資料表】
         表              讀／寫  用來做什麼
@@ -380,12 +407,18 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         sessions        寫      這一台的登入工作階段
         family_members  讀      角色與家庭
         savings_goals   讀      目前的整體存款目標
+        security_events 讀＋寫  數最近錯了幾次、有沒有被鎖；錯一次記一筆 login_failed
 
     【每一步用的工具與資料庫方法】
         步驟      呼叫                                                           做什麼
-        1 找人    crud.get(User, where={"email": …}, db=db)                      找不到回 None
+        1 鎖住    security.source_of(request)                                    來源 IP（X-Forwarded-For 的第一個）
+                  security.login_blocked(email, ip, db=db)                       被鎖住回要給使用者看的話，沒有回 None
+                  HTTPException(status_code=429, detail=…)                       errors 裡沒有 429，直接用 FastAPI 的
+          找人    crud.get(User, where={"email": …}, db=db)                      找不到回 None
         2 比對    passwords.verify_password(明碼, 雜湊)                          對回 True；雜湊壞掉也只回 False，不會爆
                   一組固定的假雜湊                                               查無此人時拿它比對，花的時間跟真的比對一樣
+          記錯    security.login_failed(email, ip, db=db, user_id=…)             記一筆；次數到了順便記 login_locked（開始鎖）
+                  db.commit()                                                    要在丟 401 之前 commit，不然這一次不會被算到
         3 停權    roles.require_active(user.suspended_at)                        停權中丟 Forbidden（PermissionError 的一種）
         4 登入    tokens.make_refresh_token／fingerprint／make_access_token      同註冊
                   crud.save(User, {"id": user.id, "last_login_at": now}, db=db)  記最後登入時間
@@ -394,8 +427,8 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
                   images.to_data_uri(user.avatar_bytes, user.avatar_mime)        有大頭貼才轉
 
     【寫法步驟】
-        1. email 轉小寫找人
-        2. 有沒有人都跑一次 verify_password；沒這個人或密碼錯 → 同一句 401
+        1. email 轉小寫；被鎖住 → 429（這時候連比對都不做）；找人
+        2. 有沒有人都跑一次 verify_password；沒這個人或密碼錯 → 記一筆失敗、commit，同一句 401
         3. 停權 → 403（附理由）
         4. 新增一列 sessions、記 last_login_at，db.commit()
         5. 查角色、家庭、存款目標，組成 user，跟兩張 token 一起回傳
@@ -417,7 +450,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -425,13 +458,23 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
         裝飾器、函式名稱、參數和這段說明字串都不用動。
 
-            # 1. 找人（email 一律小寫比對）
-            user = crud.get(User, where={"email": body.email.strip().lower()}, db=db)
+            # 1. 先看有沒有被鎖住：同一個 email 或同一個來源錯太多次（帳號存不存在都一樣算，見 toolkit/security.py）
+            email = body.email.strip().lower()
+            ip = security.source_of(request)
+            blocked = security.login_blocked(email, ip, db=db)
+            if blocked:
+                raise HTTPException(status_code=429, detail=blocked)
+
+            #    找人（email 一律小寫比對）
+            user = crud.get(User, where={"email": email}, db=db)
 
             # 2. 比對密碼。查無此人也跑一次（拿一組沒有人用的雜湊），兩種情況花的時間才會一樣
             dummy = "$2b$12$CXOgrZ2hWSUTEYKsghc3uuIaM/ekXB01qlBO04c4x/4cP9.xYOr3G"
             ok = passwords.verify_password(body.password, user.password_hash if user else dummy)
             if user is None or not ok:
+                # 記一筆失敗（次數到了就開始鎖）。先 commit 再回 401：不然請求一結束這筆就跟著被丟掉
+                security.login_failed(email, ip, db=db, user_id=user.id if user else None)
+                db.commit()
                 raise errors.unauthorized("email 或密碼不對")
 
             # 3. 密碼對了才看停權
@@ -443,7 +486,6 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             # 4. 寫一列 sessions（只存 refresh token 的指紋），記最後登入時間
             now = datetime.now(timezone.utc)
             refresh, expires = tokens.make_refresh_token(user.id)
-            ip = request.client.host if request.client else ""
             session = crud.save(UserSession, {
                 "user_id": user.id,
                 "refresh_token_hash": tokens.fingerprint(refresh),
@@ -494,17 +536,28 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
                密碼錯                            → 401「email 或密碼不對」
                沒註冊過的 email                  → 401，而且是同一句話
                被停權的帳號、密碼正確            → 403，附停權理由
+               同一個 email 連續錯 5 次之後      → 429，就算打對也一樣（15 分鐘後才解開）
         5. 資料庫 sessions 多一列，refresh_token_hash 不是 token 原文
         6. 前端改成連你的後端（frontend/index.html 的 api-base），登入頁登入，進到總覽（還沒走個人化設定的會先到設定頁）
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "login and 你的"，要全部通過
     """
-    # 1. 找人（email 一律小寫比對）
-    user = crud.get(User, where={"email": body.email.strip().lower()}, db=db)
+    # 1. 先看有沒有被鎖住：同一個 email 或同一個來源錯太多次（帳號存不存在都一樣算，見 toolkit/security.py）
+    email = body.email.strip().lower()
+    ip = security.source_of(request)
+    blocked = security.login_blocked(email, ip, db=db)
+    if blocked:
+        raise HTTPException(status_code=429, detail=blocked)
+
+    #    找人（email 一律小寫比對）
+    user = crud.get(User, where={"email": email}, db=db)
 
     # 2. 比對密碼。查無此人也跑一次（拿一組沒有人用的雜湊），兩種情況花的時間才會一樣
     dummy = "$2b$12$CXOgrZ2hWSUTEYKsghc3uuIaM/ekXB01qlBO04c4x/4cP9.xYOr3G"
     ok = passwords.verify_password(body.password, user.password_hash if user else dummy)
     if user is None or not ok:
+        # 記一筆失敗（次數到了就開始鎖）。先 commit 再回 401：不然請求一結束這筆就跟著被丟掉
+        security.login_failed(email, ip, db=db, user_id=user.id if user else None)
+        db.commit()
         raise errors.unauthorized("email 或密碼不對")
 
     # 3. 密碼對了才看停權
@@ -516,7 +569,6 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     # 4. 寫一列 sessions（只存 refresh token 的指紋），記最後登入時間
     now = datetime.now(timezone.utc)
     refresh, expires = tokens.make_refresh_token(user.id)
-    ip = request.client.host if request.client else ""
     session = crud.save(UserSession, {
         "user_id": user.id,
         "refresh_token_hash": tokens.fingerprint(refresh),
@@ -632,7 +684,7 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -805,7 +857,7 @@ def logout(
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -914,7 +966,7 @@ def logout_all(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -1034,7 +1086,7 @@ def get_me(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -1237,7 +1289,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -1463,7 +1515,7 @@ def change_password(
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -1619,7 +1671,7 @@ def request_password_reset(body: PasswordResetIn, background: BackgroundTasks, d
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -1790,7 +1842,7 @@ def confirm_password_reset(
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -1913,7 +1965,7 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -2045,7 +2097,7 @@ def resend_verify_email(me: User, background: BackgroundTasks, db: Session = Dep
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -2183,7 +2235,7 @@ def get_finance(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -2314,7 +2366,7 @@ def set_finance(body: FinanceIn, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -2416,7 +2468,8 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
 
     【會用到的資料表】
         表          讀／寫  用來做什麼
-        audit_logs  讀＋寫  數最近 15 分鐘錯了幾次；錯一次記一筆 verify_password_failed
+        audit_logs       讀＋寫  數最近 15 分鐘錯了幾次；錯一次記一筆 verify_password_failed
+        security_events  寫      錯到第 5 次（開始鎖）記一筆 verify_locked
 
     【每一步用的工具與資料庫方法】
         步驟    呼叫                                                        做什麼
@@ -2424,6 +2477,7 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
                 HTTPException(status_code=429, detail="…")                  errors 裡沒有 429，直接用 FastAPI 的
         2 比對  passwords.verify_password(body.password, me.password_hash)  對回 True
         3 記錯  crud.save(AuditLog, {…}, db=db)＋db.commit()                要在丟 400 之前 commit，不然這一次不會被算到
+                security.record("verify_locked", db=db, user_id=me.id, …)  錯到第 5 次時記：平台管理頁的安全事件
         · 為什麼記在 audit_logs：資料在資料庫裡，重開伺服器、開好幾台都算得到；平台管理員也看得到有人在猜密碼。
 
     【寫法步驟】
@@ -2448,7 +2502,7 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -2470,6 +2524,9 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
             # 3. 錯了記一筆（先存起來才算得到），回 400（不是 401）
             crud.save(AuditLog, {"actor_id": me.id, "action": "verify_password_failed", "target_type": "user",
                                  "target_id": me.id}, db=db)
+            if failures + 1 >= 5:
+                # 這一次剛好鎖住：記成安全事件，平台管理頁才看得到「有人拿著登入狀態在猜密碼」
+                security.record("verify_locked", db=db, user_id=me.id, detail="15 分鐘內錯了 5 次")
             db.commit()
             raise errors.bad_request("密碼不正確")
 
@@ -2498,6 +2555,9 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
     # 3. 錯了記一筆（先存起來才算得到），回 400（不是 401）
     crud.save(AuditLog, {"actor_id": me.id, "action": "verify_password_failed", "target_type": "user",
                          "target_id": me.id}, db=db)
+    if failures + 1 >= 5:
+        # 這一次剛好鎖住：記成安全事件，平台管理頁才看得到「有人拿著登入狀態在猜密碼」
+        security.record("verify_locked", db=db, user_id=me.id, detail="15 分鐘內錯了 5 次")
     db.commit()
     raise errors.bad_request("密碼不正確")
 
@@ -2570,7 +2630,7 @@ def list_sessions(me: User, payload: dict = Depends(current_token_payload), db: 
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -2713,7 +2773,7 @@ def upload_avatar(body: AvatarIn, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload
@@ -2817,7 +2877,7 @@ def delete_avatar(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
-            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, theme, tokens
+            from app.toolkit import crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
             from app.toolkit.deps import current_token_payload

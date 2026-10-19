@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RESTful API 說明書</title>
-<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 72 支路由哪裡符合、哪裡故意不符合。">
+<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 75 支路由哪裡符合、哪裡故意不符合。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -18,8 +18,8 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="../css/tokens.css?v=150">
-<link rel="stylesheet" href="../css/themes.css?v=150">
+<link rel="stylesheet" href="../../frontend/css/tokens.css?v=150">
+<link rel="stylesheet" href="../../frontend/css/themes.css?v=150">
 <link rel="stylesheet" href="docs.css?v=19">
 <style>
 /* ---- RESTful 說明書：代表色是紫（docs.css 的 .rs） ---- */
@@ -65,7 +65,7 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <a class="brand rail__home" href="../index.html" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
+      <a class="brand rail__home" href="https://fambudget-web.onrender.com/" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
       <div class="rail__doc">
         <div class="rail__t">RESTful 說明書</div>
         <div class="rail__s">API 設計</div>
@@ -86,7 +86,7 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
       <a class="nav__out" href="api.html"><i>&#8599;</i>API 瀏覽</a>
       <a class="nav__out" href="files.html"><i>&#8599;</i>檔案系統說明書</a>
       <a class="nav__out" href="index.html"><i>&#8599;</i>專題手冊</a>
-      <a class="nav__back" href="../index.html"><i>←</i>回到系統</a>
+      <a class="nav__back" href="https://fambudget-web.onrender.com/"><i>←</i>回到系統</a>
     </div>
   </nav>
 
@@ -100,12 +100,12 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
         REST 不是技術，是一套<b>取名字的約定</b>。約定好之後，
         別人看到你的網址就猜得出它會做什麼——不用問你、不用翻文件。<br>
         這份文件會先用<b>圖書館</b>把概念講完，再回頭誠實檢查
-        我們自己的 72 支路由：哪些符合、哪些故意不符合、哪些可以改。
+        我們自己的 75 支路由：哪些符合、哪些故意不符合、哪些可以改。
       </p>
       <div class="hero__meta">
         <div class="mchip"><span>預計閱讀</span><b>25 分鐘</b></div>
         <div class="mchip"><span>前置知識</span><b>看過 FastAPI 說明書</b></div>
-        <div class="mchip"><span>本專案</span><b>72 支路由</b></div>
+        <div class="mchip"><span>本專案</span><b>75 支路由</b></div>
       </div>
     </header>
     <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
@@ -520,10 +520,10 @@ DELETE /books/5
 
     <!-- ============ 08 ============ -->
     <section class="sec" id="ours">
-      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 72 支</h2></div>
+      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 75 支</h2></div>
       <p class="sec__lead">
         我把本專案的每一支路由都對上面的規則檢查過（清單跟 <code>backend/app/ownership.py</code> 一致，有測試對）。
-        結果是：<b>72 支裡有 35 支完全符合，37 支嚴格說不符合 REST 慣例。</b>
+        結果是：<b>75 支裡有 38 支完全符合，37 支嚴格說不符合 REST 慣例。</b>
       </p>
 
       <div class="note">
@@ -532,13 +532,13 @@ DELETE /books/5
         真的可以改得更一致的是 10 支。下面逐類講。</p>
       </div>
 
-      <h3 class="sub">完全符合（35 支）</h3>
+      <h3 class="sub">完全符合（38 支）</h3>
       <p style="color:var(--ink-soft);max-width:64ch">網址是名詞、集合用複數、動作靠方法表達，照第 2～4 節寫的就是這些：</p>
       <div class="tw">
         <table>
           <thead><tr><th>路由</th></tr></thead>
           <tbody>
-            <tr><td class="rt">POST /api/auth/password-reset<br>GET /api/auth/sessions<br>GET /api/admin/users<br>GET /api/transactions<br>POST /api/transactions<br>PATCH /api/transactions/{tx_id}<br>DELETE /api/transactions/{tx_id}<br>DELETE /api/transactions<br>GET /api/categories<br>POST /api/categories<br>GET /api/groups<br>POST /api/groups<br>PATCH /api/groups/{gid}<br>POST /api/groups/{gid}/members<br>DELETE /api/groups/{gid}/members/{user_id}<br>GET /api/budgets<br>GET /api/savings-goals<br>GET /api/alerts<br>POST /api/alerts<br>PATCH /api/alerts/{aid}<br>DELETE /api/alerts/{aid}<br>GET /api/advices<br>GET /api/family/invites<br>POST /api/family/invites<br>DELETE /api/family/invites/{invite_id}<br>PATCH /api/family/members/{user_id}<br>DELETE /api/family/members/{user_id}<br>GET /api/guardianships<br>POST /api/guardianships<br>DELETE /api/guardianships/{gid}<br>GET /api/notifications<br>PATCH /api/notifications/{nid}<br>PATCH /api/notifications<br>GET /api/allowances<br>GET /api/audit</td></tr>
+            <tr><td class="rt">POST /api/auth/password-reset<br>GET /api/auth/sessions<br>GET /api/admin/users<br>GET /api/admin/errors<br>GET /api/admin/security-events<br>POST /api/client-errors<br>GET /api/transactions<br>POST /api/transactions<br>PATCH /api/transactions/{tx_id}<br>DELETE /api/transactions/{tx_id}<br>DELETE /api/transactions<br>GET /api/categories<br>POST /api/categories<br>GET /api/groups<br>POST /api/groups<br>PATCH /api/groups/{gid}<br>POST /api/groups/{gid}/members<br>DELETE /api/groups/{gid}/members/{user_id}<br>GET /api/budgets<br>GET /api/savings-goals<br>GET /api/alerts<br>POST /api/alerts<br>PATCH /api/alerts/{aid}<br>DELETE /api/alerts/{aid}<br>GET /api/advices<br>GET /api/family/invites<br>POST /api/family/invites<br>DELETE /api/family/invites/{invite_id}<br>PATCH /api/family/members/{user_id}<br>DELETE /api/family/members/{user_id}<br>GET /api/guardianships<br>POST /api/guardianships<br>DELETE /api/guardianships/{gid}<br>GET /api/notifications<br>PATCH /api/notifications/{nid}<br>PATCH /api/notifications<br>GET /api/allowances<br>GET /api/audit</td></tr>
           </tbody>
         </table>
       </div>
@@ -733,14 +733,14 @@ DELETE /books/5
       <div class="note">
         <div class="note__k">動工前先看這兩份</div>
         <p><a href="fastapi.html">FastAPI 說明書</a> —— 怎麼用程式把這些實作出來<br>
-        <a href="api.html">API 瀏覽</a> —— 本專案 72 支路由的完整清單<br>
+        <a href="api.html">API 瀏覽</a> —— 本專案 75 支路由的完整清單<br>
         還有 <code>docs/02-前後端串接契約.md</code> —— 每一支「我送什麼、你吐什麼」</p>
       </div>
     </section>
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · RESTful API 說明書</div>
-      <div class="mono">72 ROUTES · 5 METHODS</div>
+      <div class="mono">75 ROUTES · 5 METHODS</div>
     </footer>
 
   </div>

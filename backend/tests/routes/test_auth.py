@@ -5,8 +5,9 @@ from datetime import timedelta
 
 import pytest
 
-from app.models import AuditLog, Group, GroupMember, PasswordReset, User, UserSession
-from app.toolkit import crud, email_verify, mailer, password_reset, passwords, tokens
+from app.models import AuditLog, ErrorLog, Group, GroupMember, PasswordReset, SecurityEvent, User, UserSession
+from app.toolkit import crud, email_verify, mailer, password_reset, passwords, security, tokens
+from app.toolkit.config import settings
 from tests.routes.conftest import PASSWORD, family_of, goal, guard, ledger_of, login, now, this_month, user
 
 
@@ -304,6 +305,8 @@ def test_verify_password_錯五次就先停(api):
         assert r.status_code == 400 and r.json()["detail"] == "密碼不正確"
     assert api.post("/api/auth/verify-password", headers=h, json={"password": PASSWORD}).status_code == 429
     assert crud.count(AuditLog, {"action": "verify_password_failed"}) == 5
+    # 錯到第 5 次（開始鎖）記成安全事件，平台管理頁看得到
+    assert crud.count(SecurityEvent, {"kind": "verify_locked", "user_id": me.id}) == 1
     other = user("o@x.tw", "別人")
     assert api.post("/api/auth/verify-password", headers=login(other), json={"password": PASSWORD}).status_code == 200
 
@@ -573,7 +576,9 @@ def test_admin_list_users_只有身分欄位(api):
     assert r.status_code == 200, r.text
     rows = r.json()["users"]
     assert [x["id"] for x in rows] == [str(dad.id), str(bad.id)]
-    assert set(rows[0]) == {"id", "name", "email", "role", "joined", "suspendedAt", "suspendedReason"}
+    assert set(rows[0]) == {"id", "name", "email", "role", "joined", "suspendedAt", "suspendedReason",
+                            "presence", "lastActiveAt"}
+    assert r.json()["at"]
     assert (rows[0]["role"], rows[0]["suspendedAt"]) == ("parent", None)
     assert (rows[1]["role"], rows[1]["suspendedReason"]) == (None, "違規") and rows[1]["suspendedAt"]
     assert api.get("/api/admin/users", headers=login(dad)).status_code == 403
@@ -617,3 +622,159 @@ def test_unsuspend_user(api):
     assert api.delete("/api/admin/users/%d/suspend" % bad.id, headers=h).status_code == 400
     assert api.delete("/api/admin/users/99999/suspend", headers=h).status_code == 404
     assert api.get("/api/auth/me", headers=login(bad)).status_code != 403        # 解除之後守衛不再擋
+
+
+# ===========================================================================
+# 防暴力猜密碼、大量註冊（toolkit/security.py 的規則）
+# ===========================================================================
+@pytest.mark.route(*LOGIN)
+def test_login_同一個_email_錯五次就鎖_帳號不存在也一樣(api):
+    user("daming@wang.tw", "王大明")
+    for email in ("daming@wang.tw", "nobody@wang.tw"):
+        codes = [api.post("/api/auth/login", json={"email": email, "password": "wrong-pass"}).status_code
+                 for _ in range(5)]
+        assert codes == [401] * 5
+        # 鎖住之後連對的密碼也不收；存在跟不存在的帳號看起來一模一樣
+        r = api.post("/api/auth/login", json={"email": email, "password": PASSWORD})
+        assert r.status_code == 429 and r.json()["detail"] == security.LOCKED_MESSAGE
+    assert crud.count(SecurityEvent, {"kind": "login_failed"}) == 10
+    locks = crud.find(SecurityEvent, {"kind": "login_locked"}, order_by="id")
+    assert [x.user_id is not None for x in locks] == [True, False]
+    assert all(x.subject and "@" not in x.subject for x in locks)          # 只存雜湊
+    # 別的帳號照常（同一個來源只錯了 10 次，還不到 20）
+    user("mom@wang.tw", "媽媽")
+    assert api.post("/api/auth/login", json={"email": "mom@wang.tw", "password": PASSWORD}).status_code == 200
+
+
+@pytest.mark.route(*LOGIN)
+def test_login_同一個來源錯太多次_這個來源先擋下來(api):
+    user("mom@wang.tw", "媽媽")
+    bad = {"X-Forwarded-For": "203.0.113.9, 10.0.0.1"}
+    for i in range(20):
+        r = api.post("/api/auth/login", headers=bad, json={"email": "x%d@x.tw" % i, "password": "wrong-pass"})
+        assert r.status_code == 401
+    r = api.post("/api/auth/login", headers=bad, json={"email": "mom@wang.tw", "password": PASSWORD})
+    assert r.status_code == 429 and r.json()["detail"] == security.SOURCE_LOCKED_MESSAGE
+    assert crud.count(SecurityEvent, {"kind": "source_locked"}) == 1
+    ok = api.post("/api/auth/login", headers={"X-Forwarded-For": "198.51.100.7"},
+                  json={"email": "mom@wang.tw", "password": PASSWORD})
+    assert ok.status_code == 200
+
+
+@pytest.mark.route(*REG)
+def test_register_同一個來源一小時最多五個(api):
+    src = {"X-Forwarded-For": "203.0.113.20"}
+    for i in range(settings.register_per_hour):
+        r = api.post("/api/auth/register", headers=src,
+                     json={"name": "第%d位" % i, "email": "u%d@x.tw" % i, "password": "abcd1234"})
+        assert r.status_code == 201, r.text
+    r = api.post("/api/auth/register", headers=src, json={"name": "再一位", "email": "u9@x.tw", "password": "abcd1234"})
+    assert r.status_code == 429 and r.json()["detail"] == security.REGISTER_MESSAGE
+    assert not crud.exists(User, {"email": "u9@x.tw"})
+    assert crud.count(SecurityEvent, {"kind": "register_limited"}) == 1
+    r = api.post("/api/auth/register", headers={"X-Forwarded-For": "198.51.100.8"},
+                 json={"name": "另一台", "email": "u10@x.tw", "password": "abcd1234"})
+    assert r.status_code == 201
+
+
+# ===========================================================================
+# 平台管理頁的即時監控
+# ===========================================================================
+ERRORS = ("GET", "/api/admin/errors")
+EVENTS = ("GET", "/api/admin/security-events")
+REPORT = ("POST", "/api/client-errors")
+
+
+@pytest.mark.route(*USERS)
+def test_admin_list_users_紅綠燈(api):
+    admin = user("admin@x.tw", "管理員", is_platform_admin=True)
+    t = now()
+    on = user("on@x.tw", "線上", last_active_at=t - timedelta(seconds=20))
+    idle = user("idle@x.tw", "剛離開", last_active_at=t - timedelta(minutes=5))
+    gone = user("gone@x.tw", "很久", last_active_at=t - timedelta(hours=2))
+    out = user("out@x.tw", "登出了", last_active_at=t - timedelta(seconds=10))
+    never = user("never@x.tw", "沒來過")
+    bad = user("bad@x.tw", "停權", last_active_at=t, suspended_at=t, suspended_reason="違規")
+    for u in (on, idle, gone, never):
+        session_for(u)
+    session_for(out, revoked_at=t)                         # 按過登出：馬上是紅燈
+    rows = {x["name"]: x for x in api.get("/api/admin/users", headers=login(admin)).json()["users"]}
+    assert {k: v["presence"] for k, v in rows.items()} == {
+        "線上": "online", "剛離開": "idle", "很久": "offline", "登出了": "offline", "沒來過": "offline", "停權": "suspended"}
+    assert rows["沒來過"]["lastActiveAt"] is None and rows["線上"]["lastActiveAt"]
+    # 一般帳號只要打任何一支有登入的路由，最後活動時間就會更新（30 秒內不重寫）
+    api.get("/api/auth/me", headers=login(never))
+    first = crud.get(User, never.id).last_active_at
+    assert first is not None
+    api.get("/api/auth/me", headers=login(never))
+    assert crud.get(User, never.id).last_active_at == first
+    rows = {x["name"]: x for x in api.get("/api/admin/users", headers=login(admin)).json()["users"]}
+    assert rows["沒來過"]["presence"] == "online"
+    # 剛登入、還沒點任何地方：最後一次登入也算有動靜
+    fresh = user("fresh@x.tw", "剛登入", last_login_at=now() - timedelta(seconds=5))
+    session_for(fresh)
+    rows = {x["name"]: x for x in api.get("/api/admin/users", headers=login(admin)).json()["users"]}
+    assert rows["剛登入"]["presence"] == "online" and rows["剛登入"]["lastActiveAt"]
+
+
+@pytest.mark.route(*ERRORS)
+def test_admin_errors_最新的在前_帶名字_只有管理員(api):
+    admin = user("admin@x.tw", "管理員", is_platform_admin=True)
+    kid = user("k@x.tw", "小華")
+    crud.save(ErrorLog, {"source": "server", "status": 503, "method": "POST", "path": "/api/nlp/parse",
+                         "location": "parse_one", "message": "模型服務沒有回應"})
+    crud.save(ErrorLog, {"source": "client", "path": "#/entry", "location": "vEntry",
+                         "message": "Cannot read properties of undefined", "user_id": kid.id})
+    r = api.get("/api/admin/errors", headers=login(admin))
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["lastHour"] == 2
+    first = b["errors"][0]
+    assert (first["source"], first["location"], first["userName"], first["status"]) == ("client", "vEntry", "小華", None)
+    assert set(first) == {"id", "at", "source", "status", "method", "path", "location", "message", "userName"}
+    assert b["errors"][1]["userName"] is None and b["errors"][1]["status"] == 503
+    assert api.get("/api/admin/errors", headers=login(kid)).status_code == 403
+
+
+@pytest.mark.route(*EVENTS)
+def test_admin_security_events_只列中高_今天的數字(api):
+    admin = user("admin@x.tw", "管理員", is_platform_admin=True)
+    dad = user("d@x.tw", "爸爸")
+    for _ in range(5):
+        api.post("/api/auth/login", json={"email": "d@x.tw", "password": "wrong-pass"})
+    api.post("/api/auth/login", json={"email": "nobody@x.tw", "password": "wrong-pass"})
+    crud.save(SecurityEvent, {"kind": "ai_parse", "user_id": dad.id})
+    crud.save(SecurityEvent, {"kind": "ai_quota", "user_id": dad.id, "detail": "AI 解析 用完（200 次）"})
+    crud.save(SecurityEvent, {"kind": "verify_locked", "user_id": admin.id, "detail": "15 分鐘內錯了 5 次"})
+    r = api.get("/api/admin/security-events", headers=login(admin))
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert [e["kind"] for e in b["events"]] == ["verify_locked", "ai_quota", "login_locked"]   # login_failed 不列
+    lock = b["events"][2]
+    assert (lock["level"], lock["levelText"], lock["userName"], lock["email"], lock["canSuspend"]) == \
+        ("high", "高", "爸爸", "d@x.tw", True)
+    assert b["events"][0]["canSuspend"] is False                      # 平台管理員不能被停權
+    assert b["events"][1]["level"] == "medium" and b["events"][1]["title"] == "今天的 AI 額度用完了"
+    assert b["today"] == {"loginFailed": 6, "locked": 2, "registered": 0, "aiParse": 1, "aiAdvice": 0}
+    assert api.get("/api/admin/security-events", headers=login(dad)).status_code == 403
+
+
+@pytest.mark.route(*REPORT)
+def test_report_client_error_不用登入_同一句話只記一次_防洗版(api):
+    kid = user("k@x.tw", "小華")
+    msg = {"message": "Cannot read\n  properties of undefined", "location": "vEntry", "page": "#/entry"}
+    r = api.post("/api/client-errors", json=msg)
+    assert r.status_code == 202 and r.json() == {"accepted": True}
+    assert api.post("/api/client-errors", json=msg).json() == {"accepted": False}       # 一分鐘內同一句
+    r = api.post("/api/client-errors", headers=login(kid), json=msg)
+    assert r.json() == {"accepted": True}                                             # 換個人就是另一筆
+    rows = crud.find(ErrorLog, order_by="id")
+    assert [(x.user_id, x.message, x.location, x.path, x.source) for x in rows] == [
+        (None, "Cannot read properties of undefined", "vEntry", "#/entry", "client"),
+        (kid.id, "Cannot read properties of undefined", "vEntry", "#/entry", "client")]
+    for i in range(30):
+        api.post("/api/client-errors", headers=login(kid), json={"message": "第 %d 個錯" % i})
+    assert api.post("/api/client-errors", headers=login(kid), json={"message": "再一個"}).json() == {"accepted": False}
+    assert crud.count(ErrorLog, {"user_id": kid.id}) == 30
+    assert api.post("/api/client-errors", json={"message": "   "}).status_code == 422
+    assert api.post("/api/client-errors", json={"message": "x" * 2001}).status_code == 422

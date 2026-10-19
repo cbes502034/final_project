@@ -4,11 +4,16 @@
 領域：認證（共用工具）
 
     python tools/demo_seed.py --base http://localhost:8010 --tokens <暫存資料夾>/demo_tokens.json
+    # 平台管理頁也要截圖的話，給跟伺服器同一個 DATABASE_URL（才能把管理員帳號升級）：
+    python tools/demo_seed.py --base http://localhost:8010 --tokens <…>/demo_tokens.json --db sqlite:///<…>/e2e.db
 
 做了什麼：家庭與邀請碼、照看與零用金、兩本帳（家用、已結算的墾丁旅遊）、自訂分類、
 近三個月的收支（含段落記帳來源）、預算、存款目標、提醒門檻。
 
-⚠️ 密碼每次隨機產生、不印出來；--tokens 寫出的是三個人的登入權杖（給瀏覽器直接登入截圖用），
+給了 --db 再多一個平台管理員，以及管理頁會看到的事：有人連續猜錯林美玲的密碼（被鎖 15 分鐘）、
+林小華的畫面回報了一個錯誤。
+
+⚠️ 密碼每次隨機產生、不印出來；--tokens 寫出的是每個人的登入權杖（給瀏覽器直接登入截圖用），
    **只放暫存資料夾，不要 commit**。權杖過期就重跑一次。
 ⚠️ 只能對本機的後端跑，不要對正式站跑（會在正式資料庫裡建一堆假帳）。
 """
@@ -39,7 +44,8 @@ SPEND = [
 def main() -> int:
     ap = argparse.ArgumentParser(description="展示用資料")
     ap.add_argument("--base", default="http://localhost:8010")
-    ap.add_argument("--tokens", required=True, help="三個人的登入權杖寫到這裡（暫存資料夾，不要 commit）")
+    ap.add_argument("--tokens", required=True, help="登入權杖寫到這裡（暫存資料夾，不要 commit）")
+    ap.add_argument("--db", default="", help="跟伺服器同一個 DATABASE_URL；給了才建平台管理員（升級要直接寫資料庫）")
     args = ap.parse_args()
     if urlparse(args.base).hostname not in ("localhost", "127.0.0.1"):
         sys.exit("只能對本機的後端跑")
@@ -136,10 +142,30 @@ def main() -> int:
     call("POST", "/api/alerts", tok["dad"], percent=80)
     call("GET", "/api/notifications", tok["dad"])                                    # 讓提醒門檻寫進通知
 
+    if args.db:
+        # 平台管理員：先註冊，再用 make-admin 升級（跟正式環境的 ADMIN_EMAILS 同一條路）
+        import os
+        import subprocess
+        backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        mail = "admin.%s@demo.test" % tag
+        pw = "demo-" + secrets.token_urlsafe(12)
+        call("POST", "/api/auth/register", name="平台管理員", email=mail, password=pw)
+        subprocess.run([sys.executable, "-m", "app.cli", "make-admin", mail], cwd=backend, check=True,
+                       env=dict(os.environ, DATABASE_URL=args.db), capture_output=True)
+        people["admin"] = call("POST", "/api/auth/login", email=mail, password=pw)
+        # 管理頁會看到的事：有人連續猜錯林美玲的密碼、林小華的畫面回報了一個錯誤
+        for _ in range(5):
+            http.post("/api/auth/login", json={"email": "mom.%s@demo.test" % tag, "password": "wrong-password"})
+        http.post("/api/client-errors", headers={"authorization": "Bearer " + tok["kid"]},
+                  json={"message": "Cannot read properties of undefined (reading 'map')",
+                        "location": "vStats（app.js）", "page": "#/stats"})
+        call("GET", "/api/auth/me", tok["kid"])
+
     with io.open(args.tokens, "w", encoding="utf-8") as f:
         json.dump({w: {"accessToken": p["accessToken"], "refreshToken": p["refreshToken"],
                        "expiresIn": p["expiresIn"]} for w, p in people.items()}, f)
-    print("建好了：林家三個人、%d 筆支出、3 本帳。權杖寫在 %s（不要 commit）" % (n, args.tokens))
+    print("建好了：林家三個人%s、%d 筆支出、3 本帳。權杖寫在 %s（不要 commit）"
+          % ("＋平台管理員" if args.db else "", n, args.tokens))
     return 0
 
 

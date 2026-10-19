@@ -2,9 +2,10 @@
 
 import pytest
 
-from app.models import GroupMember, NlpParse, Notification, Transaction
+from app.models import GroupMember, NlpParse, Notification, SecurityEvent, Transaction
 from app.services.llm import client
 from app.toolkit import crud
+from app.toolkit.config import settings
 from tests.routes.conftest import categories, family_of, guard, ledger_of, login, now, today, user
 
 
@@ -227,3 +228,18 @@ def test_confirm_batch_有一筆不對就一筆都不寫(api):
     assert crud.count(Transaction) == 0 and crud.count(NlpParse) == 0 and crud.count(Notification) == 0
     r = api.post("/api/nlp/confirm-batch", headers=h, json={"items": [ok, ok]})
     assert r.status_code == 201 and crud.count(Notification) == 2
+
+
+@pytest.mark.route(*ONE)
+def test_parse_one_一天的_AI_額度用完回_429(api, monkeypatch):
+    monkeypatch.setattr(client, "is_configured", lambda: False)
+    monkeypatch.setattr(settings, "ai_parse_per_day", 2)
+    me, other = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽")
+    # 模型叫不動也算一次：失敗的呼叫一樣花錢
+    codes = [api.post("/api/nlp/parse", headers=login(me), json={"text": "早餐55"}).status_code for _ in range(3)]
+    assert codes == [503, 503, 429]
+    r = api.post("/api/nlp/parse-batch", headers=login(me), json={"text": "早餐55，午餐120"})
+    assert r.status_code == 429 and "明天會恢復" in r.json()["detail"]        # 單句、段落合計
+    assert crud.count(SecurityEvent, {"kind": "ai_parse", "user_id": me.id}) == 2
+    assert crud.count(SecurityEvent, {"kind": "ai_quota", "user_id": me.id}) == 1   # 用完只記一次
+    assert api.post("/api/nlp/parse", headers=login(other), json={"text": "早餐55"}).status_code == 503

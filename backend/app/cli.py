@@ -4,7 +4,7 @@
     python -m app.cli init-env            從 .env.example 建出 .env，順便產生一組 JWT_SECRET
     python -m app.cli check-config        列出每一段設定填了沒、沒填會怎樣
     python -m app.cli init-db             建表（本機、測試用）＋ 放入系統預設分類
-    python -m app.cli make-admin [email]  把帳號設成平台管理員（不給 email 就用 ADMIN_EMAILS）
+    python -m app.cli make-admin [email]  把帳號設成平台管理員（不給 email 就用 ADMIN_EMAILS；服務啟動時也會自動跑一次）
     python -m app.cli db                  看資料庫：每張表各幾筆
     python -m app.cli db transactions     那張表最新的 10 筆
     python -m app.cli db "SELECT …"       自己寫查詢（只能查，不能改）
@@ -83,18 +83,41 @@ def init_db() -> int:
     return 0
 
 
-def make_admin(email: str | None) -> int:
-    from app.models import User
+def promote_admins(emails: list[str]) -> list[str]:
+    """把這些帳號設成平台管理員，回傳每一個的結果（給人看的一句話）。
+
+    ⚠️ 已經加入家庭、或記過任何一筆帳的帳號**不設**：平台管理員讀不到任何財務資料，
+       設下去他就再也看不到自己的帳了（ADMIN_EMAILS 填錯成家長的信箱也不會出事）。
+       要當管理員請用一個新註冊的帳號。
+    """
+    from app.models import FamilyMember, Transaction, User
     from app.toolkit import crud
+
+    out = []
+    for e in emails:
+        user = crud.get(User, where={"email": e.strip().lower()})
+        if user is None:
+            out.append("找不到 %s（要先註冊）" % e)
+        elif user.is_platform_admin:
+            out.append("%s 已經是平台管理員" % e)
+        elif crud.exists(FamilyMember, {"user_id": user.id, "status": "active"}) or \
+                crud.exists(Transaction, {"user_id": user.id}):
+            out.append("%s 已經加入家庭或記過帳，不設成平台管理員（設了他就看不到自己的帳）；請用一個新註冊的帳號" % e)
+        else:
+            crud.save(User, {"is_platform_admin": True}, where={"id": user.id})
+            out.append("%s 設成平台管理員了" % e)
+    return out
+
+
+def make_admin(email: str | None) -> int:
     from app.toolkit.config import settings
 
     emails = [email.strip().lower()] if email else settings.admin_email_list
     if not emails:
         _say("沒有指定 email，ADMIN_EMAILS 也是空的。")
         return 1
-    for e in emails:
-        n = crud.save(User, {"is_platform_admin": True}, where={"email": e})
-        _say(("%s 設成平台管理員了" if n else "找不到 %s（要先註冊）") % e)
+    for line in promote_admins(emails):
+        _say(line)
     return 0
 
 

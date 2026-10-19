@@ -1,13 +1,13 @@
 {
  "routes": {
-  "認證": 19,
+  "認證": 24,
   "記帳": 19,
   "數字": 11,
   "家庭": 21
  },
- "routes_total": 70,
- "tables": 20,
- "tests": 738,
+ "routes_total": 75,
+ "tables": 22,
+ "tests": 803,
  "heldout": {
   "cases": 101,
   "items": 125,
@@ -31,6 +31,34 @@
   "multi": 750
  },
  "eval": {
+  "claude-live": {
+   "model": "Claude（線上，含輸出檢查）",
+   "when": "2026-10-19T22:47:06",
+   "report": {
+    "cases": 101,
+    "items": 125,
+    "errors": 0,
+    "split_acc": 1.0,
+    "case_exact": 1.0,
+    "item_exact": 1.0,
+    "field_acc": {
+     "date": 1.0,
+     "amount": 1.0,
+     "kind": 1.0,
+     "cat": 1.0
+    },
+    "cat_macro_f1": 1.0,
+    "extra_items": 0,
+    "no_amount": {
+     "items": 6,
+     "filled": 0,
+     "hallucination": 0.0
+    },
+    "latency_p50": 2.06,
+    "latency_p95": 5.16
+   },
+   "misses": []
+  },
   "deepseek-r1-1.5b": {
    "model": "deepseek-r1:1.5b",
    "when": "2026-10-15T14:07:49",
@@ -401,7 +429,7 @@
  "e2e": {
   "passed": 85,
   "total": 85,
-  "when": "2026-10-15 11:18",
+  "when": "2026-10-20 00:10",
   "by_domain": {
    "認證": {
     "passed": 32,
@@ -432,7 +460,7 @@
     ],
     "got": 503,
     "ok": true,
-    "ms": 16,
+    "ms": 26,
     "note": "503：模型沒設定，前端改用規則（預期）"
    },
    {
@@ -446,7 +474,7 @@
     ],
     "got": 503,
     "ok": true,
-    "ms": 22,
+    "ms": 23,
     "note": "503：模型沒設定，前端用同一批數字寫（預期）"
    }
   ]

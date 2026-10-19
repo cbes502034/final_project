@@ -6,13 +6,17 @@
 | | |
 |---|---|
 | **線上系統** | <https://fambudget-web.onrender.com> |
-| **專題手冊** | <https://fambudget-web.onrender.com/docs/> |
-| **FastAPI 說明書** | <https://fambudget-web.onrender.com/docs/fastapi.html> ← 沒學過 FastAPI 先讀這份 |
-| **RESTful 說明書** | <https://fambudget-web.onrender.com/docs/restful.html> |
-| **檔案系統說明書** | <https://fambudget-web.onrender.com/docs/files.html> |
-| **API 瀏覽** | <https://fambudget-web.onrender.com/docs/api.html> |
+| **使用說明**（網站上） | <https://fambudget-web.onrender.com/docs/guide.html> |
+| **專題手冊** | `docs/handbook/index.html` |
+| **FastAPI 說明書** | `docs/handbook/fastapi.html` ← 沒學過 FastAPI 先讀這份 |
+| **RESTful 說明書** | `docs/handbook/restful.html` |
+| **檔案系統說明書** | `docs/handbook/files.html` |
+| **API 瀏覽** | `docs/handbook/api.html` |
 | **前後端串接契約** | `docs/02-前後端串接契約.md` ← 動工前一定要看 |
-| **模型設計** | <https://fambudget-web.onrender.com/docs/model.html> |
+| **模型設計** | `docs/handbook/model.html` |
+
+> 開發文件（手冊、說明書、API 瀏覽）放在 `docs/handbook/`，**不放在網站上**：網站只保留使用者會用到的介面與使用說明。
+> 用瀏覽器直接打開那幾個 HTML 檔就能看（樣式從 `frontend/css/` 載入）。
 | **LLM 實作規劃** | `docs/03-LLM實作規劃.md` ← 模型怎麼接（商業 API）、怎麼評、微調對照 |
 
 ---
@@ -47,9 +51,9 @@ final_project/
 │   │   ├── cli.py           python -m app.cli：init-env · check-config · init-db · make-admin
 │   │   ├── catalog.py       固定清單（角色 · 權限表 · 理財選項 · 系統分類），正本是 data.js
 │   │   ├── toolkit/     ★   寫好的工具：config · db · crud · tokens · passwords · scope · family …
-│   │   ├── models/          20 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
+│   │   ├── models/          22 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/         請求主體（Pydantic，一個檔案一個主人）
-│   │   ├── routers/         72 支路由，**一個領域一個資料夾**；還沒做的回 501
+│   │   ├── routers/         75 支路由，**一個領域一個資料夾**；還沒做的回 501
 │   │   │   ├── auth/        認證（登入那幾支已經做好）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/      記帳
 │   │   │   ├── analytics/   數字
@@ -59,7 +63,7 @@ final_project/
 │   │       ├── permission.py    家庭
 │   │       ├── analytics.py     數字
 │   │       └── evaluation.py    評測指標
-│   ├── alembic/             資料庫遷移（第一版 = 20 張表）
+│   ├── alembic/             資料庫遷移（一版一版往上加，現在是 22 張表）
 │   ├── tests/               含 routes/：每一支路由的驗收測試（說明裡的寫法也跑一遍）
 │   ├── tools/               評測：eval_nlp.py · rules_baseline.js；文件從程式產生：sync_schema.py
 │   ├── eval/                留出集與評測結果
@@ -181,7 +185,7 @@ python -m app.cli db "SELECT id, email FROM users"     # 自己寫查詢（只�
 | `pytest` | 記憶體裡的 SQLite：每個測試一份、跑得快、不需要 Docker |
 
 本機跟線上用同一種資料庫，本機寫得對，部署上去就一樣對。
-（72 支照說明字串做好的參考後端，接 PostgreSQL 跑過 72 支路由的完整掃描，0 個問題。）
+（照說明字串做好的參考後端，接 PostgreSQL 跑過全部路由的完整掃描（當時是 72 支），0 個問題。）
 
 ⚠️ 不要直接打 `docker compose up`（不加 `db`）：那會連同 compose 裡的後端、前端一起起來，
 跟 `run.py` 搶 8000 與 5174 埠。

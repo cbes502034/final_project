@@ -23,7 +23,7 @@ from __future__ import annotations
 # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.guards import block_admin
@@ -31,7 +31,7 @@ from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Not
 from app.routers._stub import not_ready, stub
 from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
 from app.services.llm import client, parse
-from app.toolkit import crud, errors, ledger, money, notify
+from app.toolkit import crud, errors, ledger, money, notify, security
 from app.toolkit.config import settings
 from app.toolkit.db import get_db
 
@@ -82,12 +82,14 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                                                     detail
         422     text 全是空白                                                先寫一句話
+        429     今天的 AI 解析次數用完了（AI_PARSE_PER_DAY，預設 200）        今天的 AI 解析次數用完了（每天 200 次），明天會恢復；也可以直接手動記一筆
         503     模型沒設定（MODEL_BASE_URL 空的）、叫不動、回來的東西看不懂  模型服務還沒接上，先用前端的規則解析
         503     services/llm/parse.py 還沒做好（NotImplementedError）        模型解析還沒做好，先用前端的規則解析
         ⚠️ 模型的問題回 503，不是 500：那是外部服務的問題，不是我們的程式壞了，前端也靠 503 決定要不要自己頂著。
 
     【會用到的資料表】
         表          讀／寫  用來做什麼
+        security_events  讀＋寫  今天叫了幾次 AI；每叫一次記一筆 ai_parse（單句、段落合計，台灣時間每天重算）
         categories  讀      系統分類＋我們家的分類，交給模型挑（模型只能回清單裡的 id）
         nlp_parses  讀      這個人以前改過的分類（user_corrected），下次同一個品項照他的習慣
         （不寫任何表）
@@ -114,7 +116,7 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
 
             from datetime import date, datetime, timedelta, timezone
 
-            from fastapi import APIRouter, Depends
+            from fastapi import APIRouter, Depends, HTTPException
             from sqlalchemy.orm import Session
 
             from app.guards import block_admin
@@ -122,7 +124,7 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
             from app.routers._stub import not_ready, stub
             from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
             from app.services.llm import client, parse
-            from app.toolkit import crud, errors, ledger, money, notify
+            from app.toolkit import crud, errors, ledger, money, notify, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -139,6 +141,13 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
                              order_by="id", db=db)
             catalog = [{"id": str(c.id), "name": c.name, "kind": c.kind} for c in cats]
             today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+            # 2b. 每天的 AI 額度（每一次都是付費的模型呼叫）：還有就記一次，用完回 429。
+            #     模型失敗也算一次——失敗的呼叫一樣花錢。先 commit：等一下 raise 的話這一筆也要留著
+            over = security.ai_quota("ai_parse", me.id, db=db)
+            db.commit()
+            if over:
+                raise HTTPException(status_code=429, detail=over)
 
             # 3. 叫模型；沒設定、叫不動、還沒做好都回 503（前端會用規則頂著）
             try:
@@ -195,7 +204,7 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
 
     from datetime import date, datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends
+    from fastapi import APIRouter, Depends, HTTPException
     from sqlalchemy.orm import Session
 
     from app.guards import block_admin
@@ -203,7 +212,7 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
     from app.routers._stub import not_ready, stub
     from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
     from app.services.llm import client, parse
-    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit import crud, errors, ledger, money, notify, security
     from app.toolkit.config import settings
     from app.toolkit.db import get_db
 
@@ -218,6 +227,13 @@ def parse_one(body: ParseIn, me: User, db: Session = Depends(get_db)):
                      order_by="id", db=db)
     catalog = [{"id": str(c.id), "name": c.name, "kind": c.kind} for c in cats]
     today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+    # 2b. 每天的 AI 額度（每一次都是付費的模型呼叫）：還有就記一次，用完回 429。
+    #     模型失敗也算一次——失敗的呼叫一樣花錢。先 commit：等一下 raise 的話這一筆也要留著
+    over = security.ai_quota("ai_parse", me.id, db=db)
+    db.commit()
+    if over:
+        raise HTTPException(status_code=429, detail=over)
 
     # 3. 叫模型；沒設定、叫不動、還沒做好都回 503（前端會用規則頂著）
     try:
@@ -305,11 +321,13 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                                detail
         422     text 全是空白                           先寫一段話
+        429     今天的 AI 解析次數用完了                今天的 AI 解析次數用完了（每天 200 次），明天會恢復；也可以直接手動記一筆
         503     模型沒設定、叫不動、回來的不是要的格式  （ModelError 的訊息，例如：模型服務還沒接上，先用前端的規則解析）
         503     services/llm/parse.py 還沒做好          模型解析還沒做好，先用前端的規則解析
 
     【會用到的資料表】
         表          讀／寫  用來做什麼
+        security_events  讀＋寫  今天叫了幾次 AI；每叫一次記一筆 ai_parse（單句、段落合計，台灣時間每天重算）
         categories  讀      系統分類＋我們家的分類，交給模型挑
         nlp_parses  讀      這個人以前改過的分類（user_corrected），下次同一個品項照他的習慣
         （不寫任何表）
@@ -343,7 +361,7 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
 
             from datetime import date, datetime, timedelta, timezone
 
-            from fastapi import APIRouter, Depends
+            from fastapi import APIRouter, Depends, HTTPException
             from sqlalchemy.orm import Session
 
             from app.guards import block_admin
@@ -351,7 +369,7 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
             from app.routers._stub import not_ready, stub
             from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
             from app.services.llm import client, parse
-            from app.toolkit import crud, errors, ledger, money, notify
+            from app.toolkit import crud, errors, ledger, money, notify, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -368,6 +386,13 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
                              order_by="id", db=db)
             catalog = [{"id": str(c.id), "name": c.name, "kind": c.kind} for c in cats]
             today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+            # 2b. 每天的 AI 額度（每一次都是付費的模型呼叫）：還有就記一次，用完回 429。
+            #     模型失敗也算一次——失敗的呼叫一樣花錢。先 commit：等一下 raise 的話這一筆也要留著
+            over = security.ai_quota("ai_parse", me.id, db=db)
+            db.commit()
+            if over:
+                raise HTTPException(status_code=429, detail=over)
 
             # 3. 叫模型；沒設定、叫不動、還沒做好都回 503（前端會用規則頂著）
             try:
@@ -418,7 +443,7 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
 
     from datetime import date, datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends
+    from fastapi import APIRouter, Depends, HTTPException
     from sqlalchemy.orm import Session
 
     from app.guards import block_admin
@@ -426,7 +451,7 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
     from app.routers._stub import not_ready, stub
     from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
     from app.services.llm import client, parse
-    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit import crud, errors, ledger, money, notify, security
     from app.toolkit.config import settings
     from app.toolkit.db import get_db
 
@@ -442,6 +467,13 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
                      order_by="id", db=db)
     catalog = [{"id": str(c.id), "name": c.name, "kind": c.kind} for c in cats]
     today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+
+    # 2b. 每天的 AI 額度（每一次都是付費的模型呼叫）：還有就記一次，用完回 429。
+    #     模型失敗也算一次——失敗的呼叫一樣花錢。先 commit：等一下 raise 的話這一筆也要留著
+    over = security.ai_quota("ai_parse", me.id, db=db)
+    db.commit()
+    if over:
+        raise HTTPException(status_code=429, detail=over)
 
     # 3. 叫模型；沒設定、叫不動、還沒做好都回 503（前端會用規則頂著）
     try:
@@ -547,7 +579,7 @@ def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
 
             from datetime import date, datetime, timedelta, timezone
 
-            from fastapi import APIRouter, Depends
+            from fastapi import APIRouter, Depends, HTTPException
             from sqlalchemy.orm import Session
 
             from app.guards import block_admin
@@ -555,7 +587,7 @@ def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
             from app.routers._stub import not_ready, stub
             from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
             from app.services.llm import client, parse
-            from app.toolkit import crud, errors, ledger, money, notify
+            from app.toolkit import crud, errors, ledger, money, notify, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -675,7 +707,7 @@ def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
 
     from datetime import date, datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends
+    from fastapi import APIRouter, Depends, HTTPException
     from sqlalchemy.orm import Session
 
     from app.guards import block_admin
@@ -683,7 +715,7 @@ def confirm_one(body: ConfirmIn, me: User, db: Session = Depends(get_db)):
     from app.routers._stub import not_ready, stub
     from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
     from app.services.llm import client, parse
-    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit import crud, errors, ledger, money, notify, security
     from app.toolkit.config import settings
     from app.toolkit.db import get_db
 
@@ -873,7 +905,7 @@ def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db))
 
             from datetime import date, datetime, timedelta, timezone
 
-            from fastapi import APIRouter, Depends
+            from fastapi import APIRouter, Depends, HTTPException
             from sqlalchemy.orm import Session
 
             from app.guards import block_admin
@@ -881,7 +913,7 @@ def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db))
             from app.routers._stub import not_ready, stub
             from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
             from app.services.llm import client, parse
-            from app.toolkit import crud, errors, ledger, money, notify
+            from app.toolkit import crud, errors, ledger, money, notify, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -993,7 +1025,7 @@ def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db))
 
     from datetime import date, datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends
+    from fastapi import APIRouter, Depends, HTTPException
     from sqlalchemy.orm import Session
 
     from app.guards import block_admin
@@ -1001,7 +1033,7 @@ def confirm_batch(body: ConfirmBatchIn, me: User, db: Session = Depends(get_db))
     from app.routers._stub import not_ready, stub
     from app.schemas.nlp import ConfirmBatchIn, ConfirmIn, ParseIn
     from app.services.llm import client, parse
-    from app.toolkit import crud, errors, ledger, money, notify
+    from app.toolkit import crud, errors, ledger, money, notify, security
     from app.toolkit.config import settings
     from app.toolkit.db import get_db
 

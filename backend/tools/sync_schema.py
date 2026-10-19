@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """把手冊的「各表欄位」那一大段，從 frontend/js/data.js 的 schema 重新產生。
 
-    python backend/tools/sync_schema.py          # 寫回 frontend/docs/index.html
+    python backend/tools/sync_schema.py          # 寫回 docs/handbook/index.html
     python backend/tools/sync_schema.py --check  # 只檢查，不寫（測試用）
 
 ⚠️ 為什麼要有這支：資料表的欄位同時寫在三個地方——
@@ -21,7 +21,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
-HANDBOOK = os.path.join(REPO, "frontend", "docs", "index.html")
+HANDBOOK = os.path.join(REPO, "docs", "handbook", "index.html")
 SPEC = os.path.join(REPO, "docs", "01-tech-stack-and-api.md")
 
 

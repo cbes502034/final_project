@@ -175,7 +175,7 @@ async def run(ws_url, tokens, workdir):
         await asyncio.sleep(4)
 
         # ---------- 未登入 ----------
-        await go(FRONT + "/docs/index.html", 1.5, keep=0.1)
+        await go(FRONT + "/docs/guide.html", 1.5, keep=0.1)
         await c.js("localStorage.removeItem('fambudget.auth')")
         await go(FRONT + "/?r=%d#/login" % (time.time() * 1000), ready="document.body.innerText.includes('開始使用')")
         await cap("首頁", "還沒登入時，先說清楚這個系統能做什麼")
@@ -201,7 +201,7 @@ async def run(ws_url, tokens, workdir):
         # ---------- 家長 ----------
         step[0] += 1
         shown.update(title="家長總覽", desc="換成家長的帳號")
-        await go(FRONT + "/docs/index.html", 1.5, keep=0.1)
+        await go(FRONT + "/docs/guide.html", 1.5, keep=0.1)
         await login("dad")
         await go(FRONT + "/?r=%d#/" % (time.time() * 1000), ready="document.querySelector('.wal__v') && document.querySelector('.bcard')")
         await asyncio.sleep(1)
@@ -296,7 +296,7 @@ async def run(ws_url, tokens, workdir):
         # ---------- 子女 ----------
         step[0] += 1
         shown.update(title="子女總覽", desc="換成子女的帳號")
-        await go(FRONT + "/docs/index.html", 1.5, keep=0.1)
+        await go(FRONT + "/docs/guide.html", 1.5, keep=0.1)
         await login("kid")
         await go(FRONT + "/?r=%d#/" % (time.time() * 1000), ready="document.querySelector('.wal__v') && document.getElementById('mailAgain')")
         await asyncio.sleep(1)

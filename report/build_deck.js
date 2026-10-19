@@ -110,6 +110,13 @@ function arrow(slide, x, y, w, id, color) {
 function down(slide, x, y, h, id) {
   slide.addShape(pres.shapes.LINE, { x, y, w: 0, h, line: { color: C.accent5, width: 2, endArrowType: "triangle" }, objectName: id });
 }
+/** 封面與結尾的網站 QR code：白底卡片，深色底上也掃得到。 */
+function qr(slide, x, y, id) {
+  slide.addShape(pres.shapes.ROUNDED_RECTANGLE, { x, y, w: 2.3, h: 2.75, rectRadius: 0.12, fill: { color: "FFFFFF" }, line: { color: "FFFFFF" }, objectName: id + "-card" });
+  slide.addImage({ path: asset("qr_site.png"), x: x + 0.2, y: y + 0.15, w: 1.9, h: 1.9, objectName: id });
+  slide.addText([{ text: "掃描開啟網站", options: { bold: true, breakLine: true } }, { text: "fambudget-web.onrender.com", options: { fontSize: 9 } }],
+    { x: x + 0.1, y: y + 2.08, w: 2.1, h: 0.6, fontSize: 12, color: "16233F", align: "center", valign: "middle", margin: 0, objectName: id + "-cap" });
+}
 const pct = (v) => (v === null || v === undefined ? "—" : (v * 100).toFixed(1) + "%");
 const fmt = (n) => Number(n).toLocaleString("en-US");
 const hdrCell = (t) => ({ text: t, options: { bold: true, color: "FFFFFF", fill: { color: THEME.colors.dk2 }, valign: "middle" } });
@@ -126,6 +133,7 @@ async function build() {
   s.addText("家庭記帳 FamBudget", { placeholder: "title" });
   s.addText("說一段話就記好帳、全家看得到彼此的家庭財務系統", { placeholder: "body" });
   s.addText("冠文・宇傑・明樺・囷洧　｜　2026 年 10 月　｜　LLM 應用期末專題", { placeholder: "meta" });
+  qr(s, 10.35, 0.75, "qr-cover");
   s.addNotes("大家好，我們的題目是家庭記帳 FamBudget。一句話：使用者說一段話，系統用大型語言模型切成好幾筆帳，家人之間依權限看得到彼此，財務建議的每一個數字都有出處。");
 
   // ---- 問題
@@ -171,7 +179,8 @@ async function build() {
   }
   text(s, "前端：純靜態網頁（HTML／CSS／JS）　後端：FastAPI　資料庫：PostgreSQL　部署：Render　模型：Claude／OpenAI／開源模型（Ollama、Hugging Face）",
     { x: 0.6, y: 5.65, w: 12.1, h: 0.8, fontSize: 15, color: C.accent5 });
-  s.addNotes("先講成果。70 支 API、20 張表、735 個自動測試全部通過，還有一個端到端測試，用真的伺服器把四個領域走一遍，全部通過。AI 解析有 101 題的留出集來量成績。");
+  s.addNotes("先講成果。" + facts.routes_total + " 支 API、" + facts.tables + " 張表、" + fmt(facts.tests) + " 個自動測試全部通過；端到端測試用真的伺服器把四個領域走一遍，" +
+    (facts.e2e ? facts.e2e.passed + " 個步驟全部通過" : "") + "。AI 解析有 " + facts.heldout.cases + " 題的留出集來量成績。");
 
   // ============================================================ 系統
   pres.addSection({ title: "系統" });
@@ -253,23 +262,43 @@ async function build() {
   const rows = [
     [hdr("能做的事"), hdr("家長"), hdr("子女"), hdr("平台管理員")],
     ["看自己的帳", Y, Y, N], ["看照看中孩子的帳", Y, N, N], ["看全家的總覽", Y, "自己的", N],
-    ["產生邀請碼、設零用金", Y, N, N], ["停權帳號、看稽核紀錄", N, N, Y], ["讀任何人的帳", N, N, N],
+    ["產生邀請碼、設零用金", Y, N, N], ["停權、看帳號狀態與安全事件", N, N, Y], ["讀任何人的帳", N, N, N],
   ].map((r, i) => (i === 0 ? r : r.map((t, j) => cell(t, j === 0))));
   s.addTable(rows, { x: 6.75, y: 1.55, w: 5.95, colW: [2.75, 1.0, 1.0, 1.2], rowH: 0.55, fontSize: 14,
     border: { type: "solid", color: "D6E0EE", pt: 0.75 }, fill: { color: C.background1 }, objectName: "perm-table" });
   card(s, 6.75, 5.6, 5.95, 0.95, "perm-note", "FFF4EC");
   text(s, "家長不能切換成孩子的帳號、平台管理員讀不到任何人的帳——刻意不做，不是沒做完。",
     { x: 7.0, y: 5.72, w: 5.5, h: 0.75, fontSize: 14, color: C.text1, valign: "middle" });
-  s.addNotes("家庭功能的重點是權限。這張表是後端實際的規則：家長看得到照看中孩子的帳，子女看不到家長的；平台管理員只能停權和看稽核，讀不到任何人的帳。家長切換成孩子帳號這個功能，我們刻意不做。");
+  s.addNotes("家庭功能的重點是權限。這張表是後端實際的規則：家長看得到照看中孩子的帳，子女看不到家長的；平台管理員只能停權、看帳號狀態與安全事件，讀不到任何人的帳。家長切換成孩子帳號這個功能，我們刻意不做。");
+
+  // ---- 平台管理
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "系統" });
+  s.addText("平台管理：即時看狀態，規則先擋、人來決定", { placeholder: "title" });
+  shot(s, "admin.png", 0.7, 1.5, 7.9, 1.6, "shot-admin");
+  const adm = [
+    ["FiActivity", C.accent2, "紅綠燈", "每個帳號在不在線上，每 10 秒更新；按了登出馬上變紅燈"],
+    ["FiAlertOctagon", C.accent3, "錯誤訊息", "後端的 5xx、使用者畫面上出的錯即時列出；使用者只看到白話，技術細節只到這裡"],
+    ["FiShield", C.accent1, "規則先擋", "同一帳號 15 分鐘錯 5 次鎖 15 分鐘、同一來源大量註冊、AI 每人每日額度"],
+    ["FiUserX", C.accent5, "停權由人按", "規則只暫時擋下、時間到自己解開；要不要停權由管理員決定，每一次都寫稽核"],
+  ];
+  for (let i = 0; i < adm.length; i++) {
+    const y = 1.55 + i * 1.3;
+    await iconCircle(s, adm[i][0], 9.05, y, 0.6, adm[i][1], HEX.lt1, "adm-c" + i);
+    text(s, adm[i][2], { x: 9.8, y: y - 0.02, w: 2.95, h: 0.4, fontSize: 17, bold: true, color: C.text2 });
+    text(s, adm[i][3], { x: 9.8, y: y + 0.4, w: 2.95, h: 0.85, fontSize: 13, color: C.accent5 });
+  }
+  text(s, "管理員一樣讀不到任何人的帳：這一頁只有身分欄位、狀態與次數（停權是關門，不是配鑰匙）。",
+    { x: 0.7, y: 6.62, w: 7.9, h: 0.3, fontSize: 11, color: C.accent5 });
+  s.addNotes("這是平台管理員的畫面。上面是即時的數字，左邊每個帳號一個燈號，右邊是被規則擋下的安全事件。規則都是數次數，例如同一個帳號十五分鐘錯五次密碼就先鎖十五分鐘；帳號不存在也一樣鎖，才不會洩漏帳號在不在。規則只暫時擋，要不要停權由管理員決定。我們刻意不讓 AI 自動封鎖：這些都是明確的事實，用規則判斷最準，AI 只會多出誤判跟費用。");
 
   // ---- 資料庫
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "系統" });
   s.addText("資料庫：" + facts.tables + " 張表，依四個領域分", { placeholder: "title" });
   const dbcols = [
-    ["認證", C.accent1, [["users", "使用者"], ["accounts", "登入帳號"], ["sessions", "登入中的裝置"], ["password_resets", "重設密碼"], ["audit_logs", "稽核紀錄"]]],
-    ["記帳", C.accent2, [["transactions", "收支明細"], ["categories", "分類"], ["groups", "帳本"], ["group_members", "帳本成員"], ["nlp_parses", "AI 解析紀錄"]]],
+    ["認證", C.accent1, [["users", "使用者"], ["sessions", "登入中的裝置"], ["password_resets", "重設密碼"], ["security_events", "安全事件"], ["error_logs", "錯誤紀錄"]]],
+    ["記帳", C.accent2, [["transactions", "收支明細"], ["accounts", "帳戶（錢包）"], ["categories", "分類"], ["groups", "帳本"], ["group_members", "帳本成員"], ["nlp_parses", "AI 解析紀錄"]]],
     ["數字", C.accent3, [["budgets", "預算"], ["savings_goals", "存款目標"], ["alert_rules", "提醒門檻"], ["advices", "財務建議"]]],
-    ["家庭", C.accent5, [["families", "家庭"], ["family_members", "家庭成員"], ["family_invites", "邀請"], ["guardianships", "照看關係"], ["allowances", "零用金"], ["notifications", "通知"]]],
+    ["家庭", C.accent5, [["families", "家庭"], ["family_members", "家庭成員"], ["family_invites", "邀請"], ["guardianships", "照看關係"], ["allowances", "零用金"], ["notifications", "通知"], ["audit_logs", "稽核紀錄"]]],
   ];
   for (let i = 0; i < 4; i++) {
     const [dom, col, tbls] = dbcols[i];
@@ -277,13 +306,13 @@ async function build() {
     card(s, x, 1.55, 2.88, 5.1, "db-col-" + i);
     text(s, dom, { x: x + 0.3, y: 1.75, w: 2.3, h: 0.5, fontSize: 20, bold: true, color: col });
     tbls.forEach(([t, zh], j) => {
-      const y = 2.4 + j * 0.68;
-      s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: x + 0.25, y, w: 2.38, h: 0.56, rectRadius: 0.08, fill: { color: C.background1 }, line: { color: "D6E0EE", width: 0.75 }, objectName: "tbl-" + t });
+      const y = 2.35 + j * 0.6;
+      s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: x + 0.25, y, w: 2.38, h: 0.52, rectRadius: 0.08, fill: { color: C.background1 }, line: { color: "D6E0EE", width: 0.75 }, objectName: "tbl-" + t });
       text(s, [{ text: t, options: { fontFace: "Consolas", fontSize: 12, color: C.text1, breakLine: true } }, { text: zh, options: { fontSize: 11, color: C.accent5 } }],
-        { x: x + 0.38, y: y + 0.04, w: 2.15, h: 0.5, valign: "middle" });
+        { x: x + 0.38, y: y + 0.02, w: 2.15, h: 0.48, valign: "middle" });
     });
   }
-  s.addNotes("資料庫一共 20 張表，跟 API 一樣依四個領域分。nlp_parses 會記下每一次 AI 解析的原始結果與使用者改了什麼，之後可以拿來當評測與訓練資料。");
+  s.addNotes("資料庫一共 " + facts.tables + " 張表，跟 API 一樣依四個領域分。nlp_parses 會記下每一次 AI 解析的原始結果與使用者改了什麼，之後可以拿來當評測與訓練資料；security_events 與 error_logs 是平台管理頁即時看的兩張表，都不放任何金額。");
 
   // ============================================================ AI 功能
   pres.addSection({ title: "AI 功能" });
@@ -326,13 +355,13 @@ async function build() {
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "AI 功能" });
   s.addText("解析結果：人一眼看得出哪裡要補", { placeholder: "title" });
   shot(s, "parse.png", 0.7, 1.5, 7.9, 1.6, "shot-parse");
-  text(s, "截圖：本機沒接模型時，前端用規則解析的結果（標紅、標黃的方式跟接模型時一樣）",
+  text(s, "截圖：本機沒接模型時的備援結果（標紅、標黃的方式跟接模型時一樣；線上接的是 Claude）",
     { x: 0.7, y: 6.62, w: 7.9, h: 0.3, fontSize: 11, color: C.accent5 });
   const pc = [
     ["FiCornerDownRight", C.accent1, "原句對照", "每一筆都標出是原句的哪一段（span），切錯一眼就看得到"],
     ["FiAlertCircle", C.accent3, "缺的標紅", "沒講金額就是空的、標「必填」，不會猜一個數字；補上才能送出"],
     ["FiPercent", C.accent4, "沒把握的標黃", "每一欄各自有信心度，低於 85% 標黃顯示百分比"],
-    ["FiCloudOff", C.accent5, "模型叫不動也能用", "後端回 503 時，前端改用規則切分，寫入照樣走後端"],
+    ["FiCloudOff", C.accent5, "模型叫不動也能用", "後端回 503 時先用簡易規則拆好、畫面上講清楚，寫入照樣走後端"],
   ];
   for (let i = 0; i < pc.length; i++) {
     const y = 1.55 + i * 1.3;
@@ -347,7 +376,7 @@ async function build() {
   s.addText("模型負責理解，程式負責確定的事", { placeholder: "title" });
   const two = [
     ["FiCpu", C.accent3, "交給模型（語意判斷）", ["把一段話切成幾筆", "「全家」是店名還是家人", "「退款」「賣二手」是收入", "從分類清單挑最像的那一個", "沒講的欄位老實填 null"]],
-    ["FiCode", C.accent1, "交給程式（確定的計算）", ["「昨天」「上禮拜三」「9/17」「28號」換成日期", "金額跟原句的數字對不上 → 信心度壓到 50%", "分類一定要在清單裡、收支要對得上", "金額 > 0，抽不到放進 missing", "確認後才寫資料庫（全部成功或全部不寫）"]],
+    ["FiCode", C.accent1, "交給程式（對事實）", ["「昨天」「上禮拜三」「9/17」換成日期；這一段沒講就沿用前一段", "原句沒有數字，金額一定是空的；跟原句（含「1.2 萬」）對不上就標出來", "店家、原句片段要真的出現在原句裡，找不到的清掉或標出來", "分類要在清單裡、收支要對得上；照這個人以前的改法調整", "確認後才寫資料庫（全部成功或全部不寫）"]],
   ];
   for (let i = 0; i < 2; i++) {
     const [ic, col, head, items] = two[i];
@@ -361,13 +390,13 @@ async function build() {
   card(s, 0.6, 5.75, 12.1, 0.9, "date-why", "FFF4EC");
   text(s, "為什麼日期不給模型算：模型最常錯的就是差一天，而這種錯使用者幾乎不會發現，月統計卻已經跑掉。",
     { x: 0.9, y: 5.85, w: 11.5, h: 0.7, fontSize: 15, color: C.text1, valign: "middle" });
-  s.addNotes("這張是整個設計的核心。左邊是模型擅長的語意判斷；右邊是可以用程式算死的東西。例如句子裡寫上禮拜三，模型就算給錯日期，程式也會依原句重算。");
+  s.addNotes("這張是整個設計的核心，也是我們的輸出管理：模型說的不算，原句寫的才算。左邊是模型擅長的語意判斷；右邊是程式逐筆對事實。例如句子裡寫上禮拜三，模型就算給錯日期，程式也會依原句重算；原句裡沒有任何數字，模型填的金額一律清掉。使用者改過的分類也會記下來，下次同一個品項先照他的習慣。");
 
   // ---- 財務建議
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "AI 功能" });
   s.addText("財務建議：每一個數字都要找得到出處", { placeholder: "title" });
   const adv = [["資料庫算數字", "收入、支出、各分類、可支配上限"], ["先算好比例", "支出佔收入、用掉幾成、各分類佔比"],
-    ["模型只寫句子", "結構化輸出；理財習慣標成「資料，不是指令」"], ["檢查數字出處", "找不到出處的那一則，信心度壓到 30%"]];
+    ["模型只寫句子", "結構化輸出；理財習慣標成「資料，不是指令」"], ["檢查數字出處", "找不到出處、或套錯分類的那一則直接不顯示"]];
   for (let i = 0; i < adv.length; i++) {
     const x = 0.6 + i * 3.1;
     card(s, x, 1.55, 2.85, 1.75, "adv-" + i);
@@ -377,7 +406,7 @@ async function build() {
   }
   const ex = [
     ["FiCheckCircle", C.accent2, "有出處，照常顯示", "「這個月已經用掉 86% 的可支配上限」", "86% 是程式先算好的比例 → 信心度照模型給的"],
-    ["FiAlertTriangle", C.accent3, "沒出處，標成要自己驗算", "「照這樣一年會花 103,200 元」", "103,200 是模型自己乘出來的 → 信心度 30%，畫面標出來"],
+    ["FiAlertTriangle", C.accent3, "沒出處或套錯，整則不顯示", "「照這樣一年會花 103,200 元」", "103,200 是模型自己乘出來的；「交通花了 6,000」其實是餐飲的 → 都丟掉；一則都不剩就改用同一批數字整理的版本"],
   ];
   for (let i = 0; i < 2; i++) {
     const [ic, col, head, quote, why] = ex[i];
@@ -386,11 +415,11 @@ async function build() {
     await iconCircle(s, ic, x + 0.3, 3.8, 0.55, col, HEX.lt1, "adv-ex-ic-" + i);
     text(s, head, { x: x + 1.05, y: 3.8, w: 4.6, h: 0.55, fontSize: 17, bold: true, color: C.text2, valign: "middle" });
     text(s, quote, { x: x + 0.3, y: 4.5, w: 5.4, h: 0.5, fontSize: 16, color: C.text1, italic: true });
-    text(s, why, { x: x + 0.3, y: 5.0, w: 5.4, h: 0.6, fontSize: 13, color: C.accent5 });
+    text(s, why, { x: x + 0.3, y: 5.0, w: 5.4, h: 0.65, fontSize: 12.5, color: C.accent5 });
   }
   text(s, "邊界規則：不給投資、保險、稅務建議；不對個人做價值判斷（不說「你太浪費」）；使用者填的理財習慣只當背景。",
     { x: 0.6, y: 5.95, w: 12.1, h: 0.7, fontSize: 14, color: C.text1 });
-  s.addNotes("財務建議的原則是數字由資料庫算，模型只寫句子。模型寫回來之後，程式會把每一個數字拿去比對出處。像一年會花十萬三千二這種模型自己乘出來的數字，就會被標成要自己驗算。");
+  s.addNotes("財務建議的原則是數字由資料庫算，模型只寫句子。模型寫回來之後，程式會把每一個數字拿去比對出處，也檢查有沒有套錯分類。像一年會花十萬三千二這種模型自己乘出來的數字，那一則就不顯示——以前是壓低信心度，但畫面上沒有顯示信心度，錯的數字照樣被當成事實，所以改成直接不要。上線實測時，每一則建議的數字我們都手算對過，11 個數字全對。");
 
   // ============================================================ 評測與測試
   pres.addSection({ title: "評測與測試" });
@@ -413,13 +442,13 @@ async function build() {
     text(s, [{ text: m + "　", options: { bold: true, color: C.text1 } }, { text: d, options: { color: C.accent5 } }], { x: 7.2, y, w: 5.5, h: 0.55, fontSize: 14 });
   });
   card(s, 7.2, 5.95, 5.5, 0.75, "eval-note", "F7F9FC");
-  text(s, "答案由 AI 產生，再用程式獨立驗算金額、日期、收支（0 錯）；人工抽查 " + facts.heldout.checked + " 題。",
+  text(s, "答案由 AI 產生，再用程式獨立驗算金額、日期、收支（0 錯）" + (facts.heldout.checked ? "；人工抽查 " + facts.heldout.checked + " 題。" : "。"),
     { x: 7.4, y: 6.0, w: 5.15, h: 0.65, fontSize: 12, color: C.accent5, valign: "middle" });
   s.addNotes("我們用 101 題、125 筆的留出集來量解析的成績，題型包含一段多筆、中文數字、相對日期、沒講金額這些難點。只比日期、金額、收支、分類四欄。");
 
   // ---- 評測結果
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "評測與測試" });
-  s.addText(modelSystems.length ? "評測結果：模型 vs 前端規則" : "評測結果：前端規則的基準線", { placeholder: "title" });
+  s.addText(modelSystems.length ? "評測結果：同一份 " + facts.heldout.cases + " 題，三套系統" : "評測結果：前端規則的基準線", { placeholder: "title" });
   const M = [["切分", (r) => r.split_acc], ["整題完全正確", (r) => r.case_exact], ["日期", (r) => r.field_acc.date],
     ["金額", (r) => r.field_acc.amount], ["分類", (r) => r.field_acc.cat], ["分類 Macro-F1", (r) => r.cat_macro_f1]];
   const series = systems.map((k) => ({ name: sysName(k), labels: M.map((m) => m[0]), values: M.map((m) => +((m[1](facts.eval[k].report) || 0) * 100).toFixed(1)) }));
@@ -428,9 +457,9 @@ async function build() {
     x: 0.6, y: 1.5, w: 7.6, h: 5.2, barDir: "col", barGrouping: "clustered", chartColors: palette.slice(0, series.length),
     showValue: true, dataLabelPosition: "outEnd", dataLabelFontSize: 11, dataLabelColor: HEX.dk1, dataLabelFontFace: "+mn-lt", dataLabelFormatCode: "0.0",
     catAxisLabelColor: HEX.dk1, catAxisLabelFontSize: 13, catAxisLabelFontFace: "+mn-lt",
-    valAxisMinVal: 0, valAxisMaxVal: 100, valAxisLabelColor: HEX.accent5, valAxisLabelFontSize: 11, valAxisLabelFontFace: "+mn-lt",
+    valAxisMinVal: 0, valAxisMaxVal: 115, valAxisMajorUnit: 20, valAxisLabelColor: HEX.accent5, valAxisLabelFontSize: 11, valAxisLabelFontFace: "+mn-lt",
     valGridLine: { color: "E3E9F2", size: 0.75 }, catGridLine: { style: "none" },
-    showLegend: series.length > 1, legendPos: "t", legendFontSize: 12, legendFontFace: "+mn-lt", legendColor: HEX.dk1,
+    showLegend: series.length > 1, legendPos: "b", legendFontSize: 12, legendFontFace: "+mn-lt", legendColor: HEX.dk1,
     showTitle: true, title: "正確率（%）", titleFontSize: 14, titleColor: HEX.dk2, titleFontFace: "+mn-lt", barGapWidthPct: 60,
     objectName: "chart-eval",
   });
@@ -445,31 +474,36 @@ async function build() {
   if (modelSystems.length) {
     // 右邊：每一個模型一張小卡，數字跟規則並排
     const rr = facts.eval.rules.report;
+    const live = modelSystems.find((k) => /live/.test(k)) || modelSystems[0];
+    const small = modelSystems.find((k) => k !== live);
+    const L = facts.eval[live].report, S = small ? facts.eval[small].report : null;
     card(s, 8.6, 1.6, 4.1, 5.05, "eval-side", "F7F9FC");
     text(s, "數字背後", { x: 8.9, y: 1.8, w: 3.6, h: 0.45, fontSize: 18, bold: true, color: C.text2 });
-    const m0 = facts.eval[modelSystems[0]].report;
+    const trio = (f) => pct(f(L)) + "（線上）／" + pct(f(rr)) + "（規則）" + (S ? "／" + pct(f(S)) + "（1.5B）" : "");
     const side = [
-      ["整題完全正確", pct(rr.case_exact) + "（規則）vs " + pct(m0.case_exact)],
-      ["分類正確率", pct(rr.field_acc.cat) + " vs " + pct(m0.field_acc.cat)],
-      ["沒講金額卻填數字", pct(rr.no_amount.hallucination) + " vs " + pct(m0.no_amount.hallucination)],
-      ["每句要等", m0.latency_p50 + " 秒（p50，本機 CPU）"],
+      ["整題完全正確", trio((r) => r.case_exact)],
+      ["分類 Macro-F1", trio((r) => r.cat_macro_f1)],
+      ["沒講金額卻填數字", trio((r) => r.no_amount.hallucination)],
+      ["每句要等", L.latency_p50 + " 秒（線上 p50，p95 " + L.latency_p95 + "）" + (S ? "；1.5B 本機 " + S.latency_p50 + " 秒" : "")],
     ];
     side.forEach(([k, v], i) => {
-      text(s, k, { x: 8.9, y: 2.4 + i * 0.72, w: 3.6, h: 0.3, fontSize: 13, color: C.accent5 });
-      text(s, v, { x: 8.9, y: 2.7 + i * 0.72, w: 3.6, h: 0.35, fontSize: 15, bold: true, color: C.text1 });
+      text(s, k, { x: 8.9, y: 2.35 + i * 0.75, w: 3.6, h: 0.3, fontSize: 12, color: C.accent5 });
+      text(s, v, { x: 8.9, y: 2.63 + i * 0.75, w: 3.6, h: 0.45, fontSize: 12.5, bold: true, color: C.text1 });
     });
-    text(s, "1.5B 的推理模型零樣本做記帳抽欄位，全面輸給規則；日期差不多，是因為日期本來就由程式依原句重算。上線要用大模型（商業 API）或先微調。",
-      { x: 8.9, y: 5.35, w: 3.6, h: 1.2, fontSize: 13, color: C.text1 });
+    text(s, "線上量的是上線那一套：Claude＋輸出管理（程式逐筆對原句）。⚠️ 題目由 AI 產生、句型比真人整齊，100% 不代表不會錯。",
+      { x: 8.9, y: 5.4, w: 3.6, h: 1.15, fontSize: 12, color: C.text1 });
   }
-  s.addNotes("這是評測結果。前端規則的整題完全正確率是 " + pct(facts.eval.rules.report.case_exact) + "。" +
+  s.addNotes("這是評測結果，三套系統用同一份 " + facts.heldout.cases + " 題。前端規則的整題完全正確率是 " + pct(facts.eval.rules.report.case_exact) + "。" +
     (modelSystems.length
-      ? "我們在本機用 Ollama 跑了 " + modelSystems.map(sysName).join("、") + "，整題完全正確率只有 " +
-        pct(facts.eval[modelSystems[0]].report.case_exact) + "，分類幾乎是亂挑，每一句還要等二三十秒。結論是小模型零樣本做不到，這正是為什麼上線用商業 API、並規劃微調。"
+      ? "線上那一套是 Claude 加上我們的輸出管理，直接打部署好的 API 量的，整題完全正確 " +
+        pct((facts.eval[modelSystems.find((k) => /live/.test(k)) || modelSystems[0]]).report.case_exact) +
+        "。本機的 1.5B 小模型零樣本只有 " + pct((facts.eval[modelSystems.find((k) => !/live/.test(k))] || facts.eval[modelSystems[0]]).report.case_exact) +
+        "，分類幾乎亂挑，每句還要等二三十秒。要提醒的是，題目是 AI 產生的，比真人說話整齊，所以一百分不代表不會錯；上線後使用者改過的解析，會收回來當新的題目。"
       : "模型的成績在填好模型設定後跑同一支評測腳本就會補上。"));
 
   // ---- 錯誤分析
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "評測與測試" });
-  const focus = modelSystems.length ? modelSystems[0] : "rules";
+  const focus = modelSystems.find((k) => facts.eval[k].misses.length) || "rules";
   s.addText(focus === "rules" ? "規則錯在哪：這就是需要模型的原因" : "錯誤分析：" + sysName(focus) + " 錯在哪", { placeholder: "title" });
   const seen = new Set();
   const picks = [];
@@ -494,9 +528,9 @@ async function build() {
     border: { type: "solid", color: "D6E0EE", pt: 0.75 }, fill: { color: C.background1 }, objectName: "miss-table" });
   card(s, 0.6, 6.0, 12.1, 0.75, "miss-take", "F7F9FC");
   text(s, focus === "rules" ? "這幾類錯是模型擅長的語意判斷（沒見過的說法、收入還是支出、哪些數字才是金額）；日期再由程式依原句重算兜底。"
-    : "小模型零樣本：分類幾乎亂挑、沒講金額一半會自己補數字，還會把原句轉成簡體。上線要用大模型，或先微調。",
+    : "小模型零樣本：分類幾乎亂挑、沒講金額一半會自己補數字，還會把原句轉成簡體。所以上線用 Claude（同一份題目全對），小模型留作微調的對照組。",
   { x: 0.9, y: 6.05, w: 11.5, h: 0.65, fontSize: 14, color: C.text1, valign: "middle" });
-  s.addNotes("這幾題是" + (focus === "rules" ? "規則" : sysName(focus)) + "錯的例子，每一種錯誤類型挑一題。");
+  s.addNotes("這幾題是" + (focus === "rules" ? "規則" : sysName(focus)) + "錯的例子，每一種錯誤類型挑一題。線上那一套在這份題目沒有錯題，所以這裡看小模型錯在哪，說明為什麼不能拿它直接上線。");
 
   // ---- 微調
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "評測與測試" });
@@ -544,21 +578,50 @@ async function build() {
     await iconCircle(s, "FiCheck", x, y, 0.42, C.accent2, HEX.lt1, "chk-" + i);
     text(s, checks[i], { x: x + 0.55, y: y - 0.02, w: 3.35, h: 0.46, fontSize: 14, color: C.text1, valign: "middle" });
   }
-  s.addNotes("測試分兩層。735 個自動測試在每次改程式時跑；端到端測試則是真的開一台伺服器、用全新的資料庫，從註冊一路走到停權，85 個步驟全部通過。右邊是其中幾個跟安全有關的檢查。");
+  s.addNotes("測試分兩層。" + fmt(facts.tests) + " 個自動測試在每次改程式時跑；端到端測試則是真的開一台伺服器、用全新的資料庫，從註冊一路走到停權，" +
+    (facts.e2e ? facts.e2e.passed + " 個步驟全部通過" : "") + "。右邊是其中幾個跟安全有關的檢查。");
+
+  // ---- 上線實測
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "評測與測試" });
+  s.addText("上線實測：測試工程師與使用者各走一遍", { placeholder: "title" });
+  const qa = [
+    ["17", "個問題找到並修正", "P0 嚴重 2、P1 6、P2 5、P3 4；每一個都重新部署、到線上再驗一次", C.accent3],
+    ["4 / 4", "過期後關閉存取", "驗證信、重設密碼、邀請碼、登入權杖：時間到真的用不了", C.accent1],
+    ["11 / 11", "建議裡的數字全對", "每一則財務建議的數字都拿帳上的資料手算對過", C.accent2],
+    ["0", "三種寬度橫向溢出", "375／768／1280 寬，24 個畫面逐一量過", C.accent2],
+  ];
+  for (let i = 0; i < qa.length; i++) {
+    const [big, unit, sub, col] = qa[i];
+    const x = 0.6 + i * 3.08;
+    card(s, x, 1.55, 2.88, 2.7, "qa-" + i);
+    text(s, big, { x: x + 0.3, y: 1.75, w: 2.4, h: 0.9, fontSize: 40, bold: true, color: col, fontFace: "Calibri" });
+    text(s, unit, { x: x + 0.3, y: 2.65, w: 2.4, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
+    text(s, sub, { x: x + 0.3, y: 3.1, w: 2.35, h: 1.05, fontSize: 12.5, color: C.accent5 });
+  }
+  card(s, 0.6, 4.5, 6.0, 2.15, "qa-user");
+  text(s, "使用者評分（17 個功能，滿分 100）", { x: 0.9, y: 4.65, w: 5.5, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
+  text(s, [{ text: "57.6 → 85.7", options: { bold: true, color: C.accent2, fontSize: 30, fontFace: "Calibri", breakLine: true } },
+    { text: "低於 60 分的功能 7 個 → 0 個；修正後最低 80 分。家長、子女各用一個帳號在正式網站上把每個功能實際用過。", options: { fontSize: 13, color: C.accent5 } }],
+  { x: 0.9, y: 5.1, w: 5.5, h: 1.45 });
+  card(s, 6.85, 4.5, 5.85, 2.15, "qa-files", "F7F9FC");
+  text(s, "交付的佐證", { x: 7.15, y: 4.65, w: 5.3, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
+  s.addText(["線上測試報告（PDF，每個問題附重現步驟與修正後的驗證）", "使用者評分與改善建議（PDF）", "完整測試流程影片（約 2 分鐘）", "AI 線上評測結果與資料庫核對查詢"].map((t, j, a) => ({ text: t, options: { bullet: true, breakLine: j < a.length - 1 } })),
+    { x: 7.15, y: 5.1, w: 5.35, h: 1.45, fontSize: 13, color: C.text1, paraSpaceAfter: 4, valign: "top", isTextBox: true, margin: 0 });
+  s.addNotes("自動測試之外，我們在部署好的正式網站上，用測試工程師的角度把每個功能實測一遍：收得到的信、寫進資料庫的資料、過期之後關不關得掉、AI 的每一個數字對不對。一共找到 17 個問題，全部修正、重新部署，再到線上驗一次。接著換成一般使用者的角度逐項打分，平均從 57.6 分到 85.7 分，低於六十分的功能歸零。");
 
   // ============================================================ 結語
   pres.addSection({ title: "結語" });
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "結語" });
   s.addText("限制與下一步", { placeholder: "title" });
   const lim = [
-    "留出集與訓練資料由 AI 產生；程式驗算過金額、日期、收支，但句型比真人整齊",
-    modelSystems.length ? "只在本機測了 " + modelSystems.map(sysName).join("、") + "；商業 API 與微調模型還沒跑同一份題目" : "模型的成績還沒跑，簡報上只有規則的基準線",
-    "數字出處檢查只確認數字有來源，不確認套在對的對象上（本機模型把總支出的 24.9% 說成交通）",
-    "免費主機會休眠：第一次開要等一下；CPU 跑開源模型一段話要十幾秒",
-    "財務建議沒有標準答案，只能用規則檢查（數字出處、邊界）加上人看",
+    "留出集與訓練資料由 AI 產生；程式驗算過金額、日期、收支，但句型比真人整齊——線上那一套全對，不代表真人說的話都對",
+    "微調的小模型還沒跑同一份題目；本機 1.5B 零樣本只有 " + (modelSystems.find((k) => !/live/.test(k)) ? pct(facts.eval[modelSystems.find((k) => !/live/.test(k))].report.case_exact) : "—"),
+    "財務建議沒有標準答案，只能用規則檢查（數字出處、套錯分類、邊界）加上人看",
+    "防濫用的規則只看次數：換來源的攻擊只擋得住「同一個帳號錯太多次」那一條",
+    "免費主機會休眠：第一次開要等一下",
   ];
   const nxt = ["把使用者改過的解析（nlp_parses.user_corrected）收進下一版留出集與訓練資料",
-    "微調模型與商業 API 在同一張表比較，決定哪一個上線", "建議加上「跟上個月比」的趨勢敘述（數字一樣由資料庫先算）", "家長端的零用金超支即時通知"];
+    "微調模型跑同一份題目，跟線上那一套放在同一張表比較", "建議加上「跟上個月比」的趨勢敘述（數字一樣由資料庫先算）", "家長端的零用金超支即時通知"];
   const col2 = [["FiAlertTriangle", C.accent3, "限制", lim], ["FiArrowRight", C.accent1, "下一步", nxt]];
   for (let i = 0; i < 2; i++) {
     const [ic, col, head, items] = col2[i];
@@ -575,6 +638,7 @@ async function build() {
   s.addText("謝謝聆聽", { placeholder: "title" });
   s.addText("Q & A", { placeholder: "body" });
   s.addText("github.com/cbes502034/final_project　｜　fambudget-web.onrender.com", { placeholder: "meta" });
+  qr(s, 10.35, 0.75, "qr-end");
   s.addNotes("謝謝大家，歡迎提問。");
 
   await pres.writeFile({ fileName: OUT });

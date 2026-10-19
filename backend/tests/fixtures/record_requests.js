@@ -139,6 +139,9 @@ async function rec(name, ...args) {
   await rec('suspendUser', kid.user.id, '多次騷擾其他使用者');
   await rec('unsuspendUser', kid.user.id);
   await rec('audit');
+  await rec('reportError', { message: 'Cannot read properties of undefined', location: 'vEntry', page: '#/entry' });
+  await rec('adminErrors');
+  await rec('adminSecurityEvents');
   await A.login({ email: 'daming@wang.tw', password: 'daming-pass-2' });
   await rec('logoutAll');
   process.stdout.write(JSON.stringify(out));

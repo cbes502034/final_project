@@ -32,6 +32,11 @@ body { color: var(--ink); font-family: "Microsoft JhengHei", "Noto Sans TC", san
 .cover h1 { font-size: 30pt; line-height: 1.25; margin: 6mm 0 4mm; color: #fff; }
 .cover .lede { color: var(--soft); font-size: 11.5pt; max-width: 150mm; }
 .meta { border: 1px solid var(--line); background: rgba(17,24,33,.92); padding: 5mm 6mm; display: grid; grid-template-columns: 34mm 1fr; gap: 2mm 6mm; font-size: 9.5pt; }
+.cover__foot { display: grid; grid-template-columns: 1fr 46mm; gap: 5mm; align-items: stretch; }
+.qr { border: 1px solid var(--accent); background: #fff; padding: 3mm; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5mm; }
+.qr img { width: 36mm; height: 36mm; image-rendering: pixelated; }
+.qr span { color: #0b0f14; font-size: 8pt; text-align: center; line-height: 1.35; }
+.qr b { font-size: 9pt; }
 .meta b { color: var(--faint); font-weight: 400; }
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin: 6mm 0; }
 .kpi { border: 1px solid var(--line); border-top: 2px solid var(--accent); background: rgba(17,24,33,.92); padding: 3.5mm 4mm; }
@@ -66,6 +71,24 @@ ul { margin: 0 0 3mm; padding-left: 5mm; } li { margin: 0 0 1mm; }
 
 def e(text: object) -> str:
     return html.escape(str(text))
+
+
+SITE = "https://fambudget-web.onrender.com"
+
+
+def qr_block(url: str = SITE) -> str:
+    """封面用的 QR code：白底黑點（深色底上直接印黑白反轉的碼，有些手機掃不到）。"""
+    import base64
+    import io as _io
+
+    import qrcode
+
+    img = qrcode.make(url, box_size=10, border=1)
+    buf = _io.BytesIO()
+    img.save(buf, format="PNG")
+    src = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    return ('<div class="qr"><img src="%s" alt="網站 QR code"><span><b>掃描開啟網站</b><br>%s</span></div>'
+            % (src, html.escape(url.replace("https://", ""))))
 
 
 def table(header: list[str], rows: list[list[str]], num_cols: tuple[int, ...] = (), widths: list[str] | None = None) -> str:

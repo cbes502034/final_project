@@ -2,7 +2,7 @@
 
     python report/qa/build_test_report.py      → report/qa/家庭記帳_測試報告.pdf
 
-內容全部來自 2026-10-19 在 Render 線上站實測的紀錄（report/qa/data/、audit.json）。
+內容全部來自 2026-10-19、10-20 在 Render 線上站實測的紀錄（report/qa/data/）。
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import io
 import json
 import os
 
-from pdfkit import build, e, table, tag
+from pdfkit import build, e, qr_block, table, tag
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -194,20 +194,20 @@ def body():
     h += ('<p class="lede">在 Render 部署後的正式網站上，以測試工程師的角色逐項實測：收得到的信、資料庫寫進去的資料、'
           '過期後關不關得掉存取、AI 的每一個數字對不對。找到的問題全部修正、重新部署，再到線上驗證一次。</p>')
     h += '<div class="kpis">'
-    for v, k in ((str(n), "找到的問題"), (str(p0), "P0 嚴重問題"), (str(n), "已修正並上線驗證"), ("768", "自動測試全過")):
+    for v, k in ((str(n), "找到的問題"), (str(p0), "P0 嚴重問題"), (str(n), "已修正並上線驗證"), ("771", "自動測試全過")):
         h += '<div class="kpi"><div class="v">%s</div><div class="k">%s</div></div>' % (v, k)
     h += "</div>"
     h += '<div class="kpis">'
     for v, k in (("99.0→100%", "AI 解析整題完全正確"), ("11 / 11", "AI 建議數字全對"), ("4 / 4", "過期後關閉存取"), ("0", "三種寬度橫向溢出")):
         h += '<div class="kpi"><div class="v" style="font-size:14pt">%s</div><div class="k">%s</div></div>' % (v, k)
     h += "</div></div>"
-    h += '<div class="meta">'
+    h += '<div class="cover__foot"><div class="meta">'
     for k, v in (("前端", "https://fambudget-web.onrender.com"), ("後端", "https://fambudget-backend-tdvg.onrender.com"),
-                 ("分支", "冠文（01dc633 → d4c355c，共 9 次提交）"), ("模型", "Claude（MODEL_PROVIDER=anthropic），模型強度不變"),
+                 ("分支", "冠文（01dc633 → 92226de）"), ("模型", "Claude（MODEL_PROVIDER=anthropic），模型強度不變"),
                  ("測試帳號", "家長 cbes502034（邱冠文）、子女 cbes50203（冠文_user）"),
                  ("收信", "Brevo HTTP API → Gmail 收件匣")):
         h += "<b>%s</b><span>%s</span>" % (e(k), e(v))
-    h += "</div></section>"
+    h += "</div>" + qr_block() + "</div></section>"
 
     h += '<h2><span class="n">01</span>摘要</h2>'
     h += ("<p>這一輪最嚴重的兩個問題都只有在線上才看得到：<b>正式資料庫沒有任何系統分類</b>（本機測試會先跑 init-db，所以一直沒發現），"
@@ -218,7 +218,7 @@ def body():
           "都已修正並重新檢查。各功能的使用者評分見另一份《使用者評分與改善建議》。</p>")
 
     h += '<h2><span class="n">02</span>測試方法與範圍</h2><ul>'
-    for t in ("自動測試：pytest 768 個（路由、說明字串、資料庫遷移、前後端契約、AI 後處理）",
+    for t in ("自動測試：pytest 771 個（路由、說明字串、資料庫遷移、前後端契約、AI 後處理）",
               "線上 API：在正式網站的同一個網域用測試帳號打 API，遇到 401 自動續期（同一個帳號同時只續期一次，避免權杖輪替打架）",
               "信件：Brevo 實際寄出，到 Gmail 收件匣取連結，再用前端頁面或 API 點開",
               "有效期：在 Render 暫時把有效期調到 2～3 分鐘，過期前後各測一次，測完刪掉變數還原",
@@ -267,6 +267,7 @@ def body():
           "「給小孩零用錢」模型自己只給分類 0.3 的信心度。兩者都會被標出來讓使用者確認，沒有默默寫錯。</div>")
 
     h += '<h2 class="break"><span class="n">06</span>資料庫核對（透過 API 讀同一個資料庫）</h2>'
+    h += '<p class="small">2026-10-19 15:39（台灣時間）的快照；之後的改善驗證與錄影又記了幾筆測試資料，筆數會比這裡多。</p>'
     h += table(["資料表", "應該是", "實際", "結果"], [[e(a), e(b), e(c), '<span class="ok">✓</span>'] for a, b, c in (
         ("users", "邱冠文已驗證、冠文_user 未驗證", "emailVerified：true／false"),
         ("categories（系統）", "12", "12"),
@@ -283,11 +284,24 @@ def body():
     h += table(["功能", "怎麼驗的", "結果"], [[e(a), e(b), '<span class="ok">%s</span>' % e(c)] for a, b, c in LIVE],
                widths=["20%", "70%", "10%"])
 
-    h += '<h2><span class="n">08</span>需要你處理的</h2><ul>'
+    h += '<h2><span class="n">08</span>追加改善（使用者評分之後）</h2>'
+    h += ("<p>第一輪使用者評分提出的 7 項建議全部實作，並在線上驗證；逐頁再檢查時又收掉 2 處重複。"
+          "細節與分數變化見《使用者評分與改善建議》第 4 節。</p>")
+    h += table(["項目", "線上驗證"], [[e(a), e(b)] for a, b in (
+        ("通知合併：同一個人 60 秒內記的好幾筆合成一則", "家長鈴鐺 6 則 → 3 則；點一下 4 筆同時已讀（未讀 6 → 2）"),
+        ("記住分類習慣：改過的分類下次照他的改法", "子女把「文具」改成教育後，再解析「文具 80」直接是教育，寫明「照你之前的改法」"),
+        ("等待時顯示秒數、超過 8 秒說明原因", "解析按鈕「解析中」→「解析中 2 秒」→ 完成"),
+        ("統計：空月份收成一行", "「05 月～09 月 沒有紀錄」"),
+        ("來源寫「AI 解析」", "收支明細來源欄"),
+        ("活動帳本自己的「開活動帳本」", "表單打開、種類 temp、結束日出現"),
+        ("英文名字頭像改用首字母大寫", "子女頭像「U」"),
+        ("帳本頁兩顆開帳本按鈕名字分開；手機明細頁只留分頁列的「記一筆」", "逐頁檢查重複按鈕歸零（每列各一的修改／刪除除外）"),
+    )], widths=["50%", "50%"])
+    h += '<h2><span class="n">09</span>需要你處理的</h2><ul>'
     h += ("<li><b>可選</b>：用 HeidiSQL 跑 report/qa/資料庫核對.sql，看「模型解析紀錄」「重設連結」兩張表（API 沒有開放讀取）。</li>"
           "<li><b>測試資料</b>：兩個測試帳號裡現在有測試用的家庭、帳、建議；要給別人展示前可以留著當示範，或由你決定是否清掉。</li>")
     h += "</ul>"
-    h += '<div class="foot">產生方式：python report/qa/build_test_report.py（內容取自 report/qa/data/ 與 audit.json）</div>'
+    h += '<div class="foot">產生方式：python report/qa/build_test_report.py（內容取自 report/qa/data/）</div>'
     return h
 
 

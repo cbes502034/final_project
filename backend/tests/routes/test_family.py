@@ -6,7 +6,7 @@ import pytest
 
 from app.models import (
     AlertRule, Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship,
-    Notification, Transaction,
+    Notification, SecurityEvent, Transaction,
 )
 from app.toolkit import crud, family
 from tests.routes.conftest import (
@@ -269,6 +269,8 @@ def test_lookup_user_一分鐘超過十次回_429(api):
     codes = [api.get("/api/family/lookup?email=x%d@x.tw" % i, headers=login(dad)).status_code for i in range(11)]
     assert codes == [404] * 10 + [429]
     assert crud.count(AuditLog, {"action": "lookup_user"}) == 10
+    api.get("/api/family/lookup?email=x99@x.tw", headers=login(dad))
+    assert crud.count(SecurityEvent, {"kind": "lookup_limited"}) == 1          # 被擋好幾次也只記一筆
 
 
 @pytest.mark.route(*INVITES)

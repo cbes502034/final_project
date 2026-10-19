@@ -4,9 +4,10 @@ from datetime import date
 
 import pytest
 
-from app.models import Advice, AlertRule, Allowance, Budget, Category, SavingsGoal
+from app.models import Advice, AlertRule, Allowance, Budget, Category, SavingsGoal, SecurityEvent
 from app.services.llm import client
 from app.toolkit import crud
+from app.toolkit.config import settings
 from tests.routes.conftest import (
     categories, family_of, goal, guard, ledger_of, login, now, spend, this_month, today, user,
 )
@@ -413,3 +414,14 @@ def test_generate_advices_權限與模型的問題(api, model, monkeypatch):
     assert api.post("/api/advices/generate", headers=login(dad), json={}).status_code == 503
     assert api.post("/api/advices/generate", headers=login(dad), json={"scope": "all"}).status_code == 422
     assert crud.count(Advice) == 1
+
+
+@pytest.mark.route(*GEN)
+def test_generate_advices_一天的額度用完回_429(api, monkeypatch):
+    monkeypatch.setattr(client, "is_configured", lambda: False)
+    monkeypatch.setattr(settings, "ai_advice_per_day", 1)
+    me = user("d@x.tw", "爸爸")
+    assert api.post("/api/advices/generate", headers=login(me), json={}).status_code == 503
+    r = api.post("/api/advices/generate", headers=login(me), json={})
+    assert r.status_code == 429 and "明天會恢復" in r.json()["detail"]
+    assert crud.count(SecurityEvent, {"kind": "ai_advice"}) == 1

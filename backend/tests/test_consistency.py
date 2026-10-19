@@ -11,8 +11,8 @@
     backend/README.md
     README.md
     docs/01-tech-stack-and-api.md
-    frontend/docs/index.html        專題手冊
-    frontend/docs/api.html          API 瀏覽頁
+    docs/handbook/index.html        專題手冊
+    docs/handbook/api.html          API 瀏覽頁
 
 靠人記得同時更新六個地方是不可能的。所以**用測試把它們綁在一起**：
 任何一個地方走散，跑 pytest 就會紅燈。
@@ -52,8 +52,8 @@ def test_每個領域的路由數在各份文件裡一致():
     """
     from app.ownership import MEMBERS
 
-    api_html = read("frontend/docs/api.html")
-    handbook = read("frontend/docs/index.html")
+    api_html = read("docs/handbook/api.html")
+    handbook = read("docs/handbook/index.html")
     spec = read("docs/01-tech-stack-and-api.md")
 
     for m in MEMBERS:
@@ -193,7 +193,7 @@ def test_畫面數在程式與手冊之間一致():
     assert m, "app.js 裡找不到 ROUTES"
     n = len(re.findall(r"[\w']+\s*:", m.group(1)))
 
-    handbook = read("frontend/docs/index.html")
+    handbook = read("docs/handbook/index.html")
     assert "%d SCREENS" % n in handbook, \
         "手冊角標的畫面數對不上，app.js 有 %d 個" % n
 
@@ -225,14 +225,14 @@ def test_手冊上的路由總數也要對():
     from app.ownership import all_routes
 
     n = len(list(all_routes()))
-    handbook = read("frontend/docs/index.html")
+    handbook = read("docs/handbook/index.html")
     found = re.findall(r"(\d+) 支路由", handbook)
     assert found, "手冊裡找不到「N 支路由」"
     stale = sorted({x for x in found if int(x) != n})
     assert not stale, "手冊寫的路由總數 %s，ownership.py 是 %d 支" % ("、".join(stale), n)
 
     # API 瀏覽頁的開場與頁尾也各寫了一次
-    api = read("frontend/docs/api.html")
+    api = read("docs/handbook/api.html")
     m1 = re.search(r"我們寫的 <b>(\d+) 支</b>", api)
     m2 = re.search(r"(\d+) ROUTES · 4 MODULES", api)
     assert m1 and m2, "API 瀏覽頁找不到路由總數"
@@ -246,7 +246,7 @@ def test_資料表張數在三份文件裡一致():
     規格文件寫 12 張、手冊內文寫 13 張、手冊角標寫 14 TABLES。
     原因是加了 notifications 之後只改了角標。所以改成用數的。
     """
-    handbook = read("frontend/docs/index.html")
+    handbook = read("docs/handbook/index.html")
     spec = read("docs/01-tech-stack-and-api.md")
 
     tables = re.findall(r'acc__code">([a-z_]+)</code>', handbook)
@@ -331,7 +331,7 @@ def test_檔案系統說明書要跟得上實際的檔案():
     說明書是別人找工具的入口，落後一版等於那個工具不存在。
     所以不靠人記得去改，讓測試去比對資料夾。
     """
-    doc = read("frontend/docs/files.html")
+    doc = read("docs/handbook/files.html")
     names = sorted(
         os.path.basename(p)
         for p in glob.glob(os.path.join(REPO, "backend", "app", "toolkit", "*.py"))
@@ -351,7 +351,7 @@ def test_手冊的資料表區塊要跟_data_js_一致():
     現在改成生成，這條測試確保沒有人再手改 HTML 讓它們分岔。
     """
     data = read("frontend/js/data.js")
-    handbook = read("frontend/docs/index.html")
+    handbook = read("docs/handbook/index.html")
 
     in_data = re.findall(r"\{ t: '([a-z_]+)'", data)
     in_doc = re.findall(r'acc__code">([a-z_]+)</code>', handbook)
@@ -383,7 +383,7 @@ def test_權限矩陣要跟_data_js_一致():
     data.js 有「查看沒有指派給自己的人」，手冊沒有。
     """
     data = read("frontend/js/data.js")
-    handbook = read("frontend/docs/index.html")
+    handbook = read("docs/handbook/index.html")
 
     actions = re.findall(r"\{ action: '([^']+)'", data)
     assert actions, "data.js 裡找不到 permissions"
@@ -695,7 +695,7 @@ def test_手冊的資料表要逐欄跟得上_data_js():
     表格數對得上，所以舊測試沒抓到。這支逐欄比對。
     """
     data = read("frontend/js/data.js")
-    handbook = read("frontend/docs/index.html")
+    handbook = read("docs/handbook/index.html")
 
     block = data[data.index("  schema: ["):data.index("  relations:")]
     # [['欄位名', '型別', '說明'], ...]
@@ -2382,6 +2382,11 @@ def test_明細的日期與分類篩選真的有篩():
 DOC_PAGES = ("index", "fastapi", "restful", "files", "api", "model", "guide")
 
 
+def doc_page(pg: str) -> str:
+    """使用說明留在網站上（frontend/docs/）；其他是開發文件，搬到 docs/handbook/，不放在網站上。"""
+    return "frontend/docs/guide.html" if pg == "guide" else "docs/handbook/%s.html" % pg
+
+
 def test_品牌是上下兩行的藝術字():
     """使用者要的品牌：上面「家庭記帳」、下面草寫英文，英文比較小、兩行一樣寬、沒有框。
 
@@ -2397,7 +2402,7 @@ def test_品牌是上下兩行的藝術字():
     assert "text=%E5%AE%B6%E5%BA%AD%E8%A8%98%E5%B8%B3FamBudget" in html, "品牌字只需要這幾個字，用 text= 只載這幾個字"
     assert lockup in read("frontend/js/app.js"), "登入頁的品牌沒有換"
     for pg in DOC_PAGES:
-        page = read("frontend/docs/%s.html" % pg)
+        page = read(doc_page(pg))
         assert lockup in page, pg + " 的品牌沒有換成上下兩行"
         assert "rail__mark" not in page and "g-mark" not in page
 
@@ -2425,11 +2430,11 @@ def test_全站同一套字():
     assert "font-family" not in themes and not re.search(r"--(sans|serif|display|mono):", themes), "主題不換字"
 
     named = re.compile(r'font-family:(?!\s*(?:var\(|inherit))[^;}]*')
-    for f in ("frontend/css/app.css", "frontend/docs/docs.css"):
+    for f in ("frontend/css/app.css", "docs/handbook/docs.css"):
         css = re.sub(r"/\*.*?\*/", "", read(f), flags=re.S)
         assert not named.findall(css), "%s 直接寫了字體名稱：%s" % (f, named.findall(css)[:3])
     for pg in DOC_PAGES:
-        page = read("frontend/docs/%s.html" % pg)
+        page = read(doc_page(pg))
         assert not named.findall(page), "%s 直接寫了字體名稱" % pg
         assert "Noto+Sans+TC" not in page and "Noto+Serif+TC" not in page, pg + " 還在載舊的字體"
     assert "Noto+Sans+TC" not in read("frontend/index.html")
@@ -2444,14 +2449,16 @@ def test_文件跟系統同一套主題與樣子():
     """
     data = read("frontend/js/data.js")
     block = data[data.index("  themes: ["):data.index("  ],", data.index("  themes: ["))]
-    css = read("frontend/docs/docs.css")
+    css = read("docs/handbook/docs.css")
     assert not re.findall(r"#[0-9A-Fa-f]{3,8}\b|rgba?\(", re.sub(r"/\*.*?\*/", "", css, flags=re.S)), \
         "docs.css 還有寫死的顏色"
     for pg in DOC_PAGES:
-        page = read("frontend/docs/%s.html" % pg)
+        page = read(doc_page(pg))
         head = page[:page.index("</head>")]
-        assert "../css/tokens.css" in head and "../css/themes.css" in head, pg + " 沒有載系統的樣式"
-        assert head.index("fambudget.theme") < head.index("../css/tokens.css"), pg + " 主題要在樣式載入前掛上"
+        # 使用說明在網站上（frontend/docs/）；開發文件搬到 docs/handbook/，樣式從 ../../frontend/css/ 載
+        css = "../css/" if pg == "guide" else "../../frontend/css/"
+        assert css + "tokens.css" in head and css + "themes.css" in head, pg + " 沒有載系統的樣式"
+        assert head.index("fambudget.theme") < head.index(css + "tokens.css"), pg + " 主題要在樣式載入前掛上"
         body = re.sub(r"<!--.*?-->", "", page, flags=re.S)
         stray = re.findall(r"#[0-9A-Fa-f]{6}\b|rgba\(", body)
         assert not stray, "%s 還有寫死的顏色：%s" % (pg, sorted(set(stray))[:5])
@@ -2460,7 +2467,7 @@ def test_文件跟系統同一套主題與樣子():
 def test_專題文件每一頁先講重點():
     """文件很長，第一次讀的人要先知道這一頁在講什麼：開頭一張「這一頁的重點」。"""
     for pg in ("index", "fastapi", "restful", "files", "api", "model"):
-        page = read("frontend/docs/%s.html" % pg)
+        page = read(doc_page(pg))
         m = re.search(r'<section class="kp".*?<ul class="kp__l">(.*?)</ul>', page, re.S)
         assert m, pg + " 沒有重點卡"
         items = re.findall(r"<li><b>[^<]+</b><span>[^<]+</span></li>", m.group(1))
@@ -2469,7 +2476,7 @@ def test_專題文件每一頁先講重點():
         assert kp_at > page.index("</header>"), pg + " 重點卡要放在開場後面"
         if 'class="sec' in page:
             assert kp_at < page.index('class="sec'), pg + " 重點卡要放在第一節前面"
-    css = read("frontend/docs/docs.css")
+    css = read("docs/handbook/docs.css")
     assert "content: '重點'" in css, "每一節的導言要標出「重點」"
 
 
@@ -2564,7 +2571,7 @@ def test_家長離開後舊邀請碼失效_沒有家長的家不能加入():
 
 def test_帳本移除與移出的說明前後一致():
     """程式、串接契約、API 說明、使用說明四處講的要一樣。"""
-    for f in ("docs/02-前後端串接契約.md", "frontend/docs/api.html", "frontend/docs/guide.html", "frontend/js/app.js"):
+    for f in ("docs/02-前後端串接契約.md", "docs/handbook/api.html", "frontend/docs/guide.html", "frontend/js/app.js"):
         text = read(f)
         assert "包含他自己記" not in text and "包含他自己記在那本" not in text, \
             f + " 還寫著「移出帳本連自己記的也看不到」，跟可見範圍一定包含自己矛盾"
@@ -2724,7 +2731,7 @@ def test_修改與多筆刪除_三層接口與文件都有():
     contract = read("docs/02-前後端串接契約.md")
     assert "### `PATCH /api/transactions/{id}`" in contract and "### `DELETE /api/transactions?ids=" in contract
     assert "clean_ids" in contract and "require_editable" in contract
-    api_html = read("frontend/docs/api.html")
+    api_html = read("docs/handbook/api.html")
     assert "{ n: 73, o: 'm2', m: 'DELETE', p: '/api/transactions'" in api_html
     guide = read("frontend/docs/guide.html")
     assert "選取多筆" in guide and "修改" in guide
@@ -2851,7 +2858,7 @@ def test_存款目標搬到註冊後的個人化設定():
     contract = read("docs/02-前後端串接契約.md")
     assert "`API.register({ name, email, password })`" in contract
     assert '{ "onboarded": true }' in contract and "user.onboardedAt" in contract
-    api_html = read("frontend/docs/api.html")
+    api_html = read("docs/handbook/api.html")
     assert '"savingsGoal": 20000\\n}' not in api_html, "API 說明頁的註冊範例還帶著存款目標"
     guide = read("frontend/docs/guide.html")
     assert "建好帳號會先帶你設定" in guide
@@ -2881,7 +2888,7 @@ def test_忘記密碼的頁面_設定與文件():
     for part in ("### `POST /api/auth/password-reset`", "### `POST /api/auth/password-reset/confirm`",
                  "GENERIC_MESSAGE", "Brevo", "25／465／587", "demoMail"):
         assert part in contract, "契約少了 " + part
-    api_html = read("frontend/docs/api.html")
+    api_html = read("docs/handbook/api.html")
     assert "{ n: 74, o: 'm1', m: 'POST', p: '/api/auth/password-reset'" in api_html
     assert "{ n: 75, o: 'm1', m: 'POST', p: '/api/auth/password-reset/confirm'" in api_html
     guide = read("frontend/docs/guide.html")
@@ -2939,7 +2946,7 @@ def _ownership_keys():
 def test_手冊的_API_目錄照_ownership_分組_一支不少():
     """手冊的 API 目錄曾經把分類、帳本放在舊的負責人底下，平台管理的四支整個不見。"""
     own = _ownership_keys()
-    hb = read("frontend/docs/index.html")
+    hb = read("docs/handbook/index.html")
     sec = hb[hb.index('id="api"'):hb.index('id="arch"')]
     seen, wrong, current = {}, [], None
     for line in sec.splitlines():
@@ -2965,7 +2972,7 @@ def test_規格與_API_瀏覽頁的路徑_就是後端的路徑():
     rows = re.findall(r"^\| (\d+) \| (GET|POST|PUT|PATCH|DELETE) \| `([^`?]+)[^`]*` \| (認證|記帳|數字|家庭)", spec, re.M)
     got = {(v, p): who for _, v, p, who in rows}
     assert got == own, sorted(set(got.items()) ^ set(own.items()))
-    api = read("frontend/docs/api.html")
+    api = read("docs/handbook/api.html")
     labels = {"m1": "認證", "m2": "記帳", "m3": "數字", "m4": "家庭"}
     rows = re.findall(r"\{ n: \d+, o: '(m\d)', m: '(\w+)', p: '([^']+)'", api)
     got = {(v, p): labels[o] for o, v, p in rows}
@@ -2977,7 +2984,8 @@ def test_每一頁寫的路由總數都對():
     n = len(_ownership_keys())
     stale = []
     for f in ["README.md", "backend/README.md", "docs/01-tech-stack-and-api.md", "docs/02-前後端串接契約.md"] + \
-            [os.path.relpath(p, REPO) for p in glob.glob(os.path.join(REPO, "frontend", "docs", "*.html"))]:
+            [os.path.relpath(p, REPO) for p in glob.glob(os.path.join(REPO, "frontend", "docs", "*.html"))
+             + glob.glob(os.path.join(REPO, "docs", "handbook", "*.html"))]:
         for mo in re.finditer(r"(\d+) (?:支路由|支 API|條路由|ROUTES)", read(f)):
             if int(mo.group(1)) != n:
                 stale.append("%s：%s" % (f, mo.group(0)))
@@ -2987,8 +2995,8 @@ def test_每一頁寫的路由總數都對():
 def test_文件的權限欄三份一致():
     own = _ownership_keys()
     spec = read("docs/01-tech-stack-and-api.md")
-    api = read("frontend/docs/api.html")
-    hb = read("frontend/docs/index.html")
+    api = read("docs/handbook/api.html")
+    hb = read("docs/handbook/index.html")
     diff = []
     for v, p in own:
         a = re.search(r"^\| \d+ \| %s \| `%s(?:\?[^`]*)?` \| (?:認證|記帳|數字|家庭)[^|]* \| ([^|]+) \|" % (v, re.escape(p)), spec, re.M)
@@ -3005,7 +3013,7 @@ def test_RESTful_說明書逐支檢查的清單就是現在的路由():
     """第 8 節「誠實檢查我們自己的 N 支」曾經停在 38 支，還寫著「這三支前端都還沒在用」。
     現在每一支都要剛好出現一次（完全符合、通用、刻意、可以改，四類擇一）。"""
     own = _ownership_keys()
-    t = read("frontend/docs/restful.html")
+    t = read("docs/handbook/restful.html")
     sec = t[t.index('id="ours"'):t.index('id="break"')]
     cells = re.findall(r'<td class="rt">(.*?)</td>', sec, re.S)
     found = []
@@ -3067,3 +3075,18 @@ def test_預算區的連結到得了設定預算的地方():
 def test_呼叫_greet_一定要帶使用者():
     """個人資料頁的主題預覽寫成 greet()（沒帶使用者），整頁出錯打不開。要的是 greeting()（早安／午安／晚安）。"""
     assert not re.search(r"greet\(\s*\)", read("frontend/js/app.js"))
+
+
+def test_網站上只放使用說明_開發文件與開發用的提示都不在前端():
+    """使用者要求（2026-10-20）：前端保留完整的 UI，不放開發類型的提示文字或文件——
+    那些整理成報告用的資料。開發文件搬到 docs/handbook/；出錯的函式、路由改送到平台管理頁。"""
+    left = sorted(os.listdir(os.path.join(REPO, "frontend", "docs")))
+    assert left == ["docs.js", "guide.html"], left
+    for name in ("index", "api", "restful", "fastapi", "files", "model"):
+        assert os.path.exists(os.path.join(REPO, "docs", "handbook", name + ".html")), name
+    app = read("frontend/js/app.js")
+    for bad in ("已連接後端", "'<div class=\"err__w\">出錯的函式", "這次是前端規則解析的", "先用前端的規則寫的",
+                "後端還沒接上，不會存", "畫面程式出錯：' + ((err && err.message) || err) + (spot"):
+        assert bad not in app, "app.js 還有開發用的提示：" + bad
+    assert "這一支做好之前" not in read("frontend/js/notify.js")
+    assert "後端還沒做這一支" not in read("frontend/docs/guide.html")

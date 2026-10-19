@@ -84,3 +84,11 @@ class FinanceIn(BaseModel):
 
 class SuspendIn(BaseModel):
     reason: str
+
+
+class ClientErrorIn(BaseModel):
+    """前端回報畫面上出的錯。只收訊息、畫面、函式名稱——不收請求內容（金額、備註）。"""
+    message: str = Field(min_length=1, max_length=2000)
+    location: str | None = Field(default=None, max_length=200)
+    page: str | None = Field(default=None, max_length=200)
+    status: int | None = Field(default=None, ge=0, le=999)

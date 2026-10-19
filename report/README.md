@@ -1,6 +1,6 @@
 # report/：期末報告簡報
 
-成品：**`家庭記帳_期末報告.pptx`**（20 頁，每一頁都有講者備註）。
+成品：**`家庭記帳_期末報告.pptx`**（22 頁，每一頁都有講者備註；封面與結尾有網站的 QR code）。
 
 簡報上的數字都不是手打的，是從程式與結果檔算出來的。模型評測跑完、測試重跑之後，照下面重新產生，數字就會更新。
 
@@ -31,7 +31,7 @@ cd report && npm install && node build_deck.js
 ```bash
 # 1. 本機開一台用全新 SQLite 的後端（見 backend/tools/e2e_check.py 開頭）與前端（python -m http.server 5195 --directory frontend）
 # 2. 建示範資料，權杖寫到暫存資料夾（不要放進 repo）
-python backend/tools/demo_seed.py --base http://localhost:8010 --tokens %TEMP%\demo_tokens.json
+python backend/tools/demo_seed.py --base http://localhost:8010 --tokens %TEMP%\demo_tokens.json --db sqlite:///<後端的資料庫檔>
 # 3. 截圖
 python report/screenshot.py --tokens %TEMP%\demo_tokens.json
 ```

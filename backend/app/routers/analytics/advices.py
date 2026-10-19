@@ -23,7 +23,7 @@ from __future__ import annotations
 # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -35,7 +35,7 @@ from app.routers._stub import not_ready, stub
 from app.schemas.advice import AdviceItem, GenerateIn
 from app.services import analytics
 from app.services.llm import advice, client
-from app.toolkit import crud, errors, money, period, profile
+from app.toolkit import crud, errors, money, period, profile, security
 from app.toolkit.config import settings
 from app.toolkit.db import get_db
 
@@ -113,7 +113,7 @@ def list_advices(me: User, scope: str | None = None, db: Session = Depends(get_d
 
             from datetime import datetime, timedelta, timezone
 
-            from fastapi import APIRouter, Depends, Query
+            from fastapi import APIRouter, Depends, HTTPException, Query
             from fastapi.encoders import jsonable_encoder
             from pydantic import ValidationError
             from sqlalchemy.orm import Session
@@ -125,7 +125,7 @@ def list_advices(me: User, scope: str | None = None, db: Session = Depends(get_d
             from app.schemas.advice import AdviceItem, GenerateIn
             from app.services import analytics
             from app.services.llm import advice, client
-            from app.toolkit import crud, errors, money, period, profile
+            from app.toolkit import crud, errors, money, period, profile, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -253,6 +253,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                                      detail
         403     scope=family，但不是家長、或沒有照看任何家人  全家的建議只有家長、而且照看著家人時才能產生
+        429     今天產生的次數用完了（AI_ADVICE_PER_DAY）     今天產生建議的次數用完了（每天 20 次），明天會恢復
         503     模型沒設定、叫不動                            （ModelError 的訊息，例如：模型服務還沒接上）
         503     services/llm/advice.py 還沒做好               建議還沒做好，先用前端的版本
         503     模型寫回來的沒有一則合格                      模型寫回來的建議格式不對，先用前端的版本
@@ -292,7 +293,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         2. 算數字：跟 GET /api/summary 一樣決定算誰（孩子的收入不算），analytics.summary ＋ savings_status；
            byCat 的分類 id 翻成名字；全部用 jsonable_encoder 轉成一般數字
         3. 把我的理財習慣組成 prompt 的背景段落
-        4. 叫 advice.write_advices；ModelError、NotImplementedError 轉成 503
+        4. 今天的額度用完 → 429（security.ai_quota，記一筆 ai_advice、commit）；叫 advice.write_advices；ModelError、NotImplementedError 轉成 503
         5. 每一則用 AdviceItem 驗證，不合格的丟掉；一則都不剩 → 503
         6. 刪掉同月同範圍的舊建議，存新的（family 的 user_id 是 NULL），db.commit()
         7. 回傳 {generatedAt, advices}
@@ -303,7 +304,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
 
             from datetime import datetime, timedelta, timezone
 
-            from fastapi import APIRouter, Depends, Query
+            from fastapi import APIRouter, Depends, HTTPException, Query
             from fastapi.encoders import jsonable_encoder
             from pydantic import ValidationError
             from sqlalchemy.orm import Session
@@ -315,7 +316,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
             from app.schemas.advice import AdviceItem, GenerateIn
             from app.services import analytics
             from app.services.llm import advice, client
-            from app.toolkit import crud, errors, money, period, profile
+            from app.toolkit import crud, errors, money, period, profile, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -360,7 +361,13 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                        "habits": me.finance_habits or [], "note": me.finance_note or ""}
             block = profile.to_prompt_block(finance, catalog.FINANCE_STYLES, catalog.FINANCE_GOALS, catalog.FINANCE_HABITS)
 
-            # 4. 叫模型寫成句子；沒設定、叫不動、還沒做好都回 503（前端會用同一批數字頂著）
+            # 4. 每天產生建議的額度（每一次都是付費的模型呼叫）：用完回 429；模型失敗也算一次
+            over = security.ai_quota("ai_advice", me.id, db=db)
+            db.commit()
+            if over:
+                raise HTTPException(status_code=429, detail=over)
+
+            #    叫模型寫成句子；沒設定、叫不動、還沒做好都回 503（前端會用同一批數字頂著）
             try:
                 drafts = advice.write_advices(numbers, block)
             except client.ModelError as exc:
@@ -504,7 +511,13 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                "habits": me.finance_habits or [], "note": me.finance_note or ""}
     block = profile.to_prompt_block(finance, catalog.FINANCE_STYLES, catalog.FINANCE_GOALS, catalog.FINANCE_HABITS)
 
-    # 4. 叫模型寫成句子；沒設定、叫不動、還沒做好都回 503（前端會用同一批數字頂著）
+    # 4. 每天產生建議的額度（每一次都是付費的模型呼叫）：用完回 429；模型失敗也算一次
+    over = security.ai_quota("ai_advice", me.id, db=db)
+    db.commit()
+    if over:
+        raise HTTPException(status_code=429, detail=over)
+
+    #    叫模型寫成句子；沒設定、叫不動、還沒做好都回 503（前端會用同一批數字頂著）
     try:
         drafts = advice.write_advices(numbers, block)
     except client.ModelError as exc:

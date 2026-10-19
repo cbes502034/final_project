@@ -111,8 +111,8 @@
       })
       .catch(function (e) {
         /* 連不上、逾時 —— 安靜地等下一次，不要每 20 秒吵一次。
-           但「後端還沒做這一支」不一樣：不講的話，鈴鐺會顯示
-           「目前沒有通知」，看的人會以為真的沒有通知。 */
+           但「通知那一支壞了」不一樣：不講的話，鈴鐺會顯示
+           「目前沒有通知」，看的人會以為真的沒有通知。e.message 是白話（見 api.js 的 USER_TEXT）。 */
         var was = state.down;
         state.down = (e && e.kind === 'backend') ? e.message : null;
         if (state.open || was !== state.down) render();
@@ -280,7 +280,7 @@
 
     if (!state.items.length && state.down) {
       h += '<div class="bell__empty">' + esc(state.down) + '<br>' +
-        '<span>這一支做好之前，通知都收不到。</span></div>';
+        '<span>通知暫時收不到，稍後會自動再試。</span></div>';
     } else if (!state.items.length) {
       h += '<div class="bell__empty">目前沒有通知。<br>' +
         '<span>被你監管的成員新增記帳時，這裡會即時跳出來。</span></div>';

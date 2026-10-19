@@ -75,32 +75,53 @@ def test_那一支還沒做_501_就算有備援也不頂著(run):
     assert e.get("fallback") is None, "501 不該回備援的結果：%s" % e
     assert e["kind"] == "backend" and e["fn"] == "API.nlpParseBatch"
     assert e["owner"] == owner_of("POST", "/api/nlp/parse-batch").label
-    assert "HTTP 501" in e["error"]
+    assert "HTTP 501" in e["dev"] and "HTTP" not in e["error"]
 
 
 def test_清單裡每一筆的型別不對_也要當成回應不正確(run):
     """SHAPE 只看最上層的 key 在不在；裡面回錯型別要靠逐筆檢查抓。"""
     e = run["txBadShape"]
     assert e["kind"] == "shape" and e["fn"] == "API.transactions"
-    assert "transactions 第 1 筆的 amount 應該是數字" in e["error"]
-    assert "｜出錯的函式：API.transactions（GET /api/transactions" in e["error"]
+    assert "transactions 第 1 筆的 amount 應該是數字" in e["dev"]
+    assert "｜出錯的函式：API.transactions（GET /api/transactions" in e["dev"]
+    assert e["error"] == "收到的資料不完整，已經通知管理員，請稍後再試"
 
 
-def test_沒有備援的_501_講出是哪一支_哪條路由_誰負責_而且不重複(run):
+def test_沒有備援的_501_技術細節講出是哪一支_哪條路由_誰負責_而且不重複(run):
+    """技術細節（e.dev）照樣講得出是哪一支；使用者看到的（e.message）只有白話。"""
     e = run["notReady"]
     owner = owner_of("POST", "/api/categories").label
     assert e["kind"] == "backend" and e["fn"] == "API.createCategory"
     assert e["route"] == "POST /api/categories" and e["owner"] == owner
-    assert e["error"].count("後端還沒做這一支") == 1
-    assert e["error"] == "後端還沒做這一支（HTTP 501）｜出錯的函式：API.createCategory（POST /api/categories，%s）" % owner
+    assert e["dev"].count("後端還沒做這一支") == 1
+    assert e["dev"] == "後端還沒做這一支（HTTP 501）｜出錯的函式：API.createCategory（POST /api/categories，%s）" % owner
+    assert e["error"] == "這個功能暫時無法使用，請稍後再試"
 
 
 def test_形狀不對_伺服器錯誤_連不上_各自有自己的說法(run):
-    assert run["shape"]["kind"] == "shape" and "回應少了 alerts" in run["shape"]["error"]
-    assert run["server"]["kind"] == "backend" and "HTTP 500" in run["server"]["error"]
-    assert run["network"]["kind"] == "network" and run["network"]["error"].startswith("連不上後端")
+    assert run["shape"]["kind"] == "shape" and "回應少了 alerts" in run["shape"]["dev"]
+    assert run["server"]["kind"] == "backend" and "HTTP 500" in run["server"]["dev"]
+    assert run["network"]["kind"] == "network" and run["network"]["dev"].startswith("連不上後端")
     for key in ("shape", "server", "network"):
-        assert "｜出錯的函式：API." in run[key]["error"]
+        assert "｜出錯的函式：API." in run[key]["dev"]
+    assert run["network"]["error"] == "連不上伺服器，請確認網路之後再試一次"
+    # 500 的原話帶著資料表名稱（relation "groups"…），不能照原樣給使用者看
+    assert run["server"]["error"] == "系統暫時出了問題，請稍後再試"
+
+
+def test_使用者的畫面上沒有任何技術字眼_技術細節送給平台管理頁(run):
+    """使用者要求：前端只保留完整的 UI，不放開發用的提示。
+    函式名稱、路由、HTTP 狀態碼只出現在送給平台管理頁的回報裡（POST /api/client-errors）。"""
+    for key in ("notReady", "shape", "server", "network", "txBadShape", "notReadyNoFallback"):
+        msg = run[key]["error"]
+        for bad in ("API.", "/api/", "HTTP", "後端", "前端", "函式", "負責"):
+            assert bad not in msg, "%s 的訊息還有「%s」：%s" % (key, bad, msg)
+    sent = {r["location"]: r for r in run["reported"]}
+    assert "API.createCategory" in sent and "HTTP 501" in sent["API.createCategory"]["message"]
+    assert "API.alerts" in sent and "回應少了 alerts" in sent["API.alerts"]["message"]
+    assert "API.notifications" in sent                    # 斷線：伺服器看不到，一定要前端回報
+    assert "API.groups" not in sent                        # 500 後端自己記得到，不重送
+    assert "API.joinFamily" not in sent                    # 業務錯誤是正確的回答，不是錯
 
 
 def test_通知那一支還沒做的時候_鈴鐺要講出來_不能說沒有通知(run):
@@ -110,15 +131,14 @@ def test_通知那一支還沒做的時候_鈴鐺要講出來_不能說沒有通
     但「那一支還沒做」也被當成「沒有通知」收起來的話，通知就整個無聲無息地
     不見了——做的人不會發現，用的人以為真的沒有通知。
     """
-    owner = owner_of("GET", "/api/notifications").label
     down = run["bellNotReady"]
     assert down["wrapHidden"] is False, "那一支還沒做的時候，鈴鐺不能收起來"
-    assert "後端還沒做這一支" in down["text"] and "API.notifications" in down["text"]
-    assert owner in down["text"] and "目前沒有通知" not in down["text"]
+    assert "通知暫時收不到" in down["text"] and "目前沒有通知" not in down["text"]
+    assert "API." not in down["text"] and "後端" not in down["text"]
 
     empty = run["bellEmpty"]
     assert empty["wrapHidden"] is True, "真的沒有通知的時候，鈴鐺照舊收起來"
-    assert "目前沒有通知" in empty["text"] and "後端還沒做" not in empty["text"]
+    assert "目前沒有通知" in empty["text"] and "暫時收不到" not in empty["text"]
 
 
 def test_照說明做對了前端就接得住(run):
@@ -262,7 +282,7 @@ def test_mock_回的每一筆都過得了逐筆檢查(sent):
 
     # 清單都是空的話，檢查等於沒跑。這幾支一定要走到有資料的狀態。
     must = ["transactions", "categories", "groups", "budgets", "members",
-            "advices", "notifications", "audit", "adminUsers", "nlpParseBatch"]
+            "advices", "notifications", "audit", "adminUsers", "nlpParseBatch", "adminErrors"]
     empty = [f for f in must if not lists.get(f)]
     assert not empty, "這幾支在 mock 走過時清單是空的，逐筆檢查等於沒跑：%s" % empty
 

@@ -4,7 +4,7 @@
 ===========================================================================
 這個檔案是幹嘛的
 ===========================================================================
-70 支路由分成四個領域（認證、記帳、數字、家庭）。哪一支屬於哪個領域只寫在這裡，
+75 支路由分成四個領域（認證、記帳、數字、家庭）。哪一支屬於哪個領域只寫在這裡，
 錯誤卡上的「屬於：記帳」、API 瀏覽頁的分組、規格文件的路由清單都要跟這裡對得上，
 `pytest` 會檢查有沒有走散。
 
@@ -85,6 +85,9 @@ MEMBERS: list[Member] = [
             "地基（資料庫連線、設定、依賴注入、密碼雜湊、JWT 實作）"
             "已經在 toolkit/ 裡寫好了，直接用就好，不用再造一次。\n"
             "停權也在這裡：平台管理員（master）可以停掉違規帳號。\n"
+            "平台管理頁即時看三件事：每個人的紅綠燈（users.last_active_at）、錯誤訊息（error_logs）、\n"
+            "  安全事件（security_events：登入錯太多次、大量註冊、AI 額度用完…，規則在 toolkit/security.py）。\n"
+            "  ⚠️ 規則只暫時擋下，**停權一律由管理員按**，不讓 AI 或規則自動停權。\n"
             "⚠️ **停權是關門，不是配鑰匙。** 他停得了人，但讀不到任何一筆帳——\n"
             "  一個能讀全系統消費明細的帳號，比家長越權嚴重得多。\n"
             "⚠️ 停權**不刪任何資料**：擋登入、擋寫入，紀錄全部留著。\n"
@@ -118,12 +121,16 @@ MEMBERS: list[Member] = [
             ("GET", "/api/admin/users"),
             ("POST", "/api/admin/users/{user_id}/suspend"),
             ("DELETE", "/api/admin/users/{user_id}/suspend"),
+            ("GET", "/api/admin/errors"),
+            ("GET", "/api/admin/security-events"),
+            ("POST", "/api/client-errors"),
         ],
         files=[
             "app/routers/auth/__init__.py",
             "app/routers/auth/auth.py",
             "app/routers/auth/admin.py",
             "app/models/user.py",
+            "app/models/monitor.py",
             "app/schemas/auth.py",
         ],
         shared=[

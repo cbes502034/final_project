@@ -61,7 +61,7 @@
 | **Pydantic** | v2 | 請求／回應驗證 | **強制結構化輸出的關鍵**，LLM 回傳也用它驗 |
 | **pydantic-settings** | 2.6+ | 環境變數管理 | 設定集中，不散落在各處 |
 | **SQLAlchemy** | 2.0 | ORM | 2.0 的型別標註對新手比較友善 |
-| **Alembic** | 1.14+ | 資料庫遷移 | 20 張表一定會改，沒有遷移工具會很痛苦 |
+| **Alembic** | 1.14+ | 資料庫遷移 | 22 張表一定會改，沒有遷移工具會很痛苦 |
 | **psycopg** | 3.2+ | PostgreSQL 驅動 | `[binary]` 版有預編譯輪檔，不用編譯 |
 | **PyJWT** | 2.10+ | JWT 簽發驗證 | 比 python-jose 維護更活躍 |
 | **passlib[bcrypt]** | 1.7+ | 密碼雜湊 | **絕不自己實作密碼雜湊** |
@@ -150,9 +150,9 @@ final_project/
 │   │   ├── ownership.py         分工的單一事實來源（誰負責哪支路由、哪些檔案）
 │   │   ├── catalog.py           固定清單（角色、權限表、理財選項、系統分類…），正本是 data.js
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
-│   │   ├── models/              20 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
+│   │   ├── models/              22 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
-│   │   ├── routers/             72 支路由，一個領域一個資料夾。還沒做的回 501
+│   │   ├── routers/             75 支路由，一個領域一個資料夾。還沒做的回 501
 │   │   │   ├── auth/            認證（auth.py、admin.py）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/          記帳（transactions、nlp、categories、groups）
 │   │   │   ├── analytics/       數字（stats、budgets、alerts、advices）
@@ -165,7 +165,7 @@ final_project/
 │   │       ├── analytics.py     所有加總（數字）
 │   │       ├── permission.py    可見範圍（家庭）
 │   │       └── evaluation.py    模型評測指標
-│   ├── alembic/                 資料庫遷移（versions/ 第一版就是 20 張表）
+│   ├── alembic/                 資料庫遷移（versions/ 一版一版往上加，現在是 22 張表）
 │   ├── tests/                   pytest（routes/：每一支路由的驗收測試；fixtures/：假後端）
 │   ├── tools/                   eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生
 │   ├── eval/                    留出集與評測結果
@@ -186,7 +186,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **72 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **75 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `本人` / `家長` / `監管者` / `建立者` / `平台管理員`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -214,9 +214,12 @@ final_project/
 | 12 | PATCH | `/api/auth/me` | 認證 | 登入 | 修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 `onboarded: true` |
 | 13 | PUT | `/api/auth/me/avatar` | 認證 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
 | 14 | DELETE | `/api/auth/me/avatar` | 認證 | 登入 | 移除大頭貼，改回顯示文字頭像 |
-| 62 | GET | `/api/admin/users` | 認證 | 平台管理員 | 帳號清單（停權用）。⚠️ 刻意不回傳任何金額 |
+| 62 | GET | `/api/admin/users` | 認證 | 平台管理員 | 帳號清單（停權用）與即時的紅綠燈（presence）。⚠️ 刻意不回傳任何金額 |
 | 63 | POST | `/api/admin/users/{user_id}/suspend` | 認證 | 平台管理員 | 停權一個帳號。body: { reason }，理由必填 |
 | 64 | DELETE | `/api/admin/users/{user_id}/suspend` | 認證 | 平台管理員 | 解除停權 |
+| 79 | GET | `/api/admin/errors` | 認證 | 平台管理員 | 錯誤訊息：後端的 5xx 與使用者畫面上出的錯，最新 100 筆。管理頁每 10 秒更新 |
+| 80 | GET | `/api/admin/security-events` | 認證 | 平台管理員 | 安全事件：被規則擋下的請求（登入錯太多次、大量註冊、AI 額度…）與今天的用量。停權由管理員按 |
+| 81 | POST | `/api/client-errors` | 認證 | 公開 | 前端回報畫面上出的錯（只收訊息、畫面、函式名稱）。防洗版，超過回 accepted: false |
 
 **⚠️ 停權是關門，不是配鑰匙。**
 
@@ -427,7 +430,7 @@ final_project/
 
 ## 5-1　每一支路由的規格，寫在那一支的說明字串裡
 
-`backend/app/routers/` 底下（一個領域一個資料夾）的 72 支路由，每一支的說明字串都有同樣的十一個段落：
+`backend/app/routers/` 底下（一個領域一個資料夾）的 75 支路由，每一支的說明字串都有同樣的十一個段落：
 
 ```
 【這支做什麼】【前端怎麼打】【誰能打】【請求主體／查詢參數】【成功回應】【錯誤回應】

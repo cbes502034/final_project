@@ -5,7 +5,7 @@ Alembic 的進入點：告訴它「連哪顆資料庫」「要跟哪些表比對
 
 - 連線網址：讀 app/toolkit/config.py 的 DATABASE_URL（跟 FastAPI 同一份設定，密碼不進 repo）。
   臨時要對別顆資料庫跑：alembic -x url=sqlite:///./dev.db upgrade head
-- 比對對象：app/models/ 的所有表（import app.models 之後 Base.metadata 就認得 20 張）。
+- 比對對象：app/models/ 的所有表（import app.models 之後 Base.metadata 就認得全部的表）。
 - SQLite 不支援大部分 ALTER TABLE，所以在 SQLite 上用 batch 模式（複製一張新表再換掉）。
 """
 

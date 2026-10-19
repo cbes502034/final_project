@@ -261,18 +261,15 @@
       'stroke="currentColor" stroke-width="1.4"><path d="M3 3h18v18H3z"/><path d="M8 12h8"/></svg>' +
       '<div class="empty__t">' + esc(t) + '</div><div class="empty__s">' + esc(s) + '</div></div>';
   }
-  /* 讀取失敗的畫面。API 的錯誤會帶著「哪一支、哪條路由、誰負責」（見 api.js 的 FN），
-     這裡把它攤開——前提是前端沒問題：照契約打過去，拿回來的不對。 */
+  /* 讀取失敗的畫面。只講白話：哪裡出了問題、可以怎麼做。
+     ⚠️ 出錯的函式、路由不放在這裡——api.js 已經把那些送到平台管理頁的「錯誤訊息」了。 */
   function errState(e) {
     e = e || {};
-    var msg = String(e.message || e).split('｜出錯的函式：')[0];
-    var title = e.kind === 'network' ? '連不上後端'
-      : (e.kind === 'backend' || e.kind === 'shape') ? '後端回應有問題' : '讀取失敗';
+    var msg = String(e.message || e);
+    var title = e.kind === 'network' ? '連不上伺服器'
+      : (e.kind === 'backend' || e.kind === 'shape') ? '這一塊暫時讀不到' : '讀取失敗';
     return '<div class="err"><div class="err__t">' + title + '</div><div class="err__s">' + esc(msg) +
-      (e.fn ? '<div class="err__w">出錯的函式 <code>' + esc(e.fn) + '</code>' +
-        (e.route ? '　<code>' + esc(e.route) + '</code>' : '') +
-        (e.owner ? '　負責：' + esc(e.owner) : '') + '</div>' : '') +
-      '<div class="err__m">目前：' + (API.mode === 'http' ? '已連接後端 ' + esc(API.base) : '還沒連接後端（資料存在這台瀏覽器）') + '</div>' +
+      (e.kind && e.kind !== 'business' ? '<div class="err__m">重新整理頁面，或過一會兒再回來看看。</div>' : '') +
       '</div></div>';
   }
 
@@ -287,12 +284,14 @@
     return p.then(function (d) { return d; }, function (e) { return { __err: e }; });
   }
 
-  /* 畫面程式本身出錯（不是 API）：一樣講出是哪一支函式、第幾行，不要默默壞掉 */
+  /* 畫面程式本身出錯（不是 API）：使用者只看到白話，不要默默壞掉；
+     是哪一支函式、第幾行送到平台管理頁的「錯誤訊息」（API.report → POST /api/client-errors）。 */
   function frontFault(err, fallback) {
     var stack = String((err && err.stack) || '');
     var mo = stack.match(/at (\S+) \(([^)]*?):(\d+):\d+\)/) || stack.match(/^(\S+)@(.*?):(\d+):\d+/m);
     var spot = mo ? mo[1] + '（' + String(mo[2]).split('/').pop() + ' 第 ' + mo[3] + ' 行）' : (fallback || '');
-    return '畫面程式出錯：' + ((err && err.message) || err) + (spot ? '｜出錯的函式：' + spot : '');
+    try { API.report('畫面程式出錯：' + ((err && err.message) || err), spot || null); } catch (x) {}
+    return '畫面出了點問題，已經通知管理員。重新整理頁面通常就會好';
   }
   global.addEventListener('error', function (ev) {
     toast(frontFault(ev.error || ev.message, ev.filename ? String(ev.filename).split('/').pop() + ' 第 ' + ev.lineno + ' 行' : ''), 'err');
@@ -1127,7 +1126,7 @@
     /* 模型叫不動、改用前端規則切的：一直留著講清楚，不要只靠一閃而過的 toast——
        不然使用者看著表格，分不出這是模型還是規則的品質 */
     if (r.fallback) {
-      h += '<div class="nudge"><b>這次是前端規則解析的</b><span>' + esc(r.note || '模型服務沒有回應，先用規則切分。') + '</span></div>';
+      h += '<div class="nudge"><b>AI 暫時沒有回應</b><span>' + esc(r.note || '先用簡易規則拆好了，每一筆請再看一眼。') + '</span></div>';
     }
     h += '<div class="prs__h">這段話被切成 <b>' + batch.length + ' 筆</b>' +
       (miss ? '，其中 <b style="color:var(--warn)">' + miss + ' 筆有欄位缺漏</b>，補齊才能送出' : '') +
@@ -2739,45 +2738,200 @@
 
      停權是關門，不是配鑰匙。
      ============================================================ */
-  function vAdmin() {
-    head('平台管理', '停權與稽核。這裡看不到任何人的帳。');
-    $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
+  /* ============================================================
+     平台管理
 
-    Promise.all([API.adminUsers(), API.audit()]).then(function (r) {
-      var users = r[0].users, logs = r[1].logs;
-      var h = '<div class="page"><div class="duo">' +
+     四塊：帳號（紅綠燈）、安全事件、錯誤訊息、稽核紀錄。
+     頁面開著、分頁在前景時每 10 秒重新讀一次——燈號自己變、新的錯誤與事件自己跑出來，
+     新的那幾筆亮一下。每一塊各自讀、各自壞，一支讀不到不會把整頁拖垮。
+
+     ⚠️ 這裡看不到任何人的帳：後端只回身分欄位與狀態（停權是關門，不是配鑰匙）。
+     ⚠️ 安全事件是規則擋下的（登入錯太多次、大量註冊、AI 額度用完…），規則只暫時擋，
+        要不要停權由管理員按——系統不自動停權。
+     ============================================================ */
+  var ADM = { timer: null, seen: {}, first: true };
+  var ADM_EVERY = 10000;
+
+  function vAdmin() {
+    head('平台管理', '帳號狀態、錯誤與安全事件，每 10 秒自動更新。這裡看不到任何人的帳。',
+      '<button class="btn btn--sm" id="admPw">改密碼</button>' +
+      '<button class="btn btn--sm btn--ghost" id="logout">登出</button>');
+    /* 管理員沒有通知可以收（通知那一支擋平台管理員），鈴鐺的輪詢關掉 */
+    if (global.Notify) global.Notify.stop();
+    ADM.seen = {}; ADM.first = true;
+    $view.innerHTML = '<div class="page adm">' +
+      '<div class="adm__stats" id="admStats">' + skeleton(1) + '</div>' +
+      '<form class="card grid-form adm__pw" id="pwF" hidden>' +
+        '<label class="fld"><span>目前的密碼</span>' +
+          '<input type="password" id="pwOld" autocomplete="current-password" required></label>' +
+        '<label class="fld"><span>新密碼</span>' +
+          '<input type="password" id="pwNew" autocomplete="new-password" placeholder="至少 8 個字" required></label>' +
+        '<div class="form__act"><button class="btn btn--sm" type="submit">更改密碼</button></div>' +
+      '</form>' +
+      '<div class="duo">' +
         '<section class="duo__c">' +
-          '<div class="sec"><h2 class="sec__t">帳號</h2><span class="sec__n">' + users.length + ' 個</span></div>' +
-          '<div class="card card--flush"><table class="dt">' +
-            '<thead><tr><th>帳號</th><th>狀態</th><th></th></tr></thead><tbody>' +
-            users.map(function (u) {
-              var off = !!u.suspendedAt;
-              return '<tr><td><span class="dt__name"><span><b>' + esc(u.name) + '</b>' +
-                  '<small>' + esc(u.email) + '</small></span></span></td>' +
-                '<td>' + (off
-                  ? '<span class="pill pill--over">已停權</span><small class="dt__why">' + esc(u.suspendedReason) + '</small>'
-                  : '<span class="pill pill--safe">正常</span>') + '</td>' +
-                '<td class="rt">' + (off
-                  ? '<button class="gx gx--go" data-unsus="' + esc(u.id) + '">解除停權</button>'
-                  : '<button class="gx gx--warn" data-sus="' + esc(u.id) + '">停權</button>') + '</td></tr>';
-            }).join('') + '</tbody></table></div>' +
+          '<div class="sec"><h2 class="sec__t">帳號</h2><span class="sec__n" id="admUsersN"></span></div>' +
+          '<div class="adm__legend" aria-hidden="true">' +
+            '<span><i class="lamp lamp--online"></i>線上</span><span><i class="lamp lamp--idle"></i>剛離開</span>' +
+            '<span><i class="lamp lamp--offline"></i>離線</span><span><i class="lamp lamp--suspended"></i>停權</span></div>' +
+          '<div class="card card--flush" id="admUsers">' + skeleton(4) + '</div>' +
         '</section>' +
-        /* ⚠️ 稽核跟帳號並排，不收起來——沒有稽核的停權就是任意封鎖 */
         '<section class="duo__c">' +
-          '<div class="sec"><h2 class="sec__t">稽核紀錄</h2><span class="sec__n">' + logs.length + ' 筆</span></div>' +
-          '<div class="card card--flush"><ol class="audl">' + logs.map(function (a) {
-            return '<li class="audl__i">' +
-              '<div class="audl__top"><b>' + esc(AUDIT_TW[a.action] || a.action) + '</b>' +
-                '<time>' + esc(localAt(a.at)) + '</time></div>' +
-              '<div class="audl__s">' + esc(a.actorName) + (a.note ? '　' + esc(a.note) : '') + '</div>' +
-            '</li>';
-          }).join('') + '</ol></div>' +
+          '<div class="sec"><h2 class="sec__t">安全事件</h2><span class="sec__n" id="admEventsN"></span></div>' +
+          '<div class="card card--flush" id="admEvents">' + skeleton(3) + '</div>' +
         '</section>' +
-      '</div></div>';
-      $view.innerHTML = h;
-    }).catch(function (e) {
-      $view.innerHTML = '<div class="page">' + errState(e) + '</div>';
+      '</div>' +
+      '<div class="duo">' +
+        '<section class="duo__c">' +
+          '<div class="sec"><h2 class="sec__t">錯誤訊息</h2><span class="sec__n" id="admErrorsN"></span></div>' +
+          '<div class="card card--flush" id="admErrors">' + skeleton(3) + '</div>' +
+        '</section>' +
+        /* ⚠️ 稽核跟帳號在同一頁，不收起來——沒有稽核的停權就是任意封鎖 */
+        '<section class="duo__c">' +
+          '<div class="sec"><h2 class="sec__t">稽核紀錄</h2><span class="sec__n" id="admAuditN"></span></div>' +
+          '<div class="card card--flush" id="admAudit">' + skeleton(3) + '</div>' +
+        '</section>' +
+      '</div>' +
+    '</div>';
+    admTick();
+    if (ADM.timer) clearInterval(ADM.timer);
+    ADM.timer = setInterval(admTick, ADM_EVERY);
+  }
+
+  /* 一次更新四塊。離開管理頁（登出、換帳號）就停；分頁在背景時先不打，切回來馬上補一次 */
+  function admTick() {
+    if (!/^#\/admin/.test(location.hash) || !document.getElementById('admUsers')) {
+      clearInterval(ADM.timer); ADM.timer = null; return;
+    }
+    if (document.visibilityState === 'hidden') return;
+    Promise.all([soft(API.adminUsers()), soft(API.adminSecurityEvents()), soft(API.adminErrors()), soft(API.audit())])
+      .then(function (r) {
+        if (!document.getElementById('admUsers')) return;
+        var users = r[0], ev = r[1], er = r[2], au = r[3];
+        admStats(users, ev, er);
+        admBox('admUsers', 'admUsersN', users, function (d) { return admUsers(d.users || [], d.at); },
+          function (d) { return (d.users || []).length + ' 個'; });
+        admBox('admEvents', 'admEventsN', ev, function (d) { return admEvents(d.events || []); },
+          function (d) { return (d.events || []).length + ' 筆'; });
+        admBox('admErrors', 'admErrorsN', er, function (d) { return admErrors(d.errors || []); },
+          function (d) { return '近 1 小時 ' + (d.lastHour || 0) + ' 筆'; });
+        admBox('admAudit', 'admAuditN', au, function (d) { return admAudit(d.logs || []); },
+          function (d) { return (d.logs || []).length + ' 筆'; });
+        ADM.first = false;
+      });
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && ADM.timer) admTick();
+  });
+
+  function admBox(id, nid, d, body, count) {
+    var box = document.getElementById(id), n = document.getElementById(nid);
+    if (!box) return;
+    if (d && d.__err) { box.innerHTML = errState(d.__err); if (n) n.textContent = ''; return; }
+    box.innerHTML = body(d);
+    if (n) n.textContent = count(d);
+  }
+
+  /* 這一筆是不是剛出現的（第一次載入的不算，不然整頁都在閃） */
+  function admNew(kind, id) {
+    var k = kind + ':' + id, was = ADM.seen[k];
+    ADM.seen[k] = 1;
+    return !was && !ADM.first;
+  }
+
+  function admStats(users, ev, er) {
+    var box = document.getElementById('admStats');
+    if (!box) return;
+    var c = { online: 0, idle: 0, offline: 0, suspended: 0 };
+    ((users && users.users) || []).forEach(function (u) { c[u.presence] = (c[u.presence] || 0) + 1; });
+    var t = (ev && ev.today) || {};
+    var now = new Date();
+    function p(x) { return (x < 10 ? '0' : '') + x; }
+    function tile(k, v, cls, sub) {
+      return '<div class="adm__s' + (cls ? ' adm__s--' + cls : '') + '"><span class="adm__k">' + k + '</span>' +
+        '<b class="adm__v">' + v + '</b>' + (sub ? '<span class="adm__h">' + sub + '</span>' : '') + '</div>';
+    }
+    box.innerHTML =
+      tile('線上', users && users.__err ? '—' : c.online, 'on', '剛離開 ' + c.idle + '　離線 ' + c.offline + '　停權 ' + c.suspended) +
+      tile('近 1 小時錯誤', er && !er.__err ? er.lastHour : '—', er && er.lastHour ? 'bad' : '', '後端與使用者畫面上的') +
+      tile('今天被擋下', ev && !ev.__err ? (t.locked || 0) : '—', t.locked ? 'warn' : '',
+        '登入失敗 ' + (t.loginFailed || 0) + ' 次　註冊 ' + (t.registered || 0) + ' 個') +
+      tile('今天 AI 呼叫', ev && !ev.__err ? (t.aiParse || 0) + (t.aiAdvice || 0) : '—', '',
+        '解析 ' + (t.aiParse || 0) + '　建議 ' + (t.aiAdvice || 0)) +
+      '<p class="adm__at"><i class="adm__pulse" aria-hidden="true"></i>每 10 秒更新　最後更新 ' +
+        p(now.getHours()) + ':' + p(now.getMinutes()) + ':' + p(now.getSeconds()) + '</p>';
+  }
+
+  var LAMP_TW = { online: '線上', idle: '剛離開', offline: '離線', suspended: '停權' };
+
+  /* 「3 分鐘前」用伺服器的時間算，不看這台電腦的時鐘 */
+  function admAgo(iso, at) {
+    if (!iso) return '還沒登入過';
+    var s = Math.max(0, (Date.parse(at) || Date.now()) - Date.parse(iso)) / 1000;
+    if (s < 60) return '剛剛';
+    if (s < 3600) return Math.floor(s / 60) + ' 分鐘前';
+    if (s < 86400) return Math.floor(s / 3600) + ' 小時前';
+    return Math.floor(s / 86400) + ' 天前';
+  }
+
+  function admUsers(users, at) {
+    if (!users.length) return emptyState('還沒有使用者', '有人註冊之後會列在這裡');
+    var order = { online: 0, idle: 1, offline: 2, suspended: 3 };
+    users = users.slice().sort(function (a, b) {
+      return (order[a.presence] - order[b.presence]) || String(b.lastActiveAt || '').localeCompare(String(a.lastActiveAt || ''));
     });
+    return '<table class="dt adm__users"><thead><tr><th>帳號</th><th>狀態</th><th></th></tr></thead><tbody>' +
+      users.map(function (u) {
+        var off = u.presence === 'suspended';
+        return '<tr><td><span class="dt__name"><i class="lamp lamp--' + esc(u.presence) + '" title="' + esc(LAMP_TW[u.presence] || '') + '"></i>' +
+            '<span><b>' + esc(u.name) + '</b><small>' + esc(u.email) + '</small></span></span></td>' +
+          '<td>' + (off
+            ? '<span class="pill pill--over">已停權</span><small class="dt__why">' + esc(u.suspendedReason) + '</small>'
+            : '<span class="adm__st adm__st--' + esc(u.presence) + '">' + esc(LAMP_TW[u.presence] || '') + '</span>' +
+              '<small class="dt__why">' + (u.presence === 'online' ? '正在使用' : '最後活動 ' + esc(admAgo(u.lastActiveAt, at))) + '</small>') + '</td>' +
+          '<td class="rt">' + (off
+            ? '<button class="gx gx--go" data-unsus="' + esc(u.id) + '">解除停權</button>'
+            : '<button class="gx gx--warn" data-sus="' + esc(u.id) + '">停權</button>') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function admEvents(events) {
+    if (!events.length) return emptyState('沒有安全事件', '登入錯太多次、大量註冊、AI 額度用完時會出現在這裡');
+    return '<ol class="audl">' + events.map(function (e) {
+      return '<li class="audl__i' + (admNew('ev', e.id) ? ' is-new' : '') + '">' +
+        '<div class="audl__top"><b><span class="lvl lvl--' + esc(e.level) + '">' + esc(e.levelText) + '</span>' + esc(e.title) + '</b>' +
+          '<time>' + esc(localAt(e.at)) + '</time></div>' +
+        '<div class="audl__s">' + (e.userName ? esc(e.userName) + '　' + esc(e.email || '') : '查不到是哪個帳號') +
+          (e.detail ? '　·　' + esc(e.detail) : '') + '</div>' +
+        (e.canSuspend ? '<div class="audl__a"><button class="gx gx--warn" data-sus="' + esc(e.userId) + '">停權這個帳號</button></div>'
+          : e.suspended ? '<div class="audl__a"><span class="pill pill--over">已停權</span></div>' : '') +
+      '</li>';
+    }).join('') + '</ol>';
+  }
+
+  function admErrors(errs) {
+    if (!errs.length) return emptyState('沒有錯誤', '後端出錯、使用者畫面上出錯時會即時出現在這裡');
+    return '<ol class="audl">' + errs.map(function (x) {
+      var where = [x.method, x.path].filter(Boolean).join(' ');
+      return '<li class="audl__i' + (admNew('er', x.id) ? ' is-new' : '') + '">' +
+        '<div class="audl__top"><b><span class="src src--' + esc(x.source) + '">' + (x.source === 'server' ? '後端' : '畫面') + '</span>' +
+          (x.status ? '<span class="adm__code">' + esc(x.status) + '</span>' : '') + esc(x.message) + '</b>' +
+          '<time>' + esc(localAt(x.at)) + '</time></div>' +
+        '<div class="audl__s">' + (where ? '<code>' + esc(where) + '</code>　' : '') +
+          (x.location ? '<code>' + esc(x.location) + '</code>　' : '') + esc(x.userName || '沒有登入的訪客') + '</div>' +
+      '</li>';
+    }).join('') + '</ol>';
+  }
+
+  function admAudit(logs) {
+    if (!logs.length) return emptyState('還沒有稽核紀錄', '停權、改角色、照看這些動作會記在這裡');
+    return '<ol class="audl">' + logs.map(function (a) {
+      return '<li class="audl__i">' +
+        '<div class="audl__top"><b>' + esc(AUDIT_TW[a.action] || a.action) + '</b>' +
+          '<time>' + esc(localAt(a.at)) + '</time></div>' +
+        '<div class="audl__s">' + esc(a.actorName) + (a.note ? '　' + esc(a.note) : '') + '</div>' +
+      '</li>';
+    }).join('') + '</ol>';
   }
 
   /* 稽核紀錄的動作 → 中文。⚠️ 後端寫進 audit_logs 的每一種 action 都要在這裡有一行，
@@ -3953,10 +4107,16 @@
         reason: '停權理由',
         onOk: function (why) {
           API.suspendUser(sid, why).then(function () {
-            vAdmin(); toast('已停權', 'ok');
+            admTick(); toast('已停權', 'ok');
           }).catch(function (err) { toast(err.message || '停權失敗', 'err'); });
         }
       });
+      return;
+    }
+
+    if (t.closest('#admPw')) {
+      var pf = document.getElementById('pwF');
+      if (pf) { pf.hidden = !pf.hidden; if (!pf.hidden) document.getElementById('pwOld').focus(); }
       return;
     }
 
@@ -3964,7 +4124,7 @@
     if (unsus) {
       var uid = unsus.dataset.unsus;
       API.unsuspendUser(uid).then(function () {
-        vAdmin(); toast('已解除停權', 'ok');
+        admTick(); toast('已解除停權', 'ok');
       }).catch(function (err) { toast(err.message || '解除失敗', 'err'); });
       return;
     }
@@ -4258,13 +4418,13 @@
       API.generateAdvices({ scope: ag.dataset.genScope }).then(function (r) {
         stopAdv();
         if (r.fallback) {
-          /* 後端的建議還沒接上：前端用同一批數字寫的，不會存起來，所以直接畫，不重新讀 */
+          /* AI 叫不動（503）：用同一批數字先整理的，不會存起來，所以直接畫，不重新讀 */
           ADV = r.advices || [];
           ag.disabled = false; ag.textContent = '產生這個月的建議';
           var hint = document.getElementById('advHint');
-          if (hint) hint.innerHTML = '<div class="nudge"><b>先用前端的規則寫的</b><span>' + esc(r.note || '') + '</span></div>';
+          if (hint) hint.innerHTML = '<div class="nudge"><b>AI 暫時沒有回應</b><span>' + esc(r.note || '') + '</span></div>';
           paintAdvices();
-          toast('產生了 ' + ADV.length + ' 則建議（後端還沒接上，不會存）', 'ok');
+          toast('先整理了 ' + ADV.length + ' 則建議（暫時的版本，不會存起來）', 'ok');
           return;
         }
         vAdvice();
@@ -4863,9 +5023,9 @@
      介面上已經拿掉——這裡留一個保險，元素不在就不要炸。 */
   var $mode = document.getElementById('mode');
   if ($mode) $mode.textContent = API.mode === 'http' ? API.base : '瀏覽器內的資料';
-  /* 頁尾說清楚資料在哪：沒接後端時，資料只存在這台瀏覽器 */
+  /* 頁尾：資料只存在這台瀏覽器（沒有伺服器的示範模式）時要講清楚，其他時候只放名字 */
   var $foot = document.querySelector('.foot');
-  if ($foot) $foot.textContent = '家庭記帳　·　' + (API.mode === 'http' ? '已連接後端' : '還沒連接後端：資料只存在這台瀏覽器');
+  if ($foot) $foot.textContent = API.mode === 'http' ? '家庭記帳　·　花錢，心裡有數' : '家庭記帳　·　資料只存在這台瀏覽器';
   API.authState().then(function (a) {
     if (a.loggedIn) { paintWho(); paintGroups(); }
     paint();

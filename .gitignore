@@ -18,3 +18,7 @@ report/package-lock.json
 
 # 評測跑到一半的暫存檔
 backend/eval/results/*.partial.jsonl
+
+# 本機開發工具的設定、測試的工作檔（結果在 PDF 裡）
+.claude/
+report/qa/out/

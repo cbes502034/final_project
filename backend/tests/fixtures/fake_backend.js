@@ -72,11 +72,15 @@ const ROUTES = [
       : notifyMode === 'empty' ? res(200, { notifications: [], unread: 0, maxId: null })
         : Promise.reject(new TypeError('Failed to fetch')))],
   ['POST', '/api/family/join', () => res(409, { detail: '你已經在一個家庭裡了' })],
+  // 畫面錯誤的回報：記下每一次送了什麼（技術細節要送到這裡，不能出現在使用者的畫面上）
+  ['POST', '/api/client-errors', () => res(202, { accepted: true })],
 ];
+const reported = [];
 global.fetch = (url, opt) => {
   const u = url.replace('http://api.test', '').split('?')[0];
   const m = (opt && opt.method) || 'GET';
   const hit = ROUTES.find(r => r[0] === m && r[1] === u);
+  if (u === '/api/client-errors') reported.push(JSON.parse(opt.body));
   return hit ? hit[2]() : res(404, { detail: 'Not Found' });
 };
 
@@ -98,7 +102,7 @@ Object.keys(A).forEach(k => {
       e => { if (e && e.kind && e.kind !== 'business') lamps['API.' + k] = e.kind; throw e; });
   };
 });
-const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e.fn, route: e.route, owner: e.owner }));
+const settle = p => p.then(r => r, e => ({ error: e.message, dev: e.dev, kind: e.kind, fn: e.fn, route: e.route, owner: e.owner }));
 
 (async () => {
   const out = { mode: A.mode };
@@ -148,5 +152,7 @@ const settle = p => p.then(r => r, e => ({ error: e.message, kind: e.kind, fn: e
   window.Notify.stop();
 
   out.lamps = lamps;
+  await new Promise(r => setImmediate(r));
+  out.reported = reported;
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { console.error('CRASH', e); process.exit(1); });

@@ -5,15 +5,15 @@
 -- ① 各表筆數
 SELECT '系統分類（應 12）' AS 項目, COUNT(*) AS 筆數 FROM categories WHERE family_id IS NULL
 UNION ALL SELECT '帳本（每個帳號至少 1）', COUNT(*) FROM groups
-UNION ALL SELECT '明細（應 13：家長 9、子女 4）', COUNT(*) FROM transactions
-UNION ALL SELECT '模型解析紀錄（應 11）', COUNT(*) FROM nlp_parses
+UNION ALL SELECT '明細（家長、子女都有）', COUNT(*) FROM transactions
+UNION ALL SELECT '模型解析紀錄（每筆 AI 寫入的明細各一列）', COUNT(*) FROM nlp_parses
 UNION ALL SELECT '家庭（應 1）', COUNT(*) FROM families
 UNION ALL SELECT '家庭成員（應 2）', COUNT(*) FROM family_members
 UNION ALL SELECT '照看關係（應 1）', COUNT(*) FROM guardianships
 UNION ALL SELECT '零用金設定（應 1）', COUNT(*) FROM allowances
 UNION ALL SELECT '邀請碼（應 2）', COUNT(*) FROM family_invites
-UNION ALL SELECT '財務建議', COUNT(*) FROM advices
-UNION ALL SELECT '通知（應 5：子女記帳 4、預算提醒 1）', COUNT(*) FROM notifications
+UNION ALL SELECT '財務建議（同月重新產生會蓋掉舊的）', COUNT(*) FROM advices
+UNION ALL SELECT '通知（子女記帳、預算提醒）', COUNT(*) FROM notifications
 UNION ALL SELECT '預算（應 1）', COUNT(*) FROM budgets
 UNION ALL SELECT '存款目標（應 1）', COUNT(*) FROM savings_goals;
 

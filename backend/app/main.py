@@ -25,7 +25,7 @@ FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試�
 目錄（都建好了）
 ===========================================================================
     app/
-    ├── models/      SQLAlchemy 資料表（20 張，欄位跟 frontend/js/data.js 的 schema 對齊）
+    ├── models/      SQLAlchemy 資料表（22 張，欄位跟 frontend/js/data.js 的 schema 對齊）
     ├── schemas/     Pydantic 請求主體（欄位名字跟前端送的一樣）
     ├── routers/     路由，一個領域一個資料夾（auth／ledger／analytics／access）——
     │                每一支都先回 501，守衛與主體模型已經接好
@@ -45,16 +45,42 @@ FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試�
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.toolkit import security
 from app.toolkit.config import settings
 
 from app import routers
 
+log = logging.getLogger("fambudget")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """服務啟動時：把 ADMIN_EMAILS 的帳號設成平台管理員。
+
+    Render 免費方案沒有 Shell 可以下 python -m app.cli make-admin，所以啟動時自己跑一次。
+    已經加入家庭或記過帳的帳號不會被設（見 cli.promote_admins）。資料庫連不上也不能讓服務起不來。
+    """
+    if settings.admin_email_list:
+        try:
+            from app.cli import promote_admins
+            for line in await run_in_threadpool(promote_admins, settings.admin_email_list):
+                log.info("平台管理員：%s", line)
+        except Exception:            # noqa: BLE001
+            log.exception("設定平台管理員失敗")
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="家庭記帳與財務控管系統 API",
     description=(
         "四人六週專題的後端。\n\n"
@@ -96,16 +122,39 @@ app.add_middleware(
 # ⚠️ 正式環境（APP_ENV=production）只回一句話——例外訊息可能帶著表名、欄位、SQL，
 #    那些是攻擊者不需要知道的事（見 toolkit/errors.py 的 safe_message）。
 #    開發環境多附上例外的類型與訊息，組員才知道錯在哪；完整的追蹤一律寫進 log。
-log = logging.getLogger("fambudget")
+# 另外記一筆 error_logs，平台管理頁即時看得到（只記第一行，SQL 與參數切掉——參數裡可能有金額）。
+def _where(request: Request) -> tuple[str, str | None]:
+    """出錯的路由（樣板，例如 /api/transactions/{tx_id}）與函式名稱。"""
+    route = request.scope.get("route")
+    endpoint = request.scope.get("endpoint")
+    return (getattr(route, "path", None) or request.url.path), getattr(endpoint, "__name__", None)
+
+
+def _first_line(exc: Exception) -> str:
+    text = str(exc).split("\n")[0].split("[SQL:")[0].split("[parameters:")[0].strip()
+    return ("%s: %s" % (type(exc).__name__, text) if text else type(exc).__name__)[:300]
 
 
 @app.exception_handler(Exception)
 async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
     log.exception("未預期的錯誤：%s %s", request.method, request.url.path)
+    path, fn = _where(request)
+    await run_in_threadpool(security.log_error, "server", _first_line(exc), status=500, method=request.method,
+                            path=path, location=fn, user_id=security.user_from(request))
     detail = "系統發生錯誤，請稍後再試"
     if not settings.is_production:
         detail += "（開發環境才看得到：%s: %s）" % (type(exc).__name__, exc)
     return JSONResponse(status_code=500, content={"detail": detail})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, exc: StarletteHTTPException):
+    """路由自己丟的 5xx（例如模型叫不動的 503）也記進 error_logs；回應照 FastAPI 原本的樣子。"""
+    if exc.status_code >= 500:
+        path, fn = _where(request)
+        await run_in_threadpool(security.log_error, "server", str(exc.detail)[:300], status=exc.status_code,
+                                method=request.method, path=path, location=fn, user_id=security.user_from(request))
+    return await http_exception_handler(request, exc)
 
 
 # ---------------------------------------------------------------------------

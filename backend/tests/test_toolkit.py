@@ -1047,3 +1047,56 @@ def test_寄信失敗的訊息不能帶出金鑰():
     with pytest.raises(mailer.MailError):
         mailer.send_mail("to@example.com", "s", "t", api_key=key, sender="me@example.com", sender_name="x",
                          client=httpx.Client(transport=httpx.MockTransport(boom)))
+
+
+# ===========================================================================
+# toolkit/security.py：紅綠燈、今天從幾點算、雜湊、來源
+# ===========================================================================
+def test_紅綠燈的三種燈號與停權():
+    from datetime import datetime, timedelta, timezone
+
+    from app.toolkit import security
+
+    at = datetime(2026, 10, 20, 3, 0, tzinfo=timezone.utc)
+    p = security.presence
+    assert p(at - timedelta(seconds=30), True, False, at) == "online"
+    assert p(at - timedelta(seconds=91), True, False, at) == "idle"
+    assert p(at - timedelta(minutes=16), True, False, at) == "offline"
+    assert p(at, False, False, at) == "offline"                 # 每一台都登出了：馬上紅燈
+    assert p(None, True, False, at) == "offline"
+    assert p(at, True, True, at) == "suspended"
+    naive = (at - timedelta(seconds=10)).replace(tzinfo=None)   # SQLite 讀回來沒有時區
+    assert p(naive, True, False, at) == "online"
+
+
+def test_AI_額度從台灣時間的半夜重算():
+    from datetime import datetime, timezone
+
+    from app.toolkit import security
+
+    # 台灣 10/20 早上 7 點 = UTC 10/19 23:00 → 今天從 UTC 10/19 16:00 算起
+    assert security.today_start(datetime(2026, 10, 19, 23, 0, tzinfo=timezone.utc)) == \
+        datetime(2026, 10, 19, 16, 0, tzinfo=timezone.utc)
+
+
+def test_email_與_IP_只存雜湊_來源看_X_Forwarded_For_的第一個():
+    from types import SimpleNamespace
+
+    from app.toolkit import security
+
+    h = security.digest("Daming@Wang.tw ")
+    assert h == security.digest("daming@wang.tw") and "@" not in h and len(h) == 32
+    assert security.digest("") is None
+    req = SimpleNamespace(headers={"x-forwarded-for": "203.0.113.9, 10.0.0.1"}, client=SimpleNamespace(host="10.0.0.2"))
+    assert security.source_of(req) == "203.0.113.9"
+    req = SimpleNamespace(headers={}, client=SimpleNamespace(host="10.0.0.2"))
+    assert security.source_of(req) == "10.0.0.2"
+    assert security.user_from(SimpleNamespace(headers={"authorization": "Bearer 壞掉的"})) is None
+
+
+def test_安全事件的種類都有程度與標題():
+    from app.toolkit import security
+
+    for kind, (level, title) in security.KINDS.items():
+        assert level in (None, "high", "medium", "low") and title, kind
+    assert security.KINDS["login_failed"][0] == "low"           # 一次一筆太多，管理頁只算總數

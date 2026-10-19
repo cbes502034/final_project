@@ -120,9 +120,30 @@ class Settings(BaseSettings):
     admin_emails: str = Field(
         default="",
         description=(
-            "平台管理員的 email，逗號分隔。`python -m app.cli make-admin` 會把這些帳號設成平台管理員。\n"
-            "⚠️ 平台管理員只能停權與看稽核，讀不到任何人的帳。"
+            "平台管理員的 email，逗號分隔。服務啟動時（以及 `python -m app.cli make-admin`）會把這些帳號設成平台管理員。\n"
+            "⚠️ 平台管理員只能停權、看帳號狀態與安全事件，讀不到任何人的帳。\n"
+            "⚠️ 已經加入家庭或記過帳的帳號不會被設成管理員（設了他就再也看不到自己的帳），要用一個新註冊的帳號。"
         ),
+    )
+    login_max_failures: int = Field(
+        default=5,
+        gt=0,
+        description="同一個 email 15 分鐘內登入失敗幾次就鎖 15 分鐘，預設 5。同一個來源（不管哪個帳號）是這個數字的 4 倍。",
+    )
+    register_per_hour: int = Field(
+        default=5,
+        gt=0,
+        description="同一個來源一小時內最多註冊幾個帳號，預設 5。本機跑端對端測試會連續註冊，可以暫時調高。",
+    )
+    ai_parse_per_day: int = Field(
+        default=200,
+        gt=0,
+        description="每個人每天（台灣時間）最多叫幾次 AI 解析（單句＋段落），預設 200。每一次都是付費的模型呼叫。",
+    )
+    ai_advice_per_day: int = Field(
+        default=20,
+        gt=0,
+        description="每個人每天最多產生幾次財務建議，預設 20。",
     )
 
     # =======================================================================

@@ -75,7 +75,7 @@ from fastapi import Depends, Path, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.toolkit import crud, errors, password_reset, tokens
+from app.toolkit import crud, errors, password_reset, security, tokens
 from app.toolkit.db import get_db
 from app.toolkit.deps import bearer, current_user_id
 
@@ -97,7 +97,7 @@ def _models():
 # 目前登入的人
 # ===========================================================================
 def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_db)):
-    """驗 token → 撈使用者 → 擋停權 → 掛上家庭與角色。每一個守衛的第一步。"""
+    """驗 token → 撈使用者 → 擋停權 → 記最後活動時間 → 掛上家庭與角色。每一個守衛的第一步。"""
     m = _models()
     user = db.get(m.User, uid)
     if user is None:
@@ -105,6 +105,8 @@ def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_
     if user.suspended_at is not None:
         # ⚠️ 已經登入的人被停權，下一次請求就要擋，不是等他 token 過期
         raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範"))
+    # 平台管理頁的紅綠燈：最後一次有登入狀態的請求（30 秒內不重寫）
+    security.touch(user, db=db)
     fm = crud.get(m.FamilyMember, where={"user_id": user.id, "status": "active"}, db=db)
     user.family_id = fm.family_id if fm else None
     user.family_role = fm.role if fm else None

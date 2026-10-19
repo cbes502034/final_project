@@ -3605,7 +3605,9 @@ body[data-page="entry"] .appbar__add { display: none; }
 body[data-page="advice"] #searchBtn, body[data-page="advice"] #searchDrawer,
 body[data-page="members"] #searchBtn, body[data-page="members"] #searchDrawer,
 body[data-page="groups"] #searchBtn, body[data-page="groups"] #searchDrawer,
-body[data-page="profile"] #searchBtn, body[data-page="profile"] #searchDrawer { display: none !important; }
+body[data-page="profile"] #searchBtn, body[data-page="profile"] #searchDrawer,
+/* 平台管理頁沒有任何明細可以搜，帳本切換也用不到 */
+body[data-page="admin"] #searchBtn, body[data-page="admin"] #searchDrawer, body[data-page="admin"] #gsw { display: none !important; }
 
 /* ---------- RWD ---------- */
 @media (max-width: 1080px) {
@@ -3738,3 +3740,86 @@ body[data-page="profile"] #searchBtn, body[data-page="profile"] #searchDrawer { 
    ⚠️ 不要做成紅色的——登出不是危險動作，紅色會跟刪除那類混在一起。 */
 #view .dtile--out .dtile__ic { background: var(--sunk); color: var(--ink-faint); border-color: var(--line); }
 #view .dtile--out .dtile__t { color: var(--ink-soft); }
+
+
+/* ============================================================
+   平台管理：上方數字、紅綠燈、安全事件、錯誤訊息
+   ⚠️ 燈號一定要配文字（線上／剛離開／離線／停權）：只靠顏色，色盲的人分不出來
+   ============================================================ */
+#view .adm__stats {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+  margin: 0 0 var(--gap);
+}
+#view .adm__s {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
+  box-shadow: var(--shadow-block); padding: 14px 16px; min-width: 0;
+  display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden;
+}
+#view .adm__s::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--line-2); }
+#view .adm__s--on::before { background: var(--up); }
+#view .adm__s--bad::before { background: var(--down); }
+#view .adm__s--warn::before { background: var(--warn); }
+#view .adm__k { font-size: 12px; color: var(--ink-faint); letter-spacing: .06em; }
+#view .adm__v {
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600;
+  line-height: 1.15; color: var(--ink);
+}
+#view .adm__s--on .adm__v { color: var(--up); }
+#view .adm__s--bad .adm__v { color: var(--down); }
+#view .adm__s--warn .adm__v { color: var(--warn); }
+#view .adm__h { font-size: 12px; color: var(--ink-faint); line-height: 1.5; }
+#view .adm__at {
+  grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--ink-faint);
+  display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums;
+}
+#view .adm__pulse {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--up); flex: none;
+  animation: admPulse 2s var(--ease) infinite;
+}
+@keyframes admPulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+#view .adm__pw { margin: 0 0 var(--gap); }
+#view .adm__pw[hidden] { display: none; }
+#view .adm .duo + .duo { margin-top: 32px; }
+
+#view .adm__legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: -4px 0 10px; font-size: 12px; color: var(--ink-faint); }
+#view .adm__legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+#view .lamp {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none;
+  background: var(--down); box-shadow: 0 0 0 3px var(--down-wash);
+}
+#view .lamp--online { background: var(--up); box-shadow: 0 0 0 3px var(--up-wash); }
+#view .lamp--idle { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-wash); }
+#view .lamp--suspended { background: var(--ink-dim); box-shadow: 0 0 0 3px var(--sunk); }
+#view .adm__users .dt__name { display: flex; align-items: center; gap: 12px; }
+#view .adm__st { font-size: 13px; font-weight: 600; color: var(--down); }
+#view .adm__st--online { color: var(--up); }
+#view .adm__st--idle { color: var(--warn); }
+
+#view .lvl, #view .src, #view .adm__code {
+  display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: var(--r-xs);
+  font-size: 11.5px; font-weight: 600; line-height: 1.6; vertical-align: 1px;
+}
+#view .lvl--high { background: var(--down-wash); color: var(--down); }
+#view .lvl--medium { background: var(--warn-wash); color: var(--warn-ink); }
+#view .lvl--low { background: var(--sunk); color: var(--ink-soft); }
+#view .src--server { background: var(--info-wash); color: var(--info); }
+#view .src--client { background: var(--accent-wash); color: var(--accent); }
+#view .adm__code { background: var(--sunk); color: var(--ink-soft); font-family: var(--mono); font-weight: 500; }
+#view .adm .audl__top b { min-width: 0; overflow-wrap: anywhere; }
+#view .adm .audl__s code { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); overflow-wrap: anywhere; }
+#view .audl__a { margin-top: 8px; }
+
+/* 新出現的那一筆亮一下（第一次載入的不亮） */
+#view .audl__i.is-new { animation: admNew 2.4s var(--ease); }
+@keyframes admNew { 0% { background: var(--accent-wash); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  #view .adm__pulse, #view .audl__i.is-new { animation: none; }
+}
+@media (max-width: 760px) {
+  #view .adm__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view .adm__v { font-size: 22px; }
+}
+@media (max-width: 380px) {
+  #view .adm__stats { grid-template-columns: minmax(0, 1fr); }
+}

@@ -30,7 +30,7 @@ from app.models import (
     Transaction, User,
 )
 from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-from app.toolkit import crud, errors, family, images, money, password_reset, period
+from app.toolkit import crud, errors, family, images, money, password_reset, period, security
 from app.toolkit.config import settings
 from app.toolkit.db import get_db
 
@@ -132,7 +132,7 @@ def get_family(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -364,7 +364,7 @@ def create_family(body: FamilyIn, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -507,7 +507,7 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -673,7 +673,7 @@ def create_invite_code(body: InviteCodeIn, me: User, db: Session = Depends(get_d
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -815,7 +815,7 @@ def join_family(body: JoinIn, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -988,7 +988,7 @@ def lookup_user(me: User, email: str | None = None, db: Session = Depends(get_db
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -1001,6 +1001,10 @@ def lookup_user(me: User, email: str | None = None, db: Session = Depends(get_db
             recent = crud.count(AuditLog, {"actor_id": me.id, "action": "lookup_user",
                                            "created_at__gte": now - timedelta(minutes=1)}, db=db)
             if recent >= 10:
+                # 這一分鐘第一次被擋：記成安全事件（一直在試 email，可能是在找誰有註冊）
+                if not security.count("lookup_limited", now - timedelta(minutes=1), db=db, user_id=me.id):
+                    security.record("lookup_limited", db=db, user_id=me.id, detail="一分鐘內查了 10 次")
+                    db.commit()
                 raise HTTPException(status_code=429, detail="查太多次了，請一分鐘後再試")
 
             # 2. 只收完整的 email（不做模糊搜尋）
@@ -1055,6 +1059,10 @@ def lookup_user(me: User, email: str | None = None, db: Session = Depends(get_db
     recent = crud.count(AuditLog, {"actor_id": me.id, "action": "lookup_user",
                                    "created_at__gte": now - timedelta(minutes=1)}, db=db)
     if recent >= 10:
+        # 這一分鐘第一次被擋：記成安全事件（一直在試 email，可能是在找誰有註冊）
+        if not security.count("lookup_limited", now - timedelta(minutes=1), db=db, user_id=me.id):
+            security.record("lookup_limited", db=db, user_id=me.id, detail="一分鐘內查了 10 次")
+            db.commit()
         raise HTTPException(status_code=429, detail="查太多次了，請一分鐘後再試")
 
     # 2. 只收完整的 email（不做模糊搜尋）
@@ -1166,7 +1174,7 @@ def list_invites(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -1333,7 +1341,7 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -1486,7 +1494,7 @@ def accept_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -1643,7 +1651,7 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -1789,7 +1797,7 @@ def change_member_role(user_id: str, body: RolePatchIn, me: User, db: Session = 
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -1977,7 +1985,7 @@ def remove_member(user_id: str, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -2175,7 +2183,7 @@ def list_guardianships(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -2315,7 +2323,7 @@ def create_guardianship(body: GuardianshipIn, me: User, db: Session = Depends(ge
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -2477,7 +2485,7 @@ def end_guardianship(gid: str, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -2624,7 +2632,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -2771,7 +2779,7 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
@@ -2883,7 +2891,7 @@ def list_audit(me: User, db: Session = Depends(get_db)):
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
-            from app.toolkit import crud, errors, family, images, money, password_reset, period
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 

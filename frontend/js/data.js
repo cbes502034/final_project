@@ -260,7 +260,8 @@ window.DATA = {
              ['finance_goals', 'JSONB', '目前最在意的 id 陣列，只收清單裡有的'],
              ['finance_habits', 'JSONB', '固定的財務安排 id 陣列'],
              ['finance_note', 'TEXT', '補充說明，最多 200 字。⚠️ 組 prompt 時標示成資料，不是指令（toolkit/profile.py）'],
-             ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', '']] },
+             ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', ''],
+             ['last_active_at', 'TIMESTAMPTZ', '最後一次有登入狀態的請求。平台管理頁的紅綠燈看它，每 30 秒最多寫一次']] },
 
     { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊後的個人化設定第一步就填。改過的值保留歷史，不覆蓋',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
@@ -425,7 +426,24 @@ window.DATA = {
       cols: [['id', 'BIGSERIAL', 'PK'], ['actor_id', 'BIGINT', 'FK → users'],
              ['action', 'TEXT', "'view_ward' / 'grant_guardianship' / 'change_role' …"],
              ['target_type', 'TEXT', ''], ['target_id', 'BIGINT', ''],
-             ['meta_json', 'JSONB', ''], ['created_at', 'TIMESTAMPTZ', '']] }
+             ['meta_json', 'JSONB', ''], ['created_at', 'TIMESTAMPTZ', '']] },
+
+    { t: 'security_events', label: '安全事件', note: '登入失敗、被規則擋下的請求、AI 用量。平台管理頁的「安全事件」讀它',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['kind', 'TEXT', "'login_failed' / 'login_locked' / 'ai_quota' …（toolkit/security.py 的 KINDS）"],
+             ['user_id', 'BIGINT', 'FK → users。查不到是誰時是 NULL'],
+             ['subject', 'TEXT', '登入用的 email 的雜湊。帳號不存在也照樣算次數，不然鎖不鎖就洩漏了帳號在不在'],
+             ['ip_hash', 'TEXT', '來源 IP 的雜湊，只拿來數次數'],
+             ['detail', 'TEXT', '給管理員看的一句話。⚠️ 不放密碼、金額、記帳內容'],
+             ['created_at', 'TIMESTAMPTZ', '']] },
+
+    { t: 'error_logs', label: '錯誤紀錄', note: '後端沒接住的錯誤、使用者畫面上出的錯。平台管理頁即時顯示',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['source', 'TEXT', "'server' 後端／'client' 使用者的瀏覽器"],
+             ['status', 'INT', 'HTTP 狀態碼。畫面程式出錯是 NULL'],
+             ['method', 'TEXT', ''], ['path', 'TEXT', '出錯的路由或畫面（#/entry）。不含查詢參數'],
+             ['location', 'TEXT', '出錯的函式或例外類型。只給管理員看，使用者畫面上不出現'],
+             ['message', 'TEXT', '最多 300 字。⚠️ 不放請求內容（金額、備註）'],
+             ['user_id', 'BIGINT', 'FK → users。沒登入時是 NULL'],
+             ['created_at', 'TIMESTAMPTZ', '']] }
   ],
 
   relations: [
@@ -456,7 +474,9 @@ window.DATA = {
     ['budgets', 'families', 'N:1', ''],
     ['budgets', 'categories', 'N:1', ''],
     ['advices', 'families', 'N:1', ''],
-    ['audit_logs', 'users', 'N:1', '']
+    ['audit_logs', 'users', 'N:1', ''],
+    ['security_events', 'users', 'N:1', ''],
+    ['error_logs', 'users', 'N:1', '']
   ],
 
   /* ---------- 權限矩陣（家庭內） ----------

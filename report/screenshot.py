@@ -40,6 +40,8 @@ SHOTS = [
     ("profile", "dad", "#/profile", 1280, 800, "", 2.5),
     ("kid_home", "kid", "#/", 1280, 800, "", 2.5),
     ("home_mobile", "dad", "#/", 390, 844, "", 2.5),
+    ("admin", "admin", "#/admin", 1280, 800, "", 3),
+    ("admin_mobile", "admin", "#/admin", 390, 844, "", 3),
     ("parse", "dad", "#/", 1280, 800, "PARSE", 8),
 ]
 

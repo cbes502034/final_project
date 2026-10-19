@@ -3,7 +3,7 @@
     python report/qa/live_audit.py --tokens <只含 access token 的 JSON>
 
 每一頁記下：
-  · 截圖（report/qa/shots/<名稱>.png）
+  · 截圖（report/qa/out/shots/<名稱>.png，工作檔不進 git）
   · 375／768／1280 三種寬度有沒有橫向溢出（scrollWidth − clientWidth）
   · 同一頁上「同一個名字」的按鈕／連結出現幾次、同一個 #/ 連結出現幾次——功能重複的線索
   · 這一頁的標題階層與主要文字（給使用者觀點評分用）
@@ -29,7 +29,7 @@ import httpx
 import websockets
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "shots")
+OUT = os.path.join(HERE, "out", "shots")      # 工作檔，不進 git（結果寫進 PDF）
 FRONT = "https://fambudget-web.onrender.com"
 CHROME = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
           r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"]
@@ -135,7 +135,7 @@ async def run(ws_url, tokens, only):
 
         await send("Page.enable")
         await send("Runtime.enable")
-        await send("Page.navigate", url=FRONT + "/docs/index.html")
+        await send("Page.navigate", url=FRONT + "/docs/guide.html")
         await asyncio.sleep(2)
         for name, who, hash_, w, h, action in PAGES:
             if only and name not in only:
@@ -205,7 +205,7 @@ def main() -> int:
         except subprocess.TimeoutExpired:      # 無頭 Chrome 偶爾關不掉：強制結束
             proc.kill()
         shutil.rmtree(profile, ignore_errors=True)
-    out = os.path.join(HERE, "audit.json")
+    out = os.path.join(HERE, "out", "audit.json")
     old = {}
     if os.path.exists(out):
         with io.open(out, encoding="utf-8") as f:

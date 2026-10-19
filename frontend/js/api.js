@@ -9,7 +9,7 @@
    後端契約（由 backend/tools/sync_spec.py 從 ownership.py 產生，不要手改）
    每一支的完整形狀：docs/02-前後端串接契約.md；前端函式與路由的對照：本檔的 FN。
 
-   認證（21 支）
+   認證（24 支）
    POST   /api/auth/register                   註冊：名字、email、密碼
    POST   /api/auth/login                      登入
    POST   /api/auth/refresh                    用 refresh token 換新的 access token
@@ -31,6 +31,9 @@
    GET    /api/admin/users                     帳號清單（停權用）
    POST   /api/admin/users/{user_id}/suspend   停權
    DELETE /api/admin/users/{user_id}/suspend   解除停權
+   GET    /api/admin/errors                    錯誤訊息
+   GET    /api/admin/security-events           安全事件
+   POST   /api/client-errors                   回報畫面上出的錯
 
    記帳（19 支）
    GET    /api/transactions                     收支明細
@@ -136,6 +139,8 @@
   var KEY = 'fambudget.state.v2';
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  /* mock 的錯誤紀錄（平台管理頁的「錯誤訊息」）。只活在這個分頁 */
+  var MOCK_ERRORS = [];
 
   /* 新資料的編號：毫秒時間戳，但保證遞增。
      同一毫秒建兩筆（段落記帳一次確認好幾筆、連點兩下）用 Date.now() 會撞號，
@@ -1106,9 +1111,13 @@
                 joined: m.joined,
                 suspendedAt: (s.suspended || {})[m.id] ? (s.suspended || {})[m.id].at : null,
                 suspendedReason: (s.suspended || {})[m.id]
-                  ? (s.suspended || {})[m.id].reason : null
+                  ? (s.suspended || {})[m.id].reason : null,
+                /* mock 只有這一台瀏覽器：登入中的只有管理員自己（他不在清單上），其他人一律紅燈 */
+                presence: (s.suspended || {})[m.id] ? 'suspended' : 'offline',
+                lastActiveAt: null
               };
-            })
+            }),
+          at: new Date().toISOString()
         };
       });
     },
@@ -1144,6 +1153,37 @@
         save();
         return { id: uid, suspendedAt: null };
       });
+    },
+
+    /* 錯誤訊息：mock 沒有伺服器，只有這個分頁回報過的畫面錯誤（不存起來，重新整理就清空） */
+    adminErrors: function () {
+      var s = load();
+      return sleep(160).then(function () {
+        requirePlatform(s);
+        var hour = Date.now() - 3600 * 1000;
+        return { errors: MOCK_ERRORS.slice().reverse().slice(0, 100),
+                 lastHour: MOCK_ERRORS.filter(function (x) { return Date.parse(x.at) >= hour; }).length };
+      });
+    },
+
+    /* 安全事件：規則（登入錯太多次、大量註冊、AI 額度）都在後端，mock 擋不了也記不到 */
+    adminSecurityEvents: function () {
+      var s = load();
+      return sleep(160).then(function () {
+        requirePlatform(s);
+        return { events: [], today: { loginFailed: 0, locked: 0, registered: 0, aiParse: 0, aiAdvice: 0 } };
+      });
+    },
+
+    reportError: function (body) {
+      body = body || {};
+      var s = load(), me = s.auth && s.auth.loggedIn ? memberOf(s.me) : null;
+      var msg = String(body.message || '').split(/\s+/).join(' ').trim().slice(0, 300);
+      if (!msg) return Promise.reject(oops('錯誤訊息是空的', 422));
+      MOCK_ERRORS.push({ id: 'E' + (MOCK_ERRORS.length + 1), at: new Date().toISOString(), source: 'client',
+        status: body.status || null, method: null, path: body.page || null, location: body.location || null,
+        message: msg, userName: me ? me.name : null });
+      return Promise.resolve({ accepted: true });
     },
 
     audit: function () {
@@ -2774,7 +2814,7 @@
   /* 登入閘：mock 也跟真後端一樣，沒登入就 401。
      ⚠️ 沒有這一層的話，登出之後某個畫面還在打 API，mock 會拿著 me = null 往下跑，
      錯在「讀不到 null 的 name」這種看不出原因的地方。 */
-  var MOCK_PUBLIC = ['authState', 'renew', 'ttl', 'login', 'register', 'logout', 'requestPasswordReset', 'confirmPasswordReset', 'verifyEmail', 'reset'];
+  var MOCK_PUBLIC = ['authState', 'renew', 'ttl', 'login', 'register', 'logout', 'requestPasswordReset', 'confirmPasswordReset', 'verifyEmail', 'reset', 'reportError'];
   Object.keys(mock).forEach(function (name) {
     if (MOCK_PUBLIC.indexOf(name) >= 0) return;
     var fn = mock[name];
@@ -2810,6 +2850,7 @@
   }
 
   var refreshing = null;          // 同時只跑一次續期，見 doRefresh()
+  var PENDING = [];               // 斷線時送不出去的錯誤回報，見 http.reportError
 
   function send(path, opt) {
     opt = opt || {};
@@ -2944,6 +2985,19 @@
     suspendUser:       function (u, r)  { return req('/api/admin/users/' + u + '/suspend', { method: 'POST', body: { reason: r } }); },
     unsuspendUser:     function (u)     { return req('/api/admin/users/' + u + '/suspend', { method: 'DELETE' }); },
     audit:             function ()      { return req('/api/audit'); },
+    adminErrors:       function ()      { return req('/api/admin/errors'); },
+    adminSecurityEvents: function ()    { return req('/api/admin/security-events'); },
+    /* 回報畫面上出的錯。⚠️ 永遠不 reject：回報的地方再出錯，就會變成「回報回報失敗」的迴圈。
+       送不出去（例如就是因為斷線才出的錯）先排著，下一次有請求成功時再補送（最多 5 筆）。 */
+    reportError:       function (b)     {
+      return send('/api/client-errors', { method: 'POST', body: b }).then(function (r) {
+        if (!r.ok) return { accepted: false };
+        return r.json();
+      }).catch(function () {
+        if (PENDING.length < 5) PENDING.push(b);
+        return { accepted: false };
+      });
+    },
     verifyPassword:    function (pw)    { return req('/api/auth/verify-password', { method: 'POST', body: { password: pw } }); },
     requestPasswordReset: function (e)  { return req('/api/auth/password-reset', { method: 'POST', body: { email: e } }); },
     confirmPasswordReset: function (t, pw) { return req('/api/auth/password-reset/confirm', { method: 'POST', body: { token: t, password: pw } }); },
@@ -3022,8 +3076,9 @@
                 'backend'   後端壞了或還沒做（5xx、404／405 路由不存在、501）
                 'network'   連不上後端
                 'shape'     回應的形狀不對（少了畫面要用的欄位）
-     backend／network／shape 會把「是哪一支出錯」接在訊息後面——
-     前提是前端沒問題：這三種都是「照契約打過去，拿回來的不對」。
+     ⚠️ 使用者的畫面上只講白話（e.message）：哪裡出了問題、可以怎麼做。
+        「是哪一支、哪條路由」放在 e.dev，連同畫面一起送到平台管理頁的「錯誤訊息」
+        （POST /api/client-errors，見 report()）。後端自己記得到的 500／503 不重送。
 
      ⚠️ 新增一支 API：mock、http 各寫一個，再在 FN 這裡登記一行。
         路由與負責人跟 backend/app/ownership.py 對齊，有測試擋。
@@ -3052,6 +3107,9 @@
     adminUsers:         ['GET /api/admin/users', '認證'],
     suspendUser:        ['POST /api/admin/users/{user_id}/suspend', '認證'],
     unsuspendUser:      ['DELETE /api/admin/users/{user_id}/suspend', '認證'],
+    adminErrors:        ['GET /api/admin/errors', '認證'],
+    adminSecurityEvents: ['GET /api/admin/security-events', '認證'],
+    reportError:        ['POST /api/client-errors', '認證'],
 
     transactions:       ['GET /api/transactions', '記帳'],
     createTransaction:  ['POST /api/transactions', '記帳'],
@@ -3119,7 +3177,8 @@
     financeProfile: ['finance', 'styles', 'goals', 'habits'],
     requestPasswordReset: ['ok', 'message'], sessions: ['sessions'],
     verifyEmail: ['ok', 'email'], resendVerifyEmail: ['ok', 'sent', 'message'],
-    adminUsers: ['users'], audit: ['logs'],
+    adminUsers: ['users'], audit: ['logs'], adminErrors: ['errors', 'lastHour'],
+    adminSecurityEvents: ['events', 'today'],
     transactions: ['transactions', 'total'], createTransaction: ['id'], updateTransaction: ['id'],
     deleteTransactions: ['deleted'], nlpParse: ['out'], nlpParseBatch: ['items'],
     categories: ['categories'], groups: ['groups'], createGroup: ['id'],
@@ -3155,7 +3214,9 @@
     allowances: { allowances: { wardId: 's', wardName: 's', amount: 'n', spent: 'n' } },
     notifications: { notifications: { id: 's', type: 's', createdAt: 't', readAt: 't?' } },
     sessions: { sessions: { id: 's', device: 's', current: 'b', lastActiveAt: 't' } },
-    adminUsers: { users: { id: 's', name: 's', email: 's', suspendedAt: 't?' } },
+    adminUsers: { users: { id: 's', name: 's', email: 's', suspendedAt: 't?', presence: 's', lastActiveAt: 't?' } },
+    adminErrors: { errors: { id: 's', at: 't', source: 's', message: 's' } },
+    adminSecurityEvents: { events: { id: 's', at: 't', kind: 's', level: 's', levelText: 's', title: 's' } },
     audit: { logs: { id: 's', at: 't', actorName: 's', action: 's' } }
   };
 
@@ -3326,7 +3387,7 @@
         return { raw: t, matched: false, fallback: true,
           out: { date: it.date, amount: it.amount || 0, kind: it.kind, cat: toBackendCat(it.cat),
                  merchant: it.merchant, conf: it.conf.amount, catConf: it.conf.cat },
-          note: '後端的解析還沒接上，先用前端的規則解析。確認寫入還是存到後端。' };
+          note: '先用簡易規則拆好了。分類和金額請再看一眼，確認之後一樣會存起來。' };
       });
     },
     nlpParseBatch: function (args) {
@@ -3336,7 +3397,7 @@
       return lookups().then(function () {
         items.forEach(function (it) { it.cat = toBackendCat(it.cat); });
         return { raw: t, matched: false, fallback: true, items: items,
-          note: '後端的解析還沒接上，先用前端的規則切分。確認寫入還是存到後端。' };
+          note: '先用簡易規則拆好了。每一筆請再看一眼，確認之後一樣會存起來。' };
       });
     },
     generateAdvices: function (args) {
@@ -3345,7 +3406,7 @@
         var built = buildAdvices(r[0], r[1].budgets || [], scope, r[2].user.id, r[0].period || global.DATA.meta.period);
         return { fallback: true, generatedAt: built.head.generatedAt,
           advices: built.advices.map(function (a) { return Object.assign(a, { userName: a.user ? r[2].user.name : null }); }),
-          note: '後端的建議還沒接上，這幾則是前端用同一批數字寫的，不會存起來。' };
+          note: '這幾則是用同一批數字先整理的，不會存起來；晚一點再按一次就會是 AI 寫的。' };
       });
     },
     sessions: function () {
@@ -3368,36 +3429,77 @@
     var st = e.status || 0;
     e.detail = e.detail || (st ? e.message : null);     // 後端的原話，錯誤匣要照原樣列出來
     if (e.kind === 'shape') {
-      // 已經在下面組好訊息
+      // 已經在下面組好 e.dev
+      e.message = USER_TEXT.shape;
     } else if (!st && (e.name === 'TypeError' || /Failed to fetch|NetworkError|Load failed/i.test(e.message))) {
       e.kind = 'network';
-      e.message = '連不上後端｜出錯的函式：' + where(name);
+      e.dev = '連不上後端｜出錯的函式：' + where(name);
+      e.message = USER_TEXT.network;
     } else if (st >= 500 || st === 404 && /^Not Found$/i.test(e.message) || st === 405) {
       e.kind = 'backend';
       /* 後端 501 的訊息本身就是「後端還沒做這一支：路由（成員）」，路由與負責人 where() 會再講一次，不重複 */
       var detail = e.message && !/^HTTP \d+/.test(e.message) && !/^Not Found$/i.test(e.message) &&
         !(st === 501 && /^後端還沒做這一支/.test(e.message)) ? '：' + e.message : '';
-      e.message = (st === 501 ? '後端還沒做這一支（HTTP 501）' : '後端出錯（HTTP ' + st + '）') + detail +
+      e.dev = (st === 501 ? '後端還沒做這一支（HTTP 501）' : '後端出錯（HTTP ' + st + '）') + detail +
         '｜出錯的函式：' + where(name);
+      /* 5xx 的話後端已經寫成一句人話（「系統發生錯誤，請稍後再試」）就照用；
+         帶著技術字眼的（前端、後端、模型、SQL…）換成白話 */
+      var said = e.detail && !/前端|後端|模型|HTTP|SQL|relation|Error/i.test(e.detail) ? e.detail : '';
+      e.message = st >= 500 && st !== 501 && said ? said : st >= 500 && st !== 501 ? USER_TEXT.server : USER_TEXT.missing;
     } else {
       e.kind = 'business';
     }
-    report(e);
+    report(e, name);
     return e;
   }
 
-  /* 標記一下這個錯誤已經處理過，不要在巢狀的 then／catch 裡被重複包裝。
-     ⚠️ 以前這裡會把每一支的結果推進左下角那張總表。那張表已經拆掉了——
-        「哪一支還沒做」要講在畫面上對應的位置，看的人才知道跟眼前的東西有什麼關係。 */
-  function report(e) {
+  /* 使用者看到的話。⚠️ 不放函式名稱、路由、HTTP 狀態碼——那些在 e.dev，送給平台管理頁 */
+  var USER_TEXT = {
+    network: '連不上伺服器，請確認網路之後再試一次',
+    server: '系統暫時出了問題，請稍後再試',
+    missing: '這個功能暫時無法使用，請稍後再試',
+    shape: '收到的資料不完整，已經通知管理員，請稍後再試'
+  };
+
+  /* 技術細節送到平台管理頁的「錯誤訊息」（POST /api/client-errors）。
+     ⚠️ 後端自己記得到的（500、503）不重送；業務錯誤（400／403／409）是正確的回答，不是錯。
+     ⚠️ 同一個函式、同一句話，這次開頁只送一次——畫面每 10 秒重畫的地方才不會洗版。 */
+  var SENT = {};
+  /* 重新整理、關掉分頁、換到別的網址時，進行中的請求會被瀏覽器中斷，看起來就像「連不上」——那不是錯。 */
+  var LEAVING = false;
+  if (typeof global.addEventListener === 'function') {
+    global.addEventListener('pagehide', function () { LEAVING = true; });
+    global.addEventListener('beforeunload', function () { LEAVING = true; });
+  }
+  function report(e, name) {
     if (e.kind === 'business' || e.logged) return;
     e.logged = true;
+    if (name === 'reportError' || e.status === 500 || e.status === 503) return;
+    var msg = e.dev || e.message, where = e.fn || (name ? 'API.' + name : null), st = e.status || null;
+    if (e.kind === 'network') {
+      /* 連不上的錯等一秒再送：頁面已經離開的話，這個計時器根本不會跑 */
+      setTimeout(function () { if (!LEAVING) send2(msg, where, st); }, 1000);
+      return;
+    }
+    send2(msg, where, st);
+  }
+  function send2(msg, location, status) {
+    var key = (location || '') + '｜' + msg;
+    if (SENT[key]) return Promise.resolve({ accepted: false });
+    SENT[key] = 1;
+    var page = (global.location && global.location.hash) || null;
+    try {
+      return Promise.resolve(impl.reportError({ message: String(msg || '沒有訊息').slice(0, 2000),
+        location: location ? String(location).slice(0, 200) : null,
+        page: page ? String(page).slice(0, 200) : null, status: status })).catch(function () { return { accepted: false }; });
+    } catch (x) { return Promise.resolve({ accepted: false }); }
   }
 
   function call(name, args) {
     var fn = impl[name];
     if (typeof fn !== 'function') {
-      var miss = new Error('前端的 ' + (MODE === 'http' ? 'http' : 'mock') + ' 轉接器少了這一支｜出錯的函式：' + where(name));
+      var miss = new Error(USER_TEXT.missing);
+      miss.dev = '前端的 ' + (MODE === 'http' ? 'http' : 'mock') + ' 轉接器少了這一支｜出錯的函式：' + where(name);
       miss.kind = 'backend';
       return Promise.reject(tag(miss, name));
     }
@@ -3412,11 +3514,17 @@
       throw e;
     }).then(function (res) {
       if (LOOKUP_STALE.indexOf(name) >= 0) { LOOKUP.cats = null; LOOKUP.people = null; }
+      /* 剛才斷線時送不出去的錯誤回報，現在連得上了，補送 */
+      if (PENDING.length && name !== 'reportError') {
+        var q = PENDING.splice(0);
+        q.forEach(function (b) { impl.reportError(b); });
+      }
       var need = SHAPE[name];
       if (need) {
         var lack = need.filter(function (k) { return !res || !(k in res); });
         if (lack.length) {
-          var bad = new Error('回應少了 ' + lack.join('、') + '｜出錯的函式：' + where(name));
+          var bad = new Error(USER_TEXT.shape);
+          bad.dev = '回應少了 ' + lack.join('、') + '｜出錯的函式：' + where(name);
           bad.kind = 'shape';
           throw bad;
         }
@@ -3426,7 +3534,8 @@
       if (ROWS[name]) {
         var wrong = checkRows(res, ROWS[name]);
         if (wrong) {
-          var bad2 = new Error('回應形狀不對：' + wrong + '｜出錯的函式：' + where(name));
+          var bad2 = new Error(USER_TEXT.shape);
+          bad2.dev = '回應形狀不對：' + wrong + '｜出錯的函式：' + where(name);
           bad2.kind = 'shape';
           throw bad2;
         }
@@ -3436,7 +3545,9 @@
     }).catch(function (e) { throw tag(e, name); });
   }
 
-  global.API = { mode: MODE, base: BASE, routes: FN, where: where };
+  global.API = { mode: MODE, base: BASE, routes: FN, where: where,
+    /* 畫面程式出錯時（app.js 的 frontFault、window.onerror）把技術細節送給平台管理頁 */
+    report: function (msg, location) { return send2(msg, location || null, null); } };
   Object.keys(FN).forEach(function (name) {
     global.API[name] = function () { return call(name, Array.prototype.slice.call(arguments)); };
   });

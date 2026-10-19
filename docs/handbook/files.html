@@ -18,8 +18,8 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="../css/tokens.css?v=150">
-<link rel="stylesheet" href="../css/themes.css?v=150">
+<link rel="stylesheet" href="../../frontend/css/tokens.css?v=150">
+<link rel="stylesheet" href="../../frontend/css/themes.css?v=150">
 <link rel="stylesheet" href="docs.css?v=19">
 <style>
 /* ---- 檔案系統說明書：代表色是青（docs.css 的 .fs） ---- */
@@ -70,7 +70,7 @@ td .fname { font-family: var(--code); font-size: 12px; color: var(--m3); }
 <div class="shell">
   <nav class="rail">
     <div class="rail__brand">
-      <a class="brand rail__home" href="../index.html" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
+      <a class="brand rail__home" href="https://fambudget-web.onrender.com/" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
       <div class="rail__doc">
         <div class="rail__t">檔案系統說明書</div>
         <div class="rail__s">專案結構</div>
@@ -84,7 +84,7 @@ td .fname { font-family: var(--code); font-size: 12px; color: var(--m3); }
       <a class="nav__out" href="fastapi.html"><i>&#8599;</i>FastAPI 說明書</a>
       <a class="nav__out" href="restful.html"><i>&#8599;</i>RESTful 說明書</a>
       <a class="nav__out" href="index.html"><i>&#8599;</i>專題手冊</a>
-      <a class="nav__back" href="../index.html"><i>←</i>回到系統</a>
+      <a class="nav__back" href="https://fambudget-web.onrender.com/"><i>←</i>回到系統</a>
     </div>
   </nav>
 
@@ -157,7 +157,7 @@ PostgreSQL
             <tr><td class="tight"><b style="color:var(--up)">綠字</b></td>
                 <td><b>已經寫好、完整可用</b>，直接 import，不要改</td></tr>
             <tr><td class="tight"><b style="color:var(--warn)">黃字刪除線</b></td>
-                <td><b>骨架在、內容還沒做</b>：路由還回 501（<code>@stub</code>）。<b>現在已經沒有了</b>——72 支路由都做完了</td></tr>
+                <td><b>骨架在、內容還沒做</b>：路由還回 501（<code>@stub</code>）。<b>現在已經沒有了</b>——75 支路由都做完了</td></tr>
           </tbody>
         </table>
       </div>
@@ -208,15 +208,15 @@ PostgreSQL
 │   │   ├── <em>guards.py</em>         <em>路由守衛：@login_required、own()、in_group()…</em>
 │   │   ├── <em>cli.py</em>            <em>python -m app.cli：init-env · check-config · init-db · make-admin · db</em>
 │   │   ├── <em>toolkit/</em>          <em>已經寫好的工具（見 03）</em>
-│   │   ├── <em>models/</em>           <em>20 張表，跟 data.js 的 schema 逐欄對齊</em>
+│   │   ├── <em>models/</em>           <em>22 張表，跟 data.js 的 schema 逐欄對齊</em>
 │   │   ├── <em>schemas/</em>          <em>請求主體，欄位名字跟前端送的一樣</em>
-│   │   ├── <em>routers/</em>          <em>72 支路由：一個領域一個資料夾（全部做完）</em>
+│   │   ├── <em>routers/</em>          <em>75 支路由：一個領域一個資料夾（全部做完）</em>
 │   │   │   ├── <em>auth/</em>         <em>認證</em>
 │   │   │   ├── <em>ledger/</em>       <em>記帳</em>
 │   │   │   ├── <em>analytics/</em>    <em>數字</em>
 │   │   │   └── <em>access/</em>       <em>家庭</em>
 │   │   └── <em>services/</em>         <em>llm/（client、parse、advice）、analytics、evaluation</em>
-│   ├── alembic/              <i>資料庫遷移（versions/ 第一版 = 20 張表）</i>
+│   ├── alembic/              <i>資料庫遷移（versions/ 一版一版往上加，現在 22 張表）</i>
 │   ├── alembic.ini           <i>⚠️ 只能有英文</i>
 │   ├── tests/                <i>一致性、工具箱、後端核心、前端代勞；fixtures/ 放測試資料</i>
 │   ├── tools/                <i>eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生</i>
@@ -258,9 +258,9 @@ PostgreSQL
             <tr><td><span class="fname">backend/app/toolkit/</span></td><td>已經寫好的工具，<b>直接 import，不要改</b></td><td class="tight">已交付</td></tr>
             <tr><td><span class="fname">backend/app/guards.py</span></td><td>路由守衛（參考 MineMarket 的 AuthDecorator）。沒登入、被停權、角色不對、不是自己的資料，路由一行都不會跑</td><td class="tight">已交付</td></tr>
             <tr><td><span class="fname">backend/app/cli.py</span></td><td>小工具指令：建 .env、檢查設定、建表放系統分類、設定平台管理員</td><td class="tight">已交付</td></tr>
-            <tr><td><span class="fname">backend/app/models/</span></td><td>20 張表。<b>資料庫裡存什麼</b>。改欄位三處一起改：data.js → models → Alembic</td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/models/</span></td><td>22 張表。<b>資料庫裡存什麼</b>。改欄位三處一起改：data.js → models → Alembic</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/schemas/</span></td><td>請求主體的形狀。<b>API 收什麼</b>——回應用 <code>crud.to_dict</code>，密碼雜湊預設就不會送出去</td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/app/routers/</span></td><td>72 支路由，<b>一個領域一個資料夾</b>（<code>auth/</code> 認證、<code>ledger/</code> 記帳、<code>analytics/</code> 數字、<code>access/</code> 家庭）。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/routers/</span></td><td>75 支路由，<b>一個領域一個資料夾</b>（<code>auth/</code> 認證、<code>ledger/</code> 記帳、<code>analytics/</code> 數字、<code>access/</code> 家庭）。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/services/</span></td><td>加總與模型。<code>llm/client.py</code> 已完成；<code>parse</code>、<code>advice</code>、<code>analytics.summary</code> 要做。<b>不碰 HTTP</b>，所以可以直接測</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/alembic/</span></td><td>資料庫結構的版本。部署時啟動前自動 <code>alembic upgrade head</code></td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">backend/.env.example</span></td><td>設定範本，依「共用／認證～4」分段；<code>python -m app.cli init-env</code> 從它建出 .env</td><td class="tight">共同</td></tr>
@@ -303,6 +303,7 @@ PostgreSQL
             <tr><td><span class="fname">crud.py</span></td><td>增刪改查，任何一張表都用同一組：條件用 dict（<code>{"amount__gte": 100}</code>）、分頁、只取欄位、批次新增、有就改沒有就新增、軟刪除；沒有條件的改／刪會被擋</td><td><code>get</code>、<code>find</code>、<code>save</code>、<code>remove</code>、<code>to_dict</code></td></tr>
             <tr><td><span class="fname">mailer.py</span></td><td>寄信：包住 Brevo 的 HTTP API（Render 免費方案擋 SMTP 埠）。試寄：<code>python -m app.toolkit.mailer --to 你的信箱</code></td><td><code>send_mail</code>、<code>build_payload</code></td></tr>
             <tr><td><span class="fname">password_reset.py</span></td><td>忘記密碼：一次性重設連結（只存雜湊、30 分鐘、冷卻 60 秒）與信件內容；有沒有帳號都回同一句話</td><td><code>new_token</code>、<code>hash_token</code>、<code>require_usable</code>、<code>reset_link</code>、<code>mail_content</code></td></tr>
+            <tr><td><span class="fname">security.py</span></td><td>防濫用的規則（登入錯太多次鎖住、同一來源大量註冊、AI 每日額度）、紅綠燈、安全事件與錯誤紀錄的寫入</td><td><code>login_blocked</code>、<code>login_failed</code>、<code>register_blocked</code>、<code>ai_quota</code>、<code>presence</code>、<code>touch</code>、<code>log_error</code></td></tr>
             <tr><td><span class="fname">roles.py</span></td><td>角色能做哪些治理動作（不管可見範圍）；平台管理員的停權規則</td><td><code>can_govern</code>、<code>require_govern</code>、<code>can_set_goal_for</code>、<code>require_platform</code>、<code>clean_suspend_reason</code>、<code>require_active</code></td></tr>
           </tbody>
         </table>

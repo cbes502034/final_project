@@ -1,6 +1,6 @@
 # backend — FastAPI 後端
 
-> 第一次碰 FastAPI？**先讀站上的 [FastAPI 說明書](https://fambudget-web.onrender.com/docs/fastapi.html)**，
+> 第一次碰 FastAPI？**先讀 [FastAPI 說明書](../docs/handbook/fastapi.html)**（用瀏覽器打開），
 > 那份是從零開始教的。這份 README 假設你已經讀過了。
 
 ---
@@ -25,7 +25,7 @@ uvicorn app.main:app --reload
 
 打開 <http://localhost:8000/docs> ——
 FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試打**，
-不需要寫前端，也不需要 Postman。72 支路由都在上面，還沒做的回 501。
+不需要寫前端，也不需要 Postman。75 支路由都在上面，還沒做的回 501。
 
 看自己剛剛寫進去的資料（不用裝任何工具）：
 
@@ -64,7 +64,7 @@ backend/
 │   │   ├── family.py · roles.py · ledger.py · alerts.py · notify.py
 │   │   └── period.py · money.py · images.py · profile.py · theme.py
 │   │
-│   ├── models/            ← 資料庫長什麼樣（SQLAlchemy，20 張表，跟 data.js 的 schema 逐欄對齊）
+│   ├── models/            ← 資料庫長什麼樣（SQLAlchemy，22 張表，跟 data.js 的 schema 逐欄對齊）
 │   ├── schemas/           ← API 收什麼（Pydantic），欄位名字跟前端送的一樣
 │   ├── routers/           ← 路由。**一個領域一個資料夾，開自己那一個就好**
 │   │                        每個資料夾裡都有 README.md，寫你那一塊怎麼開發
@@ -75,7 +75,7 @@ backend/
 │   │   └── _stub.py         共用：@stub 與 not_ready()（還沒做的回 501）
 │   └── services/          ← 加總與模型：analytics、llm/（client、parse、advice）、permission、evaluation
 │
-├── alembic/               ← 資料庫結構的版本控制（versions/ 第一版就是 20 張表）
+├── alembic/               ← 資料庫結構的版本控制（versions/ 一版一版往上加，現在是 22 張表）
 ├── alembic.ini            ← ⚠️ 只能有英文（Windows 的 alembic 用 cp950 讀它）
 ├── tests/                 ← pytest；fixtures/ 放測試用的一家人與假後端
 ├── tools/                 ← eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生

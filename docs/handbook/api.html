@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API 瀏覽</title>
-<meta name="description" content="家庭記帳系統的 72 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
+<meta name="description" content="家庭記帳系統的 75 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -18,20 +18,20 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="../css/tokens.css?v=150">
-<link rel="stylesheet" href="../css/themes.css?v=150">
+<link rel="stylesheet" href="../../frontend/css/tokens.css?v=150">
+<link rel="stylesheet" href="../../frontend/css/themes.css?v=150">
 <link rel="stylesheet" href="docs.css?v=19">
 </head>
 <body>
 
 <nav class="docbar">
-  <a class="brand docbar__brand" href="../index.html" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
+  <a class="brand docbar__brand" href="https://fambudget-web.onrender.com/" aria-label="家庭記帳 FamBudget，回到系統"><span class="brand__zh">家庭記帳</span><span class="brand__en" aria-hidden="true">FamBudget</span></a>
   <a href="index.html">← 專題手冊</a>
   <a href="fastapi.html">FastAPI 說明書</a>
   <a href="restful.html">RESTful 說明書</a>
   <a href="files.html">檔案系統說明書</a>
   <a href="model.html">記帳模型設計</a>
-  <a href="../index.html">回到系統</a>
+  <a href="https://fambudget-web.onrender.com/">回到系統</a>
 </nav>
 
 <div class="apiwrap">
@@ -40,7 +40,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>72 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>75 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -95,7 +95,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">72 ROUTES · 4 MODULES</div>
+    <div class="mono">75 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -426,9 +426,9 @@
       res: '{\n  "style": "balanced",\n  "goals": ["emergency", "travel"],\n  "habits": ["dca"],\n  "note": "每月定期定額 3,000"\n}',
       note: '⚠️ 這段會進財務建議的 prompt。風格／目標／安排一律**從固定清單挑 id**，認不得的直接丟掉；補充說明限 200 字，而且組 prompt 時會被標示成「資料，不是指令」——建議是給監管者看的，不隔離的話子女可以操控父母看到的內容。做法見 toolkit/profile.py。' },
     { n: 62, o: 'm1', m: 'GET', p: '/api/admin/users', a: '平台管理員',
-      d: '帳號清單（停權用）',
-      res: '{\n  "users": [\n    {\n      "id": "U1",\n      "name": "王大明",\n      "email": "daming@wang.tw",\n      "role": null,\n      "joined": "2026-09-14",\n      "suspendedAt": null,\n      "suspendedReason": null\n    },\n    …\n  ]\n}',
-      note: '⚠️ 刻意不回傳任何金額。只有 id／名字／email／角色／停權狀態。一個能讀全系統消費明細的帳號，比家長越權嚴重得多——而且沒有任何人看得見那個視角。停權是關門，不是配鑰匙。平台管理員由 <code>python -m app.cli make-admin</code> 設定，不能自己註冊。' },
+      d: '帳號清單（停權用）與即時的紅綠燈',
+      res: '{\n  "users": [\n    {\n      "id": "U1",\n      "name": "王大明",\n      "email": "daming@wang.tw",\n      "role": null,\n      "joined": "2026-09-14",\n      "suspendedAt": null,\n      "suspendedReason": null,\n      "presence": "online",\n      "lastActiveAt": "2026-10-20T03:05:12+00:00"\n    },\n    …\n  ],\n  "at": "2026-10-20T03:05:40+00:00"\n}',
+      note: '⚠️ 刻意不回傳任何金額。只有 id／名字／email／角色／停權狀態。一個能讀全系統消費明細的帳號，比家長越權嚴重得多——而且沒有任何人看得見那個視角。停權是關門，不是配鑰匙。presence：online 綠燈（90 秒內有請求）、idle 黃燈（15 分鐘內）、offline 紅燈（更久、或每一台都登出了）、suspended。平台管理員由 <code>ADMIN_EMAILS</code> 設定（服務啟動時自動套用；已經有家庭或記過帳的帳號不會被設），不能自己註冊。' },
     { n: 63, o: 'm1', m: 'POST', p: '/api/admin/users/{user_id}/suspend', a: '平台管理員',
       d: '停權一個帳號。body: { reason }',
       body: '{ "reason": "多次騷擾其他使用者" }',
@@ -438,6 +438,19 @@
       d: '解除停權',
       res: '{ "id": "U2", "suspendedAt": null }',
       note: '解除也要寫進 audit_logs——「誰放他回來的」跟「誰停的他」一樣重要。' },
+    { n: 79, o: 'm1', m: 'GET', p: '/api/admin/errors', a: '平台管理員',
+      d: '錯誤訊息：最新 100 筆（管理頁每 10 秒更新）',
+      res: '{\n  "errors": [\n    {\n      "id": "41",\n      "at": "2026-10-20T03:05:00+00:00",\n      "source": "client",\n      "status": null,\n      "method": null,\n      "path": "#/entry",\n      "location": "vEntry",\n      "message": "Cannot read properties of undefined",\n      "userName": "王小華"\n    },\n    …\n  ],\n  "lastHour": 3\n}',
+      note: '來源有兩種：<code>server</code> 是後端沒接住的 500 與路由丟的 5xx（例如模型叫不動的 503），<code>client</code> 是前端回報的。⚠️ 使用者的畫面上只講「哪裡出了問題、可以怎麼做」，出錯的函式與路由只出現在這裡。只記訊息第一行，SQL 與參數切掉（參數裡可能有金額）。' },
+    { n: 80, o: 'm1', m: 'GET', p: '/api/admin/security-events', a: '平台管理員',
+      d: '安全事件：被規則擋下的請求與今天的用量',
+      res: '{\n  "events": [\n    {\n      "id": "12",\n      "at": "2026-10-20T03:05:00+00:00",\n      "kind": "login_locked",\n      "level": "high",\n      "levelText": "高",\n      "title": "同一個帳號登入失敗太多次，暫時鎖住 15 分鐘",\n      "detail": "15 分鐘內錯了 5 次",\n      "userId": "5",\n      "userName": "王小華",\n      "email": "xiaohua@wang.tw",\n      "suspended": false,\n      "canSuspend": true\n    }\n  ],\n  "today": { "loginFailed": 7, "locked": 1, "registered": 2, "aiParse": 35, "aiAdvice": 3 }\n}',
+      note: '規則在 <code>toolkit/security.py</code>：同一個 email 15 分鐘錯 5 次鎖 15 分鐘（帳號不存在也一樣鎖，不洩漏帳號在不在）、同一來源錯 20 次鎖 15 分鐘、同一來源一小時註冊 5 個、每人每天 AI 解析 200 次與產生建議 20 次。全部是數次數，<b>不用 AI 判斷</b>。⚠️ 規則只暫時擋下，<b>停權一律由管理員按</b>。' },
+    { n: 81, o: 'm1', m: 'POST', p: '/api/client-errors', a: '公開',
+      d: '前端回報畫面上出的錯',
+      body: '{ "message": "Cannot read properties of undefined", "location": "vEntry", "page": "#/entry" }',
+      res: '{ "accepted": true }',
+      note: '不用登入（登入頁也可能出錯）；帶了 token 就記下是誰。只收訊息、畫面、函式名稱，<b>不收請求內容</b>。防洗版：同一個人 10 分鐘 30 筆、沒登入的 1 分鐘合計 20 筆、同一句話 1 分鐘內只記一次，超過回 <code>accepted: false</code>（不回錯，不然前端會一直重送）。' },
     { n: 65, o: 'm4', m: 'GET', p: '/api/audit', a: '平台管理員',
       d: '稽核紀錄：誰做了什麼',
       res: '{\n  "logs": [\n    {\n      "id": "L1",\n      "actor": "U3",\n      "action": "unsuspend_user",\n      "target": "U2",\n      "at": "2026-09-14T18:31:39.754Z",\n      "note": "解除停權",\n      "actorName": "陳美玲"\n    },\n    …\n  ]\n}',

@@ -630,7 +630,7 @@ def test_進度表把還沒做的算成待辦():
     p = progress()
     done = {r for v in p.values() for r in v["done"]}
     todo = {r for v in p.values() for r in v["todo"]}
-    assert len(done) + len(todo) == 72
+    assert len(done) + len(todo) == 75
     assert not (done & todo), "同一支不可以同時算完成又算待辦"
 
     still_stub = set()
@@ -834,3 +834,75 @@ def test_正式環境不印_SQL(monkeypatch):
     assert db.make_engine("sqlite://").echo is False
     monkeypatch.setattr(settings, "app_env", "development")
     assert db.make_engine("sqlite://").echo is True
+
+
+
+def test_沒接住的錯誤也記進_error_logs_SQL_參數切掉(monkeypatch):
+    """平台管理頁的「錯誤訊息」：500 要記下路由樣板、函式名稱、例外的第一行。
+    ⚠️ SQLAlchemy 的例外訊息會帶 [parameters: (...)]，裡面可能有金額——一律切掉。"""
+    from app.main import http_error, unexpected_error
+    from app.models import ErrorLog
+    from app.toolkit import crud
+    from fastapi import HTTPException
+
+    original = str(db.engine.url)
+    db.use_database("sqlite://")
+    db.create_all()
+    try:
+        a = FastAPI()
+        a.add_exception_handler(Exception, unexpected_error)
+        a.add_exception_handler(HTTPException, http_error)
+
+        @a.get("/api/things/{thing_id}")
+        def boom(thing_id: str):
+            raise ValueError("寫不進去\n[SQL: INSERT INTO transactions ...]\n[parameters: (1200, '加油')]")
+
+        @a.get("/api/model")
+        def model_down():
+            raise HTTPException(status_code=503, detail="模型服務沒有回應")
+
+        @a.get("/api/missing")
+        def missing():
+            raise HTTPException(status_code=404, detail="找不到")
+
+        c = TestClient(a, raise_server_exceptions=False)
+        assert c.get("/api/things/7").status_code == 500
+        assert c.get("/api/model").json() == {"detail": "模型服務沒有回應"}
+        assert c.get("/api/missing").status_code == 404                     # 4xx 不是錯誤，不記
+        rows = crud.find(ErrorLog, order_by="id")
+        assert [(r.status, r.path, r.location, r.source) for r in rows] == [
+            (500, "/api/things/{thing_id}", "boom", "server"), (503, "/api/model", "model_down", "server")]
+        assert rows[0].message == "ValueError: 寫不進去" and "1200" not in rows[0].message
+    finally:
+        db.drop_all()
+        db.use_database(original)
+
+
+def test_啟動時設定平台管理員_有家庭或記過帳的不設():
+    """ADMIN_EMAILS 填錯成家長的信箱也不會出事：設了他就再也看不到自己的帳。"""
+    from datetime import date
+
+    from app.cli import promote_admins
+    from app.models import Category, Family, FamilyMember, Group, Transaction, User
+    from app.toolkit import crud
+
+    original = str(db.engine.url)
+    db.use_database("sqlite://")
+    db.create_all()
+    try:
+        mk = lambda e: crud.save(User, {"email": e, "password_hash": "x", "display_name": e[0], "theme": "paper"})
+        new, dad, kid, old = mk("new@x.tw"), mk("dad@x.tw"), mk("kid@x.tw"), mk("old@x.tw")
+        fam = crud.save(Family, {"name": "王家", "created_by": dad.id})
+        crud.save(FamilyMember, {"family_id": fam.id, "user_id": dad.id, "role": "parent"})
+        g = crud.save(Group, {"name": "帳", "created_by": kid.id})
+        cat = crud.save(Category, {"name": "餐飲", "kind": "expense", "color": "cat-food"})
+        crud.save(Transaction, {"user_id": kid.id, "group_id": g.id, "category_id": cat.id, "kind": "expense",
+                                "amount": 55, "occurred_on": date(2026, 10, 1), "source": "manual"})
+        crud.save(User, {"id": old.id, "is_platform_admin": True})
+        out = promote_admins(["New@x.tw", "dad@x.tw", "kid@x.tw", "old@x.tw", "ghost@x.tw"])
+        assert [x.split(" ")[0] for x in out] == ["New@x.tw", "dad@x.tw", "kid@x.tw", "old@x.tw", "找不到"]
+        assert "設成平台管理員了" in out[0] and "不設成平台管理員" in out[1] and "不設成平台管理員" in out[2]
+        assert {u.email for u in crud.find(User, {"is_platform_admin": True})} == {"new@x.tw", "old@x.tw"}
+    finally:
+        db.drop_all()
+        db.use_database(original)
