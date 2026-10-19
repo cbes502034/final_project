@@ -60,23 +60,34 @@ _NUMBER = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(萬|%|％)?")
 
 
 def derive(numbers: dict[str, Any]) -> dict[str, Any]:
-    """模型最常「順手」算的幾個比例，先在這裡算好交給它，它就不用自己算。全部是百分比，四捨五入到小數一位。"""
+    """模型最常「順手」算的幾個比例，先在這裡算好交給它，它就不用自己算。全部是百分比，四捨五入到小數一位。
+
+    ⚠️ 名稱與值都寫成人話（「支出佔收入」:「42.0%」）：模型會照抄。以前寫成「已用掉可支配上限（%）」: 9.5，
+       線上的建議就出現「已用掉可支配上限（%）9.5%」這種句子。
+
+    >>> derive({"income": 52000, "expense": 21860, "savings": {"ratio": 0.6831},
+    ...         "byCat": [{"name": "居住", "amount": 18000}]})
+    {'支出佔收入': '42.0%', '已用掉可支配上限': '68.3%', '各分類佔支出': {'居住': '82.3%'}}
+    """
     def num(v):
         try:
             return float(v)
         except (TypeError, ValueError):
             return 0.0
 
+    def pct(v):
+        return "%.1f%%" % v
+
     income, expense = num(numbers.get("income")), num(numbers.get("expense"))
     out: dict[str, Any] = {}
     if income > 0:
-        out["支出佔收入（%）"] = round(expense / income * 100, 1)
+        out["支出佔收入"] = pct(expense / income * 100)
     savings = numbers.get("savings") or {}
     if isinstance(savings, dict) and savings.get("ratio") is not None:
-        out["已用掉可支配上限（%）"] = round(num(savings.get("ratio")) * 100, 1)
+        out["已用掉可支配上限"] = pct(num(savings.get("ratio")) * 100)
     if expense > 0:
-        out["各分類佔支出（%）"] = {
-            str(c.get("name") or ""): round(num(c.get("amount")) / expense * 100, 1)
+        out["各分類佔支出"] = {
+            str(c.get("name") or ""): pct(num(c.get("amount")) / expense * 100)
             for c in numbers.get("byCat") or [] if isinstance(c, dict)
         }
     return out
