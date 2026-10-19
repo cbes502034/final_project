@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from app.models import AuditLog, PasswordReset, User, UserSession
+from app.models import AuditLog, Group, GroupMember, PasswordReset, User, UserSession
 from app.toolkit import crud, email_verify, mailer, password_reset, passwords, tokens
 from tests.routes.conftest import PASSWORD, family_of, goal, guard, ledger_of, login, now, this_month, user
 
@@ -50,6 +50,10 @@ def test_register_註冊完直接登入(api):
     assert payload["sub"] == u["id"] and payload["sid"] == str(s.id)
     assert s.refresh_token_hash == tokens.fingerprint(b["refreshToken"]) and "iPhone" in s.user_agent
     assert s.ip_hash and s.revoked_at is None
+    # 第一本帳本：沒有它，新帳號連第一筆都記不了
+    g = crud.get(Group, where={"created_by": row.id})
+    assert g.name == "王 大明的帳本" and g.kind == "standing" and g.family_id is None
+    assert crud.exists(GroupMember, {"group_id": g.id, "user_id": row.id})
 
 
 @pytest.mark.route(*REG)

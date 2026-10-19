@@ -771,12 +771,26 @@ def test_遷移建出來的表跟_models_一模一樣(tmp_path):
         assert seeded == [(n, k) for n, k, _c, _i in catalog.SYSTEM_CATEGORIES], \
             "升到最新版之後的系統分類跟 app/catalog.py 不一樣：改了 catalog 要再寫一版遷移補上"
         command.downgrade(cfg, "0003")                   # 0004 降版不刪分類；再升一次不會多出重複的
+        # 0005：以前註冊不會開帳本，升級時幫沒有帳本的人補一本（平台管理員不補；已經有的不動）
+        eng = create_engine(url)
+        with eng.begin() as conn:
+            for email, name, admin in (("a@x.tw", "王大明", False), ("b@x.tw", "管理員", True)):
+                conn.exec_driver_sql(
+                    "INSERT INTO users (email, password_hash, display_name, theme, is_platform_admin, created_at) "
+                    "VALUES (?, 'x', ?, 'paper', ?, '2026-10-01 00:00:00')", (email, name, admin))
+        eng.dispose()
         command.upgrade(cfg, "head")
+        command.downgrade(cfg, "0004")
+        command.upgrade(cfg, "head")                     # 再跑一次不會多開一本
         eng = create_engine(url)
         with eng.connect() as conn:
             again = conn.exec_driver_sql("SELECT COUNT(*) FROM categories WHERE family_id IS NULL").scalar()
+            books = [tuple(r) for r in conn.exec_driver_sql(
+                "SELECT u.email, g.name, g.kind FROM groups g JOIN group_members m ON m.group_id = g.id "
+                "JOIN users u ON u.id = m.user_id ORDER BY u.email")]
         eng.dispose()
         assert again == len(catalog.SYSTEM_CATEGORIES)
+        assert books == [("a@x.tw", "王大明的帳本", "standing")]
         command.downgrade(cfg, "base")
     finally:
         if before is None:

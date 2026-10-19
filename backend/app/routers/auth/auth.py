@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 from app import catalog
 from app.guards import guest_only, login_required, token_required, visible_scope
 from app.models import (
-    AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+    AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
 )
 from app.routers._stub import not_ready, stub
 from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -56,6 +56,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         註冊完寄一封驗證信（toolkit/email_verify.py），點信裡的連結才算確認 email 是本人的；
         沒點照樣能用，總覽會提醒——email 打錯的人才會發現（不然忘記密碼的信永遠寄不到）。
         新帳號沒有家庭（role 是 null）、主題是 paper、onboardedAt 是 null——前端會帶他去「註冊後的個人化設定」。
+        同時開一本「〈名字〉的帳本」：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了。
         ⚠️ 存款目標不在註冊時問：帶了 savingsGoal 回 400。默默吃掉的話，使用者會以為設好了。
 
     【前端怎麼打】
@@ -100,14 +101,18 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
 
     【會用到的資料表】
         表        讀／寫  用來做什麼
-        users     讀＋寫  email 有沒有人用；新增帳號（只存密碼雜湊；email_verify_sent_at 記下寄驗證信的時間）
-        sessions  寫      這一台的登入工作階段（只存 refresh token 的指紋）
+        users          讀＋寫  email 有沒有人用；新增帳號（只存密碼雜湊；email_verify_sent_at 記下寄驗證信的時間）
+        groups         寫      第一本帳本「〈名字〉的帳本」
+        group_members  寫      自己是那本帳的成員
+        sessions       寫      這一台的登入工作階段（只存 refresh token 的指紋）
 
     【每一步用的工具與資料庫方法】
         步驟     呼叫                                        做什麼
         2 email  password_reset.normalize_email(body.email)  去空白、轉小寫、檢查格式；不對丟 ValueError
                  crud.exists(User, {"email": email}, db=db)  有沒有人用過
         3 密碼   passwords.hash_password(body.password)      先檢查強度（太弱丟 WeakPassword），再算雜湊
+        4 帳本   crud.save(Group, {"name": …, "color": catalog.GROUP_COLORS[0], "created_by": user.id, "kind": "standing"}, db=db)
+                 crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)  自己加進去
         5 登入   tokens.make_refresh_token(user.id)          回傳 (token, 到期時間)
                  tokens.fingerprint(token)                   token 的指紋（SHA-256），資料庫只存這個
                  request.headers.get("user-agent", "")       瀏覽器自己報的名字，「登入中的裝置」會用
@@ -124,7 +129,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         1. 帶了 savingsGoal → 400
         2. 整理名字（422）、email（422）；email 用過 → 409
         3. 密碼檢查強度、算雜湊（422）
-        4. 新增帳號：主題 paper、onboarded_at 留 NULL
+        4. 新增帳號：主題 paper、onboarded_at 留 NULL；開一本「〈名字〉的帳本」（名字最多取 17 字，帳本名最多 20 字）
         5. 新增一列 sessions，發 refresh token 與 access token（帶 sid），db.commit()
         6. 背景寄驗證信（新增帳號時順便記下 email_verify_sent_at，重寄的冷卻從這裡算）
         7. 回傳 token 與 user（新帳號的欄位都是固定的：沒有家庭、沒有大頭貼、目標 0、emailVerified false）
@@ -142,7 +147,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -179,6 +184,11 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
             now = datetime.now(timezone.utc)
             user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
                                     "theme": "paper", "last_login_at": now, "email_verify_sent_at": now}, db=db)
+
+            #    順便開一本自己的帳本：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了
+            group = crud.save(Group, {"name": name[:17] + "的帳本", "color": catalog.GROUP_COLORS[0],
+                                      "created_by": user.id, "kind": "standing"}, db=db)
+            crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)
 
             # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
             refresh, expires = tokens.make_refresh_token(user.id)
@@ -268,6 +278,11 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     now = datetime.now(timezone.utc)
     user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
                             "theme": "paper", "last_login_at": now, "email_verify_sent_at": now}, db=db)
+
+    #    順便開一本自己的帳本：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了
+    group = crud.save(Group, {"name": name[:17] + "的帳本", "color": catalog.GROUP_COLORS[0],
+                              "created_by": user.id, "kind": "standing"}, db=db)
+    crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)
 
     # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
     refresh, expires = tokens.make_refresh_token(user.id)
@@ -398,7 +413,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -613,7 +628,7 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -786,7 +801,7 @@ def logout(
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -895,7 +910,7 @@ def logout_all(me: User, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -1015,7 +1030,7 @@ def get_me(me: User, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -1218,7 +1233,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -1444,7 +1459,7 @@ def change_password(
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -1600,7 +1615,7 @@ def request_password_reset(body: PasswordResetIn, background: BackgroundTasks, d
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -1771,7 +1786,7 @@ def confirm_password_reset(
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -1894,7 +1909,7 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -2026,7 +2041,7 @@ def resend_verify_email(me: User, background: BackgroundTasks, db: Session = Dep
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -2164,7 +2179,7 @@ def get_finance(me: User, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -2295,7 +2310,7 @@ def set_finance(body: FinanceIn, me: User, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -2429,7 +2444,7 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -2551,7 +2566,7 @@ def list_sessions(me: User, payload: dict = Depends(current_token_payload), db: 
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -2694,7 +2709,7 @@ def upload_avatar(body: AvatarIn, me: User, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
@@ -2798,7 +2813,7 @@ def delete_avatar(me: User, db: Session = Depends(get_db)):
             from app import catalog
             from app.guards import guest_only, login_required, token_required, visible_scope
             from app.models import (
-                AuditLog, Family, FamilyMember, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
+                AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
