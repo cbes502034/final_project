@@ -8,8 +8,10 @@
   2. build_prompt()：把「算好的數字」連同常用的比例（derive() 先算好）放進 prompt，要求模型只做敘述與歸納
   3. 叫模型：complete_json(..., purpose="advice", schema=ADVICE_SCHEMA)——用 ADVICE_* 那組設定，
      格式由結構化輸出保證
-  4. 檢查數字：title／body／basis 裡出現的每一個數字，都要找得到出處（grounded()）；
-     找不到的那一則信心度壓到 0.3，前端會標出來——模型自己算出來的數字，使用者不該照單全收
+  4. 檢查數字（以事實為主）：title／body／basis 裡出現的每一個數字，都要找得到出處（grounded()），
+     而且不能套錯分類（mislabeled()：「交通花了 6,000」，6,000 其實是餐飲的）。
+     不合格的那一則**直接不要**；一則都不剩就丟 ModelError，路由回 503，前端用同一批數字自己寫。
+     ⚠️ 以前是把信心度壓到 0.3，但畫面沒有顯示信心度——錯的數字照樣被當成事實，所以改成不顯示。
   5. 路由用 AdviceItem 驗證格式、存進 advices（basis_json 存數字，給使用者驗算）
 
 使用者的理財習慣要用 toolkit/profile.py 的 to_prompt_block() 放進去（標示成資料，不是指令）。
@@ -51,8 +53,8 @@ ADVICE_SCHEMA: dict[str, Any] = {
     },
 }
 
-#: 數字對不上出處時，這一則的信心度最多剩這麼多
-UNGROUNDED_CONF = 0.3
+#: 模型寫的每一則都有數字對不上時的訊息（路由轉成 503，前端改用自己算的版本）
+UNGROUNDED_MESSAGE = "模型寫的建議有數字對不上帳上的數字，先用前端的版本"
 
 _NUMBER = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(萬|%|％)?")
 
@@ -147,6 +149,46 @@ def grounded(item: dict[str, Any], allowed: set[float]) -> bool:
     return True
 
 
+def _value(m: re.Match) -> float:
+    value = float(m.group(1).replace(",", ""))
+    return round(value * 10000, 2) if m.group(2) == "萬" else round(value, 2)
+
+
+def mislabeled(item: dict[str, Any], numbers: dict[str, Any]) -> bool:
+    """數字有出處、但套錯分類：一個子句只講了一個分類，裡面的數字卻只屬於另一個分類。
+
+    grounded() 只問「這個數字在不在算好的數字裡」，抓不到「交通花了 6,000」——6,000 是餐飲的。
+
+    >>> n = {"expense": 8600, "byCat": [{"name": "餐飲", "amount": 6000}, {"name": "交通", "amount": 2600}]}
+    >>> mislabeled({"body": "交通花了 6,000，要注意"}, n), mislabeled({"body": "餐飲 6,000，交通 2,600"}, n)
+    (True, False)
+    """
+    cats = [c for c in numbers.get("byCat") or [] if isinstance(c, dict) and c.get("name")]
+    if len(cats) < 2:
+        return False
+    try:
+        expense = float(numbers.get("expense") or 0)
+    except (TypeError, ValueError):
+        expense = 0.0
+    own: dict[str, set[float]] = {}
+    for c in cats:
+        amount = round(float(c.get("amount") or 0), 2)
+        own[str(c["name"])] = {amount} | ({round(amount / expense * 100, 1)} if expense > 0 else set())
+    general = allowed_numbers({k: v for k, v in numbers.items() if k != "byCat"})
+    texts = [str(item.get("title") or ""), str(item.get("body") or "")]
+    texts += [str(b) for b in item.get("basis") or [] if b is not None]
+    for text in texts:
+        for clause in re.split(r"[，。；;、\n]|,(?!\d{3})", text):
+            named = [n for n in own if n in clause]
+            named = [n for n in named if not any(n != o and n in o for o in named)]   # 「其他」在「其他收入」裡
+            if len(named) != 1:
+                continue
+            others = set().union(*(v for n, v in own.items() if n != named[0])) - own[named[0]] - general
+            if any(_value(m) in others for m in _NUMBER.finditer(clause)):
+                return True
+    return False
+
+
 def write_advices(numbers: dict[str, Any], finance_block: str = "") -> list[dict[str, Any]]:
     '''numbers 是 analytics 算好的數字。回傳 [{level, title, body, basis, suggest, conf}]。'''
     if not client.is_configured():
@@ -163,7 +205,7 @@ def write_advices(numbers: dict[str, Any], finance_block: str = "") -> list[dict
         raise client.ModelError("模型回來的格式不對")
 
     # c. 只留物件、只留需要的欄位（每一欄的檢查在路由裡用 AdviceItem 做）；
-    #    數字找不到出處的，信心度壓低，讓使用者知道這一則要自己驗算
+    #    數字找不到出處、或套錯分類的那一則直接不要——說錯數字的建議比沒有建議更傷信任
     allowed = allowed_numbers(numbers)
     keys = ("level", "title", "body", "basis", "suggest", "conf")
     out = []
@@ -171,10 +213,8 @@ def write_advices(numbers: dict[str, Any], finance_block: str = "") -> list[dict
         if not isinstance(it, dict):
             continue
         one = {k: it[k] for k in keys if k in it}
-        if not grounded(one, allowed):
-            try:
-                one["conf"] = min(float(one.get("conf", 1)), UNGROUNDED_CONF)
-            except (TypeError, ValueError):
-                one["conf"] = UNGROUNDED_CONF
-        out.append(one)
+        if grounded(one, allowed) and not mislabeled(one, numbers):
+            out.append(one)
+    if items and not out:
+        raise client.ModelError(UNGROUNDED_MESSAGE)
     return out

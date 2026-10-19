@@ -7,7 +7,11 @@
   1. build_prompt()  組 system 與 prompt：規則、今天日期、分類清單（模型只能從這裡挑）、一組範例
   2. 叫模型         client.complete_json(..., tool=RECORD_TOOL)：模型用 record_transactions 工具交出結果
                     （function calling；服務不支援工具呼叫時，模型回同樣格式的 JSON 也接得住）
-  3. postprocess()  一筆一筆驗證：金額 > 0、日期（span 裡的時間詞用 toolkit/dates 重算）、分類在清單裡而且收支對得上；
+  3. postprocess()  一筆一筆跟原句對事實（模型說的不算，原句寫的才算）：
+                    · 日期：span 裡的時間詞用 toolkit/dates 重算；這一段沒講、前面講過，就沿用前面的（「昨天停車100，晚餐350」）
+                    · 金額：> 0；span 裡完全沒有數字就一定是 None（不准猜）；跟原句的數字（含「1.2 萬」）對不上，信心度壓低
+                    · 分類在清單裡而且收支對得上
+                    · span、店家要真的出現在原句裡；找不到的店家清掉、找不到的 span 整筆標出來
                     抽不到的欄位設成 None、放進 missing，前端會標紅要使用者補
 
 模型沒設定或叫不動（ModelError）→ 路由回 503，前端用規則頂著。
@@ -30,6 +34,17 @@ from typing import Any
 from app.services.llm import client
 
 MODEL_UNAVAILABLE = "模型服務還沒接上，先用前端的規則解析"
+
+#: span 在原句裡找不到時，這一筆每一欄的信心度最多剩這麼多（前端會標出來）
+INVENTED_CONF = 0.3
+INVENTED_HINT = "原句裡找不到這一段，可能是模型自己加的，請確認要不要留"
+
+#: 有這些字才可能講了金額；一個都沒有，金額一定是 None
+_NUMERAL = re.compile(r"[0-9０-９零〇一二兩三四五六七八九十百千萬壹貳參肆伍陸柒捌玖拾佰仟]")
+#: 原句寫的阿拉伯數字，後面可能跟著「萬」：「1.2 萬」= 12000
+_WRITTEN = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(萬)?")
+#: 「全家一起吃火鍋」的全家是一家人，不是便利商店
+_WHOLE_FAMILY = re.compile(r"全家(?:一起|人|大小|都|去|出遊)")
 
 #: 模型唯一要交的東西。每一欄都 required、但允許 null：強迫模型對每一欄表態，「沒講」要明確寫 null。
 RECORD_TOOL: dict[str, Any] = {
@@ -101,8 +116,24 @@ def build_prompt(text: str, categories: list[dict[str, Any]], today: str) -> tup
     return "\n".join(rules), prompt
 
 
-def postprocess(data: Any, categories: list[dict[str, Any]], today: str) -> list[dict[str, Any]]:
-    """模型交回來的東西 → 前端要的 items。不合理的欄位設成 None、放進 missing。"""
+def written_amounts(span: str) -> set[float]:
+    """原句這一段寫出來的阿拉伯數字（「1.2 萬」算成 12000）。
+
+    >>> sorted(written_amounts("房租 1.2 萬")), sorted(written_amounts("加油 1,250")), written_amounts("早餐五十五")
+    ([12000.0], [1250.0], set())
+    """
+    out = set()
+    for m in _WRITTEN.finditer(span or ""):
+        value = float(m.group(1).replace(",", ""))
+        out.add(round(value * 10000, 2) if m.group(2) else value)
+    return out
+
+
+def postprocess(data: Any, categories: list[dict[str, Any]], today: str, text: str = "") -> list[dict[str, Any]]:
+    """模型交回來的東西 → 前端要的 items。不合理的欄位設成 None、放進 missing。
+
+    text 是使用者打的原句：有給的話，span 與店家要真的出現在裡面（訓練用的 notebook 不給也能跑）。
+    """
     from app.toolkit import dates, money
 
     raw_items = data.get("items") if isinstance(data, dict) else None
@@ -116,6 +147,9 @@ def postprocess(data: Any, categories: list[dict[str, Any]], today: str) -> list
             return 0.0
 
     kinds = {str(c["id"]): c["kind"] for c in categories}
+    names = {str(c["name"]) for c in categories}
+    source = re.sub(r"\s+", "", text or "")
+    last_said = None                 # 前面幾筆講過的日期：這一筆沒講，就沿用它
     items = []
     for raw in raw_items:
         if not isinstance(raw, dict):
@@ -135,6 +169,12 @@ def postprocess(data: Any, categories: list[dict[str, Any]], today: str) -> list
         if said and said != day:
             day = said
             conf["date"] = max(conf["date"], 0.9)
+        elif not said and last_said and last_said != today and day in (None, today):
+            # 「昨天停車費100，晚餐350」：晚餐那一段沒講日期，是沿用前面的「昨天」，不是今天
+            day = last_said
+            conf["date"] = min(max(conf["date"], 0.7), 0.8)
+        if said:
+            last_said = said
         if day is None:
             missing.append("date")
 
@@ -142,13 +182,16 @@ def postprocess(data: Any, categories: list[dict[str, Any]], today: str) -> list
             amount = money.to_decimal(raw.get("amount"), allow_negative=False)
         except money.InvalidAmount:
             amount = None
+        if span and not _NUMERAL.search(span):
+            amount = None                # 這一段連一個數字都沒有：模型填的金額一定是猜的
         if amount is None or amount <= 0:
             amount = None
+            conf["amount"] = 0.0
             missing.append("amount")
         else:
             # 原句裡寫的是阿拉伯數字，金額卻對不上任何一個：很可能抄錯，信心度壓低讓前端標黃
-            written = {float(n.replace(",", "")) for n in re.findall(r"\d[\d,]*(?:\.\d+)?", span)}
-            if written and float(amount) not in written:
+            written = written_amounts(span)
+            if written and round(float(amount), 2) not in written:
                 conf["amount"] = min(conf["amount"], 0.5)
 
         kind = raw.get("kind") if raw.get("kind") in ("expense", "income") else None
@@ -158,6 +201,22 @@ def postprocess(data: Any, categories: list[dict[str, Any]], today: str) -> list
         if cat not in kinds or (kind is not None and kinds[cat] != kind):
             cat = None
             missing.append("cat")
+
+        # 店家要真的出現在原句裡；「全家一起」的全家是一家人
+        merchant = str(raw.get("merchant") or "").strip()[:50]
+        if merchant and source and re.sub(r"\s+", "", merchant) not in source:
+            merchant = ""
+        if merchant == "全家" and _WHOLE_FAMILY.search(span):
+            merchant = ""
+        # 備註填成分類名稱（「麥當勞」備註「餐飲」）不帶任何資訊
+        note = str(raw.get("note") or "").strip()[:100]
+        if note in names and note not in span:
+            note = ""
+
+        # span 在原句裡找不到：這一筆可能是模型自己加的
+        invented = bool(source) and bool(span) and re.sub(r"\s+", "", span) not in source
+        if invented:
+            conf = {k: min(v, INVENTED_CONF) for k, v in conf.items()}
         items.append({
             "seq": len(items) + 1,
             "span": span,
@@ -165,11 +224,11 @@ def postprocess(data: Any, categories: list[dict[str, Any]], today: str) -> list
             "amount": float(amount) if amount is not None else None,
             "kind": kind,
             "cat": cat,
-            "merchant": str(raw.get("merchant") or "")[:50],
-            "note": str(raw.get("note") or "")[:100],
+            "merchant": merchant,
+            "note": note,
             "conf": conf,
             "missing": missing,
-            "hint": "這一筆有欄位抽不到，補上才能存" if missing else "",
+            "hint": INVENTED_HINT if invented else ("這一筆有欄位抽不到，補上才能存" if missing else ""),
         })
     return items
 
@@ -180,7 +239,7 @@ def parse_batch(text: str, categories: list[dict[str, Any]], today: str) -> dict
         raise client.ModelError(MODEL_UNAVAILABLE)
     system, prompt = build_prompt(text, categories, today)
     data = client.complete_json(prompt, system=system, max_tokens=1024, tool=RECORD_TOOL)
-    items = postprocess(data, categories, today)
+    items = postprocess(data, categories, today, text)
     return {"raw": text, "items": items,
             "note": "這段話被切成 %d 筆。切分本身也是模型的判斷，請對照原句檢查。" % len(items)}
 

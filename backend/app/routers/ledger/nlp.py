@@ -308,7 +308,7 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
         第三步      client.is_configured()                                   模型服務有沒有設定（backend/.env 的 MODEL_*）
                     build_prompt(text, categories, today)                    組 system 與 prompt；訓練資料也用這一支，兩邊才會一字不差
                     client.complete_json(prompt, system=…, tool=RECORD_TOOL)  叫模型用 record_transactions 工具交出結果；叫不動或格式不對丟 ModelError
-                    postprocess(data, categories, today)                     逐欄驗證：日期（span 裡的時間詞用 toolkit/dates 重算）、金額 > 0、分類在清單裡
+                    postprocess(data, categories, today, text)               逐欄跟原句對事實：日期（時間詞重算、沒講就沿用前面的）、金額（沒數字不准填）、分類、店家與 span 要在原句裡
 
     【寫法步驟】
         1. 去掉頭尾空白，空的回 422
@@ -377,8 +377,8 @@ def parse_batch(body: ParseIn, me: User, db: Session = Depends(get_db)):
                 system, prompt = build_prompt(text, categories, today)
                 # b. 叫模型：用 record_transactions 工具交出結果（function calling）
                 data = client.complete_json(prompt, system=system, max_tokens=1024, tool=RECORD_TOOL)
-                # c. 一筆一筆驗證：抽不到、不合理的欄位設成 None，放進 missing
-                items = postprocess(data, categories, today)
+                # c. 一筆一筆跟原句對事實：抽不到、不合理的欄位設成 None，放進 missing
+                items = postprocess(data, categories, today, text)
                 return {"raw": text, "items": items,
                         "note": "這段話被切成 %d 筆。切分本身也是模型的判斷，請對照原句檢查。" % len(items)}
 

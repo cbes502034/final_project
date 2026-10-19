@@ -224,6 +224,58 @@ def test_金額跟原句的數字對不上_信心度壓低():
     assert cn["conf"]["amount"] == 0.9                  # 原句沒有阿拉伯數字就不比
 
 
+def test_這一段沒講日期_沿用同一段話前面講的():
+    """線上評測唯一錯的一題：「昨天停車費100，晚餐350」，模型把晚餐記成今天。"""
+    text = "昨天停車費100，晚餐350"
+    a, b = parse.postprocess({"items": [_raw(span="昨天停車費100", amount=100, cat="2"),
+                                        _raw(span="晚餐350", amount=350)]}, CATS, TODAY, text)
+    assert a["date"] == b["date"] == "2026-10-01" and 0.7 <= b["conf"]["date"] <= 0.8
+    # 兩段都講了日期：各用各的；都沒講：就是今天
+    x, y = parse.postprocess({"items": [_raw(span="昨天搭高鐵1490", amount=1490, cat="2"),
+                                        _raw(span="今天計程車250", amount=250, cat="2")]}, CATS, TODAY)
+    assert (x["date"], y["date"]) == ("2026-10-01", TODAY)
+    p, q = parse.postprocess({"items": [_raw(), _raw(span="午餐120", amount=120)]}, CATS, TODAY)
+    assert p["date"] == q["date"] == TODAY
+
+
+def test_萬_也算原句寫的數字_不要誤報():
+    """「房租 1.2 萬」→ 12000 是對的，以前被當成抄錯、信心度壓到 0.5。"""
+    item = parse.postprocess({"items": [_raw(span="房租 1.2 萬", amount=12000, cat="3")]}, CATS, TODAY)[0]
+    assert item["conf"]["amount"] == 0.9
+    wrong = parse.postprocess({"items": [_raw(span="房租 1.2 萬", amount=1200, cat="3")]}, CATS, TODAY)[0]
+    assert wrong["conf"]["amount"] == 0.5
+    assert parse.written_amounts("年終 8 萬") == {80000.0}
+
+
+def test_這一段沒有任何數字_金額一定是空的():
+    item = parse.postprocess({"items": [_raw(span="晚上加油", amount=1000, cat="2")]}, CATS, TODAY, "晚上加油")[0]
+    assert item["amount"] is None and "amount" in item["missing"] and item["conf"]["amount"] == 0
+    cn = parse.postprocess({"items": [_raw(span="早餐三十五", amount=35)]}, CATS, TODAY)[0]
+    assert cn["amount"] == 35                            # 中文數字也算有講
+
+
+def test_店家與_span_要真的出現在原句裡():
+    text = "全家一起吃火鍋 1800"
+    item = parse.postprocess({"items": [_raw(span=text, amount=1800, merchant="全家", note="火鍋")]},
+                             CATS, TODAY, text)[0]
+    assert item["merchant"] == "" and item["hint"] == ""         # 全家人，不是便利商店
+    store = parse.postprocess({"items": [_raw(span="全家飯糰35", amount=35, merchant="全家")]}, CATS, TODAY,
+                              "全家飯糰35")[0]
+    assert store["merchant"] == "全家"
+    made_up = parse.postprocess({"items": [_raw(span="中午麥當勞 159", amount=159, merchant="星巴克")]},
+                                CATS, TODAY, "中午麥當勞 159")[0]
+    assert made_up["merchant"] == ""
+    ghost = parse.postprocess({"items": [_raw(), _raw(span="晚餐200", amount=200)]}, CATS, TODAY, "早餐55")[1]
+    assert ghost["hint"] == parse.INVENTED_HINT and max(ghost["conf"].values()) <= parse.INVENTED_CONF
+    assert parse.postprocess({"items": [_raw()]}, CATS, TODAY, "早餐55")[0]["hint"] == ""
+
+
+def test_備註填成分類名稱_清掉():
+    item = parse.postprocess({"items": [_raw(span="中午麥當勞 159", amount=159, merchant="麥當勞", note="餐飲")]},
+                             CATS, TODAY)[0]
+    assert item["note"] == "" and item["merchant"] == "麥當勞"
+
+
 def test_收入的分類配支出_分類放進_missing():
     item = parse.postprocess({"items": [_raw(cat="9")]}, CATS, TODAY)[0]
     assert item["cat"] is None and item["missing"] == ["cat"]
@@ -262,19 +314,36 @@ def test_模型自己算出來或編的數字(text):
     assert not advice.grounded({"title": "", "body": "", "basis": [text]}, advice.allowed_numbers(NUMBERS))
 
 
-def test_數字對不上的那一則_信心度壓到_0_3_其他照舊(monkeypatch):
+@pytest.mark.parametrize("text, wrong", [
+    ("交通花了 6,000，要注意", True),                  # 6,000 是餐飲的
+    ("交通佔支出 69.8%", True),                        # 69.8% 是餐飲的比例
+    ("餐飲 6,000，交通 2,600", False),
+    ("餐飲 6,000 佔支出 69.8%", False),
+    ("交通 2,600，總支出 8,600", False),               # 8,600 是總數，不屬於任何分類
+    ("這個月支出 8,600", False),
+])
+def test_數字有出處但套錯分類(text, wrong):
+    assert advice.mislabeled({"title": "", "body": text, "basis": []}, NUMBERS) is wrong
+
+
+def test_數字對不上或套錯分類的那一則_不顯示_其他照舊(monkeypatch):
     calls = []
     good = {"level": "warn", "title": "快用完了", "body": "已經用掉 86%。", "basis": ["支出 8,600 ÷ 可以花 10,000"],
             "suggest": ["每週少外食 2 次"], "conf": 0.9}
     made_up = {**good, "body": "照這樣一年會花 103,200。"}
+    swapped = {**good, "title": "交通太多", "body": "交通花了 6,000。"}
     monkeypatch.setattr(client, "is_configured", lambda: True)
     monkeypatch.setattr(client, "complete_json",
-                        lambda prompt, **kw: calls.append((prompt, kw)) or {"advices": [good, made_up]})
+                        lambda prompt, **kw: calls.append((prompt, kw)) or {"advices": [good, made_up, swapped]})
     out = advice.write_advices(NUMBERS, "")
-    assert [a["conf"] for a in out] == [0.9, 0.3]
+    assert [a["title"] for a in out] == ["快用完了"] and out[0]["conf"] == 0.9
     prompt, kw = calls[0]
     assert kw["purpose"] == "advice" and kw["schema"] is advice.ADVICE_SCHEMA
     assert "換算好的比例" in prompt and "43.0" in prompt
+    # 全部不合格：不要硬回一堆錯的數字，丟 ModelError（路由回 503，前端用同一批數字自己寫）
+    monkeypatch.setattr(client, "complete_json", lambda prompt, **kw: {"advices": [made_up, swapped]})
+    with pytest.raises(client.ModelError):
+        advice.write_advices(NUMBERS, "")
 
 
 def test_微調的訓練資料_prompt_跟上線一字不差():

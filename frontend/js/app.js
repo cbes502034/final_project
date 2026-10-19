@@ -3129,7 +3129,7 @@
     API.verifyEmail(token).then(function (r) {
       if (ME && ME.user) ME.user.emailVerified = true;
       sub.textContent = 'email 確認好了。';
-      next('<p class="fgt__t"><b>' + esc(r.email) + '</b> 是你的，確認完成。</p>' +
+      next('<p class="fgt__t"><b>' + esc(r.email) + '</b></p>' +
            '<p class="fgt__h">之後忘記密碼，重設信會寄到這個信箱。</p>');
     }).catch(function (e) {
       sub.textContent = '這個連結不能用了。';

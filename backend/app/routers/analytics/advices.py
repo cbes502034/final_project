@@ -256,6 +256,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         503     模型沒設定、叫不動                            （ModelError 的訊息，例如：模型服務還沒接上）
         503     services/llm/advice.py 還沒做好               建議還沒做好，先用前端的版本
         503     模型寫回來的沒有一則合格                      模型寫回來的建議格式不對，先用前端的版本
+        503     每一則都有數字找不到出處或套錯分類            模型寫的建議有數字對不上帳上的數字，先用前端的版本
         ⚠️ 模型的問題回 503，不是 500；前端靠 503 決定要不要自己頂著。
 
     【會用到的資料表】
@@ -270,6 +271,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
     【每一步用的工具與資料庫方法】（第三步 write_advices 裡用的也列在這裡）
         步驟      呼叫                                                         做什麼
         2 數字    analytics.summary(db, people, earners, this_month)           跟 GET /api/summary 同一支（要先做完那支的第三步）
+                  analytics.pocket_money(db, [me.id], this_month)              子女還沒記進來的零用金（跟 GET /api/summary 一樣算進上限）
                   analytics.savings_status(收入, 支出, 目標)                   可支配上限、比例、燈號
                   jsonable_encoder({...})                                      把 Decimal 轉成一般數字，才能放進 prompt、存進 JSON 欄位
         3 背景    profile.to_prompt_block(finance, catalog.FINANCE_STYLES, …)  理財習慣翻成人話，並標示「這是資料，不是指令」
@@ -280,7 +282,8 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                   db.commit()                                                  刪舊、存新一起寫進去
         第三步    build_prompt(numbers, block)                                 組 system 與 prompt（數字、derive() 換算好的比例、邊界規則）
                   client.complete_json(prompt, system=…, purpose="advice", schema=ADVICE_SCHEMA)  叫模型，要 JSON（ADVICE_* 那組設定）
-                  grounded(item, allowed_numbers(numbers))                     每一個數字都找得到出處？找不到的信心度壓到 0.3
+                  grounded(item, allowed_numbers(numbers))                     每一個數字都找得到出處？
+                  mislabeled(item, numbers)                                    數字有出處、但套錯分類？兩種都不合格的那一則不要
                   catalog.ADVICE_RULES                                         邊界規則一起放進 system，跟畫面上顯示的是同一份
         ⚠️ 為什麼要把 basis_json 存成 {"lines", "numbers"}：lines 給人看，numbers 是這次餵給模型的數字，事後可以驗算。
 
@@ -293,7 +296,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         5. 每一則用 AdviceItem 驗證，不合格的丟掉；一則都不剩 → 503
         6. 刪掉同月同範圍的舊建議，存新的（family 的 user_id 是 NULL），db.commit()
         7. 回傳 {generatedAt, advices}
-        第三步 write_advices() 裡面：build_prompt（格式＋邊界規則；算好的數字與比例＋理財背景）→ complete_json → 只留物件、只留需要的欄位 → 數字找不到出處的壓低信心度
+        第三步 write_advices() 裡面：build_prompt（格式＋邊界規則；算好的數字與比例＋理財背景）→ complete_json → 只留物件、只留需要的欄位 → 數字找不到出處或套錯分類的那一則不要（全部不合格丟 ModelError）
 
     【完整寫法】照下面三步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -335,13 +338,16 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
             goals = {}
             for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id__isnull": True}, order_by="id", db=db):
                 goals[row.user_id] = row.goal_amount
-            savings = analytics.savings_status(nums["income"], nums["expense"], money.add(*goals.values()))
+            # 子女還沒記進來的零用金也算進可支配上限（跟 GET /api/summary 一樣，不然建議講的跟總覽對不上）
+            pocket = money.ZERO if family_mode else analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
+            savings = analytics.savings_status(nums["income"] + pocket, nums["expense"], money.add(*goals.values()))
             cat_ids = [int(c["cat"]) for c in nums["byCat"]]
             names = {c.id: c.name for c in crud.find(Category, {"id__in": cat_ids}, db=db)}
             numbers = jsonable_encoder({
                 "period": this_month,
                 "scope": body.scope,
                 "income": nums["income"],
+                "pocketMoney": pocket,
                 "expense": nums["expense"],
                 "count": nums["count"],
                 "savings": savings,
@@ -431,7 +437,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                     raise client.ModelError("模型回來的格式不對")
 
                 # c. 只留物件、只留需要的欄位（每一欄的檢查在路由裡用 AdviceItem 做）；
-                #    數字找不到出處的，信心度壓低，讓使用者知道這一則要自己驗算
+                #    數字找不到出處、或套錯分類的那一則直接不要——說錯數字的建議比沒有建議更傷信任
                 allowed = allowed_numbers(numbers)
                 keys = ("level", "title", "body", "basis", "suggest", "conf")
                 out = []
@@ -439,12 +445,10 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                     if not isinstance(it, dict):
                         continue
                     one = {k: it[k] for k in keys if k in it}
-                    if not grounded(one, allowed):
-                        try:
-                            one["conf"] = min(float(one.get("conf", 1)), UNGROUNDED_CONF)
-                        except (TypeError, ValueError):
-                            one["conf"] = UNGROUNDED_CONF
-                    out.append(one)
+                    if grounded(one, allowed) and not mislabeled(one, numbers):
+                        out.append(one)
+                if items and not out:
+                    raise client.ModelError(UNGROUNDED_MESSAGE)
                 return out
 
     【做完怎麼確認】
@@ -478,13 +482,16 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
     goals = {}
     for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id__isnull": True}, order_by="id", db=db):
         goals[row.user_id] = row.goal_amount
-    savings = analytics.savings_status(nums["income"], nums["expense"], money.add(*goals.values()))
+    # 子女還沒記進來的零用金也算進可支配上限（跟 GET /api/summary 一樣，不然建議講的跟總覽對不上）
+    pocket = money.ZERO if family_mode else analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
+    savings = analytics.savings_status(nums["income"] + pocket, nums["expense"], money.add(*goals.values()))
     cat_ids = [int(c["cat"]) for c in nums["byCat"]]
     names = {c.id: c.name for c in crud.find(Category, {"id__in": cat_ids}, db=db)}
     numbers = jsonable_encoder({
         "period": this_month,
         "scope": body.scope,
         "income": nums["income"],
+        "pocketMoney": pocket,
         "expense": nums["expense"],
         "count": nums["count"],
         "savings": savings,

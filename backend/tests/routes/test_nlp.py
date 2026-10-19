@@ -50,10 +50,10 @@ def test_parse_one_回傳_out_而且不寫資料庫(api, model):
     me = user("d@x.tw", "爸爸")
     cats = categories()
     model["reply"] = {"items": [_item(cat=str(cats["餐飲"].id), merchant="全家")]}
-    r = api.post("/api/nlp/parse", headers=login(me), json={"text": " 早餐55 "})
+    r = api.post("/api/nlp/parse", headers=login(me), json={"text": " 全家早餐55 "})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["raw"] == "早餐55" and body["matched"] is False
+    assert body["raw"] == "全家早餐55" and body["matched"] is False
     assert body["out"] == {"date": today(), "amount": 55, "kind": "expense", "cat": str(cats["餐飲"].id),
                            "merchant": "全家", "conf": 0.99, "catConf": 0.8}
     assert str(cats["餐飲"].id) in model["calls"][0] and today() in model["calls"][0]
@@ -86,8 +86,10 @@ def test_parse_batch_每一欄都驗證_抽不到的放進_missing(api, model):
     assert items[1]["missing"] == ["amount"] and items[1]["amount"] is None and items[1]["hint"]
     assert set(items[2]["missing"]) == {"date", "amount", "kind", "cat"}
     assert items[2]["date"] is None and items[2]["kind"] is None and items[2]["cat"] is None
-    assert items[3]["missing"] == ["cat"]
-    assert items[3]["conf"] == {"date": 1.0, "amount": 0.0, "kind": 0.0, "cat": 0.0}
+    # 「收支對不上」這一段原句裡沒有：可能是模型自己加的，整筆標出來；連一個數字都沒有，金額不准填
+    assert items[3]["missing"] == ["amount", "cat"] and "原句裡找不到" in items[3]["hint"]
+    assert items[3]["conf"] == {"date": 0.3, "amount": 0.0, "kind": 0.0, "cat": 0.0}
+    assert "原句裡找不到" not in items[0]["hint"] + items[1]["hint"]
     assert r.json()["raw"] == "早餐55，晚上加油"
     assert crud.count(Transaction) == 0
 

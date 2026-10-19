@@ -392,7 +392,10 @@ def test_generate_advices_權限與模型的問題(api, model, monkeypatch):
     fam = family_of((dad, "parent"), (kid, "child"))
     family_of((solo, "parent"), name="單身家")
     guard(dad, kid)
-    model["reply"] = {"advices": [GOOD]}
+    # 這一家這個月還沒有記帳：數字都是 0，建議只能講 0（GOOD 的 86% 在這裡沒有出處，會被丟掉）
+    empty = {"level": "info", "title": "先記帳", "body": "這個月還沒有記帳資料。", "basis": ["收入 0、支出 0"],
+             "suggest": ["每天睡前記一次"], "conf": 0.8}
+    model["reply"] = {"advices": [empty]}
     assert api.post("/api/advices/generate", headers=login(kid), json={"scope": "family"}).status_code == 403
     assert api.post("/api/advices/generate", headers=login(solo), json={"scope": "family"}).status_code == 403
     r = api.post("/api/advices/generate", headers=login(dad), json={"scope": "family"})
@@ -401,6 +404,9 @@ def test_generate_advices_權限與模型的問題(api, model, monkeypatch):
     assert row.family_id == fam.id
     model["reply"] = {"advices": [{"title": "全部不合格"}]}
     assert api.post("/api/advices/generate", headers=login(dad), json={}).status_code == 503
+    model["reply"] = {"advices": [GOOD]}                 # 格式對，但 86% 在空帳上沒有出處
+    r = api.post("/api/advices/generate", headers=login(dad), json={})
+    assert r.status_code == 503 and "對不上" in r.json()["detail"]
     model["reply"] = "不是 JSON 物件"
     assert api.post("/api/advices/generate", headers=login(dad), json={}).status_code == 503
     monkeypatch.setattr(client, "is_configured", lambda: False)
