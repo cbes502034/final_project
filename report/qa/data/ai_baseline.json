@@ -1,0 +1,15 @@
+{
+  "label": "baseline（線上 Claude，輸出檢查改善前）",
+  "run": {"started": "2026-10-19T03:10:50Z", "ended": "2026-10-19T03:14:21Z", "account": "cbes50203（子女測試帳號）", "today": "2026-10-19"},
+  "cases": 101, "items": 125, "errors": 0,
+  "split": 100, "caseExact": 99.0, "itemExact": 99.2,
+  "field": {"date": 99.2, "amount": 100, "kind": 100, "cat": 100},
+  "catF1": 100, "extra": 0, "noAmount": {"items": 6, "filled": 0},
+  "p50": 1.88, "p95": 2.91,
+  "flags": {"flagged": 8, "flaggedWrong": 0, "unflaggedWrong": 1},
+  "misses": [["h086", "date:2026-10-19≠2026-10-18", "晚餐350"]],
+  "falseAlarms": [["h042", "房租 1.2 萬", "amount 12000 正確，conf.amount 被壓到 0.5"], ["h048", "年終 8 萬", "amount 80000 正確，conf.amount 被壓到 0.5"]],
+  "factNotes": [["h031", "全家一起吃火鍋 1800", "merchant 填成「全家」（這裡是全家人，不是便利商店）"], ["h032", "中午麥當勞 159", "note 填成分類名稱「餐飲」"]],
+  "byTag": {"abs-date": "7/7", "hard": "9/9", "income": "16/16", "merchant": "9/9", "multi": "17/18", "no-amount": "6/6", "no-punct": "3/3", "rel-date": "8/9", "single": "83/83", "weekday": "6/6", "zh-num": "15/15"},
+  "note": "答案日期從留出集的 2026-10-14 換算到線上的 2026-10-19：相對日期平移 5 天、星期幾用 toolkit/dates 重算、絕對日期不動。"
+}

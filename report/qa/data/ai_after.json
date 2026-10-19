@@ -1,0 +1,19 @@
+{
+  "label": "after（線上 Claude，輸出檢查改善後，commit 90e99bf）",
+  "run": {"started": "2026-10-19T07:15:29Z", "ended": "2026-10-19T07:21:36Z", "account": "cbes50203（子女測試帳號）", "today": "2026-10-19"},
+  "cases": 101, "items": 125, "errors": 0,
+  "split": 100, "caseExact": 100, "itemExact": 100,
+  "field": {"date": 100, "amount": 100, "kind": 100, "cat": 100},
+  "catF1": 100, "extra": 0, "noAmount": {"items": 6, "filled": 0},
+  "p50": 2.72, "p95": 10.18,
+  "latencyNote": "8～24 秒的 10 題都落在 07:16～07:20，Render 正在部署 14c29b2；基準那一輪 p95 是 2.91 秒",
+  "flags": {"flagged": 7, "flaggedWrong": 0, "unflaggedWrong": 0, "lowConfButRight": ["h082 給小孩零用錢 500：模型自己給分類 0.3（支出沒有零用金分類，挑「其他」合理但沒把握）"]},
+  "fixedFromBaseline": [
+    ["h086", "晚餐350 的日期 10-19 → 10-18（沿用前面的「昨天」）"],
+    ["h042", "房租 1.2 萬：金額信心度 0.5 → 0.95（不再誤報）"],
+    ["h048", "年終 8 萬：金額信心度 0.5 → 0.95"],
+    ["h031", "全家一起吃火鍋：店家「全家」→ 空白"],
+    ["h032", "中午麥當勞：備註「餐飲」→ 空白"]
+  ],
+  "facts": "所有店家、span 都在原句裡找得到"
+}
