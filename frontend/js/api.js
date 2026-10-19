@@ -9,7 +9,7 @@
    後端契約（由 backend/tools/sync_spec.py 從 ownership.py 產生，不要手改）
    每一支的完整形狀：docs/02-前後端串接契約.md；前端函式與路由的對照：本檔的 FN。
 
-   認證（19 支）
+   認證（21 支）
    POST   /api/auth/register                   註冊：名字、email、密碼
    POST   /api/auth/login                      登入
    POST   /api/auth/refresh                    用 refresh token 換新的 access token
@@ -19,6 +19,8 @@
    PATCH  /api/auth/password                   改密碼
    POST   /api/auth/password-reset             忘記密碼：寄重設信
    POST   /api/auth/password-reset/confirm     用信裡的 token 設新密碼
+   POST   /api/auth/verify-email               點驗證信的連結：確認 email 是本人的
+   POST   /api/auth/verify-email/resend        重寄驗證信
    GET    /api/auth/me/finance                 我的理財習慣
    PUT    /api/auth/me/finance                 改理財習慣
    POST   /api/auth/verify-password            重大操作前再確認一次密碼
@@ -344,6 +346,8 @@
     /* 註冊後的個人化設定走完了沒。null = 還沒（登入後先帶去 #/setup）。
        種子帳號都是早就在用的人，當成走完了；新註冊的明確是 null。 */
     if (u && u.onboardedAt === undefined) u.onboardedAt = u.joined ? u.joined + ' 09:00' : null;
+    /* email 驗證過了沒。種子帳號當成驗證過；新註冊的明確是 false（總覽會提醒去收信） */
+    if (u && u.emailVerified === undefined) u.emailVerified = true;
     return u;
   }
 
@@ -975,7 +979,8 @@
           joined: todayStr(),
           // 收入、支出不放在人身上：一律從明細現算（GET /api/summary 的 members[]），放了就會跟明細對不起來
           savingsGoal: 0,
-          onboardedAt: null           // 還沒走個人化設定
+          onboardedAt: null,          // 還沒走個人化設定
+          emailVerified: false        // 還沒點驗證信（真後端註冊完會寄一封）
         };
         global.DATA.members.push(u);
         s.newUsers = (s.newUsers || []).concat([clone(u)]);
@@ -1199,6 +1204,45 @@
         s.auth = { loggedIn: false };
         save();
         return { ok: true };
+      });
+    },
+
+    /* ---------------------------------------------------------
+       註冊後的 email 驗證
+
+       真後端：toolkit/email_verify.py 簽一張有到期時間的權杖，連結長成 #/verify/<權杖>，用 Brevo 寄出。
+       mock 寄不出信，跟忘記密碼一樣把連結放在 demoMail 攤在畫面上（真後端絕對不能回這個欄位）。
+       --------------------------------------------------------- */
+    verifyEmail: function (token) {
+      var s = load();
+      return sleep(260).then(function () {
+        var v = (s.verifies || []).filter(function (x) { return x.token === String(token || ''); })[0];
+        if (!v) throw oops('這個驗證連結無效，登入後可以在總覽重寄一封', 400);
+        if (Date.now() >= v.expiresAt) throw oops('這個驗證連結過期了，登入後可以在總覽重寄一封', 400);
+        var u = memberOf(v.userId);
+        if (!u) throw oops('這個驗證連結無效，登入後可以在總覽重寄一封', 400);
+        u.emailVerified = true;
+        (s.newUsers || []).forEach(function (n) { if (n.id === u.id) n.emailVerified = true; });
+        save();
+        return { ok: true, email: u.email };
+      });
+    },
+
+    resendVerifyEmail: function () {
+      var s = load();
+      return sleep(300).then(function () {
+        var u = memberOf(s.me);
+        if (withTheme(u).emailVerified) return { ok: true, sent: false, message: '你的 email 已經驗證過了' };
+        var now = Date.now();
+        var last = (s.verifies || []).filter(function (x) { return x.userId === u.id; })
+          .reduce(function (mx, x) { return Math.max(mx, x.createdAt); }, 0);
+        if (now - last < RESET_COOLDOWN_SEC * 1000) throw oops('驗證信剛寄出，請 1 分鐘後再試', 429);
+        var token = randomToken();
+        s.verifies = (s.verifies || []).concat([{ userId: u.id, token: token, createdAt: now,
+          expiresAt: now + 24 * 3600000 }]);
+        save();
+        return { ok: true, sent: true, message: '驗證信已經寄到 ' + u.email + '，24 小時內有效',
+                 demoMail: { to: u.email, subject: '確認你的家庭記帳 email', link: '#/verify/' + token } };
       });
     },
 
@@ -2730,7 +2774,7 @@
   /* 登入閘：mock 也跟真後端一樣，沒登入就 401。
      ⚠️ 沒有這一層的話，登出之後某個畫面還在打 API，mock 會拿著 me = null 往下跑，
      錯在「讀不到 null 的 name」這種看不出原因的地方。 */
-  var MOCK_PUBLIC = ['authState', 'renew', 'ttl', 'login', 'register', 'logout', 'requestPasswordReset', 'confirmPasswordReset', 'reset'];
+  var MOCK_PUBLIC = ['authState', 'renew', 'ttl', 'login', 'register', 'logout', 'requestPasswordReset', 'confirmPasswordReset', 'verifyEmail', 'reset'];
   Object.keys(mock).forEach(function (name) {
     if (MOCK_PUBLIC.indexOf(name) >= 0) return;
     var fn = mock[name];
@@ -2903,6 +2947,8 @@
     verifyPassword:    function (pw)    { return req('/api/auth/verify-password', { method: 'POST', body: { password: pw } }); },
     requestPasswordReset: function (e)  { return req('/api/auth/password-reset', { method: 'POST', body: { email: e } }); },
     confirmPasswordReset: function (t, pw) { return req('/api/auth/password-reset/confirm', { method: 'POST', body: { token: t, password: pw } }); },
+    verifyEmail:       function (t)     { return req('/api/auth/verify-email', { method: 'POST', body: { token: t } }); },
+    resendVerifyEmail: function ()      { return req('/api/auth/verify-email/resend', { method: 'POST' }); },
 
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
     transactions:      function (f)     { return req('/api/transactions' + qs(f)); },
@@ -2999,6 +3045,8 @@
     verifyPassword:     ['POST /api/auth/verify-password', '認證'],
     requestPasswordReset: ['POST /api/auth/password-reset', '認證'],
     confirmPasswordReset: ['POST /api/auth/password-reset/confirm', '認證'],
+    verifyEmail:        ['POST /api/auth/verify-email', '認證'],
+    resendVerifyEmail:  ['POST /api/auth/verify-email/resend', '認證'],
     sessions:           ['GET /api/auth/sessions', '認證'],
     logoutAll:          ['POST /api/auth/logout-all', '認證'],
     adminUsers:         ['GET /api/admin/users', '認證'],
@@ -3070,6 +3118,7 @@
     me: ['user'], login: ['user'], register: ['user'],
     financeProfile: ['finance', 'styles', 'goals', 'habits'],
     requestPasswordReset: ['ok', 'message'], sessions: ['sessions'],
+    verifyEmail: ['ok', 'email'], resendVerifyEmail: ['ok', 'sent', 'message'],
     adminUsers: ['users'], audit: ['logs'],
     transactions: ['transactions', 'total'], createTransaction: ['id'], updateTransaction: ['id'],
     deleteTransactions: ['deleted'], nlpParse: ['out'], nlpParseBatch: ['items'],
@@ -3220,8 +3269,11 @@
     if (name === 'summary') {
       var rule = (res.savings && res.savings.rule) || global.DATA.savingsRule;
       var sv = res.savings = res.savings || {};
-      if (!('net' in res)) res.net = res.income - res.expense;
-      if (!('rate' in res)) res.rate = res.income ? (res.income - res.expense) / res.income : 0;
+      /* 被照看的孩子：家長設的零用金（還沒自己記成收入的那部分，pocketMoney）也是這個月進來的錢——
+         不算進去的話，孩子會看到「結餘 −808」，其實他還剩兩千多 */
+      var inflow = res.income + (Number(res.pocketMoney) || 0);
+      if (!('net' in res)) res.net = inflow - res.expense;
+      if (!('rate' in res)) res.rate = inflow ? (inflow - res.expense) / inflow : 0;
       if (!('goal' in sv)) sv.goal = 0;
       if (!('allowance' in sv)) sv.allowance = res.income - sv.goal;
       if (!('used' in sv)) sv.used = res.expense;

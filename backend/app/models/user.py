@@ -51,6 +51,10 @@ class User(Base):
     suspended_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     # NULL = 還沒走完註冊後的個人化設定（存款目標、理財習慣、主題），登入後先帶去設定
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # NULL = 還沒點驗證信的連結。沒驗證照樣能用，首頁會提醒；email 打錯的人才會發現（不然忘記密碼的信永遠寄不到）
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 上一次寄驗證信的時間。重寄要隔 60 秒，不然 Brevo 每天 300 封的額度會被按光
+    email_verify_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 大頭貼（前端已縮到 256×256）。⚠️ 存資料庫不存檔案：Render 的磁碟重新部署就清空
     avatar_bytes: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     # image/jpeg／png／webp。用 toolkit/images.py 驗過的真實格式，不信副檔名

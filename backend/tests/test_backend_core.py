@@ -630,7 +630,7 @@ def test_進度表把還沒做的算成待辦():
     p = progress()
     done = {r for v in p.values() for r in v["done"]}
     todo = {r for v in p.values() for r in v["todo"]}
-    assert len(done) + len(todo) == 70
+    assert len(done) + len(todo) == 72
     assert not (done & todo), "同一支不可以同時算完成又算待辦"
 
     still_stub = set()

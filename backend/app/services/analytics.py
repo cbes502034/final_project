@@ -90,3 +90,44 @@ def summary(db: Any, users: list[int], earners: list[int], period: str, group_id
         "yearly": [{"y": y, "partial": periods.is_incomplete_year(y), **yearly[y]} for y in years],
         "perUser": per_user,
     }
+
+
+def pocket_money(db: Any, users: list[int], period: str) -> dict[int, Any]:
+    """被照看的人這個月「還沒記到的零用金」：{user_id: 金額}。可支配上限要把它加進收入。
+
+    孩子多半沒有薪水，家長在「零用金」設了 3,000，孩子卻不一定會自己記一筆「收入：零用金」。
+    沒記的話，可支配上限 = 0 − 存款目標，花一塊錢就變「超出計畫」——這不合理，孩子看了也只會被嚇到。
+    所以：零用金 = max(家長的設定, 這個月自己記的「零用金」收入)，補上的是兩者的差額，有記就不會重複算。
+    只算還在照看中的家長設的（停止照看之後，那筆設定不再算數）。
+
+    >>> pocket_money(db, [kid.id], "2026-10")   # 家長設 3,000、孩子記了 1,000
+    {kid.id: Decimal('2000')}
+    """
+    from app.models import Allowance, Category, Guardianship, Transaction
+    from app.toolkit import crud, period as periods
+
+    users = list(users)
+    if not users:
+        return {}
+    pairs = {(g["guardian_id"], g["ward_id"]) for g in crud.find(
+        Guardianship, {"ward_id__in": users, "ended_at__isnull": True}, fields=("guardian_id", "ward_id"), db=db)}
+    setting: dict[int, Any] = {}
+    for a in crud.find(Allowance, {"ward_id__in": users, "period_key__isnull": True},
+                       fields=("payer_id", "ward_id", "amount"), db=db):
+        if (a["payer_id"], a["ward_id"]) in pairs:
+            setting[a["ward_id"]] = setting.get(a["ward_id"], money.ZERO) + a["amount"]
+    if not setting:
+        return {}
+    cat_ids = crud.find(Category, {"name": "零用金", "kind": "income", "family_id__isnull": True}, fields="id", db=db)
+    start, end = periods.month_range(period)
+    recorded: dict[int, Any] = {}
+    if cat_ids:
+        for t in crud.find(Transaction, {"user_id__in": list(setting), "kind": "income", "category_id__in": cat_ids,
+                                         "occurred_on__between": (start, end)}, fields=("user_id", "amount"), db=db):
+            recorded[t["user_id"]] = recorded.get(t["user_id"], money.ZERO) + t["amount"]
+    out = {}
+    for u, amount in setting.items():
+        extra = amount - recorded.get(u, money.ZERO)
+        if extra > 0:
+            out[u] = extra
+    return out

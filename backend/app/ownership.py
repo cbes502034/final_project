@@ -106,6 +106,8 @@ MEMBERS: list[Member] = [
             ("PATCH", "/api/auth/password"),
             ("POST", "/api/auth/password-reset"),
             ("POST", "/api/auth/password-reset/confirm"),
+            ("POST", "/api/auth/verify-email"),
+            ("POST", "/api/auth/verify-email/resend"),
             ("GET", "/api/auth/me/finance"),
             ("PUT", "/api/auth/me/finance"),
             ("POST", "/api/auth/verify-password"),

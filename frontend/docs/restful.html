@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RESTful API 說明書</title>
-<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 70 支路由哪裡符合、哪裡故意不符合。">
+<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 72 支路由哪裡符合、哪裡故意不符合。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -100,12 +100,12 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
         REST 不是技術，是一套<b>取名字的約定</b>。約定好之後，
         別人看到你的網址就猜得出它會做什麼——不用問你、不用翻文件。<br>
         這份文件會先用<b>圖書館</b>把概念講完，再回頭誠實檢查
-        我們自己的 70 支路由：哪些符合、哪些故意不符合、哪些可以改。
+        我們自己的 72 支路由：哪些符合、哪些故意不符合、哪些可以改。
       </p>
       <div class="hero__meta">
         <div class="mchip"><span>預計閱讀</span><b>25 分鐘</b></div>
         <div class="mchip"><span>前置知識</span><b>看過 FastAPI 說明書</b></div>
-        <div class="mchip"><span>本專案</span><b>70 支路由</b></div>
+        <div class="mchip"><span>本專案</span><b>72 支路由</b></div>
       </div>
     </header>
     <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
@@ -520,15 +520,15 @@ DELETE /books/5
 
     <!-- ============ 08 ============ -->
     <section class="sec" id="ours">
-      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 70 支</h2></div>
+      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 72 支</h2></div>
       <p class="sec__lead">
         我把本專案的每一支路由都對上面的規則檢查過（清單跟 <code>backend/app/ownership.py</code> 一致，有測試對）。
-        結果是：<b>70 支裡有 35 支完全符合，35 支嚴格說不符合 REST 慣例。</b>
+        結果是：<b>72 支裡有 35 支完全符合，37 支嚴格說不符合 REST 慣例。</b>
       </p>
 
       <div class="note">
         <div class="note__k">這個數字不代表設計很差</div>
-        <p>不符合的 35 支裡，<b>17 支是業界通用做法、8 支是刻意的動作</b>，
+        <p>不符合的 37 支裡，<b>17 支是業界通用做法、10 支是刻意的動作</b>，
         真的可以改得更一致的是 10 支。下面逐類講。</p>
       </div>
 
@@ -564,7 +564,7 @@ DELETE /books/5
         </table>
       </div>
 
-      <h3 class="sub">第二類：刻意的動作，REST 表達不了（8 支）</h3>
+      <h3 class="sub">第二類：刻意的動作，REST 表達不了（10 支）</h3>
       <div class="tw">
         <table>
           <thead><tr><th>路由</th><th>為什麼用動作的名字</th></tr></thead>
@@ -575,6 +575,8 @@ DELETE /books/5
                 <td>這兩支<b>其實是在建立 transactions</b>，嚴格說應該是 <code>POST /api/transactions</code>。刻意分開是因為<b>來源必須分得清楚</b>：走這支的 <code>source</code> 記 <code>nlp</code>、還要寫 <code>nlp_parses</code>；混在一起，模型正確率的分母就錯了。</td></tr>
             <tr><td class="rt">POST /api/auth/password-reset/confirm<br>POST /api/auth/verify-password</td>
                 <td>兩支都是「驗一個祕密」：前者驗信裡的一次性 token 再換密碼，後者只回答密碼對不對、<b>什麼都不改</b>。它們不是對某個資源的增刪改查。</td></tr>
+            <tr><td class="rt">POST /api/auth/verify-email<br>POST /api/auth/verify-email/resend</td>
+                <td>一樣是「驗一個祕密」：前者驗信裡的權杖、把 email 標成確認過，後者重寄那封信。硬套成 <code>PATCH /api/auth/me</code> 帶 <code>emailVerified: true</code> 的話，看起來像自己就能改成 true——那正是這個流程要防的事。</td></tr>
             <tr><td class="rt">POST /api/groups/{gid}/settle</td>
                 <td>結算是<b>做了就回不去</b>的狀態轉換，而且有自己的規則（只有活動帳本、只有開帳本的人）。寫成 <code>PATCH /api/groups/{gid}</code> 帶 <code>settled: true</code> 的話，看起來像能改回 false，反而誤導。</td></tr>
             <tr><td class="rt">POST /api/family/invites/{invite_id}/accept</td>
@@ -731,14 +733,14 @@ DELETE /books/5
       <div class="note">
         <div class="note__k">動工前先看這兩份</div>
         <p><a href="fastapi.html">FastAPI 說明書</a> —— 怎麼用程式把這些實作出來<br>
-        <a href="api.html">API 瀏覽</a> —— 本專案 70 支路由的完整清單<br>
+        <a href="api.html">API 瀏覽</a> —— 本專案 72 支路由的完整清單<br>
         還有 <code>docs/02-前後端串接契約.md</code> —— 每一支「我送什麼、你吐什麼」</p>
       </div>
     </section>
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · RESTful API 說明書</div>
-      <div class="mono">70 ROUTES · 5 METHODS</div>
+      <div class="mono">72 ROUTES · 5 METHODS</div>
     </footer>
 
   </div>

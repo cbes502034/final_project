@@ -2971,6 +2971,8 @@ body.is-out .foot { display: none; }
 }
 #view .nudge b { color: var(--accent-hi); font-size: 14.5px; }
 #view .nudge span { color: var(--accent); font-size: 13.5px; font-weight: 600; }
+#view .nudge__txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 260px; }
+#view .nudge--mail span { color: var(--ink-soft); font-weight: 500; overflow-wrap: anywhere; }
 
 /* ---------- 帳本：收合列 ---------- */
 #view .lgl { background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-block); margin: 0 0 var(--gap); }

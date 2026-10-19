@@ -49,7 +49,7 @@ final_project/
 │   │   ├── toolkit/     ★   寫好的工具：config · db · crud · tokens · passwords · scope · family …
 │   │   ├── models/          20 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/         請求主體（Pydantic，一個檔案一個主人）
-│   │   ├── routers/         70 支路由，**一個領域一個資料夾**；還沒做的回 501
+│   │   ├── routers/         72 支路由，**一個領域一個資料夾**；還沒做的回 501
 │   │   │   ├── auth/        認證（登入那幾支已經做好）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/      記帳
 │   │   │   ├── analytics/   數字
@@ -181,7 +181,7 @@ python -m app.cli db "SELECT id, email FROM users"     # 自己寫查詢（只�
 | `pytest` | 記憶體裡的 SQLite：每個測試一份、跑得快、不需要 Docker |
 
 本機跟線上用同一種資料庫，本機寫得對，部署上去就一樣對。
-（70 支照說明字串做好的參考後端，接 PostgreSQL 跑過 70 支路由的完整掃描，0 個問題。）
+（72 支照說明字串做好的參考後端，接 PostgreSQL 跑過 72 支路由的完整掃描，0 個問題。）
 
 ⚠️ 不要直接打 `docker compose up`（不加 `db`）：那會連同 compose 裡的後端、前端一起起來，
 跟 `run.py` 搶 8000 與 5174 埠。
@@ -317,7 +317,7 @@ http://localhost:5174/?api=                         切回 mock
 
 | 領域 | 資料夾 | 路由 |
 |---|---|---|
-| 認證 | `backend/app/routers/auth/` | 19 支 |
+| 認證 | `backend/app/routers/auth/` | 21 支 |
 | 記帳 | `backend/app/routers/ledger/` | 19 支 |
 | 數字 | `backend/app/routers/analytics/` | 11 支 |
 | 家庭 | `backend/app/routers/access/` | 21 支 |

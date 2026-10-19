@@ -36,13 +36,13 @@
 
 | 用 React 的好處 | 對本專案的實際影響 |
 |---|---|
-| 元件化、狀態管理 | 目前十四個畫面已經寫完，重寫是純成本 |
+| 元件化、狀態管理 | 目前十五個畫面已經寫完，重寫是純成本 |
 | 生態系豐富 | 我們沒有要用第三方 UI 套件 |
 | 履歷加分 | 冠文已有 React 經驗，其他三人沒有 |
 
 | 用原生的代價 | 實際狀況 |
 |---|---|
-| 沒有元件複用 | 十四個畫面規模還撐得住，函式化就夠 |
+| 沒有元件複用 | 十五個畫面規模還撐得住，函式化就夠 |
 | 手寫 DOM 操作 | 已經封裝在 `app.js` 的 render 函式裡 |
 | 沒有型別檢查 | 用 `js/api.js` 這一層集中管住資料形狀 |
 
@@ -152,7 +152,7 @@ final_project/
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
 │   │   ├── models/              20 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
-│   │   ├── routers/             70 支路由，一個領域一個資料夾。還沒做的回 501
+│   │   ├── routers/             72 支路由，一個領域一個資料夾。還沒做的回 501
 │   │   │   ├── auth/            認證（auth.py、admin.py）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/          記帳（transactions、nlp、categories、groups）
 │   │   │   ├── analytics/       數字（stats、budgets、alerts、advices）
@@ -186,7 +186,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **70 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **72 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `本人` / `家長` / `監管者` / `建立者` / `平台管理員`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -205,6 +205,8 @@ final_project/
 | 7 | PATCH | `/api/auth/password` | 認證 | 登入 | 修改密碼，同時讓其他 session 失效。舊密碼不對回 400 |
 | 74 | POST | `/api/auth/password-reset` | 認證 | 公開 | 忘記密碼：寄一次性的重設連結（Brevo）。**有沒有這個帳號都回同一句話** |
 | 75 | POST | `/api/auth/password-reset/confirm` | 認證 | 公開 | 用信裡的 token 設新密碼。30 分鐘失效、只能用一次，成功後撤銷所有 sessions |
+| 77 | POST | `/api/auth/verify-email` | 認證 | 公開 | 點註冊驗證信的連結：確認 email 是本人的。權杖過期（`EMAIL_VERIFY_MINUTES`，預設 24 小時）或 email 改過就失效 |
+| 78 | POST | `/api/auth/verify-email/resend` | 認證 | 登入 | 重寄驗證信給自己。60 秒冷卻；已經驗證過回 `sent: false` |
 | 8 | GET | `/api/auth/me/finance` | 認證 | 本人 | 我的理財習慣（財務建議的背景） |
 | 9 | PUT | `/api/auth/me/finance` | 認證 | 本人 | 改理財習慣。body: { style, goals[], habits[], note } |
 | 10 | POST | `/api/auth/verify-password` | 認證 | 本人 | 重大操作前再確認一次。不發新 token；不對回 400 |
@@ -425,7 +427,7 @@ final_project/
 
 ## 5-1　每一支路由的規格，寫在那一支的說明字串裡
 
-`backend/app/routers/` 底下（一個領域一個資料夾）的 70 支路由，每一支的說明字串都有同樣的十一個段落：
+`backend/app/routers/` 底下（一個領域一個資料夾）的 72 支路由，每一支的說明字串都有同樣的十一個段落：
 
 ```
 【這支做什麼】【前端怎麼打】【誰能打】【請求主體／查詢參數】【成功回應】【錯誤回應】
@@ -445,7 +447,7 @@ final_project/
 
 | 領域 | 資料夾 | 路由 |
 |---|---|---|
-| **認證** | `backend/app/routers/auth/` | 19 支 |
+| **認證** | `backend/app/routers/auth/` | 21 支 |
 | **記帳** | `backend/app/routers/ledger/` | 19 支 |
 | **數字** | `backend/app/routers/analytics/` | 11 支 |
 | **家庭** | `backend/app/routers/access/` | 21 支 |

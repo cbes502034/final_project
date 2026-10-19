@@ -94,6 +94,16 @@ class Settings(BaseSettings):
         description="access token 有效期（分鐘）。刻意設短：外洩時損害只持續這麼久，前端會自動續期。",
     )
     refresh_token_days: int = Field(default=14, description="refresh token 有效期（天）。存在 sessions 表，可以撤銷。")
+    email_verify_minutes: int = Field(
+        default=1440,
+        gt=0,
+        description="註冊驗證信的連結幾分鐘後失效，預設 1440（24 小時）。測試過期時暫時設短（例如 3），測完刪掉這個變數。",
+    )
+    password_reset_minutes: int = Field(
+        default=30,
+        gt=0,
+        description="重設密碼連結幾分鐘後失效，預設 30。測試過期時暫時設短（例如 3），測完刪掉這個變數。",
+    )
     brevo_api_key: str = Field(
         default="",
         description=(
@@ -182,9 +192,13 @@ class Settings(BaseSettings):
     # =======================================================================
     # 家庭　家庭：邀請、通知
     # =======================================================================
-    invite_ttl_days: int = Field(
+    invite_ttl_days: float = Field(
         default=7,
-        description="邀請與邀請碼幾天後失效。產生時呼叫 family.expires_at(days=settings.invite_ttl_days)。",
+        gt=0,
+        description=(
+            "邀請與邀請碼幾天後失效。產生時呼叫 family.expires_at(days=settings.invite_ttl_days)。"
+            "可以填小數：測試過期時暫時設 0.002（約 3 分鐘），測完刪掉這個變數。"
+        ),
     )
 
     # -----------------------------------------------------------------------
@@ -249,7 +263,7 @@ class Settings(BaseSettings):
         own = any((self.advice_provider, self.advice_base_url, self.advice_api_key, self.advice_model_name))
         flag("數字", "advice_*", True, "",
              ok_msg=("另外設定了一組" if own else "留空：跟記帳用同一個模型服務"))
-        flag("家庭", "invite_ttl_days", self.invite_ttl_days > 0, "要大於 0", ok_msg="邀請 %d 天後失效" % self.invite_ttl_days)
+        flag("家庭", "invite_ttl_days", self.invite_ttl_days > 0, "要大於 0", ok_msg="邀請 %g 天後失效" % self.invite_ttl_days)
         return rows
 
 

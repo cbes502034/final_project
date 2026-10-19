@@ -54,7 +54,7 @@ from app.models import (  # noqa: E402
     Category, Family, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal, Transaction, User,
 )
 from app.routers._stub import is_stub  # noqa: E402
-from app.toolkit import crud, db, money, passwords, tokens  # noqa: E402
+from app.toolkit import crud, db, mailer, money, passwords, tokens  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BACKEND = os.path.dirname(os.path.dirname(HERE))
@@ -189,6 +189,10 @@ def _endpoint(app, method, path):
     return None
 
 
+def _no_mail(*args, **kwargs):
+    raise mailer.MailNotConfigured("測試不寄真的信")
+
+
 @pytest.fixture(params=["說明", "你的"])
 def api(request, monkeypatch):
     """回傳 TestClient。「說明」沒有完整寫法、「你的」還是 @stub，就跳過。"""
@@ -205,6 +209,8 @@ def api(request, monkeypatch):
         from app.main import app
         if is_stub(_endpoint(app, method, path)):
             pytest.skip("%s %s 還沒做（拿掉 @stub 之後這裡就會跑）" % (method, path))
+    # 測試絕對不寄真的信：.env 填了 BREVO_API_KEY 也一樣（要看寄了什麼，用 test_auth.py 的 outbox）
+    monkeypatch.setattr(mailer, "send_mail", _no_mail)
     original = str(db.engine.url)
     db.use_database("sqlite://")
     db.create_all()

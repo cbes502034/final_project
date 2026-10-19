@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from app.models import Advice, AlertRule, Allowance, Budget, SavingsGoal
+from app.models import Advice, AlertRule, Allowance, Budget, Category, SavingsGoal
 from app.services.llm import client
 from app.toolkit import crud
 from tests.routes.conftest import (
@@ -78,6 +78,30 @@ def test_summary_家庭_孩子的收入另外算_每個人各自的燈號(api):
     # 子女打 family 也只看得到自己
     kb = api.get("/api/summary?scope=family", headers=login(kid)).json()
     assert [m["id"] for m in kb["members"]] == [str(kid.id)] and kb["income"] == 3000
+
+
+@pytest.mark.route(*SUM)
+def test_summary_孩子的零用金算進可支配上限_自己有記就不重複算(api):
+    """家長設了零用金、孩子沒記收入：上限要是零用金，不能是 0（不然花一塊錢就「超出計畫」）。"""
+    dad, kid = user("d@x.tw", "爸爸"), user("k@x.tw", "小華")
+    family_of((dad, "parent"), (kid, "child"))
+    guard(dad, kid)
+    cats = categories()
+    kg = ledger_of(kid, name="零用錢")
+    spend(kid, kg, cats["餐飲"], 808)
+    crud.save(Allowance, {"payer_id": dad.id, "ward_id": kid.id, "amount": 3000})
+    b = api.get("/api/summary", headers=login(kid)).json()
+    assert b["pocketMoney"] == 3000
+    assert (b["savings"]["allowance"], b["savings"]["left"], b["savings"]["level"]) == (3000, 2192, "safe")
+    fam = api.get("/api/summary?scope=family", headers=login(dad)).json()
+    kid_row = next(m for m in fam["members"] if m["id"] == str(kid.id))
+    assert (kid_row["allowance"], kid_row["savingsLevel"]) == (3000, "safe")
+    assert fam["pocketMoney"] == 0 and fam["income"] == 0          # 全家模式不把零用金再算一次
+    # 孩子自己記了 1,000 的「零用金」收入：只補差額 2,000，上限還是 3,000
+    pocket = crud.save(Category, {"name": "零用金", "kind": "income", "color": "cat-transit"})
+    spend(kid, kg, pocket, 1000)
+    b = api.get("/api/summary", headers=login(kid)).json()
+    assert (b["income"], b["pocketMoney"], b["savings"]["allowance"]) == (1000, 2000, 3000)
 
 
 @pytest.mark.route(*SUM)

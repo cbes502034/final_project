@@ -83,7 +83,7 @@ def get_summary(
     【成功回應】狀態碼 200
         {"period": "2026-09", "scope": "family",
          "income": 68000, "expense": 41230, "count": 42,
-         "wardIncome": 500, "allowance": 3000, "wardSpend": 1850,
+         "wardIncome": 500, "allowance": 3000, "pocketMoney": 0, "wardSpend": 1850,
          "savings": {"goal": 20000, "allowance": 48000, "used": 41230, "left": 6770, "ratio": 0.859,
                      "level": "near", "shortfall": 0, "actual": 26770,
                      "rule": {"warnAt": 0.8, "overAt": 1.0, "note": "可支配上限 = …"}},
@@ -99,7 +99,9 @@ def get_summary(
         count                  這個月的筆數
         wardIncome／wardSpend  照看的孩子這個月的收入／支出（scope=me 時是 0）
         allowance              我給照看的孩子的零用金設定加總（scope=me 時是 0）
-        savings                analytics.savings_status(收入, 支出, 存款目標)；目標是每個人最新的一筆加起來，選了帳本就用那本帳的
+        pocketMoney            我是被照看的人時，家長設的零用金裡「我還沒自己記成收入」的部分；已經加進 savings 的可支配上限
+                               （孩子沒有薪水，不補的話上限是 0，花一塊錢就「超出計畫」）
+        savings                analytics.savings_status(收入＋pocketMoney, 支出, 存款目標)；目標是每個人最新的一筆加起來，選了帳本就用那本帳的
         savings.rule           門檻來自設定 SAVINGS_WARN_RATIO／SAVINGS_OVER_RATIO（跟前端 data.js 的 savingsRule 一致）
         members                每個人的這個月，各自的燈號——家庭整體達標不代表每個人都達標
         ⚠️ 帶了 groupId，每一個數字（包括 monthly、yearly、members）都只算那本帳。
@@ -127,6 +129,7 @@ def get_summary(
         4 加總    analytics.summary(db, people, earners, this_month, group_id)  回傳 income、expense、count、byCat、monthly、yearly、perUser
         5 目標    crud.find(SavingsGoal, {"user_id__in": people, "group_id": group_id}, order_by="id", db=db)  group_id 是 None 就是整體目標（IS NULL）；後面的蓋掉前面的
                   money.add(*goals.values())                                    全部加起來（沒有就是 0）
+                  analytics.pocket_money(db, people, this_month)               被照看的人還沒記成收入的零用金（照家長的設定補）
                   analytics.savings_status(收入, 支出, 目標)                    可支配上限、比例、燈號（除以 0 已經處理好）
         6 零用金  crud.find(Allowance, {"payer_id": me.id, "ward_id__in": kids, "period_key__isnull": True}, fields="amount", db=db)  我給每個孩子的設定
         7 每個人  images.to_data_uri(u.avatar_bytes, u.avatar_mime)             有大頭貼才轉成 data URI
@@ -140,7 +143,8 @@ def get_summary(
         2. 決定算誰：me = 只有自己；family = visible_scope 的人。照看的孩子從「收入要算的人」拿掉
         3. 有 groupId：要在我加入的帳本裡（403）
         4. analytics.summary 一次算好
-        5. 存款目標（整體或那本帳的，每人最新一筆）→ savings_status，再掛上門檻 rule
+        5. 存款目標（整體或那本帳的，每人最新一筆）→ savings_status，再掛上門檻 rule；
+           算自己的時候，被照看的人沒記到的零用金（pocket_money）要加進收入
         6. 零用金設定加總；孩子的收入、支出從 perUser 拿
         7. 每個人各自的燈號，組成 members
         8. 全部組起來回傳
@@ -198,7 +202,11 @@ def get_summary(
             goals = {}
             for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id": group_id}, order_by="id", db=db):
                 goals[row.user_id] = row.goal_amount
-            savings = analytics.savings_status(nums["income"], nums["expense"], money.add(*goals.values()))
+            # 零用金：被照看的人沒記到的那部分，照家長的設定補進可支配上限（只在算自己的時候；
+            #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
+            pocket = analytics.pocket_money(db, list(people), this_month)
+            mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
+            savings = analytics.savings_status(nums["income"] + mine_extra, nums["expense"], money.add(*goals.values()))
             savings["rule"] = {"warnAt": settings.savings_warn_ratio, "overAt": settings.savings_over_ratio,
                                "note": catalog.SAVINGS_RULE_NOTE}
 
@@ -213,7 +221,8 @@ def get_summary(
             members = []
             for u in crud.find(User, {"id__in": people}, order_by="id", db=db):
                 mine = per_user[u.id]
-                status = analytics.savings_status(mine["income"], mine["expense"], goals.get(u.id, 0))
+                status = analytics.savings_status(mine["income"] + pocket.get(u.id, money.ZERO), mine["expense"],
+                                                  goals.get(u.id, 0))
                 members.append({
                     "id": str(u.id),
                     "name": u.display_name,
@@ -238,6 +247,7 @@ def get_summary(
                 "count": nums["count"],
                 "wardIncome": money.add(*[per_user[u]["income"] for u in kids]),
                 "allowance": allowance,
+                "pocketMoney": mine_extra,
                 "wardSpend": money.add(*[per_user[u]["expense"] for u in kids]),
                 "savings": savings,
                 "byCat": nums["byCat"],
@@ -344,7 +354,11 @@ def get_summary(
     goals = {}
     for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id": group_id}, order_by="id", db=db):
         goals[row.user_id] = row.goal_amount
-    savings = analytics.savings_status(nums["income"], nums["expense"], money.add(*goals.values()))
+    # 零用金：被照看的人沒記到的那部分，照家長的設定補進可支配上限（只在算自己的時候；
+    #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
+    pocket = analytics.pocket_money(db, list(people), this_month)
+    mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
+    savings = analytics.savings_status(nums["income"] + mine_extra, nums["expense"], money.add(*goals.values()))
     savings["rule"] = {"warnAt": settings.savings_warn_ratio, "overAt": settings.savings_over_ratio,
                        "note": catalog.SAVINGS_RULE_NOTE}
 
@@ -359,7 +373,8 @@ def get_summary(
     members = []
     for u in crud.find(User, {"id__in": people}, order_by="id", db=db):
         mine = per_user[u.id]
-        status = analytics.savings_status(mine["income"], mine["expense"], goals.get(u.id, 0))
+        status = analytics.savings_status(mine["income"] + pocket.get(u.id, money.ZERO), mine["expense"],
+                                          goals.get(u.id, 0))
         members.append({
             "id": str(u.id),
             "name": u.display_name,
@@ -384,6 +399,7 @@ def get_summary(
         "count": nums["count"],
         "wardIncome": money.add(*[per_user[u]["income"] for u in kids]),
         "allowance": allowance,
+        "pocketMoney": mine_extra,
         "wardSpend": money.add(*[per_user[u]["expense"] for u in kids]),
         "savings": savings,
         "byCat": nums["byCat"],

@@ -1160,6 +1160,8 @@ def test_主頁不可以變成繞過登入的破口():
     2026-09-14 加了兩頁，都是刻意的：
       forgot  忘記密碼。本來就是給登不進去的人用的，頁面上沒有任何資料
       reset   信裡的重設連結。登入與否都要能開（ANY），只認 token，不讀任何資料
+    2026-10-19 再加一頁，一樣是刻意的：
+      verify  註冊驗證信的連結。登入與否都要能開（ANY，常常是在手機的信箱 App 裡點開），只認權杖，不讀任何資料
     """
     app = read("frontend/js/app.js")
     mo = re.search(r"var OPEN = \[([^\]]*)\]", app)
@@ -1167,8 +1169,8 @@ def test_主頁不可以變成繞過登入的破口():
     opens = re.findall(r"'([^']+)'", mo.group(1))
     assert opens == ["login", "register", "forgot"],         "沒登入能看的頁被改了：%s" % opens
     anys = re.findall(r"'([^']+)'", re.search(r"var ANY = \[([^\]]*)\]", app).group(1))
-    assert anys == ["reset"], "登入與否都能開的頁被改了：%s" % anys
-    for fn in ("vForgot", "vReset"):
+    assert anys == ["reset", "verify"], "登入與否都能開的頁被改了：%s" % anys
+    for fn in ("vForgot", "vReset", "vVerify"):
         body = re.search(r"function %s\([^)]*\) \{(.*?)\n  \}" % fn, app, re.S).group(1)
         for leak in ("API.me(", "API.transactions(", "API.summary(", "API.members("):
             assert leak not in body, "%s 是公開頁，不可以讀任何資料：%s" % (fn, leak)
@@ -1505,8 +1507,8 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
     routes = re.search(r"var ROUTES = \{(.*?)\};", app, re.S).group(1)
     pages = set(re.findall(r"(\w+): v\w+", routes))
     # 登入／註冊沒登入才看得到；member 是從家庭成員點進去的；admin 只有平台管理員（登入就直接導過去）
-    # forgot 從登入頁點、reset 從信裡的連結點、setup 是註冊完路由閘帶過去的
-    need = pages - {"login", "register", "member", "admin", "forgot", "reset", "setup"}
+    # forgot 從登入頁點、reset／verify 從信裡的連結點、setup 是註冊完路由閘帶過去的
+    need = pages - {"login", "register", "member", "admin", "forgot", "reset", "verify", "setup"}
     missing = need - tiles
     assert not missing, "這些頁面拆掉側欄之後進不去了：%s" % sorted(missing)
     assert "quick: true" in home, "儀表板上要有「記一筆」"

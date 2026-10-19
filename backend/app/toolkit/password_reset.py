@@ -23,7 +23,7 @@
   * 「沒這個帳號」不能講出來。講了，這支 API 就是帳號列舉工具：
     不用猜密碼，先把「哪些 email 有註冊」撈出來。登入的錯誤訊息是同一個道理。
   * token 只存雜湊。資料庫外流時，拿到的東西點不開任何連結。
-  * 30 分鐘失效、只能用一次。信箱被翻到一封舊信，也拿不到帳號。
+  * 30 分鐘失效（PASSWORD_RESET_MINUTES）、只能用一次。信箱被翻到一封舊信，也拿不到帳號。
   * 重寄要冷卻（should_send）。不然任何人都能拿你的 email 一直轟炸你的信箱。
   * 連結的 token 放在網址 # 後面。# 後面的東西瀏覽器**不會送給伺服器**，
     不會出現在伺服器紀錄，也不會跟著 Referer 外洩到別的網站。
@@ -48,14 +48,16 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from html import escape
 
+from app.toolkit.config import settings
+
 __all__ = [
     "TOKEN_MINUTES", "COOLDOWN_SECONDS", "GENERIC_MESSAGE", "INVALID_MESSAGE",
     "normalize_email", "new_token", "hash_token", "expires_at",
     "require_usable", "should_send", "reset_link", "mail_content",
 ]
 
-#: 重設連結幾分鐘後失效
-TOKEN_MINUTES = 30
+#: 重設連結幾分鐘後失效。正式環境 30；測試過期時在 Render 設 PASSWORD_RESET_MINUTES=3，測完刪掉
+TOKEN_MINUTES = settings.password_reset_minutes
 
 #: 同一個人兩次寄信之間至少隔幾秒
 COOLDOWN_SECONDS = 60

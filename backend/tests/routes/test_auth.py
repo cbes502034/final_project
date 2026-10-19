@@ -6,7 +6,7 @@ from datetime import timedelta
 import pytest
 
 from app.models import AuditLog, PasswordReset, User, UserSession
-from app.toolkit import crud, mailer, password_reset, passwords, tokens
+from app.toolkit import crud, email_verify, mailer, password_reset, passwords, tokens
 from tests.routes.conftest import PASSWORD, family_of, goal, guard, ledger_of, login, now, this_month, user
 
 
@@ -37,10 +37,10 @@ def test_register_註冊完直接登入(api):
     b = r.json()
     u = b["user"]
     assert {k: u[k] for k in ("name", "email", "role", "familyId", "avatar", "avatarUrl", "theme", "onboardedAt",
-                              "savingsGoal", "isPlatformAdmin", "age", "birthYear")} == {
+                              "savingsGoal", "isPlatformAdmin", "age", "birthYear", "emailVerified")} == {
         "name": "王 大明", "email": "daming@wang.tw", "role": None, "familyId": None, "avatar": "明",
         "avatarUrl": None, "theme": "paper", "onboardedAt": None, "savingsGoal": 0, "isPlatformAdmin": False,
-        "age": None, "birthYear": None}
+        "age": None, "birthYear": None, "emailVerified": False}
     assert b["expiresIn"] == 1800 and u["joined"]
     row = crud.get(User, int(u["id"]))
     assert row.email == "daming@wang.tw" and row.password_hash != "abcd1234"
@@ -226,7 +226,9 @@ def test_me_新帳號與平台管理員(api):
     new = user("n@x.tw", "新人")
     b = api.get("/api/auth/me", headers=login(new)).json()
     assert b["user"]["onboardedAt"] is None and b["user"]["theme"] == "paper" and b["family"] is None
-    assert b["visible"] == [str(new.id)] and b["user"]["savingsGoal"] == 0
+    assert b["visible"] == [str(new.id)] and b["user"]["savingsGoal"] == 0 and b["user"]["emailVerified"] is False
+    done = user("v@x.tw", "驗證過", email_verified_at=now())
+    assert api.get("/api/auth/me", headers=login(done)).json()["user"]["emailVerified"] is True
     admin = user("admin@x.tw", "管理員", is_platform_admin=True)
     b = api.get("/api/auth/me", headers=login(admin)).json()
     assert b["user"]["isPlatformAdmin"] is True and b["visible"] == [] and b["queryable"] == []
@@ -377,6 +379,79 @@ def test_confirm_password_reset_改密碼_連結作廢_全部登出(api):
     old = _reset_token(me, expires_at=now() - timedelta(minutes=1))
     assert api.post("/api/auth/password-reset/confirm", json={"token": old, "password": "ijkl9012"}).status_code == 400
     assert api.post("/api/auth/password-reset/confirm", json={"token": "亂打", "password": "ijkl9012"}).status_code == 400
+
+
+# ===========================================================================
+# 註冊後的 email 驗證
+# ===========================================================================
+VERIFY_EMAIL = ("POST", "/api/auth/verify-email")
+RESEND_VERIFY = ("POST", "/api/auth/verify-email/resend")
+
+
+@pytest.mark.route(*REG)
+def test_register_寄出驗證信_點連結之前是未驗證(api, outbox):
+    r = api.post("/api/auth/register", json={"name": "王大明", "email": "Daming@Wang.tw", "password": "abcd1234"})
+    assert r.status_code == 201 and r.json()["user"]["emailVerified"] is False
+    assert len(outbox) == 1 and outbox[0]["to"] == "daming@wang.tw" and outbox[0]["to_name"] == "王大明"
+    assert outbox[0]["subject"] == "確認你的家庭記帳 email" and "#/verify/" in outbox[0]["text"]
+    token = outbox[0]["text"].split("#/verify/")[1].split()[0]
+    row = crud.get(User, int(r.json()["user"]["id"]))
+    assert email_verify.read_token(token) == (row.id, "daming@wang.tw")
+    assert row.email_verified_at is None and row.email_verify_sent_at is not None
+    me = api.get("/api/auth/me", headers={"Authorization": "Bearer " + r.json()["accessToken"]}).json()
+    assert me["user"]["emailVerified"] is False
+
+
+@pytest.mark.route(*REG)
+def test_register_驗證信寄不出去_帳號照樣建好(api):
+    r = api.post("/api/auth/register", json={"name": "王大明", "email": "d@wang.tw", "password": "abcd1234"})
+    assert r.status_code == 201 and crud.count(User) == 1
+
+
+@pytest.mark.route(*VERIFY_EMAIL)
+def test_verify_email_點連結就驗證_點兩次一樣(api):
+    me = user("d@x.tw", "爸爸")
+    token = email_verify.make_token(me.id, me.email)
+    r = api.post("/api/auth/verify-email", json={"token": token})
+    assert r.status_code == 200 and r.json() == {"ok": True, "email": "d@x.tw"}
+    first = crud.get(User, me.id).email_verified_at
+    assert first is not None
+    assert api.get("/api/auth/me", headers=login(me)).json()["user"]["emailVerified"] is True
+    again = api.post("/api/auth/verify-email", json={"token": token})
+    assert again.status_code == 200 and crud.get(User, me.id).email_verified_at == first
+
+
+@pytest.mark.route(*VERIFY_EMAIL)
+def test_verify_email_過期_亂打_別種權杖_email改過_都不算(api):
+    me = user("d@x.tw", "爸爸")
+    old = email_verify.make_token(me.id, me.email, now=now() - timedelta(minutes=email_verify.TOKEN_MINUTES, seconds=1))
+    r = api.post("/api/auth/verify-email", json={"token": old})
+    assert r.status_code == 400 and "過期" in r.json()["detail"] and "重寄" in r.json()["detail"]
+    for bad in ("亂打", tokens.make_access_token(me.id), email_verify.make_token(me.id, "old@x.tw"),
+                email_verify.make_token(99999, "nobody@x.tw")):
+        r = api.post("/api/auth/verify-email", json={"token": bad})
+        assert r.status_code == 400 and "無效" in r.json()["detail"], bad
+    assert crud.get(User, me.id).email_verified_at is None
+    assert api.post("/api/auth/verify-email", json={}).status_code == 422
+
+
+@pytest.mark.route(*RESEND_VERIFY)
+def test_resend_verify_email_冷卻_寄新的一封_驗證過不寄(api, outbox):
+    me = user("d@x.tw", "爸爸", email_verify_sent_at=now())
+    r = api.post("/api/auth/verify-email/resend", headers=login(me))
+    assert r.status_code == 429 and "1 分鐘" in r.json()["detail"] and outbox == []
+    crud.save(User, {"id": me.id, "email_verify_sent_at": now() - timedelta(seconds=61)})
+    r = api.post("/api/auth/verify-email/resend", headers=login(me))
+    assert r.status_code == 200 and r.json()["sent"] is True and "d@x.tw" in r.json()["message"]
+    assert email_verify.ttl_text() in r.json()["message"]
+    assert len(outbox) == 1 and outbox[0]["to"] == "d@x.tw" and outbox[0]["to_name"] == "爸爸"
+    token = outbox[0]["text"].split("#/verify/")[1].split()[0]
+    assert email_verify.read_token(token) == (me.id, "d@x.tw")
+    assert api.post("/api/auth/verify-email/resend", headers=login(me)).status_code == 429   # 剛寄過
+    assert api.post("/api/auth/verify-email", json={"token": token}).status_code == 200
+    r = api.post("/api/auth/verify-email/resend", headers=login(me))
+    assert r.json() == {"ok": True, "sent": False, "message": "你的 email 已經驗證過了"} and len(outbox) == 1
+    assert api.post("/api/auth/verify-email/resend").status_code == 401
 
 
 # ===========================================================================

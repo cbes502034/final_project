@@ -432,7 +432,9 @@
     o = o || {};
     var tiles = [
       o.fam ? null : { quick: true, label: '記一筆', icon: 'add', tone: 'add' },
-      { nav: 'entry', label: '收支明細', icon: 'entry', badge: o.count ? o.count + ' 筆' : '' },
+      /* 角標是「本月」的筆數（跟 GET /api/summary 的 count 同一個範圍）；
+         明細頁列的是所有月份，不寫「本月」看起來就像數字對不上 */
+      { nav: 'entry', label: '收支明細', icon: 'entry', badge: o.count ? '本月 ' + o.count + ' 筆' : '' },
       { nav: 'groups', label: '帳本', icon: 'groups', badge: o.groups ? o.groups + ' 本' : '' },
       { nav: 'stats', label: '統計', icon: 'stats' },
       { nav: 'advice', label: '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '',
@@ -538,7 +540,7 @@
         var chev = '<svg class="wal__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
           'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 
-        var h = '<div class="page"><div id="homeInv"></div><div class="dash">';
+        var h = '<div class="page"><div id="homeMail"></div><div id="homeInv"></div><div class="dash">';
 
         /* 1. 疊在一起的數字卡——像皮夾裡的卡片。
               後面兩張露出一截：收入、支出；最前面那張是這個月還可以花。
@@ -559,6 +561,8 @@
               '<i style="width:' + used + '%"></i></div>' +
             '<div class="wal__meta"><span>已用 <b>' + used + '%</b></span>' +
               '<span>可花上限 <b>' + num(sv.allowance) + '</b></span>' +
+              /* 孩子的收入是 0、上限卻有 3,000——講出來源，不然看起來數字對不上 */
+              (Number(d.pocketMoney) > 0 ? '<span>含零用金 <b>' + num(d.pocketMoney) + '</b></span>' : '') +
               '<span>每月想存 <b>' + num(sv.goal) + '</b></span></div>' +
             '<div class="wal__foot">' +
               '<div class="wal__f"><span>結餘</span><b>' + amt(d.net) + '</b></div>' +
@@ -606,6 +610,7 @@
 
         $view.innerHTML = h + '</div>';
         animate();
+        mailNudge(m.user);
 
         /* 有人邀請你、或是你還沒有家庭，放在最上面——這是現在唯一要你決定的事。
            ⚠️ 這一支問不到就整塊不顯示：寫「還沒有加入家庭」等於替後端回答，
@@ -806,8 +811,10 @@
       '<td class="txr__c"><span style="color:' + tint(t.catColor) + '">' +
         esc(t.catName) + '</span></td>' +
       '<td class="txr__t"><span class="txr__cm" style="color:' + tint(t.catColor) + '">' + esc(t.catName) + '</span>' +
-        esc(t.merchant || t.catName) +
-        (t.note ? ' <em>' + esc(t.note) + '</em>' : '') +
+        /* 有店家寫店家、沒有就直接寫備註；兩個都沒有才寫分類。
+           不要「分類 備註」——分類欄已經寫過了，項目再寫一次是重複的字 */
+        esc(t.merchant || t.note || t.catName) +
+        (t.merchant && t.note ? ' <em>' + esc(t.note) + '</em>' : '') +
         (t.raw ? '<br><span class="txr__raw">「' + esc(t.raw) + '」</span>' : '') +
       '</td>' +
       '<td class="txr__u">' + esc(t.userName) + '</td>' +
@@ -1079,6 +1086,11 @@
 
     var miss = batch.filter(function (x) { return x.missing && x.missing.length; }).length;
     var h = '<div class="prs">';
+    /* 模型叫不動、改用前端規則切的：一直留著講清楚，不要只靠一閃而過的 toast——
+       不然使用者看著表格，分不出這是模型還是規則的品質 */
+    if (r.fallback) {
+      h += '<div class="nudge"><b>這次是前端規則解析的</b><span>' + esc(r.note || '模型服務沒有回應，先用規則切分。') + '</span></div>';
+    }
     h += '<div class="prs__h">這段話被切成 <b>' + batch.length + ' 筆</b>' +
       (miss ? '，其中 <b style="color:var(--warn)">' + miss + ' 筆有欄位缺漏</b>，補齊才能送出' : '') +
       '</div>';
@@ -1483,7 +1495,7 @@
           '<div class="page">' +
             '<div id="advHint"></div>' +
             '<div class="sec"><h2 class="sec__t">' + (sc === 'family' ? '全家的建議' : '給你的建議') + '</h2>' +
-              '<span class="sec__n">' + ADV.length + ' 則</span>' +
+              '<span class="sec__n" id="advN">' + ADV.length + ' 則</span>' +
               '<button class="btn btn--sm btn--go" id="advGen" data-gen-scope="' + sc + '">產生這個月的建議</button>' +
               '<div class="sec__tools"><label class="fsel fsel--q">' +
                 '<input type="search" id="advq" placeholder="搜尋建議" aria-label="搜尋建議" ' +
@@ -1511,6 +1523,9 @@
   function paintAdvices() {
     var box = document.getElementById('advList');
     if (!box) return;
+    /* 前端備援寫的建議不會存，只會進 ADV——則數跟著畫面上實際有幾則走 */
+    var n = document.getElementById('advN');
+    if (n) n.textContent = ADV.length + ' 則';
 
     var q = ADVQ.trim().toLowerCase();
     var rows = !q ? ADV : ADV.filter(function (a) {
@@ -3067,6 +3082,61 @@
     '</div>';
   }
 
+  /* email 還沒確認：總覽最上面提醒一次，可以重寄。不擋任何功能（email 打錯的人才會發現）。
+     平台管理員不顯示：他的帳號是 ADMIN_EMAILS 指定的。 */
+  function mailNudge(u) {
+    var box = document.getElementById('homeMail');
+    if (!box || !u || u.emailVerified !== false || u.isPlatformAdmin) return;
+    box.innerHTML = '<div class="nudge nudge--mail">' +
+        '<div class="nudge__txt"><b>還沒確認 email</b>' +
+          '<span id="mailMsg">驗證信寄到 ' + esc(u.email) + '，點信裡的按鈕就好。確認之後，忘記密碼時才收得到重設信。</span></div>' +
+        '<button type="button" class="btn btn--ghost btn--sm" id="mailAgain">重寄驗證信</button>' +
+      '</div>';
+    document.getElementById('mailAgain').addEventListener('click', function () {
+      var btn = this, msg = document.getElementById('mailMsg');
+      btn.disabled = true;
+      API.resendVerifyEmail().then(function (r) {
+        msg.textContent = r.message;
+        /* mock 寄不出信：把連結攤在畫面上（真後端不會回 demoMail） */
+        if (r.demoMail) msg.innerHTML = esc(r.message) + '　<a href="' + esc(r.demoMail.link) + '">（還沒連接後端）直接打開驗證連結</a>';
+        if (!r.sent) { ME && ME.user && (ME.user.emailVerified = true); box.innerHTML = ''; return; }
+        setTimeout(function () { btn.disabled = false; }, 60000);
+      }).catch(function (e) {
+        msg.textContent = e.message;
+        btn.disabled = false;
+      });
+    });
+  }
+
+  /* 驗證信的連結是 #/verify/<token>。跟重設連結一樣：進來就從網址列拿掉，馬上送去後端確認。
+     登入與否都能開——常常是在手機的信箱 App 裡點開的，那裡沒有登入。 */
+  function vVerify(token) {
+    gateStep = 'login';
+    try { history.replaceState(null, '', location.pathname + location.search + '#/verify'); } catch (e) {}
+    head('確認 email', '');
+    authShell('確認 email', token ? '正在確認這個 email 是你的…' : '這個驗證連結不完整。',
+      '<div class="fgt" id="vfBox">' + (token ? '' :
+        '<p class="fgt__t">請從信裡的按鈕重新打開；連結過期的話，登入後在總覽重寄一封。</p>') + '</div>');
+    var box = document.getElementById('vfBox'), sub = document.querySelector('.gate__s');
+    function next(text) {
+      API.authState().then(function (a) {
+        if (!box) return;
+        box.innerHTML = text + '<p class="gate__alt">' +
+          (a.loggedIn ? '<a href="#/">回到總覽</a>' : '<a href="#/login">登入</a>') + '</p>';
+      });
+    }
+    if (!token) { next(box.innerHTML); return; }
+    API.verifyEmail(token).then(function (r) {
+      if (ME && ME.user) ME.user.emailVerified = true;
+      sub.textContent = 'email 確認好了。';
+      next('<p class="fgt__t"><b>' + esc(r.email) + '</b> 是你的，確認完成。</p>' +
+           '<p class="fgt__h">之後忘記密碼，重設信會寄到這個信箱。</p>');
+    }).catch(function (e) {
+      sub.textContent = '這個連結不能用了。';
+      next('<p class="fgt__t">' + esc(e.message) + '</p>');
+    });
+  }
+
   /* 信裡的連結是 #/reset/<token>。進來之後把 token 收進記憶體、從網址列拿掉——
      不然它會一直躺在瀏覽紀錄裡，旁邊的人也看得到。 */
   var RESET_TOKEN = '';
@@ -3224,7 +3294,7 @@
       return '<button type="button" class="thm__i' + (on ? ' on' : '') + '" data-theme-pick="' + esc(t.id) + '" ' +
           'aria-pressed="' + on + '">' +
         '<span class="thm__pv" data-theme="' + esc(t.id) + '" aria-hidden="true">' +
-          '<span class="thm__hi">午安</span>' +
+          '<span class="thm__hi">' + greet() + '</span>' +
           '<span class="thm__s thm__s--1"></span><span class="thm__s thm__s--2"></span>' +
           '<span class="thm__c">6,770<i></i></span>' +
           '<span class="thm__q"><b></b><b></b><b></b><b></b></span>' +
@@ -3409,11 +3479,11 @@
                  advice: vAdvice, members: vMembers,
                  login: vLogin, register: vRegister, profile: vProfile,
                  member: vMember, groups: vGroups, admin: vAdmin,
-                 setup: vSetup, forgot: vForgot, reset: vReset };
+                 setup: vSetup, forgot: vForgot, reset: vReset, verify: vVerify };
 
   var OPEN = ['login', 'register', 'forgot'];      // 沒登入也能看的頁（登入了就送回總覽）
-  /* 登入與否都能開：信裡的重設連結可能在「還登入著」的瀏覽器上點開，不能把人送走 */
-  var ANY = ['reset'];
+  /* 登入與否都能開：信裡的重設連結、驗證連結可能在「還登入著」的瀏覽器上點開，不能把人送走 */
+  var ANY = ['reset', 'verify'];
 
   function paint() {
     // #/member/U3/T1051 → ['member', 'U3', 'T1051']

@@ -252,6 +252,8 @@ window.DATA = {
              ['suspended_at', 'TIMESTAMPTZ', 'NULL = 正常。⚠️ 停權只擋登入與寫入，不刪任何資料'],
              ['suspended_reason', 'TEXT', '停權理由。沒有理由的停權就是任意封鎖'],
              ['onboarded_at', 'TIMESTAMPTZ', 'NULL = 還沒走完註冊後的個人化設定（存款目標、理財習慣、主題），登入後先帶去設定'],
+             ['email_verified_at', 'TIMESTAMPTZ', 'NULL = 還沒點驗證信的連結。照樣能用，首頁會提醒去收信'],
+             ['email_verify_sent_at', 'TIMESTAMPTZ', '上一次寄驗證信的時間，重寄要隔 60 秒'],
              ['avatar_bytes', 'BYTEA', '大頭貼（前端已縮到 256×256）。⚠️ 存資料庫不存檔案：Render 的磁碟重新部署就清空'],
              ['avatar_mime', 'TEXT', 'image/jpeg／png／webp。用 toolkit/images.py 驗過的真實格式，不信副檔名'],
              ['finance_style', 'TEXT', '理財風格 id：safe／balanced／growth'],

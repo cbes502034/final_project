@@ -52,6 +52,8 @@ async function rec(name, ...args) {
   await rec('financeProfile');
   await rec('setFinanceProfile', { style: 'balanced', goals: ['emergency', 'travel'], habits: ['dca'], note: '每月定期定額 3,000' });
   await rec('verifyPassword', 'daming-pass-1');
+  await rec('resendVerifyEmail');
+  await rec('verifyEmail', 'x'.repeat(43));
   await rec('sessions');
   await rec('categories');
   await rec('createFamily', { name: '王家' });

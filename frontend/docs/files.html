@@ -157,7 +157,7 @@ PostgreSQL
             <tr><td class="tight"><b style="color:var(--up)">綠字</b></td>
                 <td><b>已經寫好、完整可用</b>，直接 import，不要改</td></tr>
             <tr><td class="tight"><b style="color:var(--warn)">黃字刪除線</b></td>
-                <td><b>骨架在、內容還沒做</b>：路由還回 501（<code>@stub</code>）。<b>現在已經沒有了</b>——70 支路由都做完了</td></tr>
+                <td><b>骨架在、內容還沒做</b>：路由還回 501（<code>@stub</code>）。<b>現在已經沒有了</b>——72 支路由都做完了</td></tr>
           </tbody>
         </table>
       </div>
@@ -210,7 +210,7 @@ PostgreSQL
 │   │   ├── <em>toolkit/</em>          <em>已經寫好的工具（見 03）</em>
 │   │   ├── <em>models/</em>           <em>20 張表，跟 data.js 的 schema 逐欄對齊</em>
 │   │   ├── <em>schemas/</em>          <em>請求主體，欄位名字跟前端送的一樣</em>
-│   │   ├── <em>routers/</em>          <em>70 支路由：一個領域一個資料夾（全部做完）</em>
+│   │   ├── <em>routers/</em>          <em>72 支路由：一個領域一個資料夾（全部做完）</em>
 │   │   │   ├── <em>auth/</em>         <em>認證</em>
 │   │   │   ├── <em>ledger/</em>       <em>記帳</em>
 │   │   │   ├── <em>analytics/</em>    <em>數字</em>
@@ -260,7 +260,7 @@ PostgreSQL
             <tr><td><span class="fname">backend/app/cli.py</span></td><td>小工具指令：建 .env、檢查設定、建表放系統分類、設定平台管理員</td><td class="tight">已交付</td></tr>
             <tr><td><span class="fname">backend/app/models/</span></td><td>20 張表。<b>資料庫裡存什麼</b>。改欄位三處一起改：data.js → models → Alembic</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/schemas/</span></td><td>請求主體的形狀。<b>API 收什麼</b>——回應用 <code>crud.to_dict</code>，密碼雜湊預設就不會送出去</td><td class="tight">各自</td></tr>
-            <tr><td><span class="fname">backend/app/routers/</span></td><td>70 支路由，<b>一個領域一個資料夾</b>（<code>auth/</code> 認證、<code>ledger/</code> 記帳、<code>analytics/</code> 數字、<code>access/</code> 家庭）。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
+            <tr><td><span class="fname">backend/app/routers/</span></td><td>72 支路由，<b>一個領域一個資料夾</b>（<code>auth/</code> 認證、<code>ledger/</code> 記帳、<code>analytics/</code> 數字、<code>access/</code> 家庭）。守衛、主體、說明寫好，內容回 501（<code>@stub</code>）等你做。<b>不寫計算</b></td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/app/services/</span></td><td>加總與模型。<code>llm/client.py</code> 已完成；<code>parse</code>、<code>advice</code>、<code>analytics.summary</code> 要做。<b>不碰 HTTP</b>，所以可以直接測</td><td class="tight">各自</td></tr>
             <tr><td><span class="fname">backend/alembic/</span></td><td>資料庫結構的版本。部署時啟動前自動 <code>alembic upgrade head</code></td><td class="tight">共同</td></tr>
             <tr><td><span class="fname">backend/.env.example</span></td><td>設定範本，依「共用／認證～4」分段；<code>python -m app.cli init-env</code> 從它建出 .env</td><td class="tight">共同</td></tr>
@@ -289,6 +289,7 @@ PostgreSQL
             <tr><td><span class="fname">deps.py</span></td><td>FastAPI 依賴</td><td><code>current_user_id</code>、<code>paging</code></td></tr>
             <tr><td><span class="fname">errors.py</span></td><td>HTTPException</td><td><code>not_found</code>、<code>forbidden</code>、<code>unauthorized</code></td></tr>
             <tr><td><span class="fname">period.py</span></td><td>日期計算</td><td><code>month_range</code>、<code>recent_months</code></td></tr>
+            <tr><td><span class="fname">email_verify.py</span></td><td>註冊後的 email 驗證信</td><td><code>make_token</code>、<code>read_token</code>、<code>verify_link</code>、<code>mail_content</code></td></tr>
             <tr><td><span class="fname">dates.py</span></td><td>時間詞換算</td><td><code>resolve</code>（「昨天」→ 日期）、<code>find</code>（在整句裡找）</td></tr>
             <tr><td><span class="fname">money.py</span></td><td>Decimal</td><td><code>to_decimal</code>、<code>ratio</code>、<code>quantize</code></td></tr>
             <tr><td><span class="fname">images.py</span></td><td>圖片驗證</td><td><code>validate_avatar</code>、<code>from_data_uri</code></td></tr>

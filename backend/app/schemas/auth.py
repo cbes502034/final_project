@@ -48,6 +48,11 @@ class PasswordResetIn(BaseModel):
     email: str
 
 
+class VerifyEmailIn(BaseModel):
+    """驗證信連結裡的 token（#/verify/<token> 那一段）。"""
+    token: str = Field(min_length=1, max_length=2000)
+
+
 class PasswordResetConfirmIn(BaseModel):
     token: str
     password: str

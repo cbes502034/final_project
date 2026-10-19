@@ -25,7 +25,7 @@ uvicorn app.main:app --reload
 
 打開 <http://localhost:8000/docs> ——
 FastAPI 自動產生的互動式文件，**可以直接在上面送出請求試打**，
-不需要寫前端，也不需要 Postman。70 支路由都在上面，還沒做的回 501。
+不需要寫前端，也不需要 Postman。72 支路由都在上面，還沒做的回 501。
 
 看自己剛剛寫進去的資料（不用裝任何工具）：
 
@@ -192,7 +192,7 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
 
 | 領域 | 資料夾 | 路由 |
 |---|---|---|
-| 認證 | `app/routers/auth/` | 19 支 |
+| 認證 | `app/routers/auth/` | 21 支 |
 | 記帳 | `app/routers/ledger/` | 19 支 |
 | 數字 | `app/routers/analytics/` | 11 支 |
 | 家庭 | `app/routers/access/` | 21 支 |
@@ -228,6 +228,8 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
 | 認證 | `JWT_ALGORITHM` |  | 預設 `HS256`。 |
 | 認證 | `ACCESS_TOKEN_MINUTES` |  | 預設 `30`。access token 有效期（分鐘）。刻意設短：外洩時損害只持續這麼久，前端會自動續期。 |
 | 認證 | `REFRESH_TOKEN_DAYS` |  | 預設 `14`。refresh token 有效期（天）。存在 sessions 表，可以撤銷。 |
+| 認證 | `EMAIL_VERIFY_MINUTES` |  | 預設 `1440`。註冊驗證信的連結幾分鐘後失效，預設 1440（24 小時）。測試過期時暫時設短（例如 3），測完刪掉這個變數。 |
+| 認證 | `PASSWORD_RESET_MINUTES` |  | 預設 `30`。重設密碼連結幾分鐘後失效，預設 30。測試過期時暫時設短（例如 3），測完刪掉這個變數。 |
 | 認證 | `BREVO_API_KEY` |  | Brevo 的 API 金鑰（Brevo 後台 → SMTP & API → API keys），忘記密碼寄信用。**不可以 commit**。 |
 | 認證 | `MAIL_FROM` |  | 寄件信箱。一定要先在 Brevo 的 Senders 驗證過，不然信會被拒絕。 |
 | 認證 | `MAIL_FROM_NAME` |  | 預設 `家庭記帳`。收件人看到的寄件人名稱。 |
@@ -244,7 +246,7 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
 | 數字 | `ADVICE_EFFORT` |  | 預設 `medium`。只有 Claude 用：建議要寫成人話，比解析多想一點。 |
 | 數字 | `SAVINGS_WARN_RATIO` |  | 預設 `0.8`。支出達可支配上限的幾成算「接近上限」。前端 data.js 的 savingsRule 要一致。 |
 | 數字 | `SAVINGS_OVER_RATIO` |  | 預設 `1.0`。幾成算「超過」。 |
-| 家庭 | `INVITE_TTL_DAYS` |  | 預設 `7`。邀請與邀請碼幾天後失效。產生時呼叫 family.expires_at(days=settings.invite_ttl_days)。 |
+| 家庭 | `INVITE_TTL_DAYS` |  | 預設 `7`。邀請與邀請碼幾天後失效。產生時呼叫 family.expires_at(days=settings.invite_ttl_days)。可以填小數：測試過期時暫時設 0.002（約 3 分鐘），測完刪掉這個變數。 |
 
 模型服務沒設定時（Claude 沒填金鑰、OpenAI 相容的沒填網址）`services/llm/client.py` 回 `None`：解析與建議的路由回 **503**，前端用規則頂著，畫面照常能用。三種填法（Claude／OpenAI／我們微調的模型）見 `docs/03-LLM實作規劃.md` 第 2 節，換來換去程式碼一行都不用改。
 

@@ -3,7 +3,7 @@
 領域：認證（）
 
 這個資料夾裡的檔案**只有你會動**：
-    auth.py（19 支裡的 16 支）、admin.py（平台管理員 3 支）
+    auth.py（21 支裡的 18 支）、admin.py（平台管理員 3 支）
 
 共用的東西不在這裡，在上一層：
     app/routers/_stub.py       @stub 與 not_ready()（認證 維護）
