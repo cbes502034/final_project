@@ -1657,6 +1657,10 @@ def test_新用戶的導覽步數照實際出現的算():
     for need in ('data-nav="entry"', 'data-nav="advice"', 'data-nav="members"', 'data-nav="groups"'):
         assert any(need in s for s in sels), "導覽少了新用戶看得到的那一步：" + need
     assert "TOURV = TOUR.filter(" in app, "開始時要先算出這一次看得到的步驟"
+    start = app[app.index("function tourStart("):app.index("function tourEnd(")]
+    # 線上資料慢：等功能格子與「還可以花」那張卡畫出來再算，不能只等固定的 0.5 秒（子女帳號曾經只剩 3 步）
+    assert "querySelector('.dgrid')" in start and "querySelector('.wal__card')" in start
+    assert "}, 500);" not in start
     paint = app[app.index("function tourGo("):app.index("/* 說明框的位置。")]
     assert "TOUR.length" not in paint and "TOUR[" not in paint, "步數與步驟要用 TOURV（看得到的那幾步）"
 

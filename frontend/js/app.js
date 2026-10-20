@@ -2638,13 +2638,20 @@
           '<div class="tour__box" id="tourBox"></div>' +
         '</div>'));
     }
-    /* 先回總覽（每一步都在總覽上），等畫面畫好，算出這一次看得到的步驟 */
+    /* 先回總覽（每一步都在總覽上），等畫面畫好，算出這一次看得到的步驟。
+       ⚠️ 不能只等固定的時間：線上的資料比本機慢，0.5 秒時卡片和功能格子常常還沒畫出來，
+          會被當成「看不到」整步略過（子女帳號曾經只剩 3 步）。
+          所以等到功能格子出現、而且「還可以花」那張卡也出來（數字拿不到的話最多等 3 秒）。 */
     if (location.hash !== '#/' && location.hash !== '') location.hash = '#/';
-    setTimeout(function () {
+    var t0 = Date.now();
+    (function ready() {
+      var waited = Date.now() - t0;
+      var drawn = document.querySelector('.dgrid') && (document.querySelector('.wal__card') || waited > 3000);
+      if (!drawn && waited < 6000) { setTimeout(ready, 150); return; }
       TOURV = TOUR.filter(function (st) { return tourVisible(st.sel); });
       if (!TOURV.length) { tourEnd(); return; }
       tourGo(1);
-    }, 500);
+    })();
   }
 
   function tourEnd() {
