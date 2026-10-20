@@ -39,7 +39,8 @@ window.DATA = {
   financeStyles: [
     { id: 'safe', name: '保守', desc: '先求穩，不追高報酬' },
     { id: 'balanced', name: '平衡', desc: '穩健為主，留一部分做成長' },
-    { id: 'growth', name: '積極', desc: '願意承擔波動換成長' }
+    { id: 'growth', name: '積極', desc: '願意承擔波動換成長' },
+    { id: 'unsure', name: '還不確定', desc: '先記帳看看再決定' }
   ],
 
   financeGoals: [
@@ -48,14 +49,41 @@ window.DATA = {
     { id: 'debt', name: '還債' },
     { id: 'travel', name: '旅遊' },
     { id: 'education', name: '子女教育' },
-    { id: 'retire', name: '退休' }
+    { id: 'retire', name: '退休' },
+    { id: 'car', name: '買車' },
+    { id: 'wedding', name: '結婚' },
+    { id: 'study', name: '自己進修' },
+    { id: 'family_care', name: '照顧家人' },
+    { id: 'business', name: '創業' }
   ],
 
   financeHabits: [
     { id: 'dca', name: '定期定額' },
     { id: 'mortgage', name: '房貸' },
     { id: 'insurance', name: '保費' },
-    { id: 'rent', name: '房租' }
+    { id: 'rent', name: '房租' },
+    { id: 'car_loan', name: '車貸、信貸' },
+    { id: 'student_loan', name: '學貸' },
+    { id: 'installment', name: '信用卡分期' },
+    { id: 'family_support', name: '固定給家裡' },
+    { id: 'subscription', name: '固定訂閱（影音、手機）' },
+    { id: 'tuition', name: '學費、補習費' }
+  ],
+
+  /* 收入怎麼來（新用戶設定第一步、個人資料）。每一種預先配好算法（mode：fixed 固定月薪／auto 自動估／actual 只算已入帳），
+     使用者可以自己改；「其他」讓他自己寫。可花上限的收入一律是 max(已入帳, 預計收入)。
+     ⚠️ 只拿來決定怎麼估、建議的做法，不拿來推測或評價收入高低、身分。 */
+  incomeTypes: [
+    { id: 'salary_end', name: '月薪（月底或月中發）', mode: 'fixed' },
+    { id: 'salary_start', name: '月薪（月初發）', mode: 'fixed' },
+    { id: 'hourly', name: '時薪、日薪、打工', mode: 'auto' },
+    { id: 'freelance', name: '接案、自由工作', mode: 'auto' },
+    { id: 'commission', name: '底薪加獎金、抽佣', mode: 'auto' },
+    { id: 'business', name: '自己做生意', mode: 'auto' },
+    { id: 'pension', name: '退休金、年金', mode: 'fixed' },
+    { id: 'family', name: '家人給的生活費', mode: 'fixed' },
+    { id: 'none', name: '目前沒有固定收入', mode: 'actual' },
+    { id: 'other', name: '其他（自己寫）', mode: 'auto' }
   ],
 
   /* ---------- 帳本可以選的顏色 ----------
@@ -153,7 +181,7 @@ window.DATA = {
   savingsRule: {
     warnAt: 0.8,          // 支出達可支配上限的 80% → 提醒
     overAt: 1.0,          // 超過 100% → 警告
-    note: '可支配上限 = 本月收入 − 每月存款目標。支出超過上限，就代表這個月存不到原本設定的金額。'
+    note: '可支配上限 = 本月收入 − 每月存款目標。收入還沒入帳時先用預計收入（取已入帳與預計比較多的那個）。支出超過上限，就代表這個月存不到原本設定的金額。'
   },
 
   /* 家庭。一個人同時只屬於一個家庭（members[].familyId）。
@@ -221,7 +249,8 @@ window.DATA = {
     { rule: '不提供投資、保險、稅務建議', why: '這些屬於受規範的專業意見，超出本系統範圍' },
     { rule: '不對個人做價值判斷', why: '只描述數字與趨勢，不說「你太浪費」這類評價' },
     { rule: '使用者填的理財習慣只當背景，不據此給投資建議', why: '「我有定期定額」解釋了錢去哪，但不代表可以建議買什麼；而且那段自由文字要標示成資料，不是指令——建議會給監管者看，不隔離的話子女可以操控父母看到的內容' },
-    { rule: '受監管者的建議同時送給監管者', why: '監管是本系統的設計目的，但必須雙方都看得到' }
+    { rule: '受監管者的建議同時送給監管者', why: '監管是本系統的設計目的，但必須雙方都看得到' },
+    { rule: '收入方式只決定建議的做法，不推測、不評價', why: '固定月薪、收入不固定、只算已入帳，需要的做法不一樣（照發薪週期分配／先留緩衝）；但薪資結構不能拿來推測或提到收入高低、職業、家境、社會階層，也不能因此給不同的評價' }
   ],
 
 
@@ -260,6 +289,10 @@ window.DATA = {
              ['finance_goals', 'JSONB', '目前最在意的 id 陣列，只收清單裡有的'],
              ['finance_habits', 'JSONB', '固定的財務安排 id 陣列'],
              ['finance_note', 'TEXT', '補充說明，最多 200 字。⚠️ 組 prompt 時標示成資料，不是指令（toolkit/profile.py）'],
+             ['income_mode', 'TEXT', '收入怎麼算：auto 自動估（近 3 個月平均，還沒紀錄用 expected_income）／fixed 固定月薪／actual 只算已入帳。預設 auto'],
+             ['expected_income', 'NUMERIC(14,2)', '每月預計收入。可花上限用 max(這個月已入帳, 預計)：月底才發薪、日薪、打工的人月初不會變負數'],
+             ['income_type', 'TEXT', '收入怎麼來：incomeTypes 的 id（月薪、時薪日薪打工、接案…、other）。只決定怎麼估與建議的做法'],
+             ['income_note', 'TEXT', '選「其他」時自己寫的收入方式，最多 30 字。⚠️ 進 prompt 前一樣當資料洗過（toolkit/profile.py）'],
              ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', ''],
              ['last_active_at', 'TIMESTAMPTZ', '最後一次有登入狀態的請求。平台管理頁的紅綠燈看它，每 30 秒最多寫一次'],
              ['deleted_at', 'TIMESTAMPTZ', 'NULL = 正常。刪除帳號後只留墓碑：名字、email 抹掉，紀錄全部刪除（toolkit/account.py）']] },

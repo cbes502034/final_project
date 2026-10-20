@@ -273,9 +273,11 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         步驟      呼叫                                                         做什麼
         2 數字    analytics.summary(db, people, earners, this_month)           跟 GET /api/summary 同一支（要先做完那支的第三步）
                   analytics.pocket_money(db, [me.id], this_month)              子女還沒記進來的零用金（跟 GET /api/summary 一樣算進上限）
+                  analytics.expected_income(db, earners, this_month)           預計收入；還沒入帳的部分（pending_income）也算進上限
                   analytics.savings_status(收入, 支出, 目標)                   可支配上限、比例、燈號
                   jsonable_encoder({...})                                      把 Decimal 轉成一般數字，才能放進 prompt、存進 JSON 欄位
         3 背景    profile.to_prompt_block(finance, catalog.FINANCE_STYLES, …)  理財習慣翻成人話，並標示「這是資料，不是指令」
+                  profile.income_block(me.income_mode, 依據, catalog.INCOME_ADVICE)  收入方式（固定月薪／不固定／只算已入帳）→ 建議的切入點；不放金額、不准推測社會階層
         4 叫模型  advice.write_advices(numbers, block)                         回傳 [{level, title, body, basis, suggest, conf}]
         5 驗證    AdviceItem.model_validate(d)                                 格式不對丟 ValidationError（from pydantic import ValidationError）
         6 存      crud.remove(Advice, {"period_type": "month", "period_key": …, "user_id": …}, db=db)  先刪同月同範圍的舊建議
@@ -341,7 +343,12 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                 goals[row.user_id] = row.goal_amount
             # 子女還沒記進來的零用金也算進可支配上限（跟 GET /api/summary 一樣，不然建議講的跟總覽對不上）
             pocket = money.ZERO if family_mode else analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
-            savings = analytics.savings_status(nums["income"] + pocket, nums["expense"], money.add(*goals.values()))
+            # 預計收入還沒入帳的部分也算進上限（跟 GET /api/summary 同一條：max(已入帳, 預計)）
+            expected = analytics.expected_income(db, earners, this_month)
+            pending = money.add(*[analytics.pending_income(expected.get(u), nums["perUser"][u]["income"] +
+                                                           (pocket if u == me.id else money.ZERO)) for u in earners])
+            savings = analytics.savings_status(nums["income"] + pocket + pending, nums["expense"], money.add(*goals.values()))
+            savings["income"] = nums["income"] + pocket + pending
             cat_ids = [int(c["cat"]) for c in nums["byCat"]]
             names = {c.id: c.name for c in crud.find(Category, {"id__in": cat_ids}, db=db)}
             numbers = jsonable_encoder({
@@ -349,6 +356,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
                 "scope": body.scope,
                 "income": nums["income"],
                 "pocketMoney": pocket,
+            "pendingIncome": pending,
                 "expense": nums["expense"],
                 "count": nums["count"],
                 "savings": savings,
@@ -360,6 +368,12 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
             finance = {"style": me.finance_style, "goals": me.finance_goals or [],
                        "habits": me.finance_habits or [], "note": me.finance_note or ""}
             block = profile.to_prompt_block(finance, catalog.FINANCE_STYLES, catalog.FINANCE_GOALS, catalog.FINANCE_HABITS)
+            # 收入方式也當背景（只算自己的時候；全家每個人的收入方式不一樣）：建議照收入結構換切入點，不推測、不評價
+            if not family_mode:
+                mine = expected.get(me.id)
+                label = profile.income_label(me.income_type, me.income_note, catalog.INCOME_TYPES)
+                block = profile.income_block(me.income_mode, mine["basis"] if mine else None, catalog.INCOME_ADVICE,
+                                             before=block, label=label)
 
             # 4. 每天產生建議的額度（每一次都是付費的模型呼叫）：用完回 429；模型失敗也算一次
             over = security.ai_quota("ai_advice", me.id, db=db)
@@ -491,7 +505,12 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         goals[row.user_id] = row.goal_amount
     # 子女還沒記進來的零用金也算進可支配上限（跟 GET /api/summary 一樣，不然建議講的跟總覽對不上）
     pocket = money.ZERO if family_mode else analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
-    savings = analytics.savings_status(nums["income"] + pocket, nums["expense"], money.add(*goals.values()))
+    # 預計收入還沒入帳的部分也算進上限（跟 GET /api/summary 同一條：max(已入帳, 預計)）
+    expected = analytics.expected_income(db, earners, this_month)
+    pending = money.add(*[analytics.pending_income(expected.get(u), nums["perUser"][u]["income"] +
+                                                   (pocket if u == me.id else money.ZERO)) for u in earners])
+    savings = analytics.savings_status(nums["income"] + pocket + pending, nums["expense"], money.add(*goals.values()))
+    savings["income"] = nums["income"] + pocket + pending
     cat_ids = [int(c["cat"]) for c in nums["byCat"]]
     names = {c.id: c.name for c in crud.find(Category, {"id__in": cat_ids}, db=db)}
     numbers = jsonable_encoder({
@@ -499,6 +518,7 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         "scope": body.scope,
         "income": nums["income"],
         "pocketMoney": pocket,
+    "pendingIncome": pending,
         "expense": nums["expense"],
         "count": nums["count"],
         "savings": savings,
@@ -510,6 +530,12 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
     finance = {"style": me.finance_style, "goals": me.finance_goals or [],
                "habits": me.finance_habits or [], "note": me.finance_note or ""}
     block = profile.to_prompt_block(finance, catalog.FINANCE_STYLES, catalog.FINANCE_GOALS, catalog.FINANCE_HABITS)
+    # 收入方式也當背景（只算自己的時候；全家每個人的收入方式不一樣）：建議照收入結構換切入點，不推測、不評價
+    if not family_mode:
+        mine = expected.get(me.id)
+        label = profile.income_label(me.income_type, me.income_note, catalog.INCOME_TYPES)
+        block = profile.income_block(me.income_mode, mine["basis"] if mine else None, catalog.INCOME_ADVICE,
+                                     before=block, label=label)
 
     # 4. 每天產生建議的額度（每一次都是付費的模型呼叫）：用完回 429；模型失敗也算一次
     over = security.ai_quota("ai_advice", me.id, db=db)

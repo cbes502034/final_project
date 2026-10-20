@@ -70,6 +70,7 @@ KINDS: dict[str, tuple[str | None, str]] = {
     "ai_quota": ("medium", "今天的 AI 額度用完了"),
     "verify_locked": ("high", "重大操作前的密碼確認錯太多次，鎖 15 分鐘"),
     "lookup_limited": ("medium", "用帳號找人太頻繁（疑似在試帳號）"),
+    "accounts_reset": ("high", "所有帳號與紀錄已清空（RESET_ACCOUNTS）"),
 }
 
 LEVEL_TEXT = {"high": "高", "medium": "中", "low": "低"}

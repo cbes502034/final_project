@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, LargeBinary, Text, Uuid
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, LargeBinary, Numeric, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models._types import BigID, JSONType, utcnow
@@ -67,6 +68,13 @@ class User(Base):
     finance_habits: Mapped[Any | None] = mapped_column(JSONType, nullable=True)
     # 補充說明，最多 200 字。⚠️ 組 prompt 時標示成資料，不是指令（toolkit/profile.py）
     finance_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 收入怎麼算（可花上限用）：auto 近 3 個月平均（還沒紀錄就用 expected_income）／fixed 固定月薪／actual 只算已入帳
+    income_mode: Mapped[str] = mapped_column(Text, nullable=False, default="auto", server_default="auto")
+    # 每月預計收入：fixed 的金額；auto 還沒有紀錄時的起始估計
+    expected_income: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    # 收入怎麼來（catalog.INCOME_TYPES 的 id）；選「其他」時自己寫的（最多 30 字）
+    income_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    income_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 最後一次有登入狀態的請求。平台管理頁的紅綠燈看它（守衛每 30 秒最多寫一次）

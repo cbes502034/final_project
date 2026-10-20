@@ -64,11 +64,17 @@ log = logging.getLogger("fambudget")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """服務啟動時：把 ADMIN_EMAILS 的帳號設成平台管理員。
+    """服務啟動時：RESET_ACCOUNTS（一次性清空所有帳號）→ 預設的平台管理員 → 把 ADMIN_EMAILS 的帳號設成平台管理員。
 
     Render 免費方案沒有 Shell 可以下 python -m app.cli make-admin，所以啟動時自己跑一次。
     已經加入家庭或記過帳的帳號不會被設（見 cli.promote_admins）。資料庫連不上也不能讓服務起不來。
     """
+    try:
+        from app.toolkit import account
+        for line in await run_in_threadpool(account.on_startup, settings):
+            log.warning("啟動：%s", line)
+    except Exception:                # noqa: BLE001
+        log.exception("清空帳號／預設管理員失敗")
     if settings.admin_email_list:
         try:
             from app.cli import promote_admins

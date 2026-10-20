@@ -357,7 +357,34 @@
     if (u && u.onboardedAt === undefined) u.onboardedAt = u.joined ? u.joined + ' 09:00' : null;
     /* email 驗證過了沒。種子帳號當成驗證過；新註冊的明確是 false（總覽會提醒去收信） */
     if (u && u.emailVerified === undefined) u.emailVerified = true;
+    /* 收入怎麼算（可花上限用）。沒設過的人跟後端一樣是 auto、沒有填金額 */
+    if (u && !u.incomeMode) u.incomeMode = 'auto';
+    if (u && u.expectedIncome === undefined) u.expectedIncome = null;
+    if (u && u.incomeType === undefined) u.incomeType = null;
+    if (u && u.incomeNote === undefined) u.incomeNote = null;
     return u;
+  }
+
+  /* 預計收入（跟後端 services/analytics.py 的 expected_income 同一條）：
+     fixed 自己填的月薪；auto 最近 3 個有記帳的月份平均，還沒紀錄用自己填的估計；actual 不估。
+     可花上限的收入一律用 max(已入帳, 預計)——月底才發薪的人月初不會變負數，入帳後不會重複算。 */
+  function expectedOf(s, uid) {
+    var m = memberOf(uid) || {};
+    var mode = m.incomeMode || 'auto', own = Number(m.expectedIncome) || 0;
+    if (mode === 'fixed') return own > 0 ? { amount: own, basis: 'fixed', months: 0 } : null;
+    if (mode !== 'auto') return null;
+    var months = [3, 2, 1].map(function (b) { return shiftMonth(global.DATA.meta.period, -b); });
+    var seen = {}, earned = 0;
+    s.transactions.forEach(function (t) {
+      if (t.user !== uid || (t.kind !== 'income' && t.kind !== 'expense')) return;
+      var ym = String(t.date).slice(0, 7);
+      if (months.indexOf(ym) < 0) return;
+      seen[ym] = true;
+      if (t.kind === 'income') earned += t.amount;
+    });
+    var n = Object.keys(seen).length;
+    if (n && earned > 0) return { amount: Math.round(earned / n), basis: 'average', months: n };
+    return own > 0 ? { amount: own, basis: 'estimate', months: 0 } : null;
   }
 
   function memberOf(id) {
@@ -797,7 +824,11 @@
         [period + ' 紀錄 0 筆'], ['先把今天花的記下來，一段話就能記好幾筆'], 1);
     } else {
       var sv = sm.savings;
-      var basis = ['收入 ' + money(sm.income) + ' − 每月想存 ' + money(sv.goal) + ' ＝ 可以花 ' + money(sv.allowance),
+      var ex = sm.expectedIncome;
+      var pend = ex && Number(ex.pending) > 0 ? Number(ex.pending) : 0;
+      var inc = sv.income !== undefined && sv.income !== null ? Number(sv.income) : sm.income;
+      var basis = [(pend ? '已入帳 ' + money(inc - pend) + '＋還沒入帳的預計收入 ' + money(pend) : '收入 ' + money(inc)) +
+                     ' − 每月想存 ' + money(sv.goal) + ' ＝ 可以花 ' + money(sv.allowance),
                    '支出 ' + money(sm.expense) + ' ÷ 可以花 ' + money(sv.allowance) + ' ＝ ' + Math.round(sv.ratio * 100) + '%'];
       if (sv.level === 'over') {
         add('warn', '這個月存不到目標了', '支出 ' + money(sm.expense) + ' 元，比可以花的多了 ' + money(sv.shortfall) + ' 元。',
@@ -808,6 +839,16 @@
       } else {
         add('ok', '這個月的進度正常', '到目前花了可以花的 ' + Math.round(sv.ratio * 100) + '%，照這個速度存得到目標。',
           basis, ['維持現在的節奏就好'], 0.9);
+      }
+      /* 收入方式不同，做法不同（只講做法；不推測、不評價收入高低或身分） */
+      if (scope !== 'family' && ex && ex.basis === 'fixed' && pend > 0) {
+        add('info', '薪水還沒入帳', '這個月的上限先照預計收入算；薪水進來記一筆收入，就會改用實際的數字。',
+          ['預計收入 ' + money(ex.amount) + '，還沒入帳 ' + money(pend)], ['房租、帳單這類固定的大筆支出，排在發薪之後'], 0.9);
+      } else if (scope !== 'family' && ex && (ex.basis === 'average' || ex.basis === 'estimate')) {
+        add('info', '收入不固定，先留一點緩衝', '收入多的月份先多存一點當緩衝，收入少的月份才不會被打亂。',
+          [ex.basis === 'average' ? '預計收入 ' + money(ex.amount) + ' ＝ 最近 ' + ex.months + ' 個有記帳的月份平均'
+                                  : '預計收入 ' + money(ex.amount) + '（你自己填的估計）'],
+          ['用每週的節奏看花費，不要等到月底'], 0.85);
       }
       if (sm.byCat.length && sm.expense) {
         var top = sm.byCat[0];
@@ -1077,6 +1118,27 @@
         if (p.onboarded !== undefined) {
           if (p.onboarded !== true) throw oops('onboarded 只能是 true', 422);
           if (!m.onboardedAt) q.onboardedAt = new Date().toISOString();
+        }
+        /* 收入怎麼算：三種都用同一條 max(已入帳, 預計)，只差在預計收入從哪裡來 */
+        if (p.incomeMode !== undefined) {
+          if (['auto', 'fixed', 'actual'].indexOf(p.incomeMode) < 0) throw oops('收入的算法只能是 auto、fixed 或 actual', 422);
+          q.incomeMode = p.incomeMode;
+        }
+        if (p.expectedIncome !== undefined) {
+          var ei = p.expectedIncome === null ? null : Number(p.expectedIncome);
+          if (ei !== null && (isNaN(ei) || ei < 0)) throw oops('預計收入要是 0 以上的數字', 422);
+          q.expectedIncome = ei || null;
+        }
+        if (p.incomeType !== undefined) {
+          var types = (global.DATA.incomeTypes || []).map(function (t) { return t.id; });
+          if (p.incomeType !== null && types.indexOf(p.incomeType) < 0) throw oops('沒有這種收入方式', 422);
+          q.incomeType = p.incomeType;
+        }
+        if (p.incomeNote !== undefined) q.incomeNote = String(p.incomeNote || '').replace(/\s+/g, ' ').trim().slice(0, 30) || null;
+        if ((p.incomeMode !== undefined || p.expectedIncome !== undefined) &&
+            ('incomeMode' in q ? q.incomeMode : m.incomeMode) === 'fixed' &&
+            !('expectedIncome' in q ? q.expectedIncome : m.expectedIncome)) {
+          throw oops('選固定月薪，要填每個月大約多少', 422);
         }
         applyPatch(s.patch);
         save();
@@ -1779,7 +1841,17 @@
           var m = memberOf(u);
           return n + (m && m.savingsGoal ? m.savingsGoal : 0);
         }, 0);
-        var allow = income - goal;
+        /* 預計收入還沒入帳的部分也算進上限（選了帳本就不估：預計收入是整個人的） */
+        var oneBook = f.groupId && f.groupId !== 'all';
+        var pending = 0, exps = [];
+        if (!oneBook) earners.forEach(function (u) {
+          var e = expectedOf(s, u);
+          if (!e) return;
+          exps.push(e);
+          pending += Math.max(0, e.amount - txSum(u, 'income'));
+        });
+        var limitIncome = income + pending;
+        var allow = limitIncome - goal;
         var ratio = allow > 0 ? expense / allow : (expense > 0 ? 2 : 0);
         var rule = D.savingsRule;
         var level = ratio >= rule.overAt ? 'over' : (ratio >= rule.warnAt ? 'near' : 'safe');
@@ -1832,8 +1904,13 @@
             level: level,
             shortfall: Math.max(0, expense - allow),
             actual: income - expense,
+            income: limitIncome,
             rule: clone(rule)
           },
+          expectedIncome: exps.length ? {
+            amount: exps.reduce(function (n, e) { return n + e.amount; }, 0), pending: pending,
+            basis: exps.length === 1 ? exps[0].basis : 'mixed', months: exps.length === 1 ? exps[0].months : 0
+          } : null,
           byCat: Object.keys(byCat).map(function (c) {
             var cat = catOf(s, c) || { name: '（找不到的分類）', color: 'cat-other' };
             return { cat: c, name: cat.name, color: cat.color, amount: byCat[c] };

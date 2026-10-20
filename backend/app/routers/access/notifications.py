@@ -22,6 +22,7 @@ from app.guards import block_admin, own
 from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.family import ReadAllIn, ReadOneIn
+from app.services import analytics
 from app.toolkit import alerts, crud, errors, ledger, money, period
 from app.toolkit.db import get_db
 
@@ -101,6 +102,7 @@ def list_notifications(
         步驟      呼叫                                                            做什麼
         1 門檻    crud.find(AlertRule, {…, "enabled": True, "or": [{"fired_period__isnull": True}, {"fired_period__ne": 這個月}]}, db=db)  開著、這個月還沒響過的（NULL 要另外寫，因為 SQL 的 != 不會選到 NULL）
                   money.add(*[…])                                                 收入、支出各自加起來
+                  analytics.pocket_money／expected_income／pending_income        整體的門檻：收入跟總覽同一條（零用金、還沒入帳的預計收入）
                   alerts.usage_percent(支出, 可支配上限)                          用掉幾成，無條件捨去；上限 ≤ 0 也不會爆
                   alerts.should_fire(門檻, 0, 用掉幾成, fired_period, 這個月)     用掉的已經到門檻、而且這個月還沒響 → True（before 傳 0：沒響過的都當作從 0 開始）
                   crud.save(Notification, {…"type": "budget_alert"…}, db=db)      transaction_id 留空（同一筆帳可能同時跨過好幾個門檻）
@@ -132,6 +134,7 @@ def list_notifications(
             from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.family import ReadAllIn, ReadOneIn
+            from app.services import analytics
             from app.toolkit import alerts, crud, errors, ledger, money, period
             from app.toolkit.db import get_db
 
@@ -154,9 +157,15 @@ def list_notifications(
                 for g in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
                     goals[g.group_id] = g.goal_amount                    # 整體目標的鍵是 None
                 names = {g.id: g.name for g in crud.find(Group, {"id__in": {r.group_id for r in rules if r.group_id}}, db=db)}
+                # 整體的門檻跟總覽同一條：已入帳＋還沒記的零用金，再跟預計收入取大的（月底才發薪的人月初不會一直響）
+                pocket = analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
+                expected = analytics.expected_income(db, [me.id], this_month).get(me.id)
                 for rule in rules:
                     rows = [t for t in mine if rule.group_id is None or t["group_id"] == rule.group_id]
                     income = money.add(*[t["amount"] for t in rows if t["kind"] == "income"])
+                    if rule.group_id is None:
+                        income += pocket
+                        income += analytics.pending_income(expected, income)
                     spent = money.add(*[t["amount"] for t in rows if t["kind"] == "expense"])
                     allowance = income - goals.get(rule.group_id, money.ZERO)
                     reached = alerts.usage_percent(spent, allowance)
@@ -243,9 +252,15 @@ def list_notifications(
             goals[g.group_id] = g.goal_amount                    # 整體目標的鍵是 None
         group_ids = list({r.group_id for r in rules if r.group_id})
         names = {g.id: g.name for g in crud.find(Group, {"id__in": group_ids}, db=db)} if group_ids else {}
+        # 整體的門檻跟總覽同一條：已入帳＋還沒記的零用金，再跟預計收入取大的（月底才發薪的人月初不會一直響）
+        pocket = analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
+        expected = analytics.expected_income(db, [me.id], this_month).get(me.id)
         for rule in rules:
             rows = [t for t in mine if rule.group_id is None or t["group_id"] == rule.group_id]
             income = money.add(*[t["amount"] for t in rows if t["kind"] == "income"])
+            if rule.group_id is None:
+                income += pocket
+                income += analytics.pending_income(expected, income)
             spent = money.add(*[t["amount"] for t in rows if t["kind"] == "expense"])
             allowance = income - goals.get(rule.group_id, money.ZERO)
             reached = alerts.usage_percent(spent, allowance)
@@ -367,6 +382,7 @@ def read_notification(
             from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.family import ReadAllIn, ReadOneIn
+            from app.services import analytics
             from app.toolkit import alerts, crud, errors, ledger, money, period
             from app.toolkit.db import get_db
 
@@ -474,6 +490,7 @@ def read_notifications(body: ReadAllIn, me: User, db: Session = Depends(get_db))
             from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.family import ReadAllIn, ReadOneIn
+            from app.services import analytics
             from app.toolkit import alerts, crud, errors, ledger, money, period
             from app.toolkit.db import get_db
 
@@ -587,6 +604,7 @@ def delete_notifications(me: User, ids: str | None = None, db: Session = Depends
             from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.family import ReadAllIn, ReadOneIn
+            from app.services import analytics
             from app.toolkit import alerts, crud, errors, ledger, money, period
             from app.toolkit.db import get_db
 

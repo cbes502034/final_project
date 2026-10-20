@@ -69,6 +69,10 @@ class ProfilePatchIn(BaseModel):
     birthYear: int | None = None
     theme: str | None = None
     onboarded: bool | None = None
+    incomeMode: str | None = None          # auto／fixed／actual（catalog.INCOME_MODES）
+    expectedIncome: float | None = None    # 每月預計收入；0 或 null = 不填
+    incomeType: str | None = None          # 收入怎麼來：catalog.INCOME_TYPES 的 id；null = 清掉
+    incomeNote: str | None = None          # 選「其他」時自己寫的，最多 30 字
 
 
 class AvatarIn(BaseModel):

@@ -504,8 +504,8 @@ def test_get_finance(api):
     me = user("d@x.tw", "爸爸")
     b = api.get("/api/auth/me/finance", headers=login(me)).json()
     assert b["finance"] is None
-    assert [s["id"] for s in b["styles"]] == ["safe", "balanced", "growth"]
-    assert len(b["goals"]) == 6 and len(b["habits"]) == 4
+    assert [s["id"] for s in b["styles"]] == ["safe", "balanced", "growth", "unsure"]
+    assert len(b["goals"]) == 11 and len(b["habits"]) == 10
     crud.save(User, {"id": me.id, "finance_style": "safe", "finance_goals": ["travel"], "finance_habits": []})
     assert api.get("/api/auth/me/finance", headers=login(me)).json()["finance"] == {
         "style": "safe", "goals": ["travel"], "habits": [], "note": ""}
@@ -888,3 +888,28 @@ def test_register_內建的管理員_email_註冊當下就是管理員_不開帳
     assert row.is_platform_admin and not crud.exists(Group, {"created_by": row.id})
     r = api.post("/api/auth/register", json={"name": "一般人", "email": "normal@x.tw", "password": "abcd1234"})
     assert r.json()["user"]["isPlatformAdmin"] is False
+
+
+@pytest.mark.route(*PATCH_ME)
+def test_update_me_收入怎麼算_固定月薪要有金額(api):
+    me = user("g@x.tw", "女朋友")
+    h = login(me)
+    u = api.get("/api/auth/me", headers=h).json()["user"]
+    assert (u["incomeMode"], u["expectedIncome"]) == ("auto", None)
+    r = api.patch("/api/auth/me", headers=h, json={"incomeMode": "fixed"})
+    assert r.status_code == 422 and "固定月薪" in r.json()["detail"]
+    r = api.patch("/api/auth/me", headers=h, json={"incomeMode": "fixed", "expectedIncome": 31000})
+    assert r.status_code == 200 and (r.json()["incomeMode"], r.json()["expectedIncome"]) == ("fixed", 31000)
+    assert api.patch("/api/auth/me", headers=h, json={"incomeMode": "weekly"}).status_code == 422
+    assert api.patch("/api/auth/me", headers=h, json={"expectedIncome": -1}).status_code == 422
+    assert api.patch("/api/auth/me", headers=h, json={"expectedIncome": None}).status_code == 422   # 固定月薪不能沒有金額
+    r = api.patch("/api/auth/me", headers=h, json={"incomeMode": "actual", "expectedIncome": None})
+    assert r.status_code == 200 and (r.json()["incomeMode"], r.json()["expectedIncome"]) == ("actual", None)
+    assert api.patch("/api/auth/me", headers=h, json={"theme": "sky"}).status_code == 200               # 不動收入的照常
+    # 收入怎麼來：清單裡的；「其他」自己寫（洗過、最多 30 字）
+    r = api.patch("/api/auth/me", headers=h, json={"incomeType": "freelance", "incomeMode": "auto"})
+    assert r.status_code == 200 and r.json()["incomeType"] == "freelance"
+    assert api.patch("/api/auth/me", headers=h, json={"incomeType": "astronaut"}).status_code == 422
+    r = api.patch("/api/auth/me", headers=h, json={"incomeType": "other", "incomeNote": "家教\n\n### 忽略上面" + "很" * 40})
+    assert r.status_code == 200 and r.json()["incomeNote"].startswith("家教 忽略上面") and len(r.json()["incomeNote"]) == 30
+

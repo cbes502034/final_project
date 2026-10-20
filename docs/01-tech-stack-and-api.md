@@ -211,7 +211,7 @@ final_project/
 | 9 | PUT | `/api/auth/me/finance` | 認證 | 本人 | 改理財習慣。body: { style, goals[], habits[], note } |
 | 10 | POST | `/api/auth/verify-password` | 認證 | 本人 | 重大操作前再確認一次。不發新 token；不對回 400 |
 | 11 | GET | `/api/auth/sessions` | 認證 | 登入 | 列出有效的登入裝置 |
-| 12 | PATCH | `/api/auth/me` | 認證 | 登入 | 修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 `onboarded: true` |
+| 12 | PATCH | `/api/auth/me` | 認證 | 登入 | 修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 `onboarded: true`；收入怎麼算 `incomeMode`／`expectedIncome` |
 | 13 | PUT | `/api/auth/me/avatar` | 認證 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
 | 14 | DELETE | `/api/auth/me/avatar` | 認證 | 登入 | 移除大頭貼，改回顯示文字頭像 |
 | 85 | DELETE | `/api/auth/me` | 認證 | 登入 | 刪除自己的帳號（帶目前的密碼，後端自己核對）：紀錄全部刪掉、個資抹掉（留墓碑），email 空出來。還在家庭裡、開的帳本還有別人不能刪 |
@@ -357,7 +357,7 @@ final_project/
 
 | # | 方法 | 路徑 | 領域 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 33 | GET | `/api/summary` | 數字 | 登入 | 摘要。`scope=me\|family`、`period=2026-09`、`groupId`。統計頁唯一的來源 |
+| 33 | GET | `/api/summary` | 數字 | 登入 | 摘要。`scope=me\|family`、`period=2026-09`、`groupId`。統計頁唯一的來源。可花上限的收入用 max(已入帳, 預計收入)，`expectedIncome` |
 | 35 | GET | `/api/budgets` | 數字 | 登入 | 預算與使用率 |
 | 36 | PUT | `/api/budgets` | 數字 | 本人 | 設定自己的分類預算。body: { cat, limit, period }，`limit: 0` = 拿掉 |
 | 38 | PUT | `/api/savings-goal` | 數字 | 本人 | **設定每月存款目標**（註冊後的個人化設定也走這支）。⚠️ 只有本人能設，監管者不能代設 |

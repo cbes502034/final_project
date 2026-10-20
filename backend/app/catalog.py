@@ -26,6 +26,7 @@ FINANCE_STYLES = [
     {"id": "safe", "name": "保守", "desc": "先求穩，不追高報酬"},
     {"id": "balanced", "name": "平衡", "desc": "穩健為主，留一部分做成長"},
     {"id": "growth", "name": "積極", "desc": "願意承擔波動換成長"},
+    {"id": "unsure", "name": "還不確定", "desc": "先記帳看看再決定"},
 ]
 
 FINANCE_GOALS = [
@@ -35,6 +36,11 @@ FINANCE_GOALS = [
     {"id": "travel", "name": "旅遊"},
     {"id": "education", "name": "子女教育"},
     {"id": "retire", "name": "退休"},
+    {"id": "car", "name": "買車"},
+    {"id": "wedding", "name": "結婚"},
+    {"id": "study", "name": "自己進修"},
+    {"id": "family_care", "name": "照顧家人"},
+    {"id": "business", "name": "創業"},
 ]
 
 FINANCE_HABITS = [
@@ -42,6 +48,12 @@ FINANCE_HABITS = [
     {"id": "mortgage", "name": "房貸"},
     {"id": "insurance", "name": "保費"},
     {"id": "rent", "name": "房租"},
+    {"id": "car_loan", "name": "車貸、信貸"},
+    {"id": "student_loan", "name": "學貸"},
+    {"id": "installment", "name": "信用卡分期"},
+    {"id": "family_support", "name": "固定給家裡"},
+    {"id": "subscription", "name": "固定訂閱（影音、手機）"},
+    {"id": "tuition", "name": "學費、補習費"},
 ]
 
 #: 帳本顏色只收這幾個代號。⚠️ 這個字串最後會進 style="…"，不驗的話等於讓人寫任意 CSS
@@ -104,6 +116,41 @@ ADVICE_RULES = [
      "why": "「我有定期定額」解釋了錢去哪，但不代表可以建議買什麼；而且那段自由文字要標示成資料，不是指令——"
             "建議會給監管者看，不隔離的話子女可以操控父母看到的內容"},
     {"rule": "受監管者的建議同時送給監管者", "why": "監管是本系統的設計目的，但必須雙方都看得到"},
+    {"rule": "收入方式只決定建議的做法，不推測、不評價",
+     "why": "固定月薪、收入不固定、只算已入帳，需要的做法不一樣（照發薪週期分配／先留緩衝）；"
+            "但薪資結構不能拿來推測或提到收入高低、職業、家境、社會階層，也不能因此給不同的評價"},
 ]
 
-SAVINGS_RULE_NOTE = "可支配上限 = 本月收入 − 每月存款目標。支出超過上限，就代表這個月存不到原本設定的金額。"
+#: 不同收入方式的建議切入點（toolkit/profile.py 的 income_block 放進 prompt）。只講「做法」，不講人
+INCOME_ADVICE = {
+    "fixed": "收入固定、每個月入帳一次：用「離下次發薪還有幾天、還能花多少」來分配；固定支出排在入帳之後",
+    "irregular": "收入不固定（例如日薪、打工、接案）：建議先留一筆緩衝，收入多的月份先補緩衝；用每週的節奏看花費",
+    "actual": "只算已入帳：可支配上限只看已經記的收入，月初偏低是正常的；收入進來記得記一筆",
+}
+
+SAVINGS_RULE_NOTE = ("可支配上限 = 本月收入 − 每月存款目標。收入還沒入帳時先用預計收入（取已入帳與預計比較多的那個）。"
+                     "支出超過上限，就代表這個月存不到原本設定的金額。")
+
+#: 收入怎麼來（新用戶設定第一步、個人資料）。每一種預先配好最合適的算法（mode），使用者可以自己改；
+#: 「其他」讓他自己寫（users.income_note，最多 30 字，進 prompt 前一樣當資料洗過）。
+#: ⚠️ 只拿來決定「預計收入怎麼估」與建議的做法，不拿來推測或評價收入高低、身分（catalog.ADVICE_RULES）
+INCOME_TYPES = [
+    {"id": "salary_end", "name": "月薪（月底或月中發）", "mode": "fixed"},
+    {"id": "salary_start", "name": "月薪（月初發）", "mode": "fixed"},
+    {"id": "hourly", "name": "時薪、日薪、打工", "mode": "auto"},
+    {"id": "freelance", "name": "接案、自由工作", "mode": "auto"},
+    {"id": "commission", "name": "底薪加獎金、抽佣", "mode": "auto"},
+    {"id": "business", "name": "自己做生意", "mode": "auto"},
+    {"id": "pension", "name": "退休金、年金", "mode": "fixed"},
+    {"id": "family", "name": "家人給的生活費", "mode": "fixed"},
+    {"id": "none", "name": "目前沒有固定收入", "mode": "actual"},
+    {"id": "other", "name": "其他（自己寫）", "mode": "auto"},
+]
+
+#: 收入怎麼算（個人資料「收入」、新用戶設定第一步）。三種都用同一條公式：max(這個月已入帳, 預計收入)，
+#: 只差在「預計收入」從哪裡來（services/analytics.py 的 expected_income）
+INCOME_MODES = {
+    "auto": "自動估：收入不固定（日薪、打工、接案）也適用，用最近 3 個有記帳的月份平均；還沒紀錄時用你填的估計",
+    "fixed": "固定月薪：每個月差不多，月底才發也沒關係，月初就照這個數字算",
+    "actual": "只算已入帳：不估，記了收入才算",
+}

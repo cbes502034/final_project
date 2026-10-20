@@ -84,15 +84,16 @@ def get_summary(
         {"period": "2026-09", "scope": "family",
          "income": 68000, "expense": 41230, "count": 42,
          "wardIncome": 500, "allowance": 3000, "pocketMoney": 0, "wardSpend": 1850,
+         "expectedIncome": {"amount": 31000, "pending": 0, "basis": "fixed", "months": 0},
          "savings": {"goal": 20000, "allowance": 48000, "used": 41230, "left": 6770, "ratio": 0.859,
-                     "level": "near", "shortfall": 0, "actual": 26770,
+                     "level": "near", "shortfall": 0, "actual": 26770, "income": 68000,
                      "rule": {"warnAt": 0.8, "overAt": 1.0, "note": "可支配上限 = …"}},
          "byCat": [{"cat": "3", "amount": 18500}],
          "monthly": [{"m": "2026-04", "income": 68000, "expense": 39800}, …共 6 個月，最後一個是本月],
          "yearly": [{"y": "2024", "partial": false, "income": …, "expense": …}, …共 3 年，最後一個是今年],
          "members": [{"id": "3", "name": "王大明", "role": "parent", "avatar": "明", "avatarUrl": null,
                       "income": 68000, "expense": 41230, "savingsGoal": 20000, "allowance": 48000,
-                      "savingsRatio": 0.859, "savingsLevel": "near", "shortfall": 0}]}
+                      "savingsRatio": 0.859, "savingsLevel": "near", "shortfall": 0, "pendingIncome": 0}]}
         欄位                   怎麼來的
         income                 這個月「收入要算的人」（不含照看的孩子）的收入
         expense                這個月所有要算的人的支出
@@ -101,9 +102,13 @@ def get_summary(
         allowance              我給照看的孩子的零用金設定加總（scope=me 時是 0）
         pocketMoney            我是被照看的人時，家長設的零用金裡「我還沒自己記成收入」的部分；已經加進 savings 的可支配上限
                                （孩子沒有薪水，不補的話上限是 0，花一塊錢就「超出計畫」）
-        savings                analytics.savings_status(收入＋pocketMoney, 支出, 存款目標)；目標是每個人最新的一筆加起來，選了帳本就用那本帳的
+        expectedIncome         預計收入（users.income_mode：auto 近 3 個月平均／fixed 固定月薪；actual 或估不出來是 null）。
+                               pending 是「還沒入帳」的部分，已經加進 savings 的可支配上限：收入一律用 max(已入帳, 預計)，
+                               月底才領薪水、日薪、打工的人月初不會變負數，入帳之後也不會重複算。選了帳本是 null（預計收入是整個人的）
+        savings                analytics.savings_status(收入＋pocketMoney＋還沒入帳的預計收入, 支出, 存款目標)；目標是每個人最新的一筆加起來，選了帳本就用那本帳的
+        savings.income         算上限用的收入（前端講「收入 − 每月想存 ＝ 可以花」用這個，不用 income）
         savings.rule           門檻來自設定 SAVINGS_WARN_RATIO／SAVINGS_OVER_RATIO（跟前端 data.js 的 savingsRule 一致）
-        members                每個人的這個月，各自的燈號——家庭整體達標不代表每個人都達標
+        members                每個人的這個月，各自的燈號（各自的預計收入也算進去，pendingIncome）——家庭整體達標不代表每個人都達標
         ⚠️ 帶了 groupId，每一個數字（包括 monthly、yearly、members）都只算那本帳。
         ⚠️ kind = transfer 不進任何加總。金額一律 Decimal，FastAPI 會轉成數字。
 
@@ -119,7 +124,7 @@ def get_summary(
         transactions                                          讀      所有數字的來源（在 analytics.summary 裡查）
         savings_goals                                         讀      每個人的存款目標（最新的一筆）
         allowances                                            讀      我給孩子的零用金設定
-        users、family_members                                 讀      members 的名字、頭像、角色
+        users、family_members                                 讀      members 的名字、頭像、角色；income_mode、expected_income（預計收入）
 
     【每一步用的工具與資料庫方法】
         步驟      呼叫                                                          做什麼
@@ -130,6 +135,8 @@ def get_summary(
         5 目標    crud.find(SavingsGoal, {"user_id__in": people, "group_id": group_id}, order_by="id", db=db)  group_id 是 None 就是整體目標（IS NULL）；後面的蓋掉前面的
                   money.add(*goals.values())                                    全部加起來（沒有就是 0）
                   analytics.pocket_money(db, people, this_month)               被照看的人還沒記成收入的零用金（照家長的設定補）
+                  analytics.expected_income(db, people, this_month)            每個人的預計收入（不估的人不在裡面）
+                  analytics.pending_income(預計, 已算進去的收入)               還沒入帳的部分：max(0, 預計 − 已入帳)
                   analytics.savings_status(收入, 支出, 目標)                    可支配上限、比例、燈號（除以 0 已經處理好）
         6 零用金  crud.find(Allowance, {"payer_id": me.id, "ward_id__in": kids, "period_key__isnull": True}, fields="amount", db=db)  我給每個孩子的設定
         7 每個人  images.to_data_uri(u.avatar_bytes, u.avatar_mime)             有大頭貼才轉成 data URI
@@ -144,7 +151,8 @@ def get_summary(
         3. 有 groupId：要在我加入的帳本裡（403）
         4. analytics.summary 一次算好
         5. 存款目標（整體或那本帳的，每人最新一筆）→ savings_status，再掛上門檻 rule；
-           算自己的時候，被照看的人沒記到的零用金（pocket_money）要加進收入
+           算自己的時候，被照看的人沒記到的零用金（pocket_money）要加進收入；
+           沒選帳本時，每個收入要算的人「還沒入帳的預計收入」（pending_income）也加進去
         6. 零用金設定加總；孩子的收入、支出從 perUser 拿
         7. 每個人各自的燈號，組成 members
         8. 全部組起來回傳
@@ -206,7 +214,19 @@ def get_summary(
             #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
             pocket = analytics.pocket_money(db, list(people), this_month)
             mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
-            savings = analytics.savings_status(nums["income"] + mine_extra, nums["expense"], money.add(*goals.values()))
+            # 預計收入：月底才領薪水、日薪、打工的人，還沒入帳前先照預計的算——收入用 max(已入帳, 預計)，入帳後不會重複算。
+            #           選了帳本就不估：預計收入是整個人的，不屬於哪一本帳
+            expected = analytics.expected_income(db, list(people), this_month) if group_id is None else {}
+            pending = {u: analytics.pending_income(expected.get(u), per_user[u]["income"] + pocket.get(u, money.ZERO))
+                       for u in people}
+            mine_pending = money.add(*[pending[u] for u in earners])
+            savings = analytics.savings_status(nums["income"] + mine_extra + mine_pending, nums["expense"],
+                                               money.add(*goals.values()))
+            savings["income"] = nums["income"] + mine_extra + mine_pending          # 算上限用的收入（前端講算式用）
+            mine_exp = [expected[u] for u in earners if u in expected]
+            expected_view = {"amount": money.add(*[e["amount"] for e in mine_exp]), "pending": mine_pending,
+                             "basis": mine_exp[0]["basis"] if len(mine_exp) == 1 else "mixed",
+                             "months": mine_exp[0]["months"] if len(mine_exp) == 1 else 0} if mine_exp else None
             savings["rule"] = {"warnAt": settings.savings_warn_ratio, "overAt": settings.savings_over_ratio,
                                "note": catalog.SAVINGS_RULE_NOTE}
 
@@ -221,7 +241,7 @@ def get_summary(
             members = []
             for u in crud.find(User, {"id__in": people}, order_by="id", db=db):
                 mine = per_user[u.id]
-                status = analytics.savings_status(mine["income"] + pocket.get(u.id, money.ZERO), mine["expense"],
+                status = analytics.savings_status(mine["income"] + pocket.get(u.id, money.ZERO) + pending[u.id], mine["expense"],
                                                   goals.get(u.id, 0))
                 members.append({
                     "id": str(u.id),
@@ -236,6 +256,7 @@ def get_summary(
                     "savingsRatio": status["ratio"],
                     "savingsLevel": status["level"],
                     "shortfall": status["shortfall"],
+                    "pendingIncome": pending[u.id],
                 })
 
             # 8. 全部組起來
@@ -248,6 +269,7 @@ def get_summary(
                 "wardIncome": money.add(*[per_user[u]["income"] for u in kids]),
                 "allowance": allowance,
                 "pocketMoney": mine_extra,
+                "expectedIncome": expected_view,
                 "wardSpend": money.add(*[per_user[u]["expense"] for u in kids]),
                 "savings": savings,
                 "byCat": nums["byCat"],
@@ -358,7 +380,19 @@ def get_summary(
     #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
     pocket = analytics.pocket_money(db, list(people), this_month)
     mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
-    savings = analytics.savings_status(nums["income"] + mine_extra, nums["expense"], money.add(*goals.values()))
+    # 預計收入：月底才領薪水、日薪、打工的人，還沒入帳前先照預計的算——收入用 max(已入帳, 預計)，入帳後不會重複算。
+    #           選了帳本就不估：預計收入是整個人的，不屬於哪一本帳
+    expected = analytics.expected_income(db, list(people), this_month) if group_id is None else {}
+    pending = {u: analytics.pending_income(expected.get(u), per_user[u]["income"] + pocket.get(u, money.ZERO))
+               for u in people}
+    mine_pending = money.add(*[pending[u] for u in earners])
+    savings = analytics.savings_status(nums["income"] + mine_extra + mine_pending, nums["expense"],
+                                       money.add(*goals.values()))
+    savings["income"] = nums["income"] + mine_extra + mine_pending          # 算上限用的收入（前端講算式用）
+    mine_exp = [expected[u] for u in earners if u in expected]
+    expected_view = {"amount": money.add(*[e["amount"] for e in mine_exp]), "pending": mine_pending,
+                     "basis": mine_exp[0]["basis"] if len(mine_exp) == 1 else "mixed",
+                     "months": mine_exp[0]["months"] if len(mine_exp) == 1 else 0} if mine_exp else None
     savings["rule"] = {"warnAt": settings.savings_warn_ratio, "overAt": settings.savings_over_ratio,
                        "note": catalog.SAVINGS_RULE_NOTE}
 
@@ -373,7 +407,7 @@ def get_summary(
     members = []
     for u in crud.find(User, {"id__in": people}, order_by="id", db=db):
         mine = per_user[u.id]
-        status = analytics.savings_status(mine["income"] + pocket.get(u.id, money.ZERO), mine["expense"],
+        status = analytics.savings_status(mine["income"] + pocket.get(u.id, money.ZERO) + pending[u.id], mine["expense"],
                                           goals.get(u.id, 0))
         members.append({
             "id": str(u.id),
@@ -388,6 +422,7 @@ def get_summary(
             "savingsRatio": status["ratio"],
             "savingsLevel": status["level"],
             "shortfall": status["shortfall"],
+            "pendingIncome": pending[u.id],
         })
 
     # 8. 全部組起來
@@ -400,6 +435,7 @@ def get_summary(
         "wardIncome": money.add(*[per_user[u]["income"] for u in kids]),
         "allowance": allowance,
         "pocketMoney": mine_extra,
+        "expectedIncome": expected_view,
         "wardSpend": money.add(*[per_user[u]["expense"] for u in kids]),
         "savings": savings,
         "byCat": nums["byCat"],

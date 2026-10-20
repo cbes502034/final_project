@@ -192,6 +192,8 @@ def test_固定清單跟_data_js_一致():
     assert catalog.FINANCE_STYLES == _data_js("financeStyles")
     assert catalog.FINANCE_GOALS == _data_js("financeGoals")
     assert catalog.FINANCE_HABITS == _data_js("financeHabits")
+    assert catalog.INCOME_TYPES == _data_js("incomeTypes")
+    assert {t["mode"] for t in catalog.INCOME_TYPES} <= set(catalog.INCOME_MODES)
     assert catalog.ROLES == _data_js("roles")
     assert catalog.PERMISSIONS == _data_js("permissions")
     assert catalog.ADVICE_RULES == _data_js("adviceRules")
@@ -915,3 +917,51 @@ def test_啟動時設定平台管理員_有家庭或記過帳的不設():
     finally:
         db.drop_all()
         db.use_database(original)
+
+
+def test_啟動時清空所有帳號只清一次_預設管理員不用驗證_密碼不在程式裡():
+    """使用者：「所有帳戶全部清空，再設一組管理者帳號，不用驗證」。
+    清空由 RESET_ACCOUNTS 觸發（同一個值只清一次）；管理員帳密從環境變數來，repo 裡沒有。"""
+    from datetime import date
+    from types import SimpleNamespace
+
+    from app.models import Category, Family, FamilyMember, Group, SecurityEvent, Transaction, User
+    from app.toolkit import account, crud, passwords
+
+    original = str(db.engine.url)
+    db.use_database("sqlite://")
+    db.create_all()
+    try:
+        dad = crud.save(User, {"email": "dad@x.tw", "password_hash": "x", "display_name": "爸", "theme": "paper"})
+        fam = crud.save(Family, {"name": "王家", "created_by": dad.id})
+        crud.save(FamilyMember, {"family_id": fam.id, "user_id": dad.id, "role": "parent"})
+        g = crud.save(Group, {"name": "帳", "created_by": dad.id})
+        system = crud.save(Category, {"name": "餐飲", "kind": "expense", "color": "cat-food"})
+        crud.save(Category, {"name": "寵物", "kind": "expense", "color": "cat-other", "family_id": fam.id})
+        crud.save(Transaction, {"user_id": dad.id, "group_id": g.id, "category_id": system.id, "kind": "expense",
+                                "amount": 55, "occurred_on": date(2026, 10, 1), "source": "manual"})
+        cfg = SimpleNamespace(reset_accounts="2026-10-20-final", admin_bootstrap_email="Boss@x.tw",
+                              admin_bootstrap_password="boss-pass-1")
+        out = account.on_startup(cfg)
+        assert "刪掉 1 個帳號、1 筆收支" in out[0] and "建好預設的平台管理員 boss@x.tw" in out[1]
+        assert [c.name for c in crud.find(Category)] == ["餐飲"]                     # 系統分類留著
+        for model in (Family, FamilyMember, Group, Transaction):
+            assert crud.count(model) == 0, model.__name__
+        boss = crud.get(User, where={"email": "boss@x.tw"})
+        assert boss.is_platform_admin and boss.email_verified_at and boss.onboarded_at   # 不用驗證、不用走設定
+        assert passwords.verify_password("boss-pass-1", boss.password_hash)
+        # 重新啟動：同一個 RESET_ACCOUNTS 不會再清（管理員還在）
+        out = account.on_startup(cfg)
+        assert "已經清過了" in out[0] and "是平台管理員" in out[1]
+        assert crud.count(User) == 1 and crud.count(SecurityEvent, {"kind": "accounts_reset"}) == 1
+        # 密碼太弱就不建
+        cfg2 = SimpleNamespace(reset_accounts="", admin_bootstrap_email="weak@x.tw", admin_bootstrap_password="12345678")
+        assert "不合格" in account.on_startup(cfg2)[0] and not crud.exists(User, {"email": "weak@x.tw"})
+    finally:
+        db.drop_all()
+        db.use_database(original)
+
+    # 管理員的密碼不能寫進程式或 repo（repo 是公開的）：預設一定是空的，只從環境變數來
+    from app.toolkit.config import Settings
+    assert Settings.model_fields["admin_bootstrap_password"].default == ""
+    assert Settings.model_fields["reset_accounts"].default == ""

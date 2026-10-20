@@ -3854,3 +3854,20 @@ body[data-page="admin"] #searchBtn, body[data-page="admin"] #searchDrawer, body[
 #view .chip .chip__x:hover { color: var(--down); }
 #view .dz { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 #view .dz__t { margin: 0; font-size: 13px; line-height: 1.75; color: var(--ink-soft); }
+
+/* ---- 收入怎麼算（個人資料）、首頁的指路 ---- */
+#view .inc__o { display: grid; gap: 8px; margin: 10px 0 12px; }
+#view .inc__a { display: grid; gap: 6px; margin-bottom: 10px; }
+#view .inc__a > span:first-child { font-size: 12px; color: var(--ink-faint); }
+#view .wal__hint {
+  display: block; margin-top: 12px; font-size: 12.5px; line-height: 1.7; color: var(--accent);
+  text-decoration: none;
+}
+#view .wal__hint:hover { text-decoration: underline; }
+.inc__note {
+  width: 100%; margin-top: 8px; padding: 9px 12px;
+  background: var(--sunk); border: 1px solid var(--line-2); border-radius: var(--r-input);
+  color: var(--ink); font-family: var(--sans); font-size: 13.5px;
+}
+.inc__note:focus { outline: none; border-color: var(--accent); }
+#view .inc .finf__g { margin: 10px 0 12px; }

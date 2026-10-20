@@ -117,6 +117,27 @@ class Settings(BaseSettings):
         default="https://fambudget-web.onrender.com",
         description="前端網址。重設密碼信裡的連結會長成 <這個網址>/#/reset/<token>。本機改成 http://localhost:5174。",
     )
+    admin_bootstrap_email: str = Field(
+        default="",
+        description=(
+            "預設的平台管理員帳號（email）。跟 ADMIN_BOOTSTRAP_PASSWORD 一起設：服務啟動時直接在資料庫建好、"
+            "已驗證、不用註冊也不用收信。帳號已經存在時只補上管理員與已驗證，不改密碼。"
+        ),
+    )
+    admin_bootstrap_password: str = Field(
+        default="",
+        description=(
+            "預設管理員的密碼。⚠️ 只放 Render 的環境變數，不要寫進程式或 repo（repo 是公開的，"
+            "寫進去等於任何人都能用管理員登入正式站）。至少 8 個字、不能全是數字。"
+        ),
+    )
+    reset_accounts: str = Field(
+        default="",
+        description=(
+            "⚠️ 清空所有帳號，救不回來。填一個這次專用的字（例如 2026-10-20-final），服務啟動時把所有帳號與紀錄"
+            "刪光一次（系統分類留著），做完記住這個字，之後重新啟動不會再清；要再清一次就換一個字。清完可以刪掉這個變數。"
+        ),
+    )
     admin_emails: str = Field(
         default="",
         description=(

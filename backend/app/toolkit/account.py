@@ -102,3 +102,87 @@ def delete_everything(user_id: int, *, db) -> dict:
         "deleted_at": now,
     }, db=db)
     return count
+
+
+# ===========================================================================
+# 服務啟動時：清空所有帳號（一次性）、預設的平台管理員
+# ===========================================================================
+# 使用者 2026-10-20：「所有帳戶全部清空，再設一組管理者帳號，不用驗證、資料庫寫死」。
+# ⚠️ 密碼不寫進程式：repo 是公開的，寫進去等於任何人都能用管理員登入正式站。
+#    改成 Render 的環境變數 ADMIN_BOOTSTRAP_EMAIL／ADMIN_BOOTSTRAP_PASSWORD，啟動時直接寫進資料庫。
+# ⚠️ 清空是救不回來的動作，由使用者自己在 Render 設 RESET_ACCOUNTS 觸發；同一個值只會清一次。
+
+def wipe_all(*, db) -> dict[str, int]:
+    """刪光所有帳號與紀錄，系統分類留著。回傳每張表刪了幾列（只 flush，不 commit）。
+
+    照外鍵的相依順序倒著刪（Base.metadata.sorted_tables 反過來＝先刪指著別人的）。
+    分類只刪家庭自訂的（family_id 不是 NULL），系統分類是遷移建好的，所有人共用。
+    """
+    from app.models import Category  # noqa: F401  確定模型都載入了，sorted_tables 才完整
+    from app.toolkit.db import Base
+
+    counts: dict[str, int] = {}
+    for table in reversed(Base.metadata.sorted_tables):
+        stmt = table.delete()
+        if table.name == "categories":
+            stmt = stmt.where(table.c.family_id.isnot(None))
+        counts[table.name] = db.execute(stmt).rowcount or 0
+    db.flush()
+    return counts
+
+
+def bootstrap_admin(email: str, password: str, name: str = "平台管理員", *, db) -> str:
+    """建好（或補好）預設的平台管理員：已驗證、已走完設定、不用收信。回傳一句給人看的話。
+
+    帳號已經存在：只補上管理員與已驗證，**不改密碼**（改密碼走「改密碼」）；
+    但已經加入家庭或記過帳的帳號不設（跟 cli.promote_admins 同一條：設了他就看不到自己的帳）。
+    """
+    from app.models import FamilyMember, Transaction, User
+
+    email = (email or "").strip().lower()
+    if not email or not password:
+        return "沒有設定 ADMIN_BOOTSTRAP_EMAIL／ADMIN_BOOTSTRAP_PASSWORD，略過"
+    now = datetime.now(timezone.utc)
+    user = crud.get(User, where={"email": email}, db=db)
+    if user is None:
+        try:
+            hashed = passwords.hash_password(password)
+        except ValueError as exc:
+            return "預設管理員的密碼不合格（%s），沒有建立" % exc
+        crud.save(User, {"email": email, "password_hash": hashed, "display_name": name, "theme": "paper",
+                         "is_platform_admin": True, "email_verified_at": now, "onboarded_at": now}, db=db)
+        return "建好預設的平台管理員 %s（已驗證，可以直接登入）" % email
+    if not user.is_platform_admin and (crud.exists(FamilyMember, {"user_id": user.id, "status": "active"}, db=db)
+                                       or crud.exists(Transaction, {"user_id": user.id}, db=db)):
+        return "%s 已經加入家庭或記過帳，不設成平台管理員；請換一個 email" % email
+    changes = {"is_platform_admin": True}
+    if user.email_verified_at is None:
+        changes["email_verified_at"] = now
+    if user.onboarded_at is None:
+        changes["onboarded_at"] = now
+    crud.save(User, {"id": user.id, **changes}, db=db)
+    return "%s 是平台管理員（已驗證）" % email
+
+
+def on_startup(settings) -> list[str]:
+    """服務啟動時跑一次：RESET_ACCOUNTS（一次性清空）→ 預設的平台管理員。回傳給 Render 紀錄看的句子。"""
+    from app.models import SecurityEvent
+    from app.toolkit import security
+    from app.toolkit.db import session_scope
+
+    out = []
+    token = (settings.reset_accounts or "").strip()
+    if token:
+        marker = "RESET_ACCOUNTS=" + token[:100]
+        with session_scope() as db:
+            if crud.exists(SecurityEvent, {"kind": "accounts_reset", "detail": marker}, db=db):
+                out.append("RESET_ACCOUNTS=%s 已經清過了，不再清（要再清一次就換一個值）" % token)
+            else:
+                counts = wipe_all(db=db)
+                security.record("accounts_reset", db=db, detail=marker)
+                out.append("清空所有帳號：刪掉 %d 個帳號、%d 筆收支（RESET_ACCOUNTS=%s）"
+                           % (counts.get("users", 0), counts.get("transactions", 0), token))
+    if settings.admin_bootstrap_email or settings.admin_bootstrap_password:
+        with session_scope() as db:
+            out.append(bootstrap_admin(settings.admin_bootstrap_email, settings.admin_bootstrap_password, db=db))
+    return out

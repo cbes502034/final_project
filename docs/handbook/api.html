@@ -273,7 +273,10 @@
       d: '個人／家庭摘要',
       q: ['scope=me|family', 'period=2026-09', 'groupId'],
       res: '{\n  "period": "2026-09",\n  "scope": "family",\n  "income": 62000,\n  "expense": 1530,\n  "net": 60470,\n  "wardIncome": 0,\n  "allowance": 0,\n  "wardSpend": 180,\n  "rate": 0.975,\n  "count": 3,\n  "savings": {\n    "goal": 15000,\n    "allowance": 47000,\n    "used": 1530,\n    "left": 45470,\n    "ratio": 0.033,\n    "level": "safe",\n    "shortfall": 0,\n    "actual": 60470,\n    "rule": {\n      "warnAt": 0.8,\n      "overAt": 1,\n      "note": "可支配上限 = 本月收入 − 每月存款目標。支出超過上限，就代表這個月存不到原本設定的金額。"\n    }\n  },\n  "byCat": [{ "cat": "C01", "name": "餐飲", "color": "cat-food", "amount": 1350 }, …],\n  "monthly": [{ "m": "2026-04", "income": 0, "expense": 0 }, …],\n  "yearly": [{ "y": "2024", "partial": false, "income": 0, "expense": 0 }, …],\n  "members": [\n    {\n      "id": "U1",\n      "name": "王大明",\n      "email": "daming@wang.tw",\n      "role": "parent",\n      "familyId": "F1",\n      "avatar": "明",\n      "age": 48,\n      "joined": "2026-09-14",\n      "savingsGoal": 15000,\n      "onboardedAt": "2026-09-14T18:31:39.711Z",\n      "birthYear": 1978,\n      "theme": "sky",\n      "avatarUrl": null,\n      "income": 62000,\n      "expense": 1350,\n      "allowance": 47000,\n      "savingsRatio": 0.029,\n      "savingsLevel": "safe",\n      "shortfall": 0\n    },\n    …\n  ]\n}',
-      note: '所有數字從 transactions 加總，帶 groupId 時每一個數字都只算那一本帳。⚠️ 加總一律在後端；<code>net</code>、<code>rate</code>、<code>savings.*</code> 這些衍生值前端補得出來（門檻同一套），後端可以不帶，但 <code>members[].savingsLevel</code> 要後端逐人算。統計頁只打這一支。' },
+      note: '<b>預計收入</b>：可花上限的收入一律用 <code>max(這個月已入帳, 預計收入)</code>——月底才發薪、日薪、打工的人月初不會變負數，入帳之後也不會重複算。'
+        + '預計收入從哪裡來看使用者選的 <code>users.income_mode</code>（auto 近 3 個有記帳的月份平均／fixed 固定月薪／actual 不估），'
+        + '回在 <code>expectedIncome: { amount, pending, basis, months }</code>（不估是 null），<code>savings.income</code> 是算上限用的收入。<br>'
+        + '所有數字從 transactions 加總，帶 groupId 時每一個數字都只算那一本帳（預計收入是整個人的，選了帳本不估）。⚠️ 加總一律在後端；<code>net</code>、<code>rate</code>、<code>savings.*</code> 這些衍生值前端補得出來（門檻同一套），後端可以不帶，但 <code>members[].savingsLevel</code> 要後端逐人算。統計頁只打這一支。' },
     { n: 35, o: 'm3', m: 'GET', p: '/api/budgets', a: '登入',
       d: '預算與使用率',
       q: ['groupId'],
@@ -307,7 +310,8 @@
       d: '修改個人資料：顯示名稱、出生年、介面主題、個人化設定走完',
       body: '{ "displayName": "王大明", "birthYear": 1978 }',
       res: '{\n  "id": "U1",\n  "name": "王大明",\n  "email": "daming@wang.tw",\n  "role": null,\n  "familyId": null,\n  "avatar": "明",\n  "age": 48,\n  "joined": "2026-09-14",\n  "savingsGoal": 0,\n  "onboardedAt": null,\n  "birthYear": 1978,\n  "theme": "paper"\n}',
-      note: '<code>{ "onboarded": true }</code>：註冊後的個人化設定走完（或全部跳過）時送，設 <code>users.onboarded_at</code>。只收 true，其他值回 422。<br>只能改自己的資料，只送要改的欄位。email 不給改——那是登入帳號，要改的話等於換帳號，要另外設計驗證流程。<br><code>theme</code> 只收 <code>paper</code>／<code>sky</code>／<code>tech</code>／<code>literary</code>／<code>pop</code>／<code>girly</code>／<code>cute</code>／<code>art</code>，其他回 422（<code>toolkit.theme.clean_theme()</code>）。<b>換膚不增加後端負擔</b>：只多存一個字串，畫面全在瀏覽器裡換。' },
+      note: '<code>{ "incomeMode": "fixed", "expectedIncome": 31000 }</code>：收入怎麼算（auto 自動估／fixed 固定月薪／actual 只算已入帳）。fixed 一定要有金額，不然 422；金額 0 或 null 是不填。<code>incomeType</code> 收入怎麼來（data.js 的 incomeTypes，10 種，含 other）、<code>incomeNote</code> 選 other 時自己寫（最多 30 字）。前端換算法之前會先問「首頁、建議、提醒都會重算，要繼續嗎」。<br>'
+        + '<code>{ "onboarded": true }</code>：註冊後的個人化設定走完（或全部跳過）時送，設 <code>users.onboarded_at</code>。只收 true，其他值回 422。<br>只能改自己的資料，只送要改的欄位。email 不給改——那是登入帳號，要改的話等於換帳號，要另外設計驗證流程。<br><code>theme</code> 只收 <code>paper</code>／<code>sky</code>／<code>tech</code>／<code>literary</code>／<code>pop</code>／<code>girly</code>／<code>cute</code>／<code>art</code>，其他回 422（<code>toolkit.theme.clean_theme()</code>）。<b>換膚不增加後端負擔</b>：只多存一個字串，畫面全在瀏覽器裡換。' },
     { n: 13, o: 'm1', m: 'PUT', p: '/api/auth/me/avatar', a: '登入',
       d: '上傳大頭貼。前端已縮到 256×256',
       body: '{ "image": "data:image/jpeg;base64,/9j/4AA…" }',

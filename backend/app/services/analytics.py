@@ -40,6 +40,72 @@ def savings_status(income: Any, expense: Any, goal: Any) -> dict[str, Any]:
     }
 
 
+def expected_income(db: Any, users: list[int], period: str) -> dict[int, dict[str, Any]]:
+    """每個人這個月的「預計收入」：{user_id: {"amount": Decimal, "basis": 怎麼來的, "months": 用了幾個月}}。不估的人不在裡面。
+
+    為什麼要有：月底才領薪水、日薪、打工、接案的人，月初還沒有收入，「收入 − 每月想存」一開始就是負的，
+    首頁變成「超出計畫」、提醒一直響。所以可花上限的收入一律用 max(這個月已入帳, 預計收入)——
+    入帳前先照預計的算，入帳後（或賺得比預計多）就是實際的，不會重複算。**算法全系統只有這一條**，
+    使用者在個人資料選的只是「預計收入從哪裡來」（users.income_mode）：
+        auto    最近 3 個完整月份裡、有記帳的那幾個月的平均收入（basis="average"）；收入不固定的人也適用。
+                還沒有任何一個這樣的月份時，用他自己填的起始估計 expected_income（basis="estimate"）
+        fixed   固定月薪：就是 expected_income（basis="fixed"）
+        actual  只算已入帳，不估
+    ⚠️ 沒記帳的月份不算進平均（剛開始用的人，之前幾個月是「沒記」不是「沒收入」）；
+       有記帳但沒有收入的月份要算（收入不固定就是會這樣），平均才不會灌水。
+
+    >>> expected_income(db, [daming.id], "2026-10")     # 固定月薪 31,000
+    {daming.id: {'amount': Decimal('31000.00'), 'basis': 'fixed', 'months': 0}}
+    """
+    from app.models import Transaction, User
+    from app.toolkit import crud, period as periods
+
+    users = list(users)
+    if not users:
+        return {}
+    people = crud.find(User, {"id__in": users}, fields=("id", "income_mode", "expected_income"), db=db)
+    auto = [p["id"] for p in people if (p["income_mode"] or "auto") == "auto"]
+    seen: dict[int, set] = {}
+    earned: dict[int, Decimal] = {}
+    if auto:
+        months = periods.recent_months(periods.shift_month(period, -1), 3)        # 上個月往前 3 個月
+        start, end = periods.month_range(months[0])[0], periods.month_range(months[-1])[1]
+        for t in crud.find(Transaction, {"user_id__in": auto, "kind__in": ["income", "expense"],
+                                         "occurred_on__between": (start, end)},
+                           fields=("user_id", "kind", "amount", "occurred_on"), db=db):
+            seen.setdefault(t["user_id"], set()).add(t["occurred_on"].isoformat()[:7])
+            if t["kind"] == "income":
+                earned[t["user_id"]] = earned.get(t["user_id"], money.ZERO) + t["amount"]
+    out: dict[int, dict[str, Any]] = {}
+    for p in people:
+        mode = p["income_mode"] or "auto"
+        own = money.to_decimal(p["expected_income"] or 0)
+        months_seen = len(seen.get(p["id"], ()))
+        if mode == "fixed" and own > 0:
+            out[p["id"]] = {"amount": own, "basis": "fixed", "months": 0}
+        elif mode == "auto" and months_seen and earned.get(p["id"], money.ZERO) > 0:
+            out[p["id"]] = {"amount": money.quantize(earned[p["id"]] / months_seen, 0), "basis": "average",
+                            "months": months_seen}
+        elif mode == "auto" and own > 0:
+            out[p["id"]] = {"amount": own, "basis": "estimate", "months": 0}
+    return out
+
+
+def pending_income(expected: dict[str, Any] | None, counted: Any) -> Decimal:
+    """預計收入裡「還沒入帳」的部分：max(0, 預計 − 已經算進收入的)。沒有預計就是 0。
+
+    加進可花上限的就是這個差額，所以已入帳的不會被算兩次；入帳超過預計就是 0。
+
+    >>> pending_income({"amount": Decimal("31000")}, Decimal("0"))
+    Decimal('31000')
+    >>> pending_income({"amount": Decimal("31000")}, Decimal("33500"))
+    Decimal('0')
+    """
+    if not expected:
+        return money.ZERO
+    return max(money.ZERO, money.to_decimal(expected["amount"]) - money.to_decimal(counted or 0))
+
+
 def summary(db: Any, users: list[int], earners: list[int], period: str, group_id: int | None = None) -> dict[str, Any]:
     '''GET /api/summary 的數字。users 是這次要算的人，earners 是收入要算進去的人（不含子女）。'''
     from datetime import date

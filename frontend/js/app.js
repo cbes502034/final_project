@@ -564,7 +564,13 @@
               '<span>可花上限 <b>' + num(sv.allowance) + '</b></span>' +
               /* 孩子的收入是 0、上限卻有 3,000——講出來源，不然看起來數字對不上 */
               (Number(d.pocketMoney) > 0 ? '<span>含零用金 <b>' + num(d.pocketMoney) + '</b></span>' : '') +
+              /* 薪水還沒入帳、先照預計收入算的部分：講出來，不然收入 0、上限卻有 26,000 看起來對不上 */
+              (d.expectedIncome && Number(d.expectedIncome.pending) > 0
+                ? '<span title="收入還沒入帳，先照預計的算；入帳之後自動改用實際的">含預計收入 <b>' + num(d.expectedIncome.pending) + '</b></span>' : '') +
               '<span>每月想存 <b>' + num(sv.goal) + '</b></span></div>' +
+            /* 一點收入都沒有、也估不出來：上限是負的。指路去設定，不要只顯示一個嚇人的數字 */
+            (!fam && !Number(d.income) && !Number(d.pocketMoney) && !(d.expectedIncome && Number(d.expectedIncome.pending) > 0)
+              ? '<a class="wal__hint" href="#/profile/income">還沒有收入進來？設定「收入怎麼算」，月底才發薪也不會變負數 ›</a>' : '') +
             '<div class="wal__foot">' +
               '<div class="wal__f"><span>結餘</span><b>' + amt(d.net) + '</b></div>' +
               '<div class="wal__f"><span>結餘率</span><b>' + pct(d.rate) + '</b></div>' +
@@ -3241,7 +3247,7 @@
         換一台裝置也一樣（標記存在帳號上：users.onboarded_at）。
      ============================================================ */
   var SETUP = { step: 0, note: '' };
-  var SETUP_STEPS = ['存錢目標', '理財習慣', '主題'];
+  var SETUP_STEPS = ['收入與存錢', '理財習慣', '主題'];
 
   function setupDots() {
     return '<ol class="stp" aria-label="個人化設定，共 ' + SETUP_STEPS.length + ' 步">' +
@@ -3260,10 +3266,12 @@
       var skipAll = '<p class="gate__alt"><button type="button" class="gate__lnk" data-su-done="skip">全部先跳過，直接開始用</button></p>';
 
       if (SETUP.step === 0) {
-        authShell('每個月想存多少？',
-          '先決定要存的，剩下的才是這個月可以花的。之後隨時可以到「個人資料」改。',
+        authShell('收入和存錢',
+          '收入 − 每月想存 ＝ 這個月可以花的。月底才領薪水也沒關係，入帳前先照你填的算。之後隨時可以到「個人資料」改。',
           setupDots() +
           '<form class="gate__f" id="suGoalF">' +
+            '<div id="suIncBox">' + incomeFields('su', u) + '</div>' +
+            '<span class="finf__k">每個月想存多少</span>' +
             '<label class="money money--lg"><i>NT$</i>' +
               '<input type="number" id="suGoal" min="0" step="100" inputmode="numeric" ' +
                 'value="' + (u.savingsGoal ? esc(u.savingsGoal) : '') + '" placeholder="0" aria-label="每月想存多少"></label>' +
@@ -3302,6 +3310,9 @@
                   return '<label class="pick pick--sm"><input type="checkbox" name="suHabit" value="' + esc(x.id) + '"' +
                     has('habits', x.id) + '><b>' + esc(x.name) + '</b></label>';
                 }).join('') + '</div></div>' +
+              '<label class="fld"><span>清單裡沒有的，自己寫（選填，200 字）</span>' +
+                '<textarea id="suFinNote" rows="2" maxlength="200" placeholder="例如：每個月固定給爸媽 5,000、明年要換工作">' +
+                  esc(SETUP.note || '') + '</textarea></label>' +
               '<p class="su__f">只拿來讓建議更貼近你，<b>不會</b>拿來推薦投資、保險。</p>' +
               '<div class="su__nav"><button type="button" class="btn" data-su-back>上一步</button>' +
                 '<button class="btn btn--go" type="submit">下一步</button></div>' +
@@ -3549,6 +3560,7 @@
 
         '<section class="duo__c">' +
           '<div class="sec"><h2 class="sec__t">存錢計畫</h2></div>' +
+          '<div class="card plan inc" id="incCard">' + incomeCard(u) + '</div>' +
           '<div class="card plan">' +
             '<div class="plan__k">每個月想存' + helpBtn('goal') + '</div>' +
             '<label class="money money--lg"><i>NT$</i>' +
@@ -3588,6 +3600,11 @@
         var thm = document.querySelector('.thm');
         if (thm && thm.scrollIntoView) thm.scrollIntoView({ block: 'start', behavior: 'smooth' });
       }
+      /* 從總覽的「設定收入怎麼算 ›」進來的：捲到收入那一張 */
+      if (at === 'income') {
+        var inc = document.getElementById('incCard');
+        if (inc && inc.scrollIntoView) inc.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
       /* 從總覽的「調整預算 ›」進來的：直接打開每月預算那一段 */
       if (at === 'budget') {
         if (!FOLD.bud) foldToggle('bud');
@@ -3595,6 +3612,104 @@
         if (bud && bud.scrollIntoView) bud.scrollIntoView({ block: 'start', behavior: 'smooth' });
       }
     });
+  }
+
+  /* ---------------------------------------------------------
+     收入怎麼算（使用者 2026-10-20：月底才領薪水，月初「還可以花」就是負的）
+
+     算法全系統只有一條：可花上限的收入 ＝ max(這個月已入帳, 預計收入)。
+     這裡選的只是「預計收入從哪裡來」，所以固定月薪、收入不固定（日薪、打工、接案）、
+     不想估的人都適用；全家模式也能直接加總。
+     ⚠️ 換選項會讓首頁的「還可以花」、財務建議、提醒門檻一起重算——換之前先問一次。
+     --------------------------------------------------------- */
+  /* 這個月的收入怎麼估（三種都用同一條 max(已入帳, 預計)，只差在預計收入從哪裡來） */
+  var INCOME_MODE_OPTS = [
+    ['fixed', '固定金額', '每個月差不多：月初就照這個數字算，月底才入帳也沒關係'],
+    ['auto', '自動估', '收入不固定：用最近 3 個有記帳的月份平均；還沒紀錄先用你填的估計'],
+    ['actual', '只算已入帳', '不估，記了收入才算']
+  ];
+  var INCOME_TW = { fixed: '固定金額', auto: '自動估', actual: '只算已入帳' };
+  function incomeTypes() { return global.DATA.incomeTypes || []; }
+  function incomeTypeOf(id) { return incomeTypes().filter(function (t) { return t.id === id; })[0]; }
+
+  /* 收入的欄位（新用戶設定第一步、個人資料共用）。p 是名字的前綴：su（設定）／inc（個人資料）。
+     「收入怎麼來」選了之後，「怎麼估」會先帶入最合適的那一種，使用者可以自己改；選「其他」可以自己寫。 */
+  function incomeFields(p, u) {
+    var type = u.incomeType || '', mode = u.incomeMode || 'auto', amt = u.expectedIncome ? Number(u.expectedIncome) : '';
+    return '<div class="finf__g"><span class="finf__k">收入怎麼來</span>' +
+        '<div class="finf__o finf__o--row">' + incomeTypes().map(function (t) {
+          return '<label class="pick pick--sm"><input type="radio" name="' + p + 'Type" value="' + esc(t.id) + '"' +
+            (t.id === type ? ' checked' : '') + '><b>' + esc(t.name) + '</b></label>';
+        }).join('') + '</div>' +
+        (type === 'other'
+          ? '<input type="text" class="inc__note" id="' + p + 'Note" maxlength="30" ' +
+              'placeholder="自己寫，例如：家教、外送、獎學金" aria-label="自己寫收入怎麼來" value="' + esc(u.incomeNote || '') + '">'
+          : '') +
+      '</div>' +
+      '<div class="finf__g"><span class="finf__k">這個月的收入怎麼估</span><div class="finf__o">' +
+        INCOME_MODE_OPTS.map(function (o) {
+          return '<label class="pick"><input type="radio" name="' + p + 'Mode" value="' + o[0] + '"' +
+            (o[0] === mode ? ' checked' : '') + '><b>' + o[1] + '</b><i>' + o[2] + '</i></label>';
+        }).join('') + '</div>' +
+        (mode === 'actual' ? '' :
+          '<label class="money"><i>NT$</i><input type="number" min="0" step="100" inputmode="numeric" id="' + p + 'Amt" ' +
+            'value="' + amt + '" placeholder="' + (mode === 'fixed' ? '每個月大約多少（必填）' : '還沒紀錄時先估（選填）：日薪 × 天數') + '" ' +
+            'aria-label="每個月大約多少收入"></label>') +
+      '</div>';
+  }
+
+  /* 表單上現在的值（還沒存的也算） */
+  function incomeNow(p, base) {
+    var q = function (sel) { return document.querySelector(sel); };
+    var amtEl = document.getElementById(p + 'Amt'), noteEl = document.getElementById(p + 'Note');
+    return {
+      incomeType: (q('[name="' + p + 'Type"]:checked') || {}).value || (base && base.incomeType) || null,
+      incomeMode: (q('[name="' + p + 'Mode"]:checked') || {}).value || (base && base.incomeMode) || 'auto',
+      expectedIncome: amtEl ? (Number(amtEl.value) || null) : (base ? base.expectedIncome : null),
+      incomeNote: noteEl ? noteEl.value.trim() : (base ? base.incomeNote : null)
+    };
+  }
+
+  function incomeCard(u) {
+    return '<div class="plan__k">收入</div>' + incomeFields('inc', u) +
+      '<div class="plan__h">收入還沒入帳前，「這個月還可以花」先照這個算；入帳之後自動改用實際的（取比較多的那個），不會重複算。</div>';
+  }
+
+  function incomeSave(patch, done) {
+    API.updateProfile(patch).then(function (u) {
+      if (ME && ME.user) {
+        ['incomeType', 'incomeMode', 'expectedIncome', 'incomeNote'].forEach(function (k) { ME.user[k] = u[k]; });
+      }
+      var card = document.getElementById('incCard');
+      if (card) card.innerHTML = incomeCard(u);
+      toast(done || '收入的算法改好了，首頁的數字已經重算', 'ok');
+    }).catch(function (err) {
+      toast(err.message || '沒有存成功', 'err');
+      var card = document.getElementById('incCard');
+      if (card && ME && ME.user) card.innerHTML = incomeCard(ME.user);
+    });
+  }
+
+  /* 一般的「要繼續嗎」：不用密碼，只是讓人知道會發生什麼 */
+  function askSure(opt) {
+    var old = document.getElementById('sureAsk');
+    if (old) old.remove();
+    var w = el('<div class="hp tw2 on" id="sureAsk">' +
+      '<div class="hp__c" role="dialog" aria-modal="true">' +
+        '<div class="hp__b" style="padding-top:26px">' +
+          '<h3 style="font-size:19px;margin-bottom:10px">' + esc(opt.title) + '</h3>' +
+          '<p>' + opt.body + '</p>' +
+        '</div>' +
+        '<div class="hp__d" style="justify-content:center;gap:10px">' +
+          '<button class="btn" id="sureNo">取消</button>' +
+          '<button class="btn btn--go" id="sureYes">' + esc(opt.ok || '繼續') + '</button>' +
+        '</div>' +
+      '</div></div>');
+    function close() { w.remove(); document.body.classList.remove('hp-on'); }
+    w.querySelector('#sureNo').addEventListener('click', function () { close(); if (opt.onNo) opt.onNo(); });
+    w.querySelector('#sureYes').addEventListener('click', function () { close(); opt.onOk(); });
+    document.body.appendChild(w);
+    document.body.classList.add('hp-on');
   }
 
   /* 登入中的裝置：GET /api/auth/sessions，「登出所有裝置」走 POST /api/auth/logout-all */
@@ -4935,8 +5050,14 @@
       e.preventDefault();
       var gv = Number(document.getElementById('suGoal').value || 0);
       if (isNaN(gv) || gv < 0) { toast('存款目標要是 0 以上的數字', 'err'); return; }
+      var inc = incomeNow('su', ME && ME.user);
+      if (inc.expectedIncome !== null && (isNaN(inc.expectedIncome) || inc.expectedIncome < 0)) { toast('收入要是 0 以上的數字', 'err'); return; }
+      if (inc.incomeMode === 'fixed' && !inc.expectedIncome) { toast('選固定金額，要填每個月大約多少', 'err'); return; }
       busy(f, true, '儲存中…');
-      API.me().then(function (m) { return API.setSavingsGoal(m.user.id, gv); }).then(function () {
+      API.updateProfile({ incomeType: inc.incomeType, incomeMode: inc.incomeMode, incomeNote: inc.incomeNote || null,
+                          expectedIncome: inc.incomeMode === 'actual' ? null : inc.expectedIncome }).then(function () {
+        return API.me();
+      }).then(function (m) { return API.setSavingsGoal(m.user.id, gv); }).then(function () {
         SETUP.step = 1;
         vSetup();
       }).catch(function (err) { busy(f, false); toast(err.message || '儲存失敗', 'err'); });
@@ -4948,9 +5069,11 @@
       var picked = function (name) {
         return [].slice.call(f.querySelectorAll('[name="' + name + '"]:checked')).map(function (i) { return i.value; });
       };
+      var noteEl = document.getElementById('suFinNote');
+      if (noteEl) SETUP.note = noteEl.value.trim();
       var fin = { style: picked('suStyle')[0] || null, goals: picked('suGoalPick'), habits: picked('suHabit'), note: SETUP.note };
       var next = function () { SETUP.step = 2; vSetup(); };
-      if (!fin.style && !fin.goals.length && !fin.habits.length) { next(); return; }   // 什麼都沒選就當跳過
+      if (!fin.style && !fin.goals.length && !fin.habits.length && !fin.note) { next(); return; }   // 什麼都沒選、沒寫就當跳過
       busy(f, true, '儲存中…');
       API.setFinanceProfile(fin).then(next).catch(function (err) {
         busy(f, false);
@@ -5167,6 +5290,67 @@
       API.setBudget({ cat: bi.dataset.budget, limit: bv, period: 'month' }).then(function (r) {
         toast(r.deleted ? '「' + r.catName + '」不設預算了' : '「' + r.catName + '」每月預算 ' + money(bv), 'ok');
       }).catch(function (err) { toast(err.message || '沒有存成功', 'err'); });
+      return;
+    }
+
+    /* 收入：「收入怎麼來」會順便帶入最合適的「怎麼估」；「怎麼估」一換，首頁、建議、提醒都會重算——換之前先問一次 */
+    if ((e.target.name === 'incType' || e.target.name === 'incMode') && e.target.closest('#incCard')) {
+      var saved = (ME && ME.user) || {};
+      var want = incomeNow('inc', saved);
+      if (e.target.name === 'incType') {
+        var tdef = incomeTypeOf(want.incomeType);
+        if (tdef) want.incomeMode = tdef.mode;
+      }
+      var card0 = document.getElementById('incCard');
+      var redraw = function (st) { if (card0) card0.innerHTML = incomeCard(st); };
+      var commit = function () {
+        if (want.incomeMode === 'fixed' && !want.expectedIncome) {
+          /* 固定金額一定要有數字：先把欄位打開讓他填，填完（離開欄位）才一起存 */
+          redraw(want);
+          var box = document.getElementById('incAmt');
+          if (box) box.focus();
+          toast('填每個月大約多少，離開欄位就會存好', 'ok');
+          return;
+        }
+        if (want.incomeType === 'other' && !want.incomeNote) {
+          redraw(want);
+          var nb = document.getElementById('incNote');
+          if (nb) nb.focus();
+        }
+        incomeSave({ incomeType: want.incomeType, incomeMode: want.incomeMode,
+                     expectedIncome: want.incomeMode === 'actual' ? null : want.expectedIncome });
+      };
+      if (want.incomeMode === (saved.incomeMode || 'auto')) { commit(); return; }   // 算法沒變：數字不會變，不用問
+      askSure({
+        title: '改成「' + INCOME_TW[want.incomeMode] + '」？',
+        body: '「這個月還可以花」、財務建議、花到幾成的提醒，都會照新的算法重算，首頁顯示的數字也會跟著變。之後隨時可以再改回「' +
+          INCOME_TW[saved.incomeMode || 'auto'] + '」。',
+        ok: '繼續',
+        onNo: function () { redraw(saved); },
+        onOk: commit
+      });
+      return;
+    }
+    if (e.target.id === 'incAmt' || e.target.id === 'incNote') {
+      var cur = incomeNow('inc', ME && ME.user);
+      if (cur.expectedIncome !== null && (isNaN(cur.expectedIncome) || cur.expectedIncome < 0)) { toast('收入要是 0 以上的數字', 'err'); return; }
+      if (cur.incomeMode === 'fixed' && !cur.expectedIncome) { toast('選固定金額，要填每個月大約多少', 'err'); return; }
+      incomeSave({ incomeType: cur.incomeType, incomeMode: cur.incomeMode, incomeNote: cur.incomeNote || null,
+                   expectedIncome: cur.incomeMode === 'actual' ? null : cur.expectedIncome },
+        e.target.id === 'incNote' ? '收入怎麼來存好了'
+          : cur.incomeMode === 'fixed' ? '每個月收入 ' + money(cur.expectedIncome) + '，首頁的數字已經重算' : '估計的收入存好了');
+      return;
+    }
+    /* 新用戶設定第一步：收入怎麼來／怎麼估換了，就地重畫（帶入最合適的算法），還不存——按「下一步」才存 */
+    if ((e.target.name === 'suType' || e.target.name === 'suMode') && document.getElementById('suIncBox')) {
+      var st = incomeNow('su', ME && ME.user);
+      if (e.target.name === 'suType') {
+        var sdef = incomeTypeOf(st.incomeType);
+        if (sdef) st.incomeMode = sdef.mode;
+      }
+      document.getElementById('suIncBox').innerHTML = incomeFields('su', st);
+      var focusEl = document.getElementById(st.incomeType === 'other' && !st.incomeNote ? 'suNote' : 'suAmt');
+      if (focusEl && (st.incomeType === 'other' || st.incomeMode === 'fixed')) focusEl.focus();
       return;
     }
 

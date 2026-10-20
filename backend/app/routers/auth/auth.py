@@ -1023,7 +1023,8 @@ def get_me(me: User, db: Session = Depends(get_db)):
         {"user": {"id": "3", "name": "王大明", "email": "daming@wang.tw", "role": "parent", "familyId": "2",
                   "avatar": "明", "avatarUrl": null, "age": 52, "birthYear": 1974, "joined": "2026-01-05",
                   "theme": "sky", "onboardedAt": "2026-01-05T01:00:00+00:00", "savingsGoal": 20000,
-                  "isPlatformAdmin": false, "emailVerified": true},
+                  "isPlatformAdmin": false, "emailVerified": true, "incomeMode": "auto", "expectedIncome": null,
+                  "incomeType": null, "incomeNote": null},
          "family": {"id": "2", "name": "王家", "period": "2026-09"},
          "visible": ["3", "4", "5"], "queryable": ["3", "4", "5", "6"],
          "guardedBy": [{"id": "4", "name": "陳美玲"}]}
@@ -1128,6 +1129,10 @@ def get_me(me: User, db: Session = Depends(get_db)):
                     "onboardedAt": onboarded.isoformat() if onboarded else None,
                     "savingsGoal": goal or 0,
                     "isPlatformAdmin": me.is_platform_admin,
+                    "incomeMode": me.income_mode or "auto",
+                    "expectedIncome": me.expected_income,
+                    "incomeType": me.income_type,
+                    "incomeNote": me.income_note,
                     "emailVerified": me.email_verified_at is not None,
                 },
                 "family": {"id": str(fam.id), "name": fam.name,
@@ -1188,6 +1193,10 @@ def get_me(me: User, db: Session = Depends(get_db)):
             "onboardedAt": onboarded.isoformat() if onboarded else None,
             "savingsGoal": goal or 0,
             "isPlatformAdmin": me.is_platform_admin,
+            "incomeMode": me.income_mode or "auto",
+            "expectedIncome": me.expected_income,
+            "incomeType": me.income_type,
+            "incomeNote": me.income_note,
             "emailVerified": me.email_verified_at is not None,
         },
         "family": {"id": str(fam.id), "name": fam.name,
@@ -1207,7 +1216,8 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
 
     【這支做什麼】
         改自己的個人資料，只送要改的欄位（沒送的保持原樣，所以是 PATCH）：
-            displayName 名字、birthYear 出生年、theme 介面主題、onboarded 個人化設定走完了
+            displayName 名字、birthYear 出生年、theme 介面主題、onboarded 個人化設定走完了、
+            incomeMode／expectedIncome 收入怎麼算（可花上限用，見 services/analytics.py 的 expected_income）
         ⚠️ email 不開放修改：email 是登入帳號，改它等於換帳號（要另外設計驗證新信箱的流程）。
         ⚠️ 換主題不需要新路由、新表，就是 users.theme 一個欄位，只收 toolkit/theme.py 清單裡的。
         onboarded 只收 true：沒有「退回沒走過」這回事；已經設過的不要蓋掉時間。
@@ -1233,6 +1243,10 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         birthYear    整數或 null  1900～今年；null = 清掉
         theme        字串         paper／sky／tech／literary／pop／girly／cute／art
         onboarded    true         只收 true
+        incomeMode   字串         auto 自動估（近 3 個月平均，還沒紀錄用 expectedIncome）／fixed 固定月薪／actual 只算已入帳
+        expectedIncome 數字或 null  每月預計收入；0 或 null = 不填。選 fixed 一定要有
+        incomeType   字串或 null  收入怎麼來（catalog.INCOME_TYPES：salary_end、hourly、freelance…、other）
+        incomeNote   字串或 null  選 other 時自己寫的，洗過（profile.clean_note）、最多 30 字
         範例：{"displayName": "王大明", "birthYear": 1974}　或　{"theme": "sky"}　或　{"onboarded": true}
         · body.model_fields_set 是「有送來的欄位名字」：birthYear 送 null（要清掉）跟沒送（不要動）分得開
         · 不認得的欄位（例如 email）FastAPI 直接回 422（ProfilePatchIn 設了 extra="forbid"）
@@ -1247,12 +1261,16 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         422     出生年不在 1900～今年          出生年份不合理
         422     主題不在清單裡                 沒有這個主題
         422     onboarded 不是 true            onboarded 只能是 true
+        422     incomeMode 不在三種裡          收入的算法只能是 auto、fixed 或 actual
+        422     expectedIncome 是負的或太大     預計收入要是 0 以上的數字
+        422     選 fixed 卻沒有金額            選固定月薪，要填每個月大約多少
+        422     incomeType 不在清單裡          沒有這種收入方式
         403     還沒點驗證信就要標 onboarded   先到信箱點驗證連結，才能開始設定
         422     帶了 email 或其他不認得的欄位  （FastAPI 自動回）
 
     【會用到的資料表】
         表             讀／寫  用來做什麼
-        users          寫      display_name、birth_year、theme、onboarded_at
+        users          寫      display_name、birth_year、theme、onboarded_at、income_mode、expected_income、income_type、income_note
         savings_goals  讀      回傳的 user 要帶 savingsGoal
 
     【每一步用的工具與資料庫方法】
@@ -1267,8 +1285,9 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         2. 有送 birthYear：不是 null 就要在 1900～今年
         3. 有送 theme：clean_theme（422）
         4. 有送 onboarded：只收 true；還沒點驗證信（而且寄得出信）→ 403；還沒設過才設 onboarded_at = 現在
-        5. 有東西要改才寫回、db.commit()
-        6. 回傳改完的 user
+        5. 有送 incomeMode／expectedIncome：在清單裡、金額 0 以上；最後是 fixed 卻沒有金額 → 422
+        6. 有東西要改才寫回、db.commit()
+        7. 回傳改完的 user
 
     【完整寫法】照下面兩步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -1331,12 +1350,31 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
                 if me.onboarded_at is None:
                     changes["onboarded_at"] = datetime.now(timezone.utc)
 
-            # 5. 寫回去
+            # 5. 收入怎麼算（可花上限用）：三種都用同一條 max(這個月已入帳, 預計收入)，只差在預計收入從哪裡來
+            if "incomeMode" in sent:
+                if body.incomeMode not in catalog.INCOME_MODES:
+                    raise errors.unprocessable("收入的算法只能是 auto、fixed 或 actual")
+                changes["income_mode"] = body.incomeMode
+            if "expectedIncome" in sent:
+                if body.expectedIncome is not None and not 0 <= body.expectedIncome <= 100000000:
+                    raise errors.unprocessable("預計收入要是 0 以上的數字")
+                changes["expected_income"] = body.expectedIncome or None                # 0、null 都是「不填」
+            if "incomeType" in sent:
+                if body.incomeType is not None and body.incomeType not in {t["id"] for t in catalog.INCOME_TYPES}:
+                    raise errors.unprocessable("沒有這種收入方式")
+                changes["income_type"] = body.incomeType
+            if "incomeNote" in sent:
+                changes["income_note"] = profile.clean_note(body.incomeNote)[:30] or None     # 「其他」自己寫的，洗過、最多 30 字
+            if {"incomeMode", "expectedIncome"} & sent and changes.get("income_mode", me.income_mode) == "fixed" \
+                    and not changes.get("expected_income", me.expected_income):
+                raise errors.unprocessable("選固定月薪，要填每個月大約多少")
+
+            # 6. 寫回去
             if changes:
                 crud.save(User, {"id": me.id, **changes}, db=db)
                 db.commit()
 
-            # 6. 回傳改完的 user（形狀同 GET /api/auth/me）
+            # 7. 回傳改完的 user（形狀同 GET /api/auth/me）
             goal = crud.get(SavingsGoal, where={"user_id": me.id, "group_id__isnull": True},
                             fields="goal_amount", order_by="-id", db=db)
             onboarded = me.onboarded_at
@@ -1357,6 +1395,10 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
                 "onboardedAt": onboarded.isoformat() if onboarded else None,
                 "savingsGoal": goal or 0,
                 "isPlatformAdmin": me.is_platform_admin,
+                "incomeMode": me.income_mode or "auto",
+                "expectedIncome": me.expected_income,
+                "incomeType": me.income_type,
+                "incomeNote": me.income_note,
             }
 
     【做完怎麼確認】
@@ -1369,6 +1411,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
                {"onboarded": true}  → 200，onboardedAt 有值；再送一次時間不變
                {"birthYear": null}  → 200，birthYear 與 age 都是 null
                {"email": "x@x.tw"}  → 422
+               {"incomeMode": "fixed", "expectedIncome": 31000} → 200；{"incomeMode": "fixed", "expectedIncome": null} → 422
         5. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁改名字、換主題，重新整理後都還在
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "update_me and 你的"，要全部通過
     """
@@ -1408,12 +1451,31 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         if me.onboarded_at is None:
             changes["onboarded_at"] = datetime.now(timezone.utc)
 
-    # 5. 寫回去
+    # 5. 收入怎麼算（可花上限用）：三種都用同一條 max(這個月已入帳, 預計收入)，只差在預計收入從哪裡來
+    if "incomeMode" in sent:
+        if body.incomeMode not in catalog.INCOME_MODES:
+            raise errors.unprocessable("收入的算法只能是 auto、fixed 或 actual")
+        changes["income_mode"] = body.incomeMode
+    if "expectedIncome" in sent:
+        if body.expectedIncome is not None and not 0 <= body.expectedIncome <= 100000000:
+            raise errors.unprocessable("預計收入要是 0 以上的數字")
+        changes["expected_income"] = body.expectedIncome or None                # 0、null 都是「不填」
+    if "incomeType" in sent:
+        if body.incomeType is not None and body.incomeType not in {t["id"] for t in catalog.INCOME_TYPES}:
+            raise errors.unprocessable("沒有這種收入方式")
+        changes["income_type"] = body.incomeType
+    if "incomeNote" in sent:
+        changes["income_note"] = profile.clean_note(body.incomeNote)[:30] or None     # 「其他」自己寫的，洗過、最多 30 字
+    if {"incomeMode", "expectedIncome"} & sent and changes.get("income_mode", me.income_mode) == "fixed" \
+            and not changes.get("expected_income", me.expected_income):
+        raise errors.unprocessable("選固定月薪，要填每個月大約多少")
+
+    # 6. 寫回去
     if changes:
         crud.save(User, {"id": me.id, **changes}, db=db)
         db.commit()
 
-    # 6. 回傳改完的 user（形狀同 GET /api/auth/me）
+    # 7. 回傳改完的 user（形狀同 GET /api/auth/me）
     goal = crud.get(SavingsGoal, where={"user_id": me.id, "group_id__isnull": True},
                     fields="goal_amount", order_by="-id", db=db)
     onboarded = me.onboarded_at
@@ -1434,6 +1496,10 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         "onboardedAt": onboarded.isoformat() if onboarded else None,
         "savingsGoal": goal or 0,
         "isPlatformAdmin": me.is_platform_admin,
+        "incomeMode": me.income_mode or "auto",
+        "expectedIncome": me.expected_income,
+        "incomeType": me.income_type,
+        "incomeNote": me.income_note,
     }
 
 
