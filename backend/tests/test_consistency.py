@@ -1683,6 +1683,34 @@ def test_段落解析表格_補上分類就不再說缺():
     assert "if (bit && bf === 'kind' && bcat && bcat.kind !== bit.kind) bit.cat = null;" in app
 
 
+def test_登入註冊的錯誤顯示在表單裡_不是右下角的小通知():
+    """使用者：「登入時錯誤的提醒訊息右下角真的太不明顯了」。"""
+    app = read("frontend/js/app.js")
+    sub = app[app.index("document.addEventListener('submit'"):app.index("if (f.id === 'suFinF')")]
+    for form in ("loginF", "regF", "forgotF", "resetF"):
+        part = sub[sub.index("if (f.id === '%s')" % form):]
+        part = part[:part.index("      return;\n    }")]
+        assert "formErr(f," in part, form + " 的錯誤要顯示在表單裡"
+    assert "toast(err.message || '登入失敗'" not in app
+
+
+def test_收支明細的輸入方式是兩個一直看得到的分頁():
+    """使用者：「切換單筆輸入或輸入文字請 AI 分析……看起來有點不明顯」。以前是要點開的下拉抽屜。"""
+    app = read("frontend/js/app.js")
+    assert "modeTab('para'" in app and "modeTab('single'" in app and 'role="tablist"' in app
+    assert 'id="modeBtn"' not in app and 'id="modePanel"' not in app
+
+
+def test_停權的理由在密碼上面_而且講清楚至少幾個字():
+    """使用者：「我輸入密碼沒有辦法停權」——理由欄在密碼下面、只寫「請寫一下理由」，以為是密碼壞了。"""
+    app = read("frontend/js/app.js")
+    d = app[app.index("function danger(opt)"):app.index("function dangerClose(")]
+    assert d.index('id="dgReason"') < d.index('id="dgPw"'), "理由要在密碼上面"
+    assert "REASON_MIN" in d
+    roles = read("backend/app/toolkit/roles.py")
+    assert "SUSPEND_REASON_MIN = 4" in roles and "var REASON_MIN = 4;" in app
+
+
 def test_下拉面板浮在按鈕下面_不搬進版面():
     """帳本清單與通知面板曾經被搬進頂列和內容之間，佔真實空間把內容往下推。
     頁首改版後它們插在標題底下，一點開整頁就往下跳。"""

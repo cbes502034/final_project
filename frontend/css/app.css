@@ -2032,7 +2032,10 @@ input[type="password"], input[type="search"], select, textarea {
 }
 .dg #dgCode { font-family: var(--code); font-size: 12.5px; }
 
-.dg__err { color: var(--down); font-size: 13px; margin-top: 4px; }
+.dg__err {
+  color: var(--down); font-size: 13px; line-height: 1.6; margin-top: 4px;
+  padding: 8px 12px; background: var(--down-wash); border-left: 3px solid var(--down);
+}
 .dg .hp__d { justify-content: flex-end; gap: 10px; }
 .btn--danger {
   background: var(--down); border-color: var(--down); color: var(--card);
@@ -3871,3 +3874,35 @@ body[data-page="admin"] #searchBtn, body[data-page="admin"] #searchDrawer, body[
 }
 .inc__note:focus { outline: none; border-color: var(--accent); }
 #view .inc .finf__g { margin: 10px 0 12px; }
+
+/* ---- 收支明細：怎麼記（AI 幫我拆／自己填一筆），兩個分頁一直看得到 ---- */
+#view .emode__row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+#view .emode {
+  flex: 1 1 auto; display: grid; grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line-2); border-radius: var(--r-input); overflow: hidden; background: var(--card);
+}
+#view .emode__t {
+  display: grid; gap: 3px; text-align: left; padding: 12px 16px; cursor: pointer;
+  background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--ink-soft);
+  transition: background-color .16s var(--ease), border-color .16s var(--ease);
+}
+#view .emode__t + .emode__t { border-left: 1px solid var(--line-2); }
+#view .emode__t b { font-size: 15px; font-weight: 600; color: var(--ink); }
+#view .emode__t small { font-size: 12px; line-height: 1.5; color: var(--ink-dim); }
+#view .emode__t:hover { background: var(--sunk); }
+#view .emode__t.on { background: var(--accent-wash); border-bottom-color: var(--accent); }
+#view .emode__t.on b { color: var(--accent); }
+#view .emode__t:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 480px) {
+  #view .emode__t { padding: 10px 12px; }
+  #view .emode__t b { font-size: 14px; }
+}
+
+/* ---- 表單裡的錯誤（登入、註冊、忘記密碼…）：按鈕正上方，紅底整行，一眼看得到 ---- */
+.gate__err {
+  margin: 4px 0 2px; padding: 11px 14px;
+  color: var(--down); background: var(--down-wash); border-left: 3px solid var(--down);
+  border-radius: 0 var(--r-input) var(--r-input) 0;
+  font-size: 14px; font-weight: 500; line-height: 1.6;
+}
+.gate__err[hidden] { display: none; }

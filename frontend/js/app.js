@@ -1014,24 +1014,15 @@
   };
 
   FOLD_BUILD.entry = function (wrap) {
-    /* ---- 模式切換：抽屜 ----
-       兩張帶說明的大卡片收成一條。要用哪一種是常態性的選擇，
-       選好之後幾乎不會再動，不值得一直佔著版面。 */
-    var h = '<div class="mbar">' +
-      /* ⚠️ helpBtn() 回傳的是一個 <button>，不可以放進另一個 <button> 裡。
-         HTML 不允許按鈕巢狀——瀏覽器解析到內層按鈕時會把外層直接關掉，
-         後面的東西就被踢出去變成兄弟節點，樣式全部對不上。
-         問號放在按鈕外面。 */
-      '<button class="mbar__b" id="modeBtn">' +
-        '<span class="mbar__n">' + (MODE === 'para' ? '段落記帳' : '單筆手動') + '</span>' +
-        '<svg class="mbar__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-          'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
-      '</button>' +
-      (MODE === 'para' ? helpBtn('entry') : '') +
-      '<div class="mbar__p" id="modePanel" hidden>' +
-        modeRow('para', '段落記帳', '一次寫一整段，自動切成好幾筆') +
-        modeRow('single', '單筆手動', '一次填一筆，欄位自己選') +
-      '</div>' +
+    /* ---- 怎麼記：兩個並排的分頁，一直看得到 ----
+       ⚠️ 以前是一顆「段落記帳 ▾」的下拉抽屜，要點開才知道還有另一種，使用者說「不明顯」。
+          兩種都一直擺著、各附一句說明，選中的那個用底色與底線標出來。
+       ⚠️ helpBtn() 本身就是一顆按鈕，不可以放進另一顆按鈕裡（HTML 不允許按鈕巢狀），放在分頁外面。 */
+    var h = '<div class="emode__row">' +
+      '<div class="emode" role="tablist" aria-label="怎麼記">' +
+        modeTab('para', 'AI 幫我拆', '打一段話，拆成好幾筆，你確認了才存') +
+        modeTab('single', '自己填一筆', '日期、金額、分類自己選') +
+      '</div>' + helpBtn('entry') +
     '</div>';
 
     h += '<div id="entryBox"></div>';
@@ -1039,11 +1030,10 @@
     renderMode();
   };
 
-  function modeRow(id, title, desc) {
-    return '<button class="mbar__i' + (MODE === id ? ' on' : '') +
-      '" data-mode="' + id + '">' +
-      '<span class="mbar__t">' + esc(title) + '</span>' +
-      '<span class="mbar__d">' + esc(desc) + '</span></button>';
+  function modeTab(id, title, desc) {
+    var on = MODE === id;
+    return '<button class="emode__t' + (on ? ' on' : '') + '" role="tab" aria-selected="' + on + '" data-mode="' + id + '">' +
+      '<b>' + esc(title) + '</b><small>' + esc(desc) + '</small></button>';
   }
 
   function renderMode() {
@@ -1055,16 +1045,12 @@
     if (!box) return;
     box.innerHTML = MODE === 'para' ? paraHTML() : singleHTML();
 
-    // 抽屜上的標籤與選中狀態也要跟著換，不然按了看起來沒反應
-    var n = document.querySelector('.mbar__n');
-    if (n) n.textContent = MODE === 'para' ? '段落記帳' : '單筆手動';
-    Array.prototype.forEach.call(document.querySelectorAll('.mbar__i'), function (b) {
-      b.classList.toggle('on', b.dataset.mode === MODE);
+    // 分頁的選中狀態也要跟著換，不然按了看起來沒反應
+    Array.prototype.forEach.call(document.querySelectorAll('.emode__t'), function (b) {
+      var on = b.dataset.mode === MODE;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
-    var mp = document.getElementById('modePanel');
-    if (mp) mp.hidden = true;
-    var mb = document.getElementById('modeBtn');
-    if (mb) mb.classList.remove('open');
   }
 
   /* ============================================================
@@ -2465,6 +2451,8 @@
      ============================================================ */
   var dangerOn = false;
   var dangerFn = null;
+  var dangerOk = '';
+  var REASON_MIN = 4;           // 跟後端 toolkit/roles.py 的 SUSPEND_REASON_MIN 一樣
   var dangerCode = '';
 
   function randomCode() {
@@ -2480,6 +2468,7 @@
     if (dangerOn) return;
     dangerOn = true;
     dangerFn = opt.onOk;
+    dangerOk = opt.ok || '確定刪除';
     dangerCode = opt.level === 'full' ? randomCode() : '';
 
     var w = el('<div class="hp dg" id="dg">' +
@@ -2488,15 +2477,17 @@
           '<button class="hp__x" id="dgX" aria-label="取消">✕</button></div>' +
         '<div class="hp__b">' +
           '<p class="dg__w">' + opt.detail + '</p>' +
-          '<label class="fld"><span>輸入密碼</span>' +
-            '<input type="password" id="dgPw" autocomplete="current-password"></label>' +
           /* 有些動作要留下理由。⚠️ 不是為了流程好看——
              沒有理由的停權就是任意封鎖，被停的人也沒有東西可以申訴。
-             理由會跟著寫進稽核紀錄。 */
+             理由會跟著寫進稽核紀錄。
+             ⚠️ 理由放在密碼**上面**、寫清楚至少幾個字：放在下面時，使用者只打了密碼就按確定，
+                只看到一行「請寫一下理由」，以為是密碼的問題、停權壞了（實際發生過）。 */
           (opt.reason
-            ? '<label class="fld"><span>' + esc(opt.reason) + '</span>' +
-                '<input type="text" id="dgReason" autocomplete="off" maxlength="80"></label>'
+            ? '<label class="fld"><span>' + esc(opt.reason) + '（至少 ' + REASON_MIN + ' 個字，會寫進稽核紀錄）</span>' +
+                '<input type="text" id="dgReason" autocomplete="off" maxlength="80" placeholder="例如：多次騷擾其他使用者"></label>'
             : '') +
+          '<label class="fld"><span>輸入你自己的密碼</span>' +
+            '<input type="password" id="dgPw" autocomplete="current-password"></label>' +
           (dangerCode
             ? '<div class="dg__code"><span>把下面這段複製貼到欄位裡</span>' +
                 '<b id="dgSrc">' + dangerCode + '</b></div>' +
@@ -2514,7 +2505,7 @@
     document.body.appendChild(w);
     document.body.classList.add('hp-on');
     requestAnimationFrame(function () { w.classList.add('on'); });
-    var p = document.getElementById('dgPw');
+    var p = document.getElementById(opt.reason ? 'dgReason' : 'dgPw');
     if (p) p.focus();
   }
 
@@ -2538,15 +2529,19 @@
   }
 
   function dangerGo() {
-    var pw = (document.getElementById('dgPw') || {}).value || '';
-    if (!pw) { dangerErr('請先輸入密碼'); return; }
-
+    /* 照畫面上的順序檢查：先理由、再密碼，錯在哪一格就跳到哪一格 */
     var reasonEl = document.getElementById('dgReason');
     var reason = reasonEl ? reasonEl.value.trim() : null;
-    if (reasonEl && reason.length < 4) {
-      dangerErr('請寫一下理由，這會留在稽核紀錄裡');
+    if (reasonEl && reason.length < REASON_MIN) {
+      dangerErr(reason ? '理由太短了：至少要 ' + REASON_MIN + ' 個字（現在 ' + reason.length + ' 個字）'
+                       : '請先寫理由（至少 ' + REASON_MIN + ' 個字），這會留在稽核紀錄裡');
+      reasonEl.focus();
       return;
     }
+
+    var pwEl = document.getElementById('dgPw');
+    var pw = (pwEl || {}).value || '';
+    if (!pw) { dangerErr('請輸入你自己的密碼'); if (pwEl) pwEl.focus(); return; }
 
     if (dangerCode) {
       var typed = ((document.getElementById('dgCode') || {}).value || '').trim();
@@ -2562,8 +2557,9 @@
       /* 密碼也交給動作本身：救不回來的（刪除帳號）後端會自己再核對一次，不只靠這裡 */
       if (fn) fn(reason, pw);
     }).catch(function (err) {
-      if (btn) { btn.disabled = false; btn.textContent = '確定刪除'; }
+      if (btn) { btn.disabled = false; btn.textContent = dangerOk; }
       dangerErr(err.message || '密碼不正確');
+      if (pwEl) { pwEl.value = ''; pwEl.focus(); }
     });
   }
 
@@ -4271,23 +4267,6 @@
       return;
     }
 
-    /* ---- 記帳方式的抽屜 ---- */
-    if (t.closest('#modeBtn') && !t.closest('[data-help]')) {
-      var mp = document.getElementById('modePanel');
-      if (mp) {
-        var opening = mp.hidden;
-        document.getElementById('modeBtn').classList.toggle('open', opening);
-        if (opening) slideOpen(mp); else slideClose(mp);
-      }
-      return;
-    }
-    if (!t.closest('.mbar')) {
-      var mp2 = document.getElementById('modePanel');
-      if (mp2 && !mp2.hidden) {
-        document.getElementById('modeBtn').classList.remove('open');
-        slideClose(mp2);
-      }
-    }
 
     var fold = t.closest('[data-fold]');
     if (fold) { foldToggle(fold.dataset.fold); return; }
@@ -4733,7 +4712,6 @@
         tag.textContent = on ? '使用中' : '已停用';
       });
       renderMode();
-      toast(MODE === 'para' ? '已切換到段落記帳' : '已切換到單筆手動', 'ok');
       return;
     }
 
@@ -4972,8 +4950,30 @@
     advTimer = setTimeout(function () { ADVQ = v; paintAdvices(); }, 220);
   });
 
+  /* 表單的錯誤：顯示在表單裡、送出按鈕的正上方（紅底、整行），晃一下讓人注意到。
+     ⚠️ 不要用右下角的 toast：登入失敗、密碼錯太多次被鎖，使用者眼睛在表單上，
+        右下角一行小字幾乎看不到（使用者實際反應過）。 */
+  function formErr(f, msg) {
+    var box = f.querySelector('.gate__err');
+    if (!box) {
+      box = el('<p class="gate__err" role="alert"></p>');
+      var go = f.querySelector('button[type="submit"]');
+      if (go) go.parentNode.insertBefore(box, go); else f.appendChild(box);
+    }
+    box.textContent = msg;
+    box.hidden = false;
+    box.style.animation = 'none';
+    void box.offsetWidth;                      // 重新觸發動畫：同一個錯誤再按一次也會晃
+    box.style.animation = 'nudge .3s';
+  }
+  function formErrClear(f) {
+    var box = f && f.querySelector('.gate__err');
+    if (box) box.hidden = true;
+  }
+
   document.addEventListener('submit', function (e) {
     var f = e.target;
+    formErrClear(f);
 
     if (f.id === 'loginF') {
       e.preventDefault();
@@ -4983,7 +4983,7 @@
         password: document.getElementById('lgPw').value
       }).then(afterLogin).catch(function (err) {
         busy(f, false);
-        toast(err.message || '登入失敗', 'err');
+        formErr(f, err.message || '登入失敗，再試一次');
       });
       return;
     }
@@ -5003,7 +5003,7 @@
         if (location.hash === '#/login') vLogin(); else location.hash = '#/login';
       }).catch(function (err) {
         busy(f, false);
-        toast(err.message || '註冊失敗', 'err');
+        formErr(f, err.message || '註冊失敗，再試一次');
       });
       return;
     }
@@ -5018,7 +5018,7 @@
         if (out) out.innerHTML = forgotResult(r);
       }).catch(function (err) {
         busy(f, false);
-        toast(err.message || '寄不出去，稍後再試', 'err');
+        formErr(f, err.message || '寄不出去，稍後再試');
       });
       return;
     }
@@ -5026,8 +5026,8 @@
     if (f.id === 'resetF') {
       e.preventDefault();
       var pw = document.getElementById('rsPw').value, pw2 = document.getElementById('rsPw2').value;
-      if (pw.length < 8) { toast('新密碼至少 8 個字', 'err'); return; }
-      if (pw !== pw2) { toast('兩次輸入的密碼不一樣', 'err'); return; }
+      if (pw.length < 8) { formErr(f, '新密碼至少 8 個字'); return; }
+      if (pw !== pw2) { formErr(f, '兩次輸入的密碼不一樣'); return; }
       busy(f, true, '設定中…');
       API.confirmPasswordReset(RESET_TOKEN, pw).then(function () {
         /* 所有裝置都登出了，這一台也是：清掉身分和通知，回登入頁 */
@@ -5040,8 +5040,8 @@
         toast('密碼改好了，用新密碼登入', 'ok');
       }).catch(function (err) {
         busy(f, false);
-        if (err.status === 400) { RESET_TOKEN = ''; vReset(); }   // 失效的連結：改顯示「重新申請」
-        toast(err.message || '沒有設定成功', 'err');
+        if (err.status === 400) { RESET_TOKEN = ''; vReset(); toast(err.message || '這個連結已經失效', 'err'); return; }
+        formErr(f, err.message || '沒有設定成功，再試一次');
       });
       return;
     }
@@ -5049,10 +5049,10 @@
     if (f.id === 'suGoalF') {
       e.preventDefault();
       var gv = Number(document.getElementById('suGoal').value || 0);
-      if (isNaN(gv) || gv < 0) { toast('存款目標要是 0 以上的數字', 'err'); return; }
+      if (isNaN(gv) || gv < 0) { formErr(f, '存款目標要是 0 以上的數字'); return; }
       var inc = incomeNow('su', ME && ME.user);
-      if (inc.expectedIncome !== null && (isNaN(inc.expectedIncome) || inc.expectedIncome < 0)) { toast('收入要是 0 以上的數字', 'err'); return; }
-      if (inc.incomeMode === 'fixed' && !inc.expectedIncome) { toast('選固定金額，要填每個月大約多少', 'err'); return; }
+      if (inc.expectedIncome !== null && (isNaN(inc.expectedIncome) || inc.expectedIncome < 0)) { formErr(f, '收入要是 0 以上的數字'); return; }
+      if (inc.incomeMode === 'fixed' && !inc.expectedIncome) { formErr(f, '選固定金額，要填每個月大約多少'); return; }
       busy(f, true, '儲存中…');
       API.updateProfile({ incomeType: inc.incomeType, incomeMode: inc.incomeMode, incomeNote: inc.incomeNote || null,
                           expectedIncome: inc.incomeMode === 'actual' ? null : inc.expectedIncome }).then(function () {
@@ -5384,6 +5384,7 @@
 
   document.addEventListener('input', function (e) {
     if (e.target.closest && e.target.closest('[data-b]')) syncBatch();
+    if (e.target.closest && e.target.closest('form.gate__f')) formErrClear(e.target.closest('form.gate__f'));
   });
 
   document.addEventListener('keydown', function (e) {
