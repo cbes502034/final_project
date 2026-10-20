@@ -52,10 +52,12 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     POST /api/auth/register
 
     【這支做什麼】
-        用名字、email、密碼開一個帳號，而且直接登入（回傳跟 POST /api/auth/login 一樣的東西）。
-        註冊完寄一封驗證信（toolkit/email_verify.py），點信裡的連結才算確認 email 是本人的；
-        沒點照樣能用，總覽會提醒——email 打錯的人才會發現（不然忘記密碼的信永遠寄不到）。
-        新帳號沒有家庭（role 是 null）、主題是 paper、onboardedAt 是 null——前端會帶他去「註冊後的個人化設定」。
+        用名字、email、密碼開一個帳號，寄一封驗證信（toolkit/email_verify.py）。**註冊完不登入**：
+        前端回到登入頁，請他去收信；點了信裡的連結（POST /api/auth/verify-email）才登入，接著做個人化設定。
+        ⚠️ 這是使用者要的流程（2026-10-20）：確認 email 是本人的之後才開始用——email 打錯的人當下就會發現，
+           不會等到忘記密碼時才知道信永遠寄不到。沒點信就先登入的人，前端停在「請先到信箱點驗證連結」，可以重寄。
+        ⚠️ 寄不出信的環境（本機開發沒設 BREVO_API_KEY、MAIL_FROM）沒有信可以點：直接算驗證過，回 verifySent false。
+        新帳號沒有家庭（role 是 null）、主題是 paper、onboardedAt 是 null。
         同時開一本「〈名字〉的帳本」：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了。
         ⚠️ 存款目標不在註冊時問：帶了 savingsGoal 回 400。默默吃掉的話，使用者會以為設好了。
         ⚠️ 同一個來源一小時內最多註冊 REGISTER_PER_HOUR 個（預設 5）：每註冊一個就寄一封信，
@@ -63,14 +65,15 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
 
     【前端怎麼打】
         frontend/js/api.js 的 API.register({ name, email, password })
-        註冊頁（#/register）送出時呼叫。前端檢查回應裡一定要有 user，並把 accessToken、refreshToken 存進 localStorage。
+        註冊頁（#/register）送出時呼叫。前端檢查回應裡一定要有 user、verifySent；**不登入**，
+        回到登入頁、email 先填好，上面顯示 message（「驗證信已寄到…」）。
 
     【誰能打】
         還沒登入的人。上面的 @guest_only 已經擋好了：
             帶著還有效的 access token → 400「你已經登入了，要換帳號請先登出」
             帶著壞掉或過期的 token → 當作沒登入，照樣可以打
         這支沒有 me 參數（本來就沒有人登入）。
-        另外收一個 request（FastAPI 的 Request）：要記下這一台的瀏覽器（User-Agent）與 IP 的雜湊。
+        另外收一個 request（FastAPI 的 Request）：拿來源 IP，限制同一個來源註冊的數量。
         還有 background（FastAPI 的 BackgroundTasks）：驗證信放在回應送出去之後才寄。
 
     【請求主體】body 是 RegisterIn（app/schemas/auth.py）
@@ -82,13 +85,13 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         範例：{"name": "王大明", "email": "Daming@Wang.tw", "password": "abcd1234"}
 
     【成功回應】狀態碼 201
-        {"accessToken": "eyJ…", "refreshToken": "eyJ…", "expiresIn": 1800,
+        {"verifySent": true, "message": "驗證信已寄到 daming@wang.tw，點信裡的按鈕就會接著開始設定",
          "user": {"id": "3", "name": "王大明", "email": "daming@wang.tw", "role": null, "familyId": null,
                   "avatar": "明", "avatarUrl": null, "age": null, "birthYear": null, "joined": "2026-09-17",
                   "theme": "paper", "onboardedAt": null, "savingsGoal": 0, "isPlatformAdmin": false,
                   "emailVerified": false}}
-        · expiresIn 是 access token 幾秒後過期（ACCESS_TOKEN_MINUTES × 60）
-        · access token 裡多放一個 sid（這一台的 sessions.id），登出、看「登入中的裝置」時才知道是哪一台
+        · **沒有 token**：註冊完不登入，點了驗證信的連結才登入
+        · 寄不出信的環境：verifySent false、message「帳號建好了，請登入」、emailVerified true
         · avatar 是名字的最後一個字
 
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
@@ -107,7 +110,6 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         users          讀＋寫  email 有沒有人用；新增帳號（只存密碼雜湊；email_verify_sent_at 記下寄驗證信的時間）
         groups         寫      第一本帳本「〈名字〉的帳本」
         group_members  寫      自己是那本帳的成員
-        sessions       寫      這一台的登入工作階段（只存 refresh token 的指紋）
         security_events  讀＋寫  這個來源一小時內註冊了幾個；註冊成功記一筆 register
 
     【每一步用的工具與資料庫方法】
@@ -119,14 +121,9 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
                  security.register_blocked(ip, db=db)        太多了回要給使用者看的話（第一次擋下時記一筆 register_limited）
         4 帳本   crud.save(Group, {"name": …, "color": catalog.GROUP_COLORS[0], "created_by": user.id, "kind": "standing"}, db=db)
                  crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)  自己加進去
-        5 登入   tokens.make_refresh_token(user.id)          回傳 (token, 到期時間)
-                 tokens.fingerprint(token)                   token 的指紋（SHA-256），資料庫只存這個
-                 request.headers.get("user-agent", "")       瀏覽器自己報的名字，「登入中的裝置」會用
-                 tokens.fingerprint(ip)                      連線的 IP；只存指紋，不存原文
-                 security.record("register", db=db, user_id=…, ip=ip)  記一筆，下一次數得到
-                 crud.save(UserSession, {…}, db=db)          新增一列，session.id（UUID）會自動產生
-                 tokens.make_access_token(user.id, extra={"sid": str(session.id)})  短效的通行證，裡面帶 sid
-                 db.commit()                                 帳號與 session 一起寫進去
+        4 寄信   mailer.is_configured()                      寄得出信嗎？寄不出（本機開發）就直接算驗證過
+        5 記錄   security.record("register", db=db, user_id=…, ip=ip)  記一筆，下一次數得到
+                 db.commit()                                 帳號、帳本、紀錄一起寫進去（不建 sessions：不登入）
         6 驗證信 email_verify.make_token(user.id, email)     簽一張驗證權杖（EMAIL_VERIFY_MINUTES 分鐘有效，預設 24 小時）
                  email_verify.verify_link(settings.app_base_url, 權杖)  <前端網址>/#/verify/<權杖>
                  email_verify.mail_content(name, 連結)       回傳（主旨, 純文字, HTML），名字已經 escape
@@ -136,10 +133,11 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         1. 帶了 savingsGoal → 400
         2. 整理名字（422）、email（422）；email 用過 → 409
         3. 密碼檢查強度、算雜湊（422）；這個來源一小時內註冊太多個 → 429
-        4. 新增帳號：主題 paper、onboarded_at 留 NULL；開一本「〈名字〉的帳本」（名字最多取 17 字，帳本名最多 20 字）
-        5. 新增一列 sessions，發 refresh token 與 access token（帶 sid），db.commit()
-        6. 背景寄驗證信（新增帳號時順便記下 email_verify_sent_at，重寄的冷卻從這裡算）
-        7. 回傳 token 與 user（新帳號的欄位都是固定的：沒有家庭、沒有大頭貼、目標 0、emailVerified false）
+        4. 新增帳號：主題 paper、onboarded_at 留 NULL；寄得出信就記下 email_verify_sent_at（重寄的冷卻從這裡算），
+           寄不出信就直接填 email_verified_at；開一本「〈名字〉的帳本」（名字最多取 17 字，帳本名最多 20 字）
+        5. 記一筆 register，db.commit()（**不登入**，不建 sessions）
+        6. 寄得出信才背景寄驗證信
+        7. 回傳 verifySent、message 與 user（新帳號的欄位都是固定的：沒有家庭、沒有大頭貼、目標 0）
 
     【完整寫法】照下面兩步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -194,46 +192,40 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
                 db.commit()                                     # 第一次被擋時記的那一筆要留著
                 raise HTTPException(status_code=429, detail=blocked)
 
-            # 4. 新增帳號（onboarded_at 是 NULL：登入後前端會帶去個人化設定）
+            # 4. 新增帳號（onboarded_at 是 NULL：點了驗證信、登入之後，前端會帶去個人化設定）
+            #    寄不出信的環境（本機開發沒設 BREVO_API_KEY）沒有信可以點，直接算驗證過，不然人會卡在那一步
             now = datetime.now(timezone.utc)
-            user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
-                                    "theme": "paper", "last_login_at": now, "email_verify_sent_at": now}, db=db)
+            can_mail = mailer.is_configured()
+            user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name, "theme": "paper",
+                                    "email_verify_sent_at": now if can_mail else None,
+                                    "email_verified_at": None if can_mail else now}, db=db)
 
             #    順便開一本自己的帳本：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了
             group = crud.save(Group, {"name": name[:17] + "的帳本", "color": catalog.GROUP_COLORS[0],
                                       "created_by": user.id, "kind": "standing"}, db=db)
             crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)
 
-            # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
-            refresh, expires = tokens.make_refresh_token(user.id)
-            session = crud.save(UserSession, {
-                "user_id": user.id,
-                "refresh_token_hash": tokens.fingerprint(refresh),
-                "user_agent": request.headers.get("user-agent", "")[:300],
-                "ip_hash": tokens.fingerprint(ip) if ip else None,
-                "expires_at": expires,
-                "last_seen_at": now,
-            }, db=db)
-            security.record("register", db=db, user_id=user.id, ip=ip)     # 數「同一個來源註冊了幾個」用
+            # 5. 註冊完**不登入**：記一筆（數「同一個來源註冊了幾個」用），寫進去
+            security.record("register", db=db, user_id=user.id, ip=ip)
             db.commit()
 
-            # 6. 寄驗證信（背景寄，回應不等 Brevo）：點了連結才算確認 email 是本人的；寄不出去只記 log，帳號照樣建好
-            subject, text, html = email_verify.mail_content(
-                name, email_verify.verify_link(settings.app_base_url, email_verify.make_token(user.id, email)))
+            # 6. 寄驗證信（背景寄，回應不等 Brevo）：點信裡的連結才登入、接著做個人化設定；寄不出去只記 log，帳號照樣建好
+            if can_mail:
+                subject, text, html = email_verify.mail_content(
+                    name, email_verify.verify_link(settings.app_base_url, email_verify.make_token(user.id, email)))
 
-            def send():
-                try:
-                    mailer.send_mail(email, subject, text, html, to_name=name)
-                except (mailer.MailNotConfigured, mailer.MailError) as exc:
-                    logging.getLogger("fambudget").warning("驗證信寄不出去：%s", exc)
+                def send():
+                    try:
+                        mailer.send_mail(email, subject, text, html, to_name=name)
+                    except (mailer.MailNotConfigured, mailer.MailError) as exc:
+                        logging.getLogger("fambudget").warning("驗證信寄不出去：%s", exc)
 
-            background.add_task(send)
+                background.add_task(send)
 
-            # 7. 回傳 token 與使用者（新帳號：沒有家庭、沒有大頭貼、還沒走個人化設定、email 還沒驗證）
+            # 7. 回傳使用者與下一步（沒有 token：前端回到登入頁，請他去收信）
             return {
-                "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
-                "refreshToken": refresh,
-                "expiresIn": settings.access_token_minutes * 60,
+                "verifySent": can_mail,
+                "message": ("驗證信已寄到 %s，點信裡的按鈕就會接著開始設定" % email) if can_mail else "帳號建好了，請登入",
                 "user": {
                     "id": str(user.id),
                     "name": user.display_name,
@@ -249,7 +241,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
                     "onboardedAt": None,
                     "savingsGoal": 0,
                     "isPlatformAdmin": False,
-                    "emailVerified": False,
+                    "emailVerified": not can_mail,
                 },
             }
 
@@ -262,9 +254,10 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
                同一個 email 換大寫再註冊  → 409
                帶 "savingsGoal": 1000     → 400
                password 填 "1234"         → 422
-           backend/.env 填了 BREVO_API_KEY 與 MAIL_FROM 的話，信箱會收到「確認你的家庭記帳 email」
-        5. 拿回來的 accessToken 按 Authorize，打 GET /api/auth/me → 就是這個人，emailVerified 是 false
-        6. 前端改成連你的後端（frontend/index.html 的 api-base），註冊頁註冊一個帳號，要直接進到「個人化設定」
+           backend/.env 填了 BREVO_API_KEY 與 MAIL_FROM 的話，信箱會收到「確認你的家庭記帳 email」，回應沒有 token
+        5. 點信裡的按鈕（或 POST /api/auth/verify-email 送信裡的權杖）→ 這時才拿到 token
+        6. 前端改成連你的後端（frontend/index.html 的 api-base），註冊頁註冊一個帳號：回到登入頁、顯示「驗證信已寄到…」；
+           點信裡的按鈕才登入，接著進到「個人化設定」
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "register and 你的"，要全部通過
     """
     # 1. 存款目標不在註冊時問：帶了就講清楚，不要默默吃掉
@@ -295,46 +288,40 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         db.commit()                                     # 第一次被擋時記的那一筆要留著
         raise HTTPException(status_code=429, detail=blocked)
 
-    # 4. 新增帳號（onboarded_at 是 NULL：登入後前端會帶去個人化設定）
+    # 4. 新增帳號（onboarded_at 是 NULL：點了驗證信、登入之後，前端會帶去個人化設定）
+    #    寄不出信的環境（本機開發沒設 BREVO_API_KEY）沒有信可以點，直接算驗證過，不然人會卡在那一步
     now = datetime.now(timezone.utc)
-    user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name,
-                            "theme": "paper", "last_login_at": now, "email_verify_sent_at": now}, db=db)
+    can_mail = mailer.is_configured()
+    user = crud.save(User, {"email": email, "password_hash": hashed, "display_name": name, "theme": "paper",
+                            "email_verify_sent_at": now if can_mail else None,
+                            "email_verified_at": None if can_mail else now}, db=db)
 
     #    順便開一本自己的帳本：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了
     group = crud.save(Group, {"name": name[:17] + "的帳本", "color": catalog.GROUP_COLORS[0],
                               "created_by": user.id, "kind": "standing"}, db=db)
     crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)
 
-    # 5. 註冊完直接登入：寫一列 sessions（只存 refresh token 的指紋）
-    refresh, expires = tokens.make_refresh_token(user.id)
-    session = crud.save(UserSession, {
-        "user_id": user.id,
-        "refresh_token_hash": tokens.fingerprint(refresh),
-        "user_agent": request.headers.get("user-agent", "")[:300],
-        "ip_hash": tokens.fingerprint(ip) if ip else None,
-        "expires_at": expires,
-        "last_seen_at": now,
-    }, db=db)
-    security.record("register", db=db, user_id=user.id, ip=ip)     # 數「同一個來源註冊了幾個」用
+    # 5. 註冊完**不登入**：記一筆（數「同一個來源註冊了幾個」用），寫進去
+    security.record("register", db=db, user_id=user.id, ip=ip)
     db.commit()
 
-    # 6. 寄驗證信（背景寄，回應不等 Brevo）：點了連結才算確認 email 是本人的；寄不出去只記 log，帳號照樣建好
-    subject, text, html = email_verify.mail_content(
-        name, email_verify.verify_link(settings.app_base_url, email_verify.make_token(user.id, email)))
+    # 6. 寄驗證信（背景寄，回應不等 Brevo）：點信裡的連結才登入、接著做個人化設定；寄不出去只記 log，帳號照樣建好
+    if can_mail:
+        subject, text, html = email_verify.mail_content(
+            name, email_verify.verify_link(settings.app_base_url, email_verify.make_token(user.id, email)))
 
-    def send():
-        try:
-            mailer.send_mail(email, subject, text, html, to_name=name)
-        except (mailer.MailNotConfigured, mailer.MailError) as exc:
-            logging.getLogger("fambudget").warning("驗證信寄不出去：%s", exc)
+        def send():
+            try:
+                mailer.send_mail(email, subject, text, html, to_name=name)
+            except (mailer.MailNotConfigured, mailer.MailError) as exc:
+                logging.getLogger("fambudget").warning("驗證信寄不出去：%s", exc)
 
-    background.add_task(send)
+        background.add_task(send)
 
-    # 7. 回傳 token 與使用者（新帳號：沒有家庭、沒有大頭貼、還沒走個人化設定、email 還沒驗證）
+    # 7. 回傳使用者與下一步（沒有 token：前端回到登入頁，請他去收信）
     return {
-        "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
-        "refreshToken": refresh,
-        "expiresIn": settings.access_token_minutes * 60,
+        "verifySent": can_mail,
+        "message": ("驗證信已寄到 %s，點信裡的按鈕就會接著開始設定" % email) if can_mail else "帳號建好了，請登入",
         "user": {
             "id": str(user.id),
             "name": user.display_name,
@@ -350,7 +337,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
             "onboardedAt": None,
             "savingsGoal": 0,
             "isPlatformAdmin": False,
-            "emailVerified": False,
+            "emailVerified": not can_mail,
         },
     }
 
@@ -1216,6 +1203,8 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         ⚠️ email 不開放修改：email 是登入帳號，改它等於換帳號（要另外設計驗證新信箱的流程）。
         ⚠️ 換主題不需要新路由、新表，就是 users.theme 一個欄位，只收 toolkit/theme.py 清單裡的。
         onboarded 只收 true：沒有「退回沒走過」這回事；已經設過的不要蓋掉時間。
+        ⚠️ 還沒點驗證信的人不能標 onboarded（403）：註冊 → 點信 → 個人化設定，這個順序由後端守住。
+           寄不出信的環境（本機開發）沒有信可以點，不擋。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.updateProfile({...})
@@ -1250,6 +1239,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         422     出生年不在 1900～今年          出生年份不合理
         422     主題不在清單裡                 沒有這個主題
         422     onboarded 不是 true            onboarded 只能是 true
+        403     還沒點驗證信就要標 onboarded   先到信箱點驗證連結，才能開始設定
         422     帶了 email 或其他不認得的欄位  （FastAPI 自動回）
 
     【會用到的資料表】
@@ -1268,7 +1258,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         1. 有送 displayName：整理空白，空的或太長 422
         2. 有送 birthYear：不是 null 就要在 1900～今年
         3. 有送 theme：clean_theme（422）
-        4. 有送 onboarded：只收 true；還沒設過才設 onboarded_at = 現在
+        4. 有送 onboarded：只收 true；還沒點驗證信（而且寄得出信）→ 403；還沒設過才設 onboarded_at = 現在
         5. 有東西要改才寫回、db.commit()
         6. 回傳改完的 user
 
@@ -1327,6 +1317,9 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
             if "onboarded" in sent:
                 if body.onboarded is not True:
                     raise errors.unprocessable("onboarded 只能是 true")
+                # 註冊後要先點驗證信，才能開始（完成）設定；寄不出信的環境（本機開發）沒有信可以點，不擋
+                if me.email_verified_at is None and me.onboarded_at is None and mailer.is_configured():
+                    raise errors.forbidden("先到信箱點驗證連結，才能開始設定")
                 if me.onboarded_at is None:
                     changes["onboarded_at"] = datetime.now(timezone.utc)
 
@@ -1401,6 +1394,9 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
     if "onboarded" in sent:
         if body.onboarded is not True:
             raise errors.unprocessable("onboarded 只能是 true")
+        # 註冊後要先點驗證信，才能開始（完成）設定；寄不出信的環境（本機開發）沒有信可以點，不擋
+        if me.email_verified_at is None and me.onboarded_at is None and mailer.is_configured():
+            raise errors.forbidden("先到信箱點驗證連結，才能開始設定")
         if me.onboarded_at is None:
             changes["onboarded_at"] = datetime.now(timezone.utc)
 
@@ -1899,17 +1895,20 @@ def confirm_password_reset(
 
 
 @router.post("/auth/verify-email", summary="點驗證信的連結：確認 email 是本人的")
-def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
+def verify_email(body: VerifyEmailIn, request: Request, db: Session = Depends(get_db)):
     """點驗證信的連結：確認 email 是本人的
 
     POST /api/auth/verify-email
 
     【這支做什麼】
-        使用者點了驗證信裡的連結（#/verify/<權杖>），前端把權杖送來：對的話把 users.email_verified_at 填上現在。
+        使用者點了驗證信裡的連結（#/verify/<權杖>），前端把權杖送來：對的話把 users.email_verified_at 填上現在，
+        而且**第一次點的時候順便登入**（回 token）：註冊完不登入，點了信才接著做個人化設定。
+        ⚠️ 只有第一次點會登入：已經驗證過的再點一次只回確認好了——信可能被轉寄，連結不能變成一直有效的登入連結。
+        ⚠️ 停權的人只驗證、不登入。
         ⚠️ 權杖過期就進不來：簽的時候寫了到期時間（EMAIL_VERIFY_MINUTES，預設 24 小時），過了 read_token 直接丟錯。
         ⚠️ 權杖裡放了 email：使用者改過 email 的話，舊信的連結對不上，一樣失效。
-        ⚠️ 點兩次結果一樣（冪等）：已經驗證過的，再點一次也回成功，不會改掉第一次的時間。
-        不另外開表存權杖：驗證 email 不像重設密碼——被別人拿去點，頂多是幫你確認了 email，拿不到帳號。
+        ⚠️ 點兩次不會出錯：已經驗證過的，再點一次也回成功（loggedIn false），不會改掉第一次的時間。
+        不另外開表存權杖：第一次點才登入，而第一次點的一定是收到信的人（跟忘記密碼的重設連結一樣，信箱就是鑰匙）。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.verifyEmail(token)
@@ -1917,6 +1916,7 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
 
     【誰能打】
         任何人都能打，不用登入（上面沒有守衛）：拿得出有效權杖的人，就是收得到那封信的人。
+        另外收一個 request（FastAPI 的 Request）：第一次點要登入，記下這一台的瀏覽器與 IP 的雜湊（同登入）。
 
     【請求主體】body 是 VerifyEmailIn（app/schemas/auth.py）
         欄位   型別  必填  說明
@@ -1924,7 +1924,11 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
         範例：{"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"}
 
     【成功回應】狀態碼 200
-        {"ok": true, "email": "daming@wang.tw"}
+        第一次點：{"ok": true, "email": "daming@wang.tw", "loggedIn": true,
+                   "accessToken": "eyJ…", "refreshToken": "eyJ…", "expiresIn": 1800,
+                   "user": {"id": "3", "name": "王大明", "email": "daming@wang.tw", "onboardedAt": null}}
+        再點一次、或停權中：{"ok": true, "email": "daming@wang.tw", "loggedIn": false}
+        · user 只放前端換頁要用的；完整的打 GET /api/auth/me
 
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                              detail
@@ -1935,18 +1939,23 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
 
     【會用到的資料表】
         表     讀／寫  用來做什麼
-        users  讀＋寫  權杖裡的那個人；email_verified_at = 現在
+        users     讀＋寫  權杖裡的那個人；email_verified_at、last_login_at = 現在
+        sessions  寫      第一次點：這一台的登入工作階段（只存 refresh token 的指紋）
 
     【每一步用的工具與資料庫方法】
         步驟    呼叫                                        做什麼
         1 權杖  email_verify.read_token(body.token)         回傳 (user_id, email)；過期、無效丟 email_verify.InvalidToken
         2 帳號  crud.get(User, user_id, db=db)              找不到是 None
-        3 寫入  crud.save(User, {"id": …, "email_verified_at": 現在}, db=db)＋db.commit()
+        3 寫入  crud.save(User, {"id": …, "email_verified_at": 現在}, db=db)
+        4 登入  tokens.make_refresh_token／fingerprint／make_access_token、crud.save(UserSession, {…})  同登入
+                security.source_of(request)                  來源 IP
+                db.commit()
 
     【寫法步驟】
         1. 解開權杖，過期或無效 → 400
         2. 帳號不在、email 對不上 → 400
-        3. 還沒驗證過才填上時間；回 {"ok": true, "email": …}
+        3. 已經驗證過 → 回 {"ok": true, "email": …, "loggedIn": false}
+        4. 第一次：填上時間；停權中就只回 loggedIn false；不然建一列 sessions、發兩張 token，回 loggedIn true
 
     【完整寫法】照下面兩步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -1984,11 +1993,38 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
             if user is None or user.email != email:
                 raise errors.bad_request("這個驗證連結無效，登入後可以在總覽重寄一封")
 
-            # 3. 填上驗證時間；已經驗證過就不動（點兩次結果一樣）
-            if user.email_verified_at is None:
-                crud.save(User, {"id": user.id, "email_verified_at": datetime.now(timezone.utc)}, db=db)
+            # 3. 已經驗證過：只回確認好了，**不登入**（第二次以後的點擊可能是轉寄出去的信）
+            if user.email_verified_at is not None:
+                return {"ok": True, "email": user.email, "loggedIn": False}
+
+            # 4. 第一次點：填上驗證時間，順便登入——註冊完沒有登入，點了信才接著做個人化設定。停權的人只驗證、不登入
+            now = datetime.now(timezone.utc)
+            crud.save(User, {"id": user.id, "email_verified_at": now}, db=db)
+            if user.suspended_at is not None:
                 db.commit()
-            return {"ok": True, "email": user.email}
+                return {"ok": True, "email": user.email, "loggedIn": False}
+            refresh, expires = tokens.make_refresh_token(user.id)
+            ip = security.source_of(request)
+            session = crud.save(UserSession, {
+                "user_id": user.id,
+                "refresh_token_hash": tokens.fingerprint(refresh),
+                "user_agent": request.headers.get("user-agent", "")[:300],
+                "ip_hash": tokens.fingerprint(ip) if ip else None,
+                "expires_at": expires,
+                "last_seen_at": now,
+            }, db=db)
+            crud.save(User, {"id": user.id, "last_login_at": now}, db=db)
+            db.commit()
+            return {
+                "ok": True,
+                "email": user.email,
+                "loggedIn": True,
+                "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
+                "refreshToken": refresh,
+                "expiresIn": settings.access_token_minutes * 60,
+                "user": {"id": str(user.id), "name": user.display_name, "email": user.email,
+                         "onboardedAt": None if user.onboarded_at is None else security.aware(user.onboarded_at).isoformat()},
+            }
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -1996,11 +2032,11 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
            （沒填的話，在 python 裡 email_verify.make_token(他的 id, 他的 email) 自己簽一張）
         3. 瀏覽器打開 http://localhost:8000/docs，找到 POST /api/auth/verify-email，不用按 Authorize
         4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
-               信裡的權杖                            → 200；GET /api/auth/me 的 emailVerified 變 true
-               同一個權杖再送一次                    → 200（結果一樣）
+               信裡的權杖                            → 200，loggedIn true、有 token；GET /api/auth/me 的 emailVerified 變 true
+               同一個權杖再送一次                    → 200，loggedIn false、沒有 token
                隨便打幾個字                          → 400「這個驗證連結無效…」
                .env 設 EMAIL_VERIFY_MINUTES=1，等 1 分鐘再送  → 400「這個驗證連結過期了…」
-        5. 前端：點信裡的按鈕，#/verify/… 這一頁顯示「email 確認好了」，總覽的提醒消失
+        5. 前端：點信裡的按鈕，#/verify/… 確認好了就登入、接著進到「個人化設定」
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "verify_email and 你的"，要全部通過
     """
     # 1. 解開權杖：簽章不對、過期、不是驗證信的權杖 → 400（過期的權杖從這裡就進不去了）
@@ -2014,11 +2050,38 @@ def verify_email(body: VerifyEmailIn, db: Session = Depends(get_db)):
     if user is None or user.email != email:
         raise errors.bad_request("這個驗證連結無效，登入後可以在總覽重寄一封")
 
-    # 3. 填上驗證時間；已經驗證過就不動（點兩次結果一樣）
-    if user.email_verified_at is None:
-        crud.save(User, {"id": user.id, "email_verified_at": datetime.now(timezone.utc)}, db=db)
+    # 3. 已經驗證過：只回確認好了，**不登入**（第二次以後的點擊可能是轉寄出去的信）
+    if user.email_verified_at is not None:
+        return {"ok": True, "email": user.email, "loggedIn": False}
+
+    # 4. 第一次點：填上驗證時間，順便登入——註冊完沒有登入，點了信才接著做個人化設定。停權的人只驗證、不登入
+    now = datetime.now(timezone.utc)
+    crud.save(User, {"id": user.id, "email_verified_at": now}, db=db)
+    if user.suspended_at is not None:
         db.commit()
-    return {"ok": True, "email": user.email}
+        return {"ok": True, "email": user.email, "loggedIn": False}
+    refresh, expires = tokens.make_refresh_token(user.id)
+    ip = security.source_of(request)
+    session = crud.save(UserSession, {
+        "user_id": user.id,
+        "refresh_token_hash": tokens.fingerprint(refresh),
+        "user_agent": request.headers.get("user-agent", "")[:300],
+        "ip_hash": tokens.fingerprint(ip) if ip else None,
+        "expires_at": expires,
+        "last_seen_at": now,
+    }, db=db)
+    crud.save(User, {"id": user.id, "last_login_at": now}, db=db)
+    db.commit()
+    return {
+        "ok": True,
+        "email": user.email,
+        "loggedIn": True,
+        "accessToken": tokens.make_access_token(user.id, extra={"sid": str(session.id)}),
+        "refreshToken": refresh,
+        "expiresIn": settings.access_token_minutes * 60,
+        "user": {"id": str(user.id), "name": user.display_name, "email": user.email,
+                 "onboardedAt": None if user.onboarded_at is None else security.aware(user.onboarded_at).isoformat()},
+    }
 
 
 @router.post("/auth/verify-email/resend", summary="重寄驗證信")

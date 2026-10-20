@@ -31,7 +31,8 @@ REG = ("POST", "/api/auth/register")
 
 
 @pytest.mark.route(*REG)
-def test_register_註冊完直接登入(api):
+def test_register_建好帳號但不登入_要先點驗證信(api, outbox):
+    """使用者要的流程（2026-10-20）：註冊完回到登入頁，點了信裡的連結才登入、接著做個人化設定。"""
     r = api.post("/api/auth/register", json={"name": " 王 大明 ", "email": " Daming@Wang.TW ", "password": "abcd1234"},
                  headers={"User-Agent": "Mozilla/5.0 (iPhone)"})
     assert r.status_code == 201, r.text
@@ -42,15 +43,12 @@ def test_register_註冊完直接登入(api):
         "name": "王 大明", "email": "daming@wang.tw", "role": None, "familyId": None, "avatar": "明",
         "avatarUrl": None, "theme": "paper", "onboardedAt": None, "savingsGoal": 0, "isPlatformAdmin": False,
         "age": None, "birthYear": None, "emailVerified": False}
-    assert b["expiresIn"] == 1800 and u["joined"]
+    assert b["verifySent"] is True and "daming@wang.tw" in b["message"] and u["joined"]
+    assert "accessToken" not in b and "refreshToken" not in b                # 不登入
     row = crud.get(User, int(u["id"]))
     assert row.email == "daming@wang.tw" and row.password_hash != "abcd1234"
     assert passwords.verify_password("abcd1234", row.password_hash) and row.onboarded_at is None
-    payload = tokens.read_access_token(b["accessToken"])
-    s = crud.get(UserSession, where={"user_id": row.id})
-    assert payload["sub"] == u["id"] and payload["sid"] == str(s.id)
-    assert s.refresh_token_hash == tokens.fingerprint(b["refreshToken"]) and "iPhone" in s.user_agent
-    assert s.ip_hash and s.revoked_at is None
+    assert crud.count(UserSession) == 0 and row.last_login_at is None
     # 第一本帳本：沒有它，新帳號連第一筆都記不了
     g = crud.get(Group, where={"created_by": row.id})
     assert g.name == "王 大明的帳本" and g.kind == "standing" and g.family_id is None
@@ -320,6 +318,7 @@ CONFIRM = ("POST", "/api/auth/password-reset/confirm")
 
 @pytest.fixture()
 def outbox(monkeypatch):
+    """寄得出信的環境：信收進這個清單（不真的寄）。"""
     sent = []
 
     def fake(to, subject, text, html=None, **kw):
@@ -327,6 +326,7 @@ def outbox(monkeypatch):
         return "msg-1"
 
     monkeypatch.setattr(mailer, "send_mail", fake)
+    monkeypatch.setattr(mailer, "is_configured", lambda: True)
     return sent
 
 
@@ -405,27 +405,58 @@ def test_register_寄出驗證信_點連結之前是未驗證(api, outbox):
     row = crud.get(User, int(r.json()["user"]["id"]))
     assert email_verify.read_token(token) == (row.id, "daming@wang.tw")
     assert row.email_verified_at is None and row.email_verify_sent_at is not None
-    me = api.get("/api/auth/me", headers={"Authorization": "Bearer " + r.json()["accessToken"]}).json()
-    assert me["user"]["emailVerified"] is False
+    # 沒點信就先登入：登得進去，但個人化設定標不了完成（前端停在「請先到信箱點驗證連結」）
+    h = {"Authorization": "Bearer " + api.post("/api/auth/login", json={"email": "daming@wang.tw",
+                                                                         "password": "abcd1234"}).json()["accessToken"]}
+    assert api.get("/api/auth/me", headers=h).json()["user"]["emailVerified"] is False
+    r = api.patch("/api/auth/me", headers=h, json={"onboarded": True})
+    assert r.status_code == 403 and "驗證連結" in r.json()["detail"]
+    # 點了信：登入（拿到 token），接著可以完成設定
+    v = api.post("/api/auth/verify-email", json={"token": token}).json()
+    assert v["loggedIn"] is True and v["user"]["onboardedAt"] is None
+    h2 = {"Authorization": "Bearer " + v["accessToken"]}
+    assert api.patch("/api/auth/me", headers=h2, json={"onboarded": True}).status_code == 200
 
 
 @pytest.mark.route(*REG)
-def test_register_驗證信寄不出去_帳號照樣建好(api):
+def test_register_寄不出信的環境_直接算驗證過_登入就能設定(api):
+    """本機開發沒設寄信：沒有信可以點，不能把人卡住。"""
     r = api.post("/api/auth/register", json={"name": "王大明", "email": "d@wang.tw", "password": "abcd1234"})
     assert r.status_code == 201 and crud.count(User) == 1
+    b = r.json()
+    assert b["verifySent"] is False and b["message"] == "帳號建好了，請登入" and b["user"]["emailVerified"] is True
+    assert "accessToken" not in b
+    t = api.post("/api/auth/login", json={"email": "d@wang.tw", "password": "abcd1234"}).json()["accessToken"]
+    assert api.patch("/api/auth/me", headers={"Authorization": "Bearer " + t}, json={"onboarded": True}).status_code == 200
 
 
 @pytest.mark.route(*VERIFY_EMAIL)
-def test_verify_email_點連結就驗證_點兩次一樣(api):
+def test_verify_email_第一次點就登入_再點只回確認好了(api):
     me = user("d@x.tw", "爸爸")
     token = email_verify.make_token(me.id, me.email)
-    r = api.post("/api/auth/verify-email", json={"token": token})
-    assert r.status_code == 200 and r.json() == {"ok": True, "email": "d@x.tw"}
+    r = api.post("/api/auth/verify-email", json={"token": token}, headers={"User-Agent": "Mozilla/5.0 (iPhone)"})
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert (b["ok"], b["email"], b["loggedIn"], b["expiresIn"]) == (True, "d@x.tw", True, 1800)
+    assert b["user"] == {"id": str(me.id), "name": "爸爸", "email": "d@x.tw", "onboardedAt": None}
+    s = crud.get(UserSession, where={"user_id": me.id})
+    assert tokens.read_access_token(b["accessToken"])["sid"] == str(s.id) and "iPhone" in s.user_agent
+    assert s.refresh_token_hash == tokens.fingerprint(b["refreshToken"])
     first = crud.get(User, me.id).email_verified_at
-    assert first is not None
-    assert api.get("/api/auth/me", headers=login(me)).json()["user"]["emailVerified"] is True
+    assert first is not None and crud.get(User, me.id).last_login_at is not None
+    assert api.get("/api/auth/me", headers={"Authorization": "Bearer " + b["accessToken"]}).json()["user"]["emailVerified"] is True
+    # 再點一次（信可能被轉寄）：只回確認好了，不再登入
     again = api.post("/api/auth/verify-email", json={"token": token})
-    assert again.status_code == 200 and crud.get(User, me.id).email_verified_at == first
+    assert again.status_code == 200 and again.json() == {"ok": True, "email": "d@x.tw", "loggedIn": False}
+    assert crud.get(User, me.id).email_verified_at == first and crud.count(UserSession) == 1
+
+
+@pytest.mark.route(*VERIFY_EMAIL)
+def test_verify_email_停權的人只驗證不登入(api):
+    bad = user("b@x.tw", "壞人", suspended_at=now(), suspended_reason="違規")
+    r = api.post("/api/auth/verify-email", json={"token": email_verify.make_token(bad.id, bad.email)})
+    assert r.status_code == 200 and r.json() == {"ok": True, "email": "b@x.tw", "loggedIn": False}
+    assert crud.get(User, bad.id).email_verified_at is not None and crud.count(UserSession) == 0
 
 
 @pytest.mark.route(*VERIFY_EMAIL)

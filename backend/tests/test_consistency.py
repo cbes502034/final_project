@@ -1716,10 +1716,12 @@ _FAMILY_DRIVER = _ADMIN_DRIVER.split("(async () => {")[0] + r"""
   const code = await API.createInviteCode({ role: 'parent', label: '給外婆' });
   out.code = code;
   await API.register({ name: '林小姑', email: 'aunt@mail.tw', password: PW });
+  await API.login({ email: 'aunt@mail.tw', password: PW });          // 註冊完不登入（要先點驗證信）
   out.newUser = (await API.me()).user;
   out.join = await API.joinFamily({ code: code.code.toLowerCase().replace('-', ' ') });
   out.newParentVisible = (await API.me()).visible;
   await API.register({ name: '陌生人', email: 'x@mail.tw', password: PW });
+  await API.login({ email: 'x@mail.tw', password: PW });
   out.reuse = await fails(API.joinFamily({ code: code.code }));
   out.strangerMembers = (await API.members()).members.map(m => m.id);
   const stranger = (await API.me()).user.id;
@@ -2777,6 +2779,7 @@ const tryIt = p => p.then(r => r, e => ({ error: e.message, status: e.status || 
   // ---- 註冊：不收存款目標，註冊完還沒個人化設定 ----
   out.regWithGoal = await tryIt(API.register({ name: '測試', email: 'new@x.tw', password: PW, savingsGoal: 5000 }));
   out.reg = await tryIt(API.register({ name: '測試', email: 'new@x.tw', password: PW }));
+  await API.verifyEmail(out.reg.demoMail.link.split('/').pop());       // 點了信才登入
   out.meBefore = (await API.me()).user.onboardedAt;
   out.badFlag = await tryIt(API.updateProfile({ onboarded: false }));
   await API.setSavingsGoal((await API.me()).user.id, 6000);
@@ -2827,6 +2830,7 @@ def test_忘記密碼_不透露帳號_連結一次性會過期_改完登出():
 
     assert out["regWithGoal"]["status"] == 400, "存款目標不在註冊時收"
     assert out["reg"]["user"]["onboardedAt"] is None and out["meBefore"] is None, "新帳號要還沒走個人化設定"
+    assert "accessToken" not in out["reg"] and out["reg"]["verifySent"] is True, "註冊完不登入，要先點驗證信"
     assert out["badFlag"]["status"] == 422
     assert out["meAfter"] and out["goalAfter"] == 6000, "個人化設定走完要記在帳號上，重新整理後還在"
     assert out["seed"], "示範帳號是早就在用的人，不該被帶去個人化設定"
@@ -3097,3 +3101,19 @@ def test_網站上只放使用說明_開發文件與開發用的提示都不在�
         assert bad not in app, "app.js 還有開發用的提示：" + bad
     assert "這一支做好之前" not in read("frontend/js/notify.js")
     assert "後端還沒做這一支" not in read("frontend/docs/guide.html")
+
+
+def test_註冊完回登入頁_點了驗證信才接著設定():
+    """使用者要的流程（2026-10-20）：按註冊 → 回到登入頁、請他去收信 → 點信裡的連結才登入、接著做個人化設定。
+    沒點信就先登入的人停在「還差一步」，不能跳過去設定（後端 PATCH /api/auth/me 也擋 onboarded）。"""
+    app = read("frontend/js/app.js")
+    reg = app[app.index("if (f.id === 'regF') {"):app.index("if (f.id === 'forgotF') {")]
+    assert "afterLogin" not in reg and "REG_NOTE = {" in reg and "'#/login'" in reg, "註冊完不可以直接登入"
+    assert "if (!admin && m.user.emailVerified === false && !m.user.onboardedAt) { location.hash = '#/verify'; return; }" in app
+    assert app.index("location.hash = '#/verify'; return;") < app.index("location.hash = '#/setup'; return;"),         "要先擋「還沒點驗證信」，才輪到個人化設定"
+    assert "function verifyPending()" in app and "if (!token) { verifyPending(); return; }" in app
+    ver = app[app.index("API.verifyEmail(token).then(function (r) {"):]
+    assert ver.index("if (r.loggedIn) {") < ver.index("afterLogin(r, true);"), "第一次點信要登入、接著設定"
+    api = read("frontend/js/api.js")
+    assert "verifyEmail:       function (t)     { return req('/api/auth/verify-email', { method: 'POST', body: { token: t } }).then(keep); }" in api
+

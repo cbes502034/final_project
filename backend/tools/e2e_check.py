@@ -95,10 +95,10 @@ def main() -> int:
     # ------------------------------------------------------------------ 認證
     r.domain = "認證"
     for who, name in (("dad", "林爸爸"), ("kid", "林小華"), ("mom", "林媽媽"), ("out", "路人"), ("admin", "管理員")):
-        data, ok = r.step("註冊：" + name, "POST", "/api/auth/register", want=(201, 409),
-                          json_body={"name": name, "email": mail[who], "password": pw[who]})
-        if ok and data and "accessToken" in data:
-            tok[who], refresh[who], uid[who] = data["accessToken"], data["refreshToken"], data["user"]["id"]
+        # 註冊完不登入（要先點驗證信）；本機沒設寄信，直接算驗證過，下面登入就好
+        r.step("註冊：" + name, "POST", "/api/auth/register", want=(201, 409),
+               json_body={"name": name, "email": mail[who], "password": pw[who]},
+               check=lambda d: "accessToken" not in d)
     if args.db:
         env = dict(os.environ, DATABASE_URL=args.db, ADMIN_EMAILS=mail["admin"])
         subprocess.run([sys.executable, "-m", "app.cli", "make-admin"], cwd=BACKEND, env=env,

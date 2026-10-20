@@ -991,14 +991,16 @@
         s.newUsers = (s.newUsers || []).concat([clone(u)]);
         s.passwords = s.passwords || {};
         s.passwords[u.id] = pwHash(p.password);
-        s.me = u.id;
-        s.auth = { loggedIn: true };
+        /* 註冊完不登入（跟真後端一樣）：點了驗證信的連結才登入。mock 寄不出信，連結放在 demoMail 攤在畫面上 */
+        var now = Date.now(), token = randomToken();
+        s.verifies = (s.verifies || []).concat([{ userId: u.id, token: token, createdAt: now,
+          expiresAt: now + 24 * 3600000 }]);
         save();
         return {
-          accessToken: 'mock.access.' + u.id,
-          refreshToken: 'mock.refresh.' + u.id,
-          expiresIn: 1800,
-          user: withTheme(clone(u))
+          verifySent: true,
+          message: '驗證信已寄到 ' + mail + '，點信裡的按鈕就會接著開始設定',
+          user: withTheme(clone(u)),
+          demoMail: { to: mail, subject: '確認你的家庭記帳 email', link: '#/verify/' + token }
         };
       });
     },
@@ -1261,10 +1263,16 @@
         if (Date.now() >= v.expiresAt) throw oops('這個驗證連結過期了，登入後可以在總覽重寄一封', 400);
         var u = memberOf(v.userId);
         if (!u) throw oops('這個驗證連結無效，登入後可以在總覽重寄一封', 400);
+        /* 已經驗證過：只回確認好了，不再登入（跟真後端一樣） */
+        if (withTheme(u).emailVerified) { save(); return { ok: true, email: u.email, loggedIn: false }; }
         u.emailVerified = true;
         (s.newUsers || []).forEach(function (n) { if (n.id === u.id) n.emailVerified = true; });
+        s.me = u.id;
+        s.auth = { loggedIn: true };
         save();
-        return { ok: true, email: u.email };
+        return { ok: true, email: u.email, loggedIn: true, accessToken: 'mock.access.' + u.id,
+                 refreshToken: 'mock.refresh.' + u.id, expiresIn: 1800,
+                 user: { id: u.id, name: u.name, email: u.email, onboardedAt: u.onboardedAt || null } };
       });
     },
 
@@ -3001,7 +3009,7 @@
     verifyPassword:    function (pw)    { return req('/api/auth/verify-password', { method: 'POST', body: { password: pw } }); },
     requestPasswordReset: function (e)  { return req('/api/auth/password-reset', { method: 'POST', body: { email: e } }); },
     confirmPasswordReset: function (t, pw) { return req('/api/auth/password-reset/confirm', { method: 'POST', body: { token: t, password: pw } }); },
-    verifyEmail:       function (t)     { return req('/api/auth/verify-email', { method: 'POST', body: { token: t } }); },
+    verifyEmail:       function (t)     { return req('/api/auth/verify-email', { method: 'POST', body: { token: t } }).then(keep); },
     resendVerifyEmail: function ()      { return req('/api/auth/verify-email/resend', { method: 'POST' }); },
 
     summary:           function (f)     { return req('/api/summary' + qs(f)); },
@@ -3173,10 +3181,10 @@
   /* 畫面一定會讀的欄位。少了任何一個，畫面會在很後面的地方壞掉（讀不到 undefined 的 map），
      看不出是哪一支回錯——所以在這裡先檢查，直接指出是哪一支。 */
   var SHAPE = {
-    me: ['user'], login: ['user'], register: ['user'],
+    me: ['user'], login: ['user'], register: ['user', 'verifySent', 'message'],
     financeProfile: ['finance', 'styles', 'goals', 'habits'],
     requestPasswordReset: ['ok', 'message'], sessions: ['sessions'],
-    verifyEmail: ['ok', 'email'], resendVerifyEmail: ['ok', 'sent', 'message'],
+    verifyEmail: ['ok', 'email', 'loggedIn'], resendVerifyEmail: ['ok', 'sent', 'message'],
     adminUsers: ['users'], audit: ['logs'], adminErrors: ['errors', 'lastHour'],
     adminSecurityEvents: ['events', 'today'],
     transactions: ['transactions', 'total'], createTransaction: ['id'], updateTransaction: ['id'],

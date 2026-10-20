@@ -196,7 +196,7 @@ final_project/
 
 | # | 方法 | 路徑 | 領域 | 權限 | 用途 |
 |---|---|---|---|---|---|
-| 1 | POST | `/api/auth/register` | 認證 | 公開 | 註冊。只問名字、email、密碼，回傳 user + tokens（存款目標在註冊後的個人化設定） |
+| 1 | POST | `/api/auth/register` | 認證 | 公開 | 註冊。只問名字、email、密碼，寄驗證信；**不登入**（點了信才登入，接著做個人化設定） |
 | 2 | POST | `/api/auth/login` | 認證 | 公開 | 登入。回傳 access + refresh token |
 | 3 | POST | `/api/auth/refresh` | 認證 | 公開 | 用 refresh token 換新的 access token |
 | 4 | POST | `/api/auth/logout` | 認證 | 登入 | 撤銷目前的 refresh token |
@@ -205,7 +205,7 @@ final_project/
 | 7 | PATCH | `/api/auth/password` | 認證 | 登入 | 修改密碼，同時讓其他 session 失效。舊密碼不對回 400 |
 | 74 | POST | `/api/auth/password-reset` | 認證 | 公開 | 忘記密碼：寄一次性的重設連結（Brevo）。**有沒有這個帳號都回同一句話** |
 | 75 | POST | `/api/auth/password-reset/confirm` | 認證 | 公開 | 用信裡的 token 設新密碼。30 分鐘失效、只能用一次，成功後撤銷所有 sessions |
-| 77 | POST | `/api/auth/verify-email` | 認證 | 公開 | 點註冊驗證信的連結：確認 email 是本人的。權杖過期（`EMAIL_VERIFY_MINUTES`，預設 24 小時）或 email 改過就失效 |
+| 77 | POST | `/api/auth/verify-email` | 認證 | 公開 | 點註冊驗證信的連結：確認 email 是本人的，第一次點順便登入。權杖過期（`EMAIL_VERIFY_MINUTES`，預設 24 小時）或 email 改過就失效 |
 | 78 | POST | `/api/auth/verify-email/resend` | 認證 | 登入 | 重寄驗證信給自己。60 秒冷卻；已經驗證過回 `sent: false` |
 | 8 | GET | `/api/auth/me/finance` | 認證 | 本人 | 我的理財習慣（財務建議的背景） |
 | 9 | PUT | `/api/auth/me/finance` | 認證 | 本人 | 改理財習慣。body: { style, goals[], habits[], note } |

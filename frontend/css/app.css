@@ -834,6 +834,15 @@ body.is-out .main {
 }
 #view .su__thm { margin: 0 -6px 16px; }
 
+/* ---- 註冊完回到登入頁：請他去收信 ---- */
+.gate__note {
+  display: flex; flex-direction: column; gap: 6px; margin: -6px 0 18px; padding: 12px 14px;
+  background: var(--accent-wash); border: 1px solid var(--accent-line); border-radius: var(--r-card);
+  font-size: 12.5px; line-height: 1.7; color: var(--ink-soft);
+}
+.gate__note b { font-size: 13.5px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.gate__note a { color: var(--accent-hi); }
+
 /* ---- 忘記密碼：送出之後 ---- */
 .fgt { display: flex; flex-direction: column; gap: 12px; }
 .fgt__t { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink); }

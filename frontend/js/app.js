@@ -3111,10 +3111,17 @@
        「登入」的書籤）就跳過主頁，不要再擋他一次。 */
     if (gateStep === 'landing') { vLanding(); return; }
     head('登入', '');
-    authShell('登入', '記一句話就記一筆帳，家人的支出一起看得見。',
+    /* 剛註冊完：回到這裡，上面講清楚「去收信，點信裡的按鈕就會接著開始設定」，email 先填好 */
+    var rn = REG_NOTE;
+    REG_NOTE = null;
+    authShell(rn ? '去收信' : '登入', rn ? '帳號建好了。' : '記一句話就記一筆帳，家人的支出一起看得見。',
+      (rn ? '<div class="gate__note" id="regNote"><b>' + esc(rn.message) + '</b>' +
+          (rn.verifySent ? '<span>沒收到的話，看一下垃圾信件匣；也可以先登入，在下一頁重寄一封。</span>' : '') +
+          (rn.demoMail ? '<a href="' + esc(rn.demoMail.link) + '">（這台沒有寄信）直接打開驗證連結</a>' : '') +
+        '</div>' : '') +
       '<form class="gate__f" id="loginF">' +
         '<label class="fld"><span>Email</span>' +
-          '<input type="email" id="lgEmail" autocomplete="username" required></label>' +
+          '<input type="email" id="lgEmail" autocomplete="username" value="' + (rn ? esc(rn.email) : '') + '" required></label>' +
         '<label class="fld"><span>密碼</span>' +
           '<input type="password" id="lgPw" autocomplete="current-password" required></label>' +
         '<a class="gate__fp" href="#/forgot">忘記密碼？</a>' +
@@ -3123,10 +3130,13 @@
       '</form>');
   }
 
+  /* 註冊成功之後要在登入頁顯示的那一段（只顯示一次） */
+  var REG_NOTE = null;
+
   function vRegister() {
     gateStep = 'register';
     head('註冊', '');
-    authShell('建立帳號', '只要名字、email、密碼。每月想存多少，建好帳號之後再一步一步設定。',
+    authShell('建立帳號', '只要名字、email、密碼。建好之後會寄一封確認信，點信裡的按鈕就接著設定每月想存多少。',
       '<form class="gate__f" id="regF">' +
         '<label class="fld"><span>名字</span>' +
           '<input type="text" id="rgName" autocomplete="name" required></label>' +
@@ -3311,6 +3321,7 @@
     gateStep = 'login';
     try { history.replaceState(null, '', location.pathname + location.search + '#/verify'); } catch (e) {}
     head('確認 email', '');
+    if (!token) { verifyPending(); return; }
     authShell('確認 email', token ? '正在確認這個 email 是你的…' : '這個驗證連結不完整。',
       '<div class="fgt" id="vfBox">' + (token ? '' :
         '<p class="fgt__t">請從信裡的按鈕重新打開；連結過期的話，登入後在總覽重寄一封。</p>') + '</div>');
@@ -3324,6 +3335,13 @@
     }
     if (!token) { next(box.innerHTML); return; }
     API.verifyEmail(token).then(function (r) {
+      if (r.loggedIn) {
+        /* 第一次點：登入了，接著做個人化設定（路由閘看到還沒設定，會帶去 #/setup） */
+        SETUP.step = 0;
+        afterLogin(r, true);
+        toast('email 確認好了，花一分鐘設定一下', 'ok');
+        return;
+      }
       if (ME && ME.user) ME.user.emailVerified = true;
       sub.textContent = 'email 確認好了。';
       next('<p class="fgt__t"><b>' + esc(r.email) + '</b></p>' +
@@ -3331,6 +3349,42 @@
     }).catch(function (e) {
       sub.textContent = '這個連結不能用了。';
       next('<p class="fgt__t">' + esc(e.message) + '</p>');
+    });
+  }
+
+  /* 註冊完還沒點驗證信就先登入：停在這裡，可以重寄、換帳號，不能跳過去設定。
+     ⚠️ 後端也守著：還沒點驗證信的人標不了「個人化設定走完」（PATCH /api/auth/me 回 403）。 */
+  function verifyPending() {
+    API.authState().then(function (a) {
+      if (!a.loggedIn) {
+        authShell('確認 email', '這個驗證連結不完整。',
+          '<div class="fgt"><p class="fgt__t">請從信裡的按鈕重新打開；連結過期的話，登入後可以重寄一封。</p>' +
+          '<p class="gate__alt"><a href="#/login">登入</a></p></div>');
+        return;
+      }
+      return API.me().then(function (m) {
+        var u = m.user;
+        if (u.emailVerified !== false || u.onboardedAt) { location.hash = '#/'; return; }
+        authShell('還差一步', '到信箱點確認信裡的按鈕，就會接著開始設定。',
+          '<div class="fgt">' +
+            '<p class="fgt__t">確認信寄到 <b>' + esc(u.email) + '</b></p>' +
+            '<p class="fgt__h" id="vpMsg">沒收到的話，看一下垃圾信件匣，或重寄一封（24 小時內有效）。</p>' +
+            '<button type="button" class="btn btn--go gate__go" id="vpAgain">重寄確認信</button>' +
+            '<p class="gate__alt">email 打錯了？<button type="button" class="gate__lnk" id="logout">登出，用別的 email 註冊</button></p>' +
+          '</div>');
+        document.getElementById('vpAgain').addEventListener('click', function () {
+          var btn = this, msg = document.getElementById('vpMsg');
+          btn.disabled = true;
+          API.resendVerifyEmail().then(function (r) {
+            msg.textContent = r.message;
+            if (r.demoMail) msg.innerHTML = esc(r.message) + '　<a href="' + esc(r.demoMail.link) + '">（這台沒有寄信）直接打開驗證連結</a>';
+            setTimeout(function () { btn.disabled = false; }, 60000);
+          }).catch(function (e) {
+            msg.textContent = e.message;
+            btn.disabled = false;
+          });
+        });
+      });
     });
   }
 
@@ -3726,6 +3780,8 @@
         if (admin && page !== 'admin') { location.hash = '#/admin'; return; }
         if (!admin && page === 'admin') { location.hash = '#/'; return; }
         /* 還沒走完註冊後的個人化設定：先帶去設定（每一步都能跳過，不是關卡） */
+        /* 註冊完還沒點驗證信：先去收信（點了信才接著做個人化設定） */
+        if (!admin && m.user.emailVerified === false && !m.user.onboardedAt) { location.hash = '#/verify'; return; }
         if (!admin && !m.user.onboardedAt && page !== 'setup') { location.hash = '#/setup'; return; }
         /* 分類（含家庭自訂）先拿到，記帳、統計的下拉才完整。
            ⚠️ 拿不到就照實空著——用到分類的地方會自己顯示是哪一支還沒做。 */
@@ -4671,9 +4727,11 @@
         email: document.getElementById('rgEmail').value,
         password: document.getElementById('rgPw').value
       }).then(function (d) {
-        SETUP.step = 0;
-        afterLogin(d, true);               // 路由閘看到還沒個人化設定，會帶去 #/setup
-        toast('帳號建好了，花一分鐘設定一下', 'ok');
+        /* 註冊完不登入：回到登入頁、email 先填好，請他去收信。點了信裡的按鈕才登入、接著做個人化設定 */
+        busy(f, false);
+        REG_NOTE = { email: d.user.email, message: d.message, verifySent: d.verifySent, demoMail: d.demoMail || null };
+        gateStep = 'login';
+        if (location.hash === '#/login') vLogin(); else location.hash = '#/login';
       }).catch(function (err) {
         busy(f, false);
         toast(err.message || '註冊失敗', 'err');

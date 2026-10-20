@@ -64,9 +64,10 @@ def main() -> int:
 
     people = {}
     for who, name in (("dad", "林建宏"), ("mom", "林美玲"), ("kid", "林小華")):
-        d = call("POST", "/api/auth/register", name=name, email="%s.%s@demo.test" % (who, tag),
-                 password="demo-" + secrets.token_urlsafe(12))
-        people[who] = d
+        email, pw = "%s.%s@demo.test" % (who, tag), "demo-" + secrets.token_urlsafe(12)
+        # 註冊完不登入（正式環境要先點驗證信）；本機沒設寄信，直接算驗證過，登入就好
+        call("POST", "/api/auth/register", name=name, email=email, password=pw)
+        people[who] = call("POST", "/api/auth/login", email=email, password=pw)
     tok = {w: p["accessToken"] for w, p in people.items()}
     uid = {w: p["user"]["id"] for w, p in people.items()}
 

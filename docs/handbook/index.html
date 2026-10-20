@@ -612,7 +612,7 @@
         <table>
           <thead><tr><th class="num">#</th><th class="tight">方法</th><th>路徑</th><th class="tight">權限</th><th>用途</th></tr></thead>
           <tbody>
-            <tr><td class="num">1</td><td class="tight">POST</td><td class="rt">/api/auth/register</td><td class="tight">公開</td><td>註冊。只問名字、email、密碼，回傳 user + tokens。存款目標在註冊後的個人化設定</td></tr>
+            <tr><td class="num">1</td><td class="tight">POST</td><td class="rt">/api/auth/register</td><td class="tight">公開</td><td>註冊。只問名字、email、密碼，寄驗證信；不登入，點了信才登入、接著做個人化設定</td></tr>
             <tr><td class="num">2</td><td class="tight">POST</td><td class="rt">/api/auth/login</td><td class="tight">公開</td><td>登入。回傳 access + refresh token</td></tr>
             <tr><td class="num">3</td><td class="tight">POST</td><td class="rt">/api/auth/refresh</td><td class="tight">公開</td><td>用 refresh token 換新的 access token</td></tr>
             <tr><td class="num">4</td><td class="tight">POST</td><td class="rt">/api/auth/logout</td><td class="tight">登入</td><td>撤銷目前這台裝置的 refresh token</td></tr>
@@ -621,7 +621,7 @@
             <tr><td class="num">7</td><td class="tight">PATCH</td><td class="rt">/api/auth/password</td><td class="tight">登入</td><td>修改密碼，同時讓其他裝置的 session 失效。舊密碼不對回 400</td></tr>
             <tr><td class="num">74</td><td class="tight">POST</td><td class="rt">/api/auth/password-reset</td><td class="tight">公開</td><td>忘記密碼：寄重設信（Brevo）。<b>有沒有這個帳號都回同一句話</b></td></tr>
             <tr><td class="num">75</td><td class="tight">POST</td><td class="rt">/api/auth/password-reset/confirm</td><td class="tight">公開</td><td>用信裡的 token 設新密碼。一次性、30 分鐘，成功後撤銷所有 sessions</td></tr>
-            <tr><td class="num">77</td><td class="tight">POST</td><td class="rt">/api/auth/verify-email</td><td class="tight">公開</td><td>點註冊驗證信的連結，確認 email 是本人的。權杖過期或 email 改過就失效</td></tr>
+            <tr><td class="num">77</td><td class="tight">POST</td><td class="rt">/api/auth/verify-email</td><td class="tight">公開</td><td>點註冊驗證信的連結，確認 email 是本人的，第一次點順便登入。權杖過期或 email 改過就失效</td></tr>
             <tr><td class="num">78</td><td class="tight">POST</td><td class="rt">/api/auth/verify-email/resend</td><td class="tight">登入</td><td>重寄驗證信給自己。60 秒冷卻，驗證過就不寄</td></tr>
             <tr><td class="num">8</td><td class="tight">GET</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>我的理財習慣（財務建議的背景）</td></tr>
             <tr><td class="num">9</td><td class="tight">PUT</td><td class="rt">/api/auth/me/finance</td><td class="tight">本人</td><td>改理財習慣。body: { style, goals[], habits[], note }</td></tr>

@@ -45,7 +45,7 @@ import sys
 import httpx
 
 __all__ = [
-    "API_URL", "TIMEOUT_SECONDS", "MailNotConfigured", "MailError",
+    "API_URL", "TIMEOUT_SECONDS", "MailNotConfigured", "MailError", "is_configured",
     "build_payload", "send_mail", "main",
 ]
 
@@ -110,6 +110,16 @@ def _settings():
     from .config import settings  # 用到才讀，import 這個模組不需要資料庫設定
 
     return settings
+
+
+def is_configured() -> bool:
+    """有金鑰、有寄件人：寄得出信。
+
+    註冊後要不要「先點驗證信才能開始設定」看的就是這個：本機開發沒設寄信，信寄不出去，
+    就不能把人卡在那一步（註冊時直接算驗證過）。
+    """
+    s = _settings()
+    return bool(s.brevo_api_key and s.mail_from)
 
 
 def send_mail(
