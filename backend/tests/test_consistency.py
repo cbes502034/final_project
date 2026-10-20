@@ -1645,6 +1645,22 @@ def test_每一步導覽都找得到看得見的目標():
         assert found, "導覽步驟找不到目標：" + sel
 
 
+def test_新用戶的導覽步數照實際出現的算():
+    """新用戶只有一本帳、沒照看家人：帳本切換和鈴鐺不在畫面上。
+    曾經 4 步裡只剩 1 步看得到，第一個框就寫「2 / 4」。"""
+    app = read("frontend/js/app.js")
+    tour = re.search(r"var TOUR = \[(.*?)\];", app, re.S).group(1)
+    sels = re.findall(r"sel: '([^']+)'", tour)
+    # 第一步就是記帳，而且電腦（總覽格子）和手機（底部「＋」）都有位置
+    assert ".dtile--add" in sels[0] and ".tabbar__add" in sels[0]
+    # 新用戶一定有的：明細、建議、家人、帳本格子
+    for need in ('data-nav="entry"', 'data-nav="advice"', 'data-nav="members"', 'data-nav="groups"'):
+        assert any(need in s for s in sels), "導覽少了新用戶看得到的那一步：" + need
+    assert "TOURV = TOUR.filter(" in app, "開始時要先算出這一次看得到的步驟"
+    paint = app[app.index("function tourGo("):app.index("/* 說明框的位置。")]
+    assert "TOUR.length" not in paint and "TOUR[" not in paint, "步數與步驟要用 TOURV（看得到的那幾步）"
+
+
 def test_下拉面板浮在按鈕下面_不搬進版面():
     """帳本清單與通知面板曾經被搬進頂列和內容之間，佔真實空間把內容往下推。
     頁首改版後它們插在標題底下，一點開整頁就往下跳。"""
@@ -3117,3 +3133,41 @@ def test_註冊完回登入頁_點了驗證信才接著設定():
     api = read("frontend/js/api.js")
     assert "verifyEmail:       function (t)     { return req('/api/auth/verify-email', { method: 'POST', body: { token: t } }).then(keep); }" in api
 
+
+def test_別的分頁登出_這個分頁跟著回登入頁():
+    """2026-10-20 線上紀錄：一個分頁登出後，另一個分頁的通知每分鐘拿著登出的權杖問一次，一直 401。"""
+    app = read("frontend/js/app.js")
+    part = app[app.index("window.addEventListener('storage'"):]
+    part = part[:part.index("});") + 3]
+    assert "e.key !== 'fambudget.auth'" in part and "Notify.stop()" in part and "'#/login'" in part
+    main = read("backend/app/main.py")
+    assert 'log.warning("平台管理員：%s", line)' in main, "設定管理員的結果要印在 Render 的紀錄裡（info 不會印）"
+
+
+
+def test_解析表格第一欄是項目_明細不把原句當備註():
+    """使用者 2026-10-20：「接著去學校買了10元自動鉛筆」整句被當成備註。項目可以改，原句只拿來對照。"""
+    app = read("frontend/js/app.js")
+    assert "<span>項目</span>" in app and "<span>原句</span>" not in app
+    assert 'data-b="note" class="btbl__item"' in app and 'class="btbl__raw">原句「' in app
+    assert "txr__raw" not in app, "明細不再把原句當主要文字（原句在「修改」裡）"
+    assert "note: itemOf(t, merchant)" in read("frontend/js/api.js")
+
+
+def test_登記的資料都有刪除的入口():
+    """使用者 2026-10-20：「登記資料都需要有可以刪除的功能，比方說建議的部分就沒有」。
+    每一種使用者自己留下的資料，後端有刪除的路由、畫面上也有按得到的地方。"""
+    from app.ownership import all_routes
+
+    routes = {"%s %s" % k for k in all_routes()}
+    for r in ("DELETE /api/transactions/{tx_id}", "DELETE /api/transactions", "DELETE /api/groups/{gid}",
+              "DELETE /api/alerts/{aid}", "DELETE /api/auth/me/avatar", "DELETE /api/family/invites/{invite_id}",
+              "DELETE /api/guardianships/{gid}", "DELETE /api/advices/{aid}", "DELETE /api/categories/{cid}",
+              "DELETE /api/notifications", "DELETE /api/auth/me"):
+        assert r in routes, r
+    app = read("frontend/js/app.js")
+    assert 'data-advdel="' in app and "API.deleteAdvice(" in app, "建議要能刪"
+    assert 'data-catdel="' in app and "API.deleteCategory(" in app, "自訂分類要能刪"
+    assert 'id="delMe"' in app and "API.deleteAccount()" in app, "帳號要能刪"
+    notify = read("frontend/js/notify.js")
+    assert 'data-ndel="' in notify and 'id="bellClear"' in notify and "API.deleteNotifications(" in notify, "通知要能刪"

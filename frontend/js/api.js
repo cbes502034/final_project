@@ -9,7 +9,7 @@
    後端契約（由 backend/tools/sync_spec.py 從 ownership.py 產生，不要手改）
    每一支的完整形狀：docs/02-前後端串接契約.md；前端函式與路由的對照：本檔的 FN。
 
-   認證（24 支）
+   認證（25 支）
    POST   /api/auth/register                   註冊：名字、email、密碼
    POST   /api/auth/login                      登入
    POST   /api/auth/refresh                    用 refresh token 換新的 access token
@@ -28,6 +28,7 @@
    PATCH  /api/auth/me                         改個人資料、主題、個人化設定走完
    PUT    /api/auth/me/avatar                  上傳大頭貼
    DELETE /api/auth/me/avatar                  移除大頭貼
+   DELETE /api/auth/me                         刪除自己的帳號
    GET    /api/admin/users                     帳號清單（停權用）
    POST   /api/admin/users/{user_id}/suspend   停權
    DELETE /api/admin/users/{user_id}/suspend   解除停權
@@ -35,7 +36,7 @@
    GET    /api/admin/security-events           安全事件
    POST   /api/client-errors                   回報畫面上出的錯
 
-   記帳（19 支）
+   記帳（20 支）
    GET    /api/transactions                     收支明細
    POST   /api/transactions                     手動新增一筆
    PATCH  /api/transactions/{tx_id}             修改一筆
@@ -47,6 +48,7 @@
    POST   /api/nlp/confirm-batch                批次確認後一次寫入
    GET    /api/categories                       分類（系統預設＋我們家自訂）
    POST   /api/categories                       新增家庭自訂分類
+   DELETE /api/categories/{cid}                 刪家庭自訂分類
    GET    /api/groups                           我加入的帳本
    POST   /api/groups                           開一本帳
    PATCH  /api/groups/{gid}                     改名稱、顏色、說明
@@ -56,7 +58,7 @@
    POST   /api/groups/{gid}/settle              結算活動帳本
    PATCH  /api/groups/{gid}/notify              這本帳有動靜要不要通知我
 
-   數字（11 支）
+   數字（12 支）
    GET    /api/summary            個人／家庭摘要
    GET    /api/budgets            預算與已花
    PUT    /api/budgets            設定預算（limit 0 = 拿掉）
@@ -68,8 +70,9 @@
    DELETE /api/alerts/{aid}       刪門檻
    GET    /api/advices            財務建議清單
    POST   /api/advices/generate   產生這個月的建議
+   DELETE /api/advices/{aid}       刪一則建議
 
-   家庭（21 支）
+   家庭（22 支）
    GET    /api/family                              家庭、成員、監管關係
    POST   /api/family                              建立家庭（建立的人是家長）
    DELETE /api/family                              解散家庭（唯一的家長）
@@ -88,6 +91,7 @@
    GET    /api/notifications                       通知清單（輪詢）
    PATCH  /api/notifications/{nid}                 一則標記已讀
    PATCH  /api/notifications                       整批標記已讀
+   DELETE /api/notifications                       刪通知（可以一次好幾則）
    GET    /api/allowances                          我給每個被照看的人多少零用金
    PUT    /api/allowance                           設定零用金
    GET    /api/audit                               稽核紀錄
@@ -861,6 +865,33 @@
     ['C01', /早餐|午餐|晚餐|宵夜|吃|飯|咖啡|飲料|麵包|便當|餐/]
   ];
   var MERCHANTS = ['全家', '7-11', '萊爾富', '全聯', '家樂福', '好市多', '星巴克', '麥當勞', '加油站'];
+  /* 備註只留「買了什麼」：跟後端 services/llm/parse.py 的 item_of() 同一套規則
+     （「接著去學校買了10元自動鉛筆」→「自動鉛筆」；「中午跟同事吃飯320」→「吃飯」） */
+  var IT = {
+    connect: /^(?:接著|然後|之後|後來|再來|最後|首先|順便|另外|還有|以及|加上|再|又|也|先|和|跟)+/,
+    who: /^(?:我們|我|他們|他|她|全家人|家裡|小孩|孩子|老婆|老公|媽媽|爸爸)/,
+    time: /(?:今天|昨天|前天|大前天|明天|今早|今晚|昨晚|早上|上午|中午|下午|傍晚|晚上|半夜|凌晨|剛剛|剛才|上禮拜[一二三四五六日天]?|上週[一二三四五六日天]?|這禮拜[一二三四五六日天]?|禮拜[一二三四五六日天]|星期[一二三四五六日天]|週[一二三四五六日天]|\d{1,2}[\/月]\d{1,2}[日號]?|\d{1,2}[日號])/g,
+    money: /(?:NT\$|\$)?\d[\d,]*(?:\.\d+)?萬?(?:元|塊錢|塊|圓)?|[零〇一二兩三四五六七八九十百千萬]+(?:元|塊錢|塊)|[零〇一二兩三四五六七八九]*[十百千萬][零〇一二兩三四五六七八九十百千萬]*/g,
+    verb: /買了|買|吃了|吃|喝了|喝|花了|花|付了|付|繳了|繳|叫了|點了|訂了|搭了|搭|坐了|坐|租了|租|收到|領了|領|賣了|賣/g,
+    unit: /^(?:一|兩|二|三|四|五|幾)?(?:個|杯|份|瓶|包|盒|張|碗|條|罐|支|本|件|雙|台|次)/,
+    go: /^(?:去|到|在|跑去|跑到)/
+  };
+  function itemOf(span, merchant) {
+    var s = String(span || '').replace(/\s+/g, '');
+    if (merchant) s = s.split(merchant).join('');
+    s = s.replace(IT.money, '').replace(IT.time, '');
+    var v = null, m;
+    IT.verb.lastIndex = 0;
+    while ((m = IT.verb.exec(s))) v = m;
+    if (v) {
+      var rest = s.slice(v.index + v[0].length).replace(IT.unit, '');
+      s = rest.length >= 2 ? rest : rest ? v[0].replace(/了$/, '') + rest : s.slice(0, v.index);
+    }
+    for (var i = 0; i < 3; i++) s = s.replace(IT.connect, '').replace(IT.who, '').replace(IT.go, '');
+    s = s.replace(/^[的，,、。]+|[的，,、。]+$/g, '');
+    return s.length >= 2 ? s.slice(0, 20) : '';
+  }
+
   function parseLine(text) {
     var t = String(text || '');
     var amount = amountOf(t);
@@ -874,7 +905,7 @@
     var merchant = MERCHANTS.filter(function (x) { return t.indexOf(x) >= 0; })[0] || '';
     var missing = amount ? [] : ['amount'];
     return {
-      date: date, amount: amount, kind: kind, cat: cat, merchant: merchant, note: '',
+      date: date, amount: amount, kind: kind, cat: cat, merchant: merchant, note: itemOf(t, merchant),
       conf: { date: back ? 0.9 : 0.8, amount: amount ? 0.9 : 0, kind: rule ? 0.85 : 0.6, cat: rule ? 0.75 : 0.3 },
       missing: missing,
       hint: amount ? (rule ? '' : '分類猜不出來，先放「其他」，確認時改一下。') : '這一句抓不到金額，補上才能存。'
@@ -2255,6 +2286,13 @@
         // 下次帶 since 就永遠切不到新紀錄，新通知永遠進不了清單。
         var maxId = rows.length ? rows[rows.length - 1].id : (f.since || null);
 
+        // 刪掉的通知不再出現（跟真後端刪掉那一列一樣）
+        var hidden = s.hiddenNotify || [];
+        if (hidden.length) {
+          unread -= rows.filter(function (r) { return hidden.indexOf(r.id) >= 0 && !r.readAt; }).length;
+          rows = rows.filter(function (r) { return hidden.indexOf(r.id) < 0; });
+        }
+
         // since 之後（更新）的才回，跟真後端的 WHERE id > :since 一樣
         if (f.since) {
           var cut = rows.filter(function (r) { return r.id === f.since; })[0];
@@ -2359,7 +2397,9 @@
                   'family' 全家的建議 ＋ 我監管的人的個人建議（家長才有）
            ⚠️ 子女不會拿到全家的建議——那幾則是寫給家長看的，裡面會點名。 */
         var fam = f.scope === 'family' && vis.length > 1;
+        var gone = s.deletedAdvices || [];
         var rows = D.advices.concat(s.advices || []).filter(function (a) {
+          if (gone.indexOf(a.id) >= 0) return false;            // 刪掉的不再出現
           if (a.scope === 'family') return fam;
           if (a.user === s.me) return !fam;
           return fam && vis.indexOf(a.user) >= 0;
@@ -2811,6 +2851,75 @@
     },
 
 
+    /* ---------------------------------------------------------
+       刪除（使用者要求「登記的資料都要能刪」）：建議、自訂分類、通知、帳號本身
+       --------------------------------------------------------- */
+    deleteAdvice: function (id) {
+      var s = load();
+      return sleep(160).then(function () {
+        var me = memberOf(s.me), D = global.DATA;
+        var a = D.advices.concat(s.advices || []).filter(function (x) {
+          return x.id === id && (s.deletedAdvices || []).indexOf(id) < 0;
+        })[0];
+        var mine = !!a && a.user === s.me, ours = !!a && a.scope === 'family' && !!me.familyId;
+        if (!mine && !ours) throw oops('找不到這則建議', 404);
+        if (!mine && !isParentOf(s, me.familyId)) throw oops('全家的建議只有家長可以刪', 403);
+        s.advices = (s.advices || []).filter(function (x) { return x.id !== id; });
+        s.deletedAdvices = (s.deletedAdvices || []).concat([id]);
+        save();
+        return { id: id, deleted: true };
+      });
+    },
+
+    deleteCategory: function (id) {
+      var s = load();
+      return sleep(200).then(function () {
+        var me = memberOf(s.me);
+        if (!isParentOf(s, me.familyId)) throw oops('只有家長可以刪家庭的分類', 403);
+        var c = allCats(s).filter(function (x) { return x.id === id; })[0];
+        if (c && !c.custom) throw oops('系統分類不能刪', 403);
+        if (!c) throw oops('找不到這個分類', 404);
+        /* 用這個分類記的帳改到「其他」／「其他收入」，不會跟著消失 */
+        var other = allCats(s).filter(function (x) {
+          return !x.custom && x.kind === c.kind && x.name === (c.kind === 'expense' ? '其他' : '其他收入');
+        })[0];
+        var moved = 0;
+        s.transactions.forEach(function (t) { if (t.cat === id && other) { t.cat = other.id; moved++; } });
+        s.customCategories = (s.customCategories || []).filter(function (x) { return x.id !== id; });
+        save();
+        return { id: id, deleted: true, moved: moved };
+      });
+    },
+
+    deleteNotifications: function (ids) {
+      var list = [].concat(ids || []).map(String).filter(Boolean);
+      if (!list.length) return Promise.reject(oops('沒有指定要刪哪幾筆', 400));
+      return mock.notifications({}).then(function (res) {
+        var s = load();
+        var mine = res.notifications.map(function (n) { return n.id; });
+        var gone = list.filter(function (x, i) { return mine.indexOf(x) >= 0 && list.indexOf(x) === i; });
+        s.hiddenNotify = (s.hiddenNotify || []).concat(gone);
+        save();
+        return { deleted: gone };
+      });
+    },
+
+    deleteAccount: function () {
+      var s = load();
+      return sleep(260).then(function () {
+        var me = memberOf(s.me);
+        if (me.isPlatformAdmin) throw oops('平台管理員的帳號不能在這裡刪除', 403);
+        if (me.familyId) throw oops('你還在一個家庭裡：先到「家庭成員」退出（或解散）家庭，才能刪除帳號', 409);
+        global.DATA.members = global.DATA.members.filter(function (m) { return m.id !== me.id; });
+        s.newUsers = (s.newUsers || []).filter(function (m) { return m.id !== me.id; });
+        s.transactions = s.transactions.filter(function (t) { return t.user !== me.id; });
+        s.auth = { loggedIn: false };
+        s.me = null;
+        save();
+        return { deleted: true };
+      });
+    },
+
     reset: function () {
       try { localStorage.removeItem(KEY); } catch (e) {}
       applyGoals(null);
@@ -2994,6 +3103,15 @@
     unsuspendUser:     function (u)     { return req('/api/admin/users/' + u + '/suspend', { method: 'DELETE' }); },
     audit:             function ()      { return req('/api/audit'); },
     adminErrors:       function ()      { return req('/api/admin/errors'); },
+    deleteAdvice:      function (id)    { return req('/api/advices/' + id, { method: 'DELETE' }); },
+    deleteCategory:    function (id)    { return req('/api/categories/' + id, { method: 'DELETE' }); },
+    deleteNotifications: function (ids) {
+      return req('/api/notifications' + qs({ ids: [].concat(ids || []).join(',') }), { method: 'DELETE' });
+    },
+    /* 刪除帳號之後，這台的登入一起清掉（後端已經讓手上的 token 失效） */
+    deleteAccount:     function ()      {
+      return req('/api/auth/me', { method: 'DELETE' }).then(function (d) { setTokens(null); return d; });
+    },
     adminSecurityEvents: function ()    { return req('/api/admin/security-events'); },
     /* 回報畫面上出的錯。⚠️ 永遠不 reject：回報的地方再出錯，就會變成「回報回報失敗」的迴圈。
        送不出去（例如就是因為斷線才出的錯）先排著，下一次有請求成功時再補送（最多 5 筆）。 */
@@ -3115,6 +3233,10 @@
     adminUsers:         ['GET /api/admin/users', '認證'],
     suspendUser:        ['POST /api/admin/users/{user_id}/suspend', '認證'],
     unsuspendUser:      ['DELETE /api/admin/users/{user_id}/suspend', '認證'],
+    deleteAccount:      ['DELETE /api/auth/me', '認證'],
+    deleteCategory:     ['DELETE /api/categories/{cid}', '記帳'],
+    deleteAdvice:       ['DELETE /api/advices/{aid}', '數字'],
+    deleteNotifications: ['DELETE /api/notifications', '家庭'],
     adminErrors:        ['GET /api/admin/errors', '認證'],
     adminSecurityEvents: ['GET /api/admin/security-events', '認證'],
     reportError:        ['POST /api/client-errors', '認證'],
@@ -3187,6 +3309,8 @@
     verifyEmail: ['ok', 'email', 'loggedIn'], resendVerifyEmail: ['ok', 'sent', 'message'],
     adminUsers: ['users'], audit: ['logs'], adminErrors: ['errors', 'lastHour'],
     adminSecurityEvents: ['events', 'today'],
+    deleteAdvice: ['deleted'], deleteCategory: ['deleted', 'moved'], deleteNotifications: ['deleted'],
+    deleteAccount: ['deleted'],
     transactions: ['transactions', 'total'], createTransaction: ['id'], updateTransaction: ['id'],
     deleteTransactions: ['deleted'], nlpParse: ['out'], nlpParseBatch: ['items'],
     categories: ['categories'], groups: ['groups'], createGroup: ['id'],

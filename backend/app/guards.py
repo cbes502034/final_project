@@ -100,7 +100,8 @@ def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_
     """驗 token → 撈使用者 → 擋停權 → 記最後活動時間 → 掛上家庭與角色。每一個守衛的第一步。"""
     m = _models()
     user = db.get(m.User, uid)
-    if user is None:
+    if user is None or user.deleted_at is not None:
+        # 刪除帳號之後，手上那張 access token（最多 30 分鐘）也不能再用
         raise errors.unauthorized("登入資訊無效，請重新登入")
     if user.suspended_at is not None:
         # ⚠️ 已經登入的人被停權，下一次請求就要擋，不是等他 token 過期

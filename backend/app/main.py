@@ -73,7 +73,7 @@ async def lifespan(_app: FastAPI):
         try:
             from app.cli import promote_admins
             for line in await run_in_threadpool(promote_admins, settings.admin_email_list):
-                log.info("平台管理員：%s", line)
+                log.warning("平台管理員：%s", line)     # warning：Render 的紀錄才看得到（info 不會印）
         except Exception:            # noqa: BLE001
             log.exception("設定平台管理員失敗")
     yield

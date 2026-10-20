@@ -425,3 +425,27 @@ def test_generate_advices_一天的額度用完回_429(api, monkeypatch):
     r = api.post("/api/advices/generate", headers=login(me), json={})
     assert r.status_code == 429 and "明天會恢復" in r.json()["detail"]
     assert crud.count(SecurityEvent, {"kind": "ai_advice"}) == 1
+
+
+# ===========================================================================
+# DELETE /api/advices/{aid}：登記的資料都要能刪
+# ===========================================================================
+DELADV = ("DELETE", "/api/advices/{aid}")
+
+
+@pytest.mark.route(*DELADV)
+def test_delete_advice_自己的自己刪_全家的只有家長(api):
+    dad, kid, other = user("d@x.tw", "爸爸"), user("k@x.tw", "小華"), user("o@x.tw", "別人")
+    fam = family_of((dad, "parent"), (kid, "child"))
+    mine, kids, whole, theirs = (_advice(dad, title="爸爸的"), _advice(kid, title="小華的"),
+                                 _advice(None, family_id=fam.id, title="全家的"), _advice(other, title="別人的"))
+    r = api.delete("/api/advices/%d" % kids.id, headers=login(kid))
+    assert r.status_code == 200 and r.json() == {"id": str(kids.id), "deleted": True}
+    assert not crud.exists(Advice, {"id": kids.id})
+    r = api.delete("/api/advices/%d" % whole.id, headers=login(kid))
+    assert r.status_code == 403 and "家長" in r.json()["detail"]
+    assert api.delete("/api/advices/%d" % whole.id, headers=login(dad)).status_code == 200
+    assert api.delete("/api/advices/%d" % theirs.id, headers=login(dad)).status_code == 404       # 別人的：當作沒有
+    assert api.delete("/api/advices/%d" % kids.id, headers=login(dad)).status_code == 404         # 刪過了
+    assert api.delete("/api/advices/abc", headers=login(dad)).status_code == 404
+    assert crud.exists(Advice, {"id": mine.id}) and crud.exists(Advice, {"id": theirs.id})

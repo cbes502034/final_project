@@ -73,7 +73,8 @@ async function rec(name, ...args) {
   await rec('createGuardianship', { wardId: kid.user.id });
   await rec('guardianships');
   await rec('me');
-  await rec('createCategory', { name: '寵物', kind: 'expense' });
+  const pet = await rec('createCategory', { name: '寵物', kind: 'expense' });
+  await rec('deleteCategory', pet.id);
   const g = await rec('createGroup', { name: '家用', color: 'book-indigo', note: '日常開銷' });
   await rec('groups', {});
   await rec('updateGroup', g.id, { note: '日常開銷，全家共用' });
@@ -99,7 +100,8 @@ async function rec(name, ...args) {
   await rec('budgets', {});
   await rec('summary', { scope: 'family' });
   await rec('generateAdvices', { scope: 'me' });
-  await rec('advices', { scope: 'me' });
+  const advs = await rec('advices', { scope: 'me' });
+  await rec('deleteAdvice', advs.advices[0].id);
   const al = await rec('createAlert', { percent: 80, groupId: null });
   await rec('alerts');
   await rec('updateAlert', al.id, { enabled: false });
@@ -107,6 +109,7 @@ async function rec(name, ...args) {
   await rec('setAllowance', kid.user.id, 3000);
   await rec('allowances');
   const nt = await rec('notifications', {});
+  await rec('deleteNotifications', nt.notifications && nt.notifications.length ? [nt.notifications[nt.notifications.length - 1].id] : ['N1']);
   if (nt.notifications && nt.notifications[0]) {
     await rec('readNotification', nt.notifications[0].id);
     await rec('readNotifications', nt.maxId);
@@ -142,6 +145,10 @@ async function rec(name, ...args) {
   await rec('reportError', { message: 'Cannot read properties of undefined', location: 'vEntry', page: '#/entry' });
   await rec('adminErrors');
   await rec('adminSecurityEvents');
+  // 刪除帳號：沒有家庭的人才能刪
+  await A.register({ name: '路人', email: 'solo@wang.tw', password: 'solo-pass-12' });
+  await A.login({ email: 'solo@wang.tw', password: 'solo-pass-12' });
+  await rec('deleteAccount');
   await A.login({ email: 'daming@wang.tw', password: 'daming-pass-2' });
   await rec('logoutAll');
   process.stdout.write(JSON.stringify(out));

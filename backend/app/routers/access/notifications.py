@@ -22,7 +22,7 @@ from app.guards import block_admin, own
 from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.family import ReadAllIn, ReadOneIn
-from app.toolkit import alerts, crud, errors, money, period
+from app.toolkit import alerts, crud, errors, ledger, money, period
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["通知"])
@@ -132,7 +132,7 @@ def list_notifications(
             from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.family import ReadAllIn, ReadOneIn
-            from app.toolkit import alerts, crud, errors, money, period
+            from app.toolkit import alerts, crud, errors, ledger, money, period
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -367,7 +367,7 @@ def read_notification(
             from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.family import ReadAllIn, ReadOneIn
-            from app.toolkit import alerts, crud, errors, money, period
+            from app.toolkit import alerts, crud, errors, ledger, money, period
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -474,7 +474,7 @@ def read_notifications(body: ReadAllIn, me: User, db: Session = Depends(get_db))
             from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.family import ReadAllIn, ReadOneIn
-            from app.toolkit import alerts, crud, errors, money, period
+            from app.toolkit import alerts, crud, errors, ledger, money, period
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -520,3 +520,114 @@ def read_notifications(body: ReadAllIn, me: User, db: Session = Depends(get_db))
     # 3. 剩下的未讀（之後才進來的還是未讀）
     unread = crud.count(Notification, {"recipient_id": me.id, "read_at__isnull": True}, db=db)
     return {"updated": updated, "unread": unread}
+
+
+@router.delete("/notifications", summary="刪通知（可以一次好幾則）")
+@block_admin
+def delete_notifications(me: User, ids: str | None = None, db: Session = Depends(get_db)):
+    """刪通知（可以一次好幾則）
+
+    DELETE /api/notifications
+
+    【這支做什麼】
+        刪掉自己收到的通知（使用者要求「登記的資料都要能刪」）。鈴鐺裡同一個人一分鐘內的好幾則合成一列，
+        那一列的「刪除」就是一次刪好幾則；「清除已讀」也是把已讀的 id 一次送來。
+        ⚠️ 只刪自己收到的；別人的、找不到的不算、也不報錯——通知可能已經在另一個分頁刪掉了。
+        ⚠️ 沒帶 ids 一定回 400：不能被當成「全部刪光」。
+
+    【前端怎麼打】
+        frontend/js/api.js 的 API.deleteNotifications(ids)
+        鈴鐺每一列的「×」、最下面的「清除已讀」。
+
+    【誰能打】
+        登入、沒被停權、不是平台管理員。上面的 @block_admin 已經擋好了：
+            沒登入 → 401；被停權、或是平台管理員 → 403
+        所以函式裡不用再檢查身分。參數 me 就是目前登入的人（User 物件）：
+            me.id            他的 id
+            me.family_id     他的家庭 id（還沒加入家庭是 None）
+            me.family_role   'parent'／'child'（還沒加入家庭是 None）
+
+    【查詢參數】
+        參數  型別  必填  說明
+        ids   字串  是    逗號分隔的通知 id；空白與重複自動去掉，一次最多 ledger.MAX_BATCH 個
+        範例：DELETE /api/notifications?ids=31,32,35
+
+    【成功回應】狀態碼 200
+        {"deleted": ["31", "32"]}
+        · 實際刪掉的（自己收到的那幾則）
+
+    【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
+        狀態碼  什麼時候          detail
+        400     沒帶 ids、或太多  沒有指定要刪哪幾筆（ledger.clean_ids 的那句話）
+
+    【會用到的資料表】
+        表             讀／寫    用來做什麼
+        notifications  讀＋刪    自己收到的那幾則
+
+    【每一步用的工具與資料庫方法】
+        步驟    呼叫                                                                    做什麼
+        1 整理  ledger.clean_ids(ids)                                                   去空白、去重複；空的丟 ValueError
+        2 找    crud.find(Notification, {"id__in": […], "recipient_id": me.id}, fields="id", db=db)  只認自己收到的
+        3 刪    crud.remove(Notification, {"id__in": […]}, db=db)＋db.commit()
+
+    【寫法步驟】
+        1. 整理 ids；空的 → 400
+        2. 只找自己收到的那幾則
+        3. 有才刪、db.commit()；回實際刪掉的 id
+
+    【完整寫法】照下面兩步改，改完這支就做好了
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+
+            from datetime import datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, Query
+            from sqlalchemy.orm import Session
+
+            from app.guards import block_admin, own
+            from app.models import AlertRule, Group, Notification, SavingsGoal, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.family import ReadAllIn, ReadOneIn
+            from app.toolkit import alerts, crud, errors, ledger, money, period
+            from app.toolkit.db import get_db
+
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
+
+            # 1. 整理要刪的 id：去空白、去重複；空的回 400（不能被當成「全部刪光」）
+            try:
+                wanted = ledger.clean_ids(ids or "")
+            except ValueError as exc:
+                raise errors.bad_request(str(exc)) from None
+            numbers = [int(x) for x in wanted if x.isdigit()]
+
+            # 2. 只刪自己收到的；別人的、找不到的不算，也不報錯（可能已經在另一個分頁刪掉了）
+            mine = crud.find(Notification, {"id__in": numbers or [0], "recipient_id": me.id}, fields="id", db=db)
+            if mine:
+                crud.remove(Notification, {"id__in": mine}, db=db)
+                db.commit()
+            return {"deleted": [str(i) for i in mine]}
+
+    【做完怎麼確認】
+        1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
+        2. 瀏覽器打開 http://localhost:8000/docs，找到 DELETE /api/notifications
+        3. 按右上角 Authorize，貼上家長登入拿到的 accessToken（先讓照看的孩子記一筆，鈴鐺才有通知）
+        4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
+               ids 填自己的兩則          → 200，deleted 是那兩個 id；GET /api/notifications 少兩則
+               ids 填別人的              → 200，deleted 是空的
+               ids 不填                  → 400
+        5. 前端改成連你的後端（frontend/index.html 的 api-base），鈴鐺按某一列的「×」，那一列消失
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_notifications and u4f60" -v，要全部通過
+    """
+    # 1. 整理要刪的 id：去空白、去重複；空的回 400（不能被當成「全部刪光」）
+    try:
+        wanted = ledger.clean_ids(ids or "")
+    except ValueError as exc:
+        raise errors.bad_request(str(exc)) from None
+    numbers = [int(x) for x in wanted if x.isdigit()]
+
+    # 2. 只刪自己收到的；別人的、找不到的不算，也不報錯（可能已經在另一個分頁刪掉了）
+    mine = crud.find(Notification, {"id__in": numbers or [0], "recipient_id": me.id}, fields="id", db=db)
+    if mine:
+        crud.remove(Notification, {"id__in": mine}, db=db)
+        db.commit()
+    return {"deleted": [str(i) for i in mine]}

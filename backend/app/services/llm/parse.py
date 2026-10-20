@@ -12,6 +12,7 @@
                     · 金額：> 0；span 裡完全沒有數字就一定是 None（不准猜）；跟原句的數字（含「1.2 萬」）對不上，信心度壓低
                     · 分類在清單裡而且收支對得上
                     · span、店家要真的出現在原句裡；找不到的店家清掉、找不到的 span 整筆標出來
+                    · 備註只留「買了什麼」（item_of）：連接詞、主詞、時間、店家、金額、動詞都不要
   4. apply_habits() 路由再照這個人以前的改法調整分類（他把「文具」從日用品改成教育過，下次就先用教育）
                     抽不到的欄位設成 None、放進 missing，前端會標紅要使用者補
 
@@ -46,6 +47,78 @@ _NUMERAL = re.compile(r"[0-9０-９零〇一二兩三四五六七八九十百千
 _WRITTEN = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(萬)?")
 #: 「全家一起吃火鍋」的全家是一家人，不是便利商店
 _WHOLE_FAMILY = re.compile(r"全家(?:一起|人|大小|都|去|出遊)")
+
+# ---------------------------------------------------------------------------
+# 備註只留「買了什麼」（使用者 2026-10-20：「接著去學校買了10元自動鉛筆」整句當備註，前綴是不需要的）
+# ---------------------------------------------------------------------------
+_CONNECT = re.compile(r"^(?:接著|然後|之後|後來|再來|最後|首先|順便|另外|還有|以及|加上|再|又|也|先|和|跟)+")
+_WHO = re.compile(r"^(?:我們|我|他們|他|她|全家人|家裡|小孩|孩子|老婆|老公|媽媽|爸爸)")
+_TIME = re.compile(r"(?:今天|昨天|前天|大前天|明天|今早|今晚|昨晚|早上|上午|中午|下午|傍晚|晚上|半夜|凌晨|剛剛|剛才"
+                   r"|上禮拜[一二三四五六日天]?|上週[一二三四五六日天]?|這禮拜[一二三四五六日天]?"
+                   r"|禮拜[一二三四五六日天]|星期[一二三四五六日天]|週[一二三四五六日天]"
+                   r"|\d{1,2}[/月]\d{1,2}[日號]?|\d{1,2}[日號])")
+_MONEY = re.compile(r"(?:NT\$|\$)?\d[\d,]*(?:\.\d+)?萬?(?:元|塊錢|塊|圓)?"
+                    r"|[零〇一二兩三四五六七八九十百千萬]+(?:元|塊錢|塊)"
+                    r"|[零〇一二兩三四五六七八九]*[十百千萬][零〇一二兩三四五六七八九十百千萬]*")
+_VERB = re.compile(r"買了|買|吃了|吃|喝了|喝|花了|花|付了|付|繳了|繳|叫了|點了|訂了|搭了|搭|坐了|坐|租了|租|收到|領了|領|賣了|賣")
+_UNIT = re.compile(r"^(?:一|兩|二|三|四|五|幾)?(?:個|杯|份|瓶|包|盒|張|碗|條|罐|支|本|件|雙|台|次)")
+_GO = re.compile(r"^(?:去|到|在|跑去|跑到)")
+
+
+def _looks_raw(note: str, span: str) -> bool:
+    """備註看起來是整段原句（有數字、太長、跟原句一樣、開頭是連接詞／主詞／時間）。"""
+    flat = re.sub(r"\s+", "", note)
+    return (flat == re.sub(r"\s+", "", span) or bool(re.search(r"\d", flat)) or len(flat) > 10
+            or bool(_CONNECT.match(flat) or _WHO.match(flat) or _TIME.match(flat)))
+
+
+def item_of(note: str, span: str, merchant: str = "") -> str:
+    """備註整理成「買了什麼」：連接詞、主詞、時間、店家、金額、動詞都拿掉。
+
+    模型給的備註已經乾淨（「奶茶」「加油」）就照用；看起來是整段原句、或沒給，才從原句整理。
+    「吃飯」「加油」這種動作本身就是項目的，留著動詞。整理不出來回空字串（前端顯示分類）。
+
+    >>> item_of("接著去學校買了10元自動鉛筆", "接著去學校買了10元自動鉛筆")
+    '自動鉛筆'
+    >>> item_of("", "我晚上去7-11買了10元奶茶", "7-11")
+    '奶茶'
+    >>> item_of("奶茶", "我晚上去7-11買了10元奶茶", "7-11")
+    '奶茶'
+    >>> item_of("", "中午跟同事吃飯320")
+    '吃飯'
+    >>> item_of("", "昨天全聯買衛生紙199", "全聯")
+    '衛生紙'
+    >>> item_of("", "加油1200")
+    '加油'
+    >>> item_of("", "買了一杯珍奶60")
+    '珍奶'
+    >>> item_of("", "小孩補習費四千五")
+    '補習費'
+    >>> item_of("", "去看電影花了560")
+    '看電影'
+    """
+    note = str(note or "").strip()
+    if note and not _looks_raw(note, span):
+        return note[:20]
+    s = re.sub(r"\s+", "", note or span or "")
+    if merchant:
+        s = s.replace(re.sub(r"\s+", "", merchant), "")
+    s = _TIME.sub("", _MONEY.sub("", s))
+    verbs = list(_VERB.finditer(s))
+    if verbs:
+        v = verbs[-1]
+        rest = _UNIT.sub("", s[v.end():])
+        if len(rest) >= 2:
+            s = rest                                   # 買了自動鉛筆 → 自動鉛筆
+        elif rest:
+            s = v.group(0).rstrip("了") + rest          # 吃飯 → 吃飯（只剩一個字：動作本身就是項目）
+        else:
+            s = s[:v.start()]                          # 去看電影花了 → 去看電影
+    for _ in range(3):
+        s = _GO.sub("", _WHO.sub("", _CONNECT.sub("", s)))
+    s = re.sub(r"^[的，,、。]+|[的，,、。]+$", "", s)
+    return s[:20] if len(s) >= 2 else ""
+
 
 #: 模型唯一要交的東西。每一欄都 required、但允許 null：強迫模型對每一欄表態，「沒講」要明確寫 null。
 RECORD_TOOL: dict[str, Any] = {
@@ -213,6 +286,8 @@ def postprocess(data: Any, categories: list[dict[str, Any]], today: str, text: s
         note = str(raw.get("note") or "").strip()[:100]
         if note in names and note not in span:
             note = ""
+        # 備註只留「買了什麼」：模型偶爾把整段原句當備註（「接著去學校買了10元自動鉛筆」），整理成「自動鉛筆」
+        note = item_of(note, span, merchant)
 
         # span 在原句裡找不到：這一筆可能是模型自己加的
         invented = bool(source) and bool(span) and re.sub(r"\s+", "", span) not in source

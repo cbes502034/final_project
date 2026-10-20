@@ -663,3 +663,22 @@ def test_read_notifications_只標到_readUntil(api):
     assert crud.count(Notification, {"read_at__isnull": True}) == 2          # 別人的不受影響
     r = api.patch("/api/notifications", headers=h, json={"readUntil": str(c.id)})
     assert r.json() == {"updated": 1, "unread": 0}
+
+
+# ===========================================================================
+# DELETE /api/notifications?ids=：通知可以刪
+# ===========================================================================
+DELNOTES = ("DELETE", "/api/notifications")
+
+
+@pytest.mark.route(*DELNOTES)
+def test_delete_notifications_只刪自己收到的_沒帶_ids_擋下(api):
+    dad, mom = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽")
+    a, b, c = _note(dad), _note(dad), _note(mom)
+    r = api.delete("/api/notifications?ids=%d,%d,%d,%d" % (a.id, b.id, c.id, a.id), headers=login(dad))
+    assert r.status_code == 200 and sorted(r.json()["deleted"]) == sorted([str(a.id), str(b.id)])
+    assert not crud.exists(Notification, {"recipient_id": dad.id})
+    assert crud.exists(Notification, {"id": c.id})                                   # 別人的不動
+    assert api.delete("/api/notifications?ids=%d" % a.id, headers=login(dad)).json() == {"deleted": []}
+    assert api.delete("/api/notifications", headers=login(dad)).status_code == 400
+    assert api.delete("/api/notifications?ids=%d" % c.id).status_code == 401

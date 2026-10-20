@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API 瀏覽</title>
-<meta name="description" content="家庭記帳系統的 75 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
+<meta name="description" content="家庭記帳系統的 79 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -40,7 +40,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>75 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>79 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -95,7 +95,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">75 ROUTES · 4 MODULES</div>
+    <div class="mono">79 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -245,6 +245,10 @@
       body: '{ "name": "寵物", "kind": "expense" }',
       res: '{\n  "id": "C21",\n  "name": "寵物",\n  "kind": "expense",\n  "color": "cat-other",\n  "icon": "寵",\n  "familyId": "F1",\n  "custom": true\n}',
       note: '只有家長，全家共用。名稱 1～10 個字（422）、同一個收支裡跟已有的重名回 409。新增之後前端會重拿分類清單。' },
+    { n: 83, o: 'm2', m: 'DELETE', p: '/api/categories/{cid}', a: '家長',
+      d: '刪家庭自訂分類',
+      res: '{ "id": "14", "deleted": true, "moved": 3 }',
+      note: '用這個分類記的帳<b>不會跟著消失</b>：支出改到系統的「其他」、收入改到「其他收入」，<code>moved</code> 是改了幾筆。這個分類的預算一起拿掉。系統分類 403；別家的 404。' },
     { n: 19, o: 'm2', m: 'POST', p: '/api/nlp/parse', a: '登入', llm: true,
       d: '單句：一句話 → 一筆。只解析，不寫入',
       body: '{ "text": "早餐55" }',
@@ -295,6 +299,10 @@
       body: '{ "scope": "me" }',
       res: '{\n  "generatedAt": "2026-09-15 02:31",\n  "advices": [\n    {\n      "id": "A1",\n      "level": "ok",\n      "title": "這個月的進度正常",\n      "body": "到目前花了可以花的 3%，照這個速度存得到目標。",\n      "basis": ["收入 62,000 − 每月想存 15,000 ＝ 可以花 47,000", "支出 1,350 ÷ 可以花 47,000 ＝ 3%"],\n      "suggest": ["維持現在的節奏就好"],\n      "conf": 0.9,\n      "scope": "user",\n      "user": "U1",\n      "period": "2026-09",\n      "generatedAt": "2026-09-15 02:31",\n      "userName": "王大明"\n    },\n    …\n  ]\n}',
       note: '順序不能顛倒：① analytics 從資料庫算出所有數字 → ② 把算好的數字交給模型只做敘述 → ③ Pydantic 驗證 → ④ 存進 advices（同一個月、同一個範圍蓋掉舊的）。模型不做任何算術。模型叫不動回 503，這時前端用同一批數字寫成句子頂著（<code>fallback: true</code>，不會存）；還沒做（501）不頂。' },
+    { n: 82, o: 'm3', m: 'DELETE', p: '/api/advices/{aid}', a: '本人／家長',
+      d: '刪一則建議',
+      res: '{ "id": "9", "deleted": true }',
+      note: '自己的建議自己刪；全家的建議只有家長能刪（子女 403）。別人的、別家的一律 <b>404</b>，不說「有，但不是你的」。只刪這一則，明細與數字不受影響。' },
     { n: 12, o: 'm1', m: 'PATCH', p: '/api/auth/me', a: '登入',
       d: '修改個人資料：顯示名稱、出生年、介面主題、個人化設定走完',
       body: '{ "displayName": "王大明", "birthYear": 1978 }',
@@ -309,6 +317,10 @@
       d: '移除大頭貼，改回顯示文字頭像',
       res: '{ "avatarUrl": null, "avatar": "明" }',
       note: '移除之後 <code>avatarUrl</code> 回傳 null，前端自動退回文字頭像。' },
+    { n: 85, o: 'm1', m: 'DELETE', p: '/api/auth/me', a: '登入',
+      d: '刪除自己的帳號',
+      res: '{ "deleted": true }',
+      note: '使用者要求「登記的資料都要能刪」。他記的每一筆帳、只有他在用的帳本、預算、存款目標、提醒、建議、通知、登入紀錄全部刪掉；名字、email、密碼、大頭貼抹掉，<b>email 空出來可以再註冊</b>。users 那一列留著當墓碑（<code>deleted_at</code>），稽核紀錄還指著它。<br>⚠️ 還在家庭裡、或開的帳本還有別人在用 → <b>409</b>（先退出家庭、移出別人）。前端先要求再輸入一次密碼。規則在 <code>toolkit/account.py</code>。' },
     { n: 55, o: 'm4', m: 'GET', p: '/api/notifications', a: '登入',
       d: '通知清單。帶 <code>since</code> 只拿新的',
       q: ['since', 'unreadOnly'],
@@ -324,6 +336,11 @@
       body: '{ "readUntil": "NT1" }',
       res: '{ "updated": 0, "unread": 0 }',
       note: '點「全部已讀」時呼叫。body 帶 {"readUntil": 按下去當時最新的那一則}，只標到那一則為止——避免把點擊當下才進來的新通知也標成已讀。沒帶 readUntil 回 400。' },
+    { n: 84, o: 'm4', m: 'DELETE', p: '/api/notifications', a: '本人',
+      d: '刪通知（可以一次好幾則）',
+      q: ['ids'],
+      res: '{ "deleted": ["31", "32"] }',
+      note: '鈴鐺每一列的「×」、「清除已讀」都打這一支。只刪自己收到的，別人的、找不到的不算也不報錯；<b>沒帶 ids 一定 400</b>，不能被當成「全部刪光」。' },
     { n: 39, o: 'm3', m: 'GET', p: '/api/savings-goals', a: '登入',
       d: '我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的',
       res: '{ "goals": [{ "groupId": null, "groupName": "整體", "goal": 15000 }, …] }',

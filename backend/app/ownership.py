@@ -4,7 +4,7 @@
 ===========================================================================
 這個檔案是幹嘛的
 ===========================================================================
-75 支路由分成四個領域（認證、記帳、數字、家庭）。哪一支屬於哪個領域只寫在這裡，
+79 支路由分成四個領域（認證、記帳、數字、家庭）。哪一支屬於哪個領域只寫在這裡，
 錯誤卡上的「屬於：記帳」、API 瀏覽頁的分組、規格文件的路由清單都要跟這裡對得上，
 `pytest` 會檢查有沒有走散。
 
@@ -118,6 +118,7 @@ MEMBERS: list[Member] = [
             ("PATCH", "/api/auth/me"),
             ("PUT", "/api/auth/me/avatar"),
             ("DELETE", "/api/auth/me/avatar"),
+            ("DELETE", "/api/auth/me"),
             ("GET", "/api/admin/users"),
             ("POST", "/api/admin/users/{user_id}/suspend"),
             ("DELETE", "/api/admin/users/{user_id}/suspend"),
@@ -174,6 +175,7 @@ MEMBERS: list[Member] = [
             ("POST", "/api/nlp/confirm-batch"),
             ("GET", "/api/categories"),
             ("POST", "/api/categories"),
+            ("DELETE", "/api/categories/{cid}"),
             ("GET", "/api/groups"),
             ("POST", "/api/groups"),
             ("PATCH", "/api/groups/{gid}"),
@@ -228,6 +230,7 @@ MEMBERS: list[Member] = [
             ("DELETE", "/api/alerts/{aid}"),
             ("GET", "/api/advices"),
             ("POST", "/api/advices/generate"),
+            ("DELETE", "/api/advices/{aid}"),
         ],
         files=[
             "app/routers/analytics/__init__.py",
@@ -304,6 +307,7 @@ MEMBERS: list[Member] = [
             ("GET", "/api/notifications"),
             ("PATCH", "/api/notifications/{nid}"),
             ("PATCH", "/api/notifications"),
+            ("DELETE", "/api/notifications"),
             ("GET", "/api/allowances"),
             ("PUT", "/api/allowance"),
             ("GET", "/api/audit"),

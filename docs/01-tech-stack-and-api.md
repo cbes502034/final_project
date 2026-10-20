@@ -152,7 +152,7 @@ final_project/
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
 │   │   ├── models/              22 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
-│   │   ├── routers/             75 支路由，一個領域一個資料夾。還沒做的回 501
+│   │   ├── routers/             79 支路由，一個領域一個資料夾。還沒做的回 501
 │   │   │   ├── auth/            認證（auth.py、admin.py）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/          記帳（transactions、nlp、categories、groups）
 │   │   │   ├── analytics/       數字（stats、budgets、alerts、advices）
@@ -186,7 +186,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **75 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **79 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `本人` / `家長` / `監管者` / `建立者` / `平台管理員`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -214,6 +214,7 @@ final_project/
 | 12 | PATCH | `/api/auth/me` | 認證 | 登入 | 修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 `onboarded: true` |
 | 13 | PUT | `/api/auth/me/avatar` | 認證 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
 | 14 | DELETE | `/api/auth/me/avatar` | 認證 | 登入 | 移除大頭貼，改回顯示文字頭像 |
+| 85 | DELETE | `/api/auth/me` | 認證 | 登入 | 刪除自己的帳號：紀錄全部刪掉、個資抹掉（留墓碑），email 空出來。還在家庭裡、開的帳本還有別人不能刪 |
 | 62 | GET | `/api/admin/users` | 認證 | 平台管理員 | 帳號清單（停權用）與即時的紅綠燈（presence）。⚠️ 刻意不回傳任何金額 |
 | 63 | POST | `/api/admin/users/{user_id}/suspend` | 認證 | 平台管理員 | 停權一個帳號。body: { reason }，理由必填 |
 | 64 | DELETE | `/api/admin/users/{user_id}/suspend` | 認證 | 平台管理員 | 解除停權 |
@@ -276,6 +277,7 @@ final_project/
 | 55 | GET | `/api/notifications` | 家庭 | 登入 | 通知清單。帶 since 只拿新的 |
 | 56 | PATCH | `/api/notifications/{nid}` | 家庭 | 本人 | 把一則標記成已讀 |
 | 57 | PATCH | `/api/notifications` | 家庭 | 本人 | 整批標記已讀 |
+| 84 | DELETE | `/api/notifications?ids=` | 家庭 | 本人 | 刪通知（可以一次好幾則）。只刪自己收到的，沒帶 ids 回 400 |
 | 25 | GET | `/api/groups` | 記帳 | 登入 | 我加入的群組（帳本） |
 | 26 | POST | `/api/groups` | 記帳 | 登入 | 建立一個群組，建立者自動加入 |
 | 27 | PATCH | `/api/groups/{gid}` | 記帳 | 建立者 | 改名稱、顏色、備註，或復原封存（`archived: false`） |
@@ -299,6 +301,7 @@ final_project/
 | 73 | DELETE | `/api/transactions` | 記帳 | 本人 | 一次刪多筆。`?ids=T1,T2`，最多 100 筆；**全部成功或全部不動** |
 | 23 | GET | `/api/categories` | 記帳 | 登入 | 分類體系（系統預設 + 家庭自訂） |
 | 24 | POST | `/api/categories` | 記帳 | 家長 | 新增家庭自訂分類。body: { name, kind }，1～10 字、同收支不重名 |
+| 83 | DELETE | `/api/categories/{cid}` | 記帳 | 家長 | 刪家庭自訂分類。用它記的帳改到「其他」／「其他收入」，它的預算一起拿掉 |
 
 **查詢參數的權限行為**：不帶 `userId` 時回傳「你看得到的所有人」；
 帶 `userId` 但你沒有權限看那個人 → **回 403 而不是空陣列**（空陣列會讓人以為對方沒記帳）。
@@ -384,6 +387,7 @@ final_project/
 |---|---|---|---|---|---|
 | 44 | GET | `/api/advices` | 數字 | 登入 | 建議清單。`scope`、`period` |
 | 45 | POST | `/api/advices/generate` | 數字 ★ | 登入（全家限家長） | 產生這個月的建議。body: { scope }。**後端先算好數字再餵給模型** |
+| 82 | DELETE | `/api/advices/{aid}` | 數字 | 本人／家長 | 刪一則建議。全家的建議只有家長能刪；別人的一律 404 |
 
 **產生流程（順序不能顛倒）**
 
@@ -430,7 +434,7 @@ final_project/
 
 ## 5-1　每一支路由的規格，寫在那一支的說明字串裡
 
-`backend/app/routers/` 底下（一個領域一個資料夾）的 75 支路由，每一支的說明字串都有同樣的十一個段落：
+`backend/app/routers/` 底下（一個領域一個資料夾）的 79 支路由，每一支的說明字串都有同樣的十一個段落：
 
 ```
 【這支做什麼】【前端怎麼打】【誰能打】【請求主體／查詢參數】【成功回應】【錯誤回應】

@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app import catalog
 from app.guards import block_admin, parent_required
-from app.models import Category, User
+from app.models import Budget, Category, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.transaction import CategoryIn
 from app.toolkit import crud, errors
@@ -98,7 +98,7 @@ def list_categories(me: User, db: Session = Depends(get_db)):
 
             from app import catalog
             from app.guards import block_admin, parent_required
-            from app.models import Category, User
+            from app.models import Budget, Category, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import CategoryIn
             from app.toolkit import crud, errors
@@ -147,7 +147,7 @@ def list_categories(me: User, db: Session = Depends(get_db)):
 
     from app import catalog
     from app.guards import block_admin, parent_required
-    from app.models import Category, User
+    from app.models import Budget, Category, Transaction, User
     from app.routers._stub import not_ready, stub
     from app.schemas.transaction import CategoryIn
     from app.toolkit import crud, errors
@@ -244,7 +244,7 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
 
             from app import catalog
             from app.guards import block_admin, parent_required
-            from app.models import Category, User
+            from app.models import Budget, Category, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import CategoryIn
             from app.toolkit import crud, errors
@@ -295,7 +295,7 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
 
     from app import catalog
     from app.guards import block_admin, parent_required
-    from app.models import Category, User
+    from app.models import Budget, Category, Transaction, User
     from app.routers._stub import not_ready, stub
     from app.schemas.transaction import CategoryIn
     from app.toolkit import crud, errors
@@ -322,3 +322,136 @@ def create_category(body: CategoryIn, me: User, db: Session = Depends(get_db)):
     return {"id": str(c.id), "name": c.name, "kind": c.kind, "color": c.color, "icon": name[:1],
             "custom": True, "familyId": str(me.family_id)}
     # raise not_ready("POST /api/categories", OWNER)
+
+
+@router.delete("/categories/{cid}", summary="刪家庭自訂分類")
+@parent_required
+def delete_category(cid: str, me: User, db: Session = Depends(get_db)):
+    """刪家庭自訂分類
+
+    DELETE /api/categories/{cid}
+
+    【這支做什麼】
+        刪掉我們家自訂的一個分類（使用者要求「登記的資料都要能刪」）。系統分類不能刪。
+        ⚠️ 用這個分類記的帳**不會跟著消失**：支出改到系統的「其他」、收入改到「其他收入」，回應裡講改了幾筆。
+        這個分類的預算一起拿掉（分類都沒了，預算沒有意義）；它底下的子分類改成沒有上層。
+
+    【前端怎麼打】
+        frontend/js/api.js 的 API.deleteCategory(id)
+        個人資料頁「我們家的分類」每一個的「刪除」（先確認一次，講清楚紀錄會改到「其他」）。
+
+    【誰能打】
+        家長。上面的 @parent_required 已經擋好了：
+            沒登入 → 401；被停權、平台管理員、不是家長 → 403
+        所以函式裡不用再檢查身分。參數 me 就是目前登入的家長（User 物件），me.family_id 是他的家庭。
+
+    【路徑參數】{cid} 是分類的 id（字串）
+        範例：DELETE /api/categories/14
+
+    【成功回應】狀態碼 200
+        {"id": "14", "deleted": true, "moved": 3}
+        · moved 是改到「其他」／「其他收入」的紀錄筆數
+
+    【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
+        狀態碼  什麼時候                          detail
+        403     系統分類                          系統分類不能刪
+        404     找不到、或是別家的                找不到這個分類
+        409     系統的「其他」分類不見了（不該發生）  找不到系統的「其他」分類，先請管理員補上系統分類
+
+    【會用到的資料表】
+        表            讀／寫    用來做什麼
+        categories    讀＋寫    找分類、系統的「其他」；子分類改成沒有上層；刪分類
+        transactions  寫        用這個分類的帳改到「其他」
+        budgets       刪        這個分類的預算
+
+    【每一步用的工具與資料庫方法】
+        步驟      呼叫                                                            做什麼
+        1 找      crud.get(Category, id, db=db)                                   找不到是 None
+        2 改紀錄  crud.get(Category, where={"family_id__isnull": True, "kind": …, "name": "其他"／"其他收入"}, db=db)
+                  crud.save(Transaction, {"category_id": 其他.id}, where={"category_id": …}, db=db)  回傳改了幾筆
+        3 收尾    crud.remove(Budget, {"category_id": …}, db=db)
+                  crud.save(Category, {"parent_id": None}, where={"parent_id": …}, db=db)
+        4 刪      crud.remove(Category, id=…, db=db)＋db.commit()
+
+    【寫法步驟】
+        1. 系統分類 → 403；找不到或別家的 → 404
+        2. 用這個分類的帳改到系統的「其他」（支出）或「其他收入」（收入）
+        3. 這個分類的預算拿掉；子分類改成沒有上層
+        4. 刪掉分類、db.commit()，回 {"id", "deleted": true, "moved": 幾筆}
+
+    【完整寫法】照下面兩步改，改完這支就做好了
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+
+            from fastapi import APIRouter, Depends
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import block_admin, parent_required
+            from app.models import Budget, Category, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.transaction import CategoryIn
+            from app.toolkit import crud, errors
+            from app.toolkit.db import get_db
+
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
+
+            # 1. 找這個分類：系統分類不能刪；別家的、找不到一律當作沒有
+            row = crud.get(Category, int(cid) if cid.isdigit() else 0, db=db)
+            if row is not None and row.family_id is None:
+                raise errors.forbidden("系統分類不能刪")
+            if row is None or row.family_id != me.family_id:
+                raise errors.not_found("找不到這個分類")
+
+            # 2. 用這個分類記的帳改到系統的「其他」（支出）或「其他收入」（收入）：紀錄不會跟著消失
+            fallback = crud.get(Category, where={"family_id__isnull": True, "kind": row.kind,
+                                                 "name": "其他" if row.kind == "expense" else "其他收入"}, db=db)
+            if fallback is None:
+                raise errors.conflict("找不到系統的「其他」分類，先請管理員補上系統分類")
+            moved = crud.save(Transaction, {"category_id": fallback.id}, where={"category_id": row.id}, db=db)
+
+            # 3. 這個分類的預算一起拿掉；子分類改成沒有上層
+            crud.remove(Budget, {"category_id": row.id}, db=db)
+            crud.save(Category, {"parent_id": None}, where={"parent_id": row.id}, db=db)
+
+            # 4. 刪掉分類
+            cat_id = row.id
+            crud.remove(Category, id=cat_id, db=db)
+            db.commit()
+            return {"id": str(cat_id), "deleted": True, "moved": moved}
+
+    【做完怎麼確認】
+        1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
+        2. 瀏覽器打開 http://localhost:8000/docs，找到 DELETE /api/categories/{cid}
+        3. 按右上角 Authorize，貼上家長登入拿到的 accessToken（先打 POST /api/categories 新增一個，再記一筆用它）
+        4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
+               刪自己家的自訂分類  → 200，moved 是 1；那一筆的分類變成「其他」
+               刪系統分類          → 403
+               再刪一次            → 404
+               子女打              → 403
+        5. 前端改成連你的後端（frontend/index.html 的 api-base），個人資料頁的自訂分類按「刪除」，分類消失、紀錄改成「其他」
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_category and u4f60" -v，要全部通過
+    """
+    # 1. 找這個分類：系統分類不能刪；別家的、找不到一律當作沒有
+    row = crud.get(Category, int(cid) if cid.isdigit() else 0, db=db)
+    if row is not None and row.family_id is None:
+        raise errors.forbidden("系統分類不能刪")
+    if row is None or row.family_id != me.family_id:
+        raise errors.not_found("找不到這個分類")
+
+    # 2. 用這個分類記的帳改到系統的「其他」（支出）或「其他收入」（收入）：紀錄不會跟著消失
+    fallback = crud.get(Category, where={"family_id__isnull": True, "kind": row.kind,
+                                         "name": "其他" if row.kind == "expense" else "其他收入"}, db=db)
+    if fallback is None:
+        raise errors.conflict("找不到系統的「其他」分類，先請管理員補上系統分類")
+    moved = crud.save(Transaction, {"category_id": fallback.id}, where={"category_id": row.id}, db=db)
+
+    # 3. 這個分類的預算一起拿掉；子分類改成沒有上層
+    crud.remove(Budget, {"category_id": row.id}, db=db)
+    crud.save(Category, {"parent_id": None}, where={"parent_id": row.id}, db=db)
+
+    # 4. 刪掉分類
+    cat_id = row.id
+    crud.remove(Category, id=cat_id, db=db)
+    db.commit()
+    return {"id": str(cat_id), "deleted": True, "moved": moved}

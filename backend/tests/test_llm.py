@@ -404,3 +404,58 @@ def test_MODEL_MAX_TOKENS_只會放寬不會縮小(monkeypatch):
     monkeypatch.setattr(settings, "model_max_tokens", 100)
     client.complete_json("x", max_tokens=1024, client=http)
     assert [b["max_tokens"] for b in sent] == [4096, 1024]
+
+
+# ===========================================================================
+# 備註只留「買了什麼」（使用者 2026-10-20）
+# ===========================================================================
+ITEM_CASES = [
+    ("接著去學校買了10元自動鉛筆", "", "自動鉛筆"),
+    ("我晚上去7-11買了10元奶茶", "7-11", "奶茶"),
+    ("中午跟同事吃飯320", "", "吃飯"),
+    ("昨天全聯買衛生紙199", "全聯", "衛生紙"),
+    ("加油1200", "", "加油"),
+    ("買了一杯珍奶60", "", "珍奶"),
+    ("小孩補習費四千五", "", "補習費"),
+    ("去看電影花了560", "", "看電影"),
+    ("繳電費2400", "", "電費"),
+    ("跟朋友喝咖啡150", "路易莎", "咖啡"),
+]
+
+
+def test_備註只留買了什麼_模型給的乾淨備註照用():
+    for span, merchant, want in ITEM_CASES:
+        assert parse.item_of("", span, merchant) == want, span
+        assert parse.item_of(span, span, merchant) == want, "整段原句當備註也要整理：" + span
+    assert parse.item_of("奶茶", "我晚上去7-11買了10元奶茶", "7-11") == "奶茶"
+    assert parse.item_of("早餐", "早餐55") == "早餐"
+
+
+def test_解析結果的備註不會是整段原句():
+    cats = [{"id": "1", "name": "餐飲", "kind": "expense"}, {"id": "6", "name": "教育", "kind": "expense"}]
+    text = "我晚上去7-11買了10元奶茶 接著去學校買了10元自動鉛筆"
+    data = {"items": [
+        {"span": "我晚上去7-11買了10元奶茶", "date": "2026-10-20", "amount": 10, "kind": "expense", "cat": "1",
+         "merchant": "7-11", "note": "我晚上去7-11買了10元奶茶", "conf": {"date": 1, "amount": 1, "kind": 1, "cat": 1}},
+        {"span": "接著去學校買了10元自動鉛筆", "date": "2026-10-20", "amount": 10, "kind": "expense", "cat": "6",
+         "merchant": "", "note": "接著去學校買了10元自動鉛筆", "conf": {"date": 1, "amount": 1, "kind": 1, "cat": 1}},
+    ]}
+    items = parse.postprocess(data, cats, "2026-10-20", text)
+    assert [i["note"] for i in items] == ["奶茶", "自動鉛筆"]
+
+
+def test_前端規則備援整理備註_跟後端同一套():
+    """模型叫不動時前端用規則頂著（api.js 的 itemOf）：結果要跟後端 item_of 一樣。"""
+    import shutil
+    import subprocess
+
+    if not shutil.which("node"):
+        pytest.skip("這台機器沒有 node")
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    src = open(os.path.join(repo, "frontend", "js", "api.js"), encoding="utf-8").read()
+    snippet = src[src.index("  var IT = {"):src.index("  function parseLine(text)")]
+    script = snippet + "\nconst cases = %s;\nprocess.stdout.write(JSON.stringify(cases.map(c => itemOf(c[0], c[1]))));" % \
+        json.dumps([[s, m] for s, m, _w in ITEM_CASES], ensure_ascii=False)
+    out = subprocess.run(["node", "-e", script], capture_output=True, check=True)
+    got = json.loads(out.stdout.decode("utf-8"))
+    assert got == [w for _s, _m, w in ITEM_CASES]

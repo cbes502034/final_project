@@ -276,6 +276,7 @@
       '<button class="bell__mute" id="bellMute" title="開關提示音">' +
         (muted() ? '🔇 靜音中' : '🔔 有聲音') + '</button>' +
       (state.unread ? '<button class="bell__all" id="bellAll">全部已讀</button>' : '') +
+      (state.items.some(function (x) { return x.readAt; }) ? '<button class="bell__all" id="bellClear">清除已讀</button>' : '') +
       '</div>';
 
     if (!state.items.length && state.down) {
@@ -288,15 +289,17 @@
       h += '<div class="bell__list">' + groups.map(function (g) {
         var n = g.items[0];
         var unread = g.items.some(function (x) { return !x.readAt; });
-        return '<button class="bell__i' + (unread ? ' unread' : '') +
-          '" data-nid="' + esc(g.items.map(function (x) { return x.id; }).join(',')) + '"' +
+        var ids = g.items.map(function (x) { return x.id; }).join(',');
+        return '<div class="bell__row"><button class="bell__i' + (unread ? ' unread' : '') +
+          '" data-nid="' + esc(ids) + '"' +
           ' data-tx="' + esc(g.items.length === 1 ? (n.txId || '') : '') + '">' +
           '<span class="bell__dot"></span>' +
           '<span class="bell__m">' +
             '<span class="bell__l">' + groupLine(g) + '</span>' +
             '<span class="bell__s">' + ago(n.createdAt) + '　·　' +
               (n.type === 'budget_alert' ? '階段性提醒' : '唯讀檢視') + '</span>' +
-          '</span></button>';
+          '</span></button>' +
+          '<button class="bell__del" data-ndel="' + esc(ids) + '" aria-label="刪除這則通知" title="刪除">&#10005;</button></div>';
       }).join('') + '</div>';
     }
 
@@ -329,6 +332,23 @@
       global.API.readNotifications(state.maxId).then(function () {
         state.items.forEach(function (n) { n.readAt = n.readAt || new Date().toISOString(); });
         state.unread = 0;
+        render();
+      });
+      return;
+    }
+
+    /* 刪通知：這一列（合併的那一列一次好幾則），或「清除已讀」 */
+    var del = e.target.closest && (e.target.closest('[data-ndel]') || e.target.closest('#bellClear'));
+    if (del) {
+      if (!global.API.deleteNotifications) return;
+      var gone = del.id === 'bellClear'
+        ? state.items.filter(function (x) { return x.readAt; }).map(function (x) { return String(x.id); })
+        : String(del.dataset.ndel || '').split(',');
+      if (!gone.length) return;
+      global.API.deleteNotifications(gone).then(function () {
+        var lost = state.items.filter(function (x) { return gone.indexOf(String(x.id)) >= 0 && !x.readAt; }).length;
+        state.items = state.items.filter(function (x) { return gone.indexOf(String(x.id)) < 0; });
+        state.unread = Math.max(0, state.unread - lost);
         render();
       });
       return;

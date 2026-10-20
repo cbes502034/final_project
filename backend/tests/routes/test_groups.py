@@ -281,3 +281,34 @@ def test_set_group_notify_只改我自己那一列(api):
     assert crud.get(GroupMember, (g.id, dad.id)).notify is False
     assert api.patch("/api/groups/%d/notify" % g.id, headers=login(stranger), json={"notify": True}).status_code == 403
     assert api.patch("/api/groups/%d/notify" % g.id, headers=login(mom), json={"notify": "maybe"}).status_code == 422
+
+
+# ===========================================================================
+# DELETE /api/categories/{cid}：自訂分類可以刪，紀錄改到「其他」
+# ===========================================================================
+DELCAT = ("DELETE", "/api/categories/{cid}")
+
+
+@pytest.mark.route(*DELCAT)
+def test_delete_category_紀錄改到其他_預算拿掉_系統分類不能刪(api):
+    from app.models import Budget
+    dad, kid = user("d@x.tw", "爸爸"), user("k@x.tw", "小華")
+    fam = family_of((dad, "parent"), (kid, "child"))
+    cats = categories(fam)                                  # 「寵物」是我們家的自訂分類
+    g = ledger_of(dad)
+    t = spend(dad, g, cats["寵物"], 300)
+    crud.save(Budget, {"user_id": dad.id, "category_id": cats["寵物"].id, "period_type": "month", "limit_amount": 1000,
+                       "created_by": dad.id})
+    assert api.delete("/api/categories/%d" % cats["寵物"].id, headers=login(kid)).status_code == 403   # 子女
+    r = api.delete("/api/categories/%d" % cats["餐飲"].id, headers=login(dad))
+    assert r.status_code == 403 and "系統分類" in r.json()["detail"]
+    r = api.delete("/api/categories/%d" % cats["寵物"].id, headers=login(dad))
+    assert r.status_code == 200 and r.json() == {"id": str(cats["寵物"].id), "deleted": True, "moved": 1}
+    assert crud.get(Transaction, t.id).category_id == cats["其他"].id                    # 紀錄還在，改到「其他」
+    assert not crud.exists(Category, {"id": cats["寵物"].id})
+    assert not crud.exists(Budget, {"category_id": cats["寵物"].id})
+    assert api.delete("/api/categories/%d" % cats["寵物"].id, headers=login(dad)).status_code == 404
+    other = user("o@x.tw", "別家")
+    fam2 = family_of((other, "parent"), name="別家")
+    theirs = crud.save(Category, {"name": "別家的", "kind": "expense", "color": "cat-other", "family_id": fam2.id})
+    assert api.delete("/api/categories/%d" % theirs.id, headers=login(dad)).status_code == 404

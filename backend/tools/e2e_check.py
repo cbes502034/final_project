@@ -161,8 +161,9 @@ def main() -> int:
     cats, _ = r.step("分類清單", "GET", "/api/categories", token=tok["dad"],
                      check=lambda d: len(d.get("categories", d)) >= 12)
     by_name = {c["name"]: c["id"] for c in (cats or {}).get("categories", [])}
-    r.step("新增家庭自訂分類", "POST", "/api/categories", token=tok["dad"], want=(201,),
-           json_body={"name": "寵物", "kind": "expense"})
+    pet, _ = r.step("新增家庭自訂分類", "POST", "/api/categories", token=tok["dad"], want=(201,),
+                    json_body={"name": "寵物", "kind": "expense"})
+    pet_id = (pet or {}).get("id") or ((pet or {}).get("category") or {}).get("id")
     g, _ = r.step("建一本帳", "POST", "/api/groups", token=tok["dad"], want=(201,), json_body={"name": "家用"})
     gid = (g or {}).get("id") or ((g or {}).get("group") or {}).get("id")
     r.step("把媽媽加進帳本", "POST", "/api/groups/%s/members" % gid, token=tok["dad"], want=(200, 201),
@@ -221,8 +222,7 @@ def main() -> int:
     # ------------------------------------------------------------------ 數字
     r.domain = "數字"
     r.step("這個月的總覽數字", "GET", "/api/summary", token=tok["dad"],
-           check=lambda d: (float(d["income"]) == 50000 and float(d["expense"]) == 8600 + 55 + 1200)
-           or "income=%s expense=%s" % (d.get("income"), d.get("expense")))
+           check=lambda d: float(d["income"]) == 50000 and float(d["expense"]) == 8600 + 55 + 1200)
     r.step("子女看全家（只算得到自己看得到的）", "GET", "/api/summary?scope=family", token=tok["kid"], want=(200, 403))
     r.step("家長看全家", "GET", "/api/summary?scope=family", token=tok["dad"])
     r.step("設分類預算", "PUT", "/api/budgets", token=tok["dad"], want=(200, 201),
@@ -242,7 +242,26 @@ def main() -> int:
                     json_body={"scope": "me"})
     r.rows[-1]["note"] = "模型寫了 %d 則" % len(adv["advices"]) if r.rows[-1]["got"] == 201 else \
         "503：模型沒設定，前端用同一批數字寫（預期）"
-    r.step("財務建議清單", "GET", "/api/advices", token=tok["dad"])
+    advs, _ = r.step("財務建議清單", "GET", "/api/advices", token=tok["dad"])
+
+    # ------------------------------------------------------------------ 刪除（登記的資料都要能刪）
+    first = next(iter((advs or {}).get("advices", [])), None)
+    if first:
+        r.step("刪一則建議", "DELETE", "/api/advices/%s" % first["id"], token=tok["dad"],
+               check=lambda d: d.get("deleted") is True)
+    r.step("別人的、找不到的建議刪不到（404）", "DELETE", "/api/advices/999999", token=tok["dad"], want=(404,))
+    r.domain = "記帳"
+    r.step("記一筆寵物的帳", "POST", "/api/transactions", token=tok["dad"], want=(201,),
+           json_body={"date": d0, "amount": 300, "kind": "expense", "cat": pet_id, "groupId": gid})
+    r.step("子女不能刪家庭的分類", "DELETE", "/api/categories/%s" % pet_id, token=tok["kid"], want=(403,))
+    r.step("刪自訂分類：用它記的帳改到「其他」", "DELETE", "/api/categories/%s" % pet_id, token=tok["dad"],
+           check=lambda d: d.get("deleted") is True and int(d.get("moved", 0)) == 1)
+    r.domain = "家庭"
+    nl, _ = r.step("通知清單", "GET", "/api/notifications", token=tok["dad"])
+    nid = next(iter(n["id"] for n in (nl or {}).get("notifications", [])), "0")
+    r.step("刪通知沒帶 ids 一定 400（不會被當成全部刪光）", "DELETE", "/api/notifications", token=tok["dad"], want=(400,))
+    r.step("刪一則通知", "DELETE", "/api/notifications?ids=%s" % nid, token=tok["dad"],
+           check=lambda d: d.get("deleted") == [nid])
 
     # ------------------------------------------------------------------ 平台管理員
     r.domain = "認證"
@@ -259,7 +278,9 @@ def main() -> int:
         r.step("停權的人登入不了", "POST", "/api/auth/login", want=(401, 403),
                json_body={"email": mail["out"], "password": pw["out"]})
         r.step("解除停權", "DELETE", "/api/admin/users/%s/suspend" % uid["out"], token=tok["admin"], want=(200,))
-        r.step("解除後登得進去", "POST", "/api/auth/login", json_body={"email": mail["out"], "password": pw["out"]})
+        back, ok = r.step("解除後登得進去", "POST", "/api/auth/login", json_body={"email": mail["out"], "password": pw["out"]})
+        if ok:
+            tok["out"] = back["accessToken"]          # 停權時舊的登入都被撤掉了
     other, _ = r.step("媽媽在第二台裝置登入", "POST", "/api/auth/login",
                       json_body={"email": mail["mom"], "password": pw["mom"]})
     r.step("改密碼", "PATCH", "/api/auth/password", token=tok["mom"],
@@ -270,6 +291,10 @@ def main() -> int:
     r.step("登出", "POST", "/api/auth/logout", token=tok["dad"], want=(200, 204),
            json_body={"refreshToken": refresh["dad"]})
     r.step("登出後 refresh 不能用", "POST", "/api/auth/refresh", want=(401,), json_body={"refreshToken": refresh["dad"]})
+    r.step("還在家庭裡不能刪帳號", "DELETE", "/api/auth/me", token=tok["kid"], want=(409,))
+    r.step("路人刪除自己的帳號", "DELETE", "/api/auth/me", token=tok["out"], check=lambda d: d.get("deleted") is True)
+    r.step("刪掉的帳號登不進去", "POST", "/api/auth/login", want=(401,),
+           json_body={"email": mail["out"], "password": pw["out"]})
 
     passed = sum(row["ok"] for row in r.rows)
     print("\n%d / %d 通過" % (passed, len(r.rows)))

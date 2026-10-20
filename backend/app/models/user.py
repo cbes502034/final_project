@@ -71,6 +71,8 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 最後一次有登入狀態的請求。平台管理頁的紅綠燈看它（守衛每 30 秒最多寫一次）
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 刪除帳號的時間；NULL = 正常。這一列只剩墓碑（名字、email 已經抹掉），登不進來、平台管理頁不列
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class UserSession(Base):

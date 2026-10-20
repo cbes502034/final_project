@@ -574,3 +574,126 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         "conf": float(r.confidence),
         "generatedAt": stamp,
     } for r in rows]}
+
+
+@router.delete("/advices/{aid}", summary="刪一則建議")
+@block_admin
+def delete_advice(aid: str, me: User, db: Session = Depends(get_db)):
+    """刪一則建議
+
+    DELETE /api/advices/{aid}
+
+    【這支做什麼】
+        刪掉一則財務建議（使用者要求「登記的資料都要能刪」）。只刪這一則，明細與數字都不受影響；
+        之後按「產生這個月的建議」會重新寫。
+        自己的建議自己刪；全家的建議（user_id 是 NULL、family_id 是我們家）只有家長能刪——子女看得到，但那是全家的。
+        ⚠️ 別人的、別家的一律回 404，不說「有，但不是你的」：不然 id 一個一個試，就知道別人有幾則建議。
+
+    【前端怎麼打】
+        frontend/js/api.js 的 API.deleteAdvice(id)
+        財務建議頁每一則右上角的「刪除」（先確認一次）。
+
+    【誰能打】
+        登入、沒被停權、不是平台管理員。上面的 @block_admin 已經擋好了：
+            沒登入 → 401；被停權、或是平台管理員 → 403
+        所以函式裡不用再檢查身分。參數 me 就是目前登入的人（User 物件）：
+            me.id            他的 id
+            me.family_id     他的家庭 id（還沒加入家庭是 None）
+            me.family_role   'parent'／'child'（還沒加入家庭是 None）
+
+    【路徑參數】{aid} 是建議的 id（字串）
+        範例：DELETE /api/advices/9
+
+    【成功回應】狀態碼 200
+        {"id": "9", "deleted": true}
+
+    【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
+        狀態碼  什麼時候                              detail
+        403     子女要刪全家的建議                    全家的建議只有家長可以刪
+        404     找不到、別人的、別家的（不說是哪一種）  找不到這則建議
+
+    【會用到的資料表】
+        表       讀／寫    用來做什麼
+        advices  讀＋刪    找這一則、刪掉
+
+    【每一步用的工具與資料庫方法】
+        步驟    呼叫                                  做什麼
+        1 找    crud.get(Advice, id, db=db)           找不到是 None
+        2 刪    crud.remove(Advice, id=…, db=db)      用主鍵刪一列
+                db.commit()
+
+    【寫法步驟】
+        1. 找這一則：自己的、或我們家的全家建議才算；其他一律 404
+        2. 全家的建議：不是家長 → 403
+        3. 刪掉、db.commit()，回 {"id", "deleted": true}
+        ⚠️ 刪之前先把 id 存起來，刪掉之後就不要再讀 row 了。
+
+    【完整寫法】照下面兩步改，改完這支就做好了
+        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+
+            from datetime import datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, HTTPException, Query
+            from fastapi.encoders import jsonable_encoder
+            from pydantic import ValidationError
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import block_admin, visible_scope
+            from app.models import Advice, Category, Guardianship, SavingsGoal, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.advice import AdviceItem, GenerateIn
+            from app.services import analytics
+            from app.services.llm import advice, client
+            from app.toolkit import crud, errors, money, period, profile, security
+            from app.toolkit.config import settings
+            from app.toolkit.db import get_db
+
+        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
+        裝飾器、函式名稱、參數和這段說明字串都不用動。
+
+            # 1. 找這一則：自己的、或我們家的全家建議才算；別人的、別家的一律當作找不到
+            row = crud.get(Advice, int(aid) if aid.isdigit() else 0, db=db)
+            mine = row is not None and row.user_id == me.id
+            ours = row is not None and row.user_id is None and me.family_id is not None and row.family_id == me.family_id
+            if not (mine or ours):
+                raise errors.not_found("找不到這則建議")
+
+            # 2. 全家的建議只有家長能刪（子女看得到，但那是全家的）
+            if ours and me.family_role != "parent":
+                raise errors.forbidden("全家的建議只有家長可以刪")
+
+            # 3. 刪掉
+            advice_id = row.id
+            crud.remove(Advice, id=advice_id, db=db)
+            db.commit()
+            return {"id": str(advice_id), "deleted": True}
+
+    【做完怎麼確認】
+        1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
+        2. 瀏覽器打開 http://localhost:8000/docs，找到 DELETE /api/advices/{aid}
+        3. 按右上角 Authorize，貼上登入拿到的 accessToken（先打 POST /api/advices/generate 產生幾則）
+        4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
+               刪自己的            → 200；GET /api/advices 少一則
+               再刪一次            → 404
+               子女刪全家的那一則  → 403
+               別人的              → 404
+        5. 前端改成連你的後端（frontend/index.html 的 api-base），財務建議頁按某一則的「刪除」，那一則消失
+        6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "delete_advice and u4f60" -v，要全部通過
+    """
+    # 1. 找這一則：自己的、或我們家的全家建議才算；別人的、別家的一律當作找不到
+    row = crud.get(Advice, int(aid) if aid.isdigit() else 0, db=db)
+    mine = row is not None and row.user_id == me.id
+    ours = row is not None and row.user_id is None and me.family_id is not None and row.family_id == me.family_id
+    if not (mine or ours):
+        raise errors.not_found("找不到這則建議")
+
+    # 2. 全家的建議只有家長能刪（子女看得到，但那是全家的）
+    if ours and me.family_role != "parent":
+        raise errors.forbidden("全家的建議只有家長可以刪")
+
+    # 3. 刪掉
+    advice_id = row.id
+    crud.remove(Advice, id=advice_id, db=db)
+    db.commit()
+    return {"id": str(advice_id), "deleted": True}

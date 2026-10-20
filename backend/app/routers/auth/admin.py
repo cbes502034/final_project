@@ -50,7 +50,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
         「最後一次有請求」記在 users.last_active_at，守衛每 30 秒最多寫一次（toolkit/security.py 的 touch）。
         ⚠️ 只有身分欄位與上線狀態：id、名字、email、家庭角色、註冊日、停權狀態、紅綠燈。收入、支出、存款目標一律不給——
            停權是關門，不是配鑰匙；一個讀得到全系統消費明細的帳號，比家長越權嚴重得多。
-        其他平台管理員不列（他們不能被停權）。
+        其他平台管理員不列（他們不能被停權）；刪除了帳號的（只剩墓碑）也不列。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.adminUsers()
@@ -84,7 +84,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
 
     【每一步用的工具與資料庫方法】
         步驟    呼叫                                                  做什麼
-        1 帳號  crud.find(User, {"is_platform_admin": False}, order_by="id", db=db)  所有一般帳號
+        1 帳號  crud.find(User, {"is_platform_admin": False, "deleted_at__isnull": True}, order_by="id", db=db)  所有一般帳號（刪除的不列）
         2 角色  crud.find(FamilyMember, {"status": "active"}, db=db)  做成 {user_id: role}
         3 登入  crud.find(UserSession, {"revoked_at__isnull": True, "expires_at__gt": now}, fields="user_id", db=db)  還登入著的人
         4 燈號  security.last_seen(u)                                 最後一次請求與最後一次登入，取比較晚的那個（補上時區）
@@ -117,7 +117,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
         裝飾器、函式名稱、參數和這段說明字串都不用動。
 
             # 1. 所有一般帳號（其他平台管理員不列）
-            users = crud.find(User, {"is_platform_admin": False}, order_by="id", db=db)
+            users = crud.find(User, {"is_platform_admin": False, "deleted_at__isnull": True}, order_by="id", db=db)
 
             # 2. 每個人的家庭角色
             role_of = {m.user_id: m.role for m in crud.find(FamilyMember, {"status": "active"}, db=db)}
@@ -157,7 +157,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
         6. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "admin_list_users and 你的"，要全部通過
     """
     # 1. 所有一般帳號（其他平台管理員不列）
-    users = crud.find(User, {"is_platform_admin": False}, order_by="id", db=db)
+    users = crud.find(User, {"is_platform_admin": False, "deleted_at__isnull": True}, order_by="id", db=db)
 
     # 2. 每個人的家庭角色
     role_of = {m.user_id: m.role for m in crud.find(FamilyMember, {"status": "active"}, db=db)}

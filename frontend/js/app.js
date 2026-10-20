@@ -831,7 +831,7 @@
            不要「分類 備註」——分類欄已經寫過了，項目再寫一次是重複的字 */
         esc(t.merchant || t.note || t.catName) +
         (t.merchant && t.note ? ' <em>' + esc(t.note) + '</em>' : '') +
-        (t.raw ? '<br><span class="txr__raw">「' + esc(t.raw) + '」</span>' : '') +
+        /* 原句不放在明細上（看起來會像備註）：要看在「修改」裡，那裡寫著「原本的句子」 */
       '</td>' +
       '<td class="txr__u">' + esc(t.userName) + '</td>' +
       '<td class="txr__s">' + (t.source === 'nlp' ? 'AI 解析' : '手動') + '</td>' +
@@ -1133,7 +1133,7 @@
       '</div>';
 
     h += '<div class="btbl"><div class="btbl__hd">' +
-      '<span></span><span>原句</span><span>日期</span><span>金額</span>' +
+      '<span></span><span>項目</span><span>日期</span><span>金額</span>' +
       '<span>收支</span><span>分類</span><span>店家</span><span></span></div>';
     h += batch.map(function (it, i) { return batchRow(it, i); }).join('');
     h += '</div>';
@@ -1160,7 +1160,11 @@
     return '<div class="btbl__r' + (it.missing && it.missing.length ? ' has-miss' : '') +
       '" data-bi="' + i + '" style="animation-delay:' + (i * 50) + 'ms">' +
       '<span class="btbl__n">' + it.seq + '</span>' +
-      '<span class="btbl__span">' + esc('「' + it.span + '」') +
+      /* 第一欄是「買了什麼」（可以改）；原句縮小放在底下，只拿來對照切得對不對 */
+      '<span class="btbl__span">' +
+        '<input data-b="note" class="btbl__item" type="text" maxlength="100" placeholder="買了什麼（選填）" value="' +
+          esc(it.note || '') + '">' +
+        '<small class="btbl__raw">原句「' + esc(it.span) + '」</small>' +
         (it.hint ? '<em class="btbl__hint">' + esc(it.hint) + '</em>' : '') + '</span>' +
       cell('date', '<input data-b="date" type="date" value="' + esc(it.date || '') + '">', it.conf.date) +
       cell('amount', '<input data-b="amount" type="number" placeholder="缺" value="' +
@@ -1597,6 +1601,14 @@
     }).join('');
   }
 
+  /* 這一則我能不能刪：自己的可以；全家的只有家長；照看的孩子的建議是孩子的，不能替他刪 */
+  function advCanDelete(a) {
+    var u = ME && ME.user;
+    if (!u || a.temp) return false;               // AI 叫不動時暫時整理的那幾則沒有存起來，沒有東西可以刪
+    if (a.scope === 'family') return u.role === 'parent';
+    return String(a.user) === String(u.id);
+  }
+
   function advBody(a) {
     return '<div class="ad__b">' +
       '<p>' + esc(a.body) + '</p>' +
@@ -1606,6 +1618,7 @@
       '<div class="ad__k">建議</div><ul>' +
         (a.suggest || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') +
       '</ul>' +
+      (advCanDelete(a) ? '<div class="ad__x"><button class="gx gx--warn" data-advdel="' + esc(a.id) + '">刪除這則建議</button></div>' : '') +
     '</div>';
   }
 
@@ -1795,7 +1808,9 @@
         '<p class="fcat__h">系統分類不夠用的時候再加。加了之後，全家記帳、預算、統計都用得到。</p>' +
         (mine.length
           ? '<div class="fcat__l">' + mine.map(function (c) {
-              return '<span class="chip">' + esc(c.name) + '<small>' + (c.kind === 'income' ? '收入' : '支出') + '</small></span>';
+              return '<span class="chip">' + esc(c.name) + '<small>' + (c.kind === 'income' ? '收入' : '支出') + '</small>' +
+                '<button class="chip__x" data-catdel="' + esc(c.id) + '" data-catname="' + esc(c.name) + '" ' +
+                  'aria-label="刪除分類 ' + esc(c.name) + '">&#10005;</button></span>';
             }).join('') + '</div>'
           : '<p class="fcat__e">還沒有自訂分類。</p>') +
         '<form class="fcat__f" id="catNewF">' +
@@ -2527,20 +2542,40 @@
      說明只講「這裡能做什麼」，不解釋系統怎麼實作。
      ============================================================ */
   var TOUR_KEY = 'fambudget.tour';
+  /* 每一步都寫電腦和手機兩個位置（逗號隔開），挑畫面上看得到的那個。
+     ⚠️ 新用戶一定看得到的東西排前面：只有一本帳時沒有帳本切換、沒照看家人時沒有鈴鐺，
+        那幾步這次就不出現，步數也照實際出現的算（不要出現「2 / 4」開頭）。 */
   var TOUR = [
-    { sel: '.dtile--add', hash: '#/',
+    { sel: '.dtile--add, .tabbar__add', hash: '#/',
       t: '從這裡記帳',
-      b: '打一段話就好，例如「早餐55 中午吃飯320」，系統會幫你拆成一筆一筆。' },
+      b: '打一段話就好，例如「早餐55 中午吃飯320」，系統會幫你拆成一筆一筆，你確認了才存。' },
     { sel: '.wal__card', hash: '#/',
       t: '這個月還能花多少',
       b: '收入扣掉你想存的，剩下的就是能放心花的錢。' },
-    { sel: '#gswBtn', hash: '#/',
-      t: '切換帳本',
+    { sel: '.dtile[data-nav="entry"], .tabbar__i[data-tab="entry"]', hash: '#/',
+      t: '收支明細',
+      b: '記過的每一筆都在這裡，可以改、可以刪，也能一次選好幾筆刪掉。' },
+    { sel: '.dtile[data-nav="advice"], .tabbar__i[data-tab="advice"]', hash: '#/',
+      t: '財務建議',
+      b: '按一下就幫你看這個月的花費；每個數字都附算式，可以自己驗算。' },
+    { sel: '.dtile[data-nav="members"]', hash: '#/',
+      t: '家人',
+      b: '建立家庭、邀請家人；照看孩子的時候，看得到他記了什麼。' },
+    { sel: '#gswBtn, .dtile[data-nav="groups"]', hash: '#/',
+      t: '帳本',
       b: '家用、旅遊基金可以分開記。切過去之後，數字都只看那一本。' },
     { sel: '#bell', hash: '#/',
       t: '通知',
       b: '家人記帳、或是你花到設定的比例時，這裡會亮。' }
   ];
+  var TOURV = TOUR;               // 這一次真的會出現的步驟（開始時算一次）
+
+  function tourVisible(sel) {
+    return Array.prototype.filter.call(document.querySelectorAll(sel), function (n) {
+      var rr = n.getBoundingClientRect();
+      return rr.width > 0 && rr.height > 0;
+    })[0] || null;
+  }
     var tourAt = -1;
 
   function clamp(v, lo, hi) {
@@ -2548,18 +2583,22 @@
     return Math.max(lo, Math.min(v, hi));
   }
 
+  /* 看過導覽記在「這個帳號」上（fambudget.tour.<id>），不是這台瀏覽器：
+     同一台電腦第二個註冊的人也是新用戶，一樣要問一次。 */
+  var TOUR_UID = '';
+  function tourKey() { return TOUR_KEY + '.' + TOUR_UID; }
   function tourDone() {
-    try { return localStorage.getItem(TOUR_KEY) === 'done'; } catch (e) { return true; }
+    try { return localStorage.getItem(tourKey()) === 'done'; } catch (e) { return true; }
   }
   function tourRemember() {
-    try { localStorage.setItem(TOUR_KEY, 'done'); } catch (e) {}
+    try { localStorage.setItem(tourKey(), 'done'); } catch (e) {}
   }
 
   function tourAsk() {
-    if (tourDone()) return;
     /* ⚠️ 導覽的每一步都指向財務功能（記帳、帳本、通知），
        平台管理員的首頁上一個都沒有——框會圈在看不見的元素上。 */
     API.me().then(function (m) {
+      TOUR_UID = m.user.id;
       if (m.user.isPlatformAdmin || tourDone() || document.getElementById('tourAsk')) return;
       if (!m.user.onboardedAt || /^#\/setup/.test(location.hash)) return;   // 先把個人化設定走完
       tourAskShow();
@@ -2598,7 +2637,13 @@
           '<div class="tour__box" id="tourBox"></div>' +
         '</div>'));
     }
-    tourGo(1);
+    /* 先回總覽（每一步都在總覽上），等畫面畫好，算出這一次看得到的步驟 */
+    if (location.hash !== '#/' && location.hash !== '') location.hash = '#/';
+    setTimeout(function () {
+      TOURV = TOUR.filter(function (st) { return tourVisible(st.sel); });
+      if (!TOURV.length) { tourEnd(); return; }
+      tourGo(1);
+    }, 500);
   }
 
   function tourEnd() {
@@ -2612,9 +2657,9 @@
   function tourGo(delta) {
     var next = tourAt + delta;
     if (next < 0) next = 0;
-    if (next >= TOUR.length) { tourEnd(); toast('隨時可以從「使用說明」再看一次', 'ok'); return; }
+    if (next >= TOURV.length) { tourEnd(); toast('隨時可以從「使用說明」再看一次', 'ok'); return; }
     tourAt = next;
-    var step = TOUR[tourAt];
+    var step = TOURV[tourAt];
 
     if (step.hash && location.hash !== step.hash) { location.hash = step.hash; }
     document.body.classList.add('tour-on');
@@ -2622,17 +2667,14 @@
   }
 
   function tourPaint() {
-    var step = TOUR[tourAt];
+    var step = TOURV[tourAt];
     var hole = document.getElementById('tourHole');
     var box = document.getElementById('tourBox');
     if (!hole || !box) return;
 
     /* 同一步可能有桌機和手機兩個位置，挑畫面上真的看得到的那一個 */
-    var el0 = Array.prototype.filter.call(document.querySelectorAll(step.sel), function (n) {
-      var rr = n.getBoundingClientRect();
-      return rr.width > 0 && rr.height > 0;
-    })[0];
-    if (!el0) { tourGo(1); return; }          // 那個東西這次不在畫面上就跳過
+    var el0 = tourVisible(step.sel);
+    if (!el0) { tourGo(1); return; }          // 開始之後才不見的（例如換了版面）就跳過
 
     /* 導覽期間 body 是 overflow:hidden（不讓使用者自己捲，否則圈圈會跟目標分家）。
        但那也擋掉了我們自己的 scrollIntoView——目標在畫面外的那幾步就會圈到空氣。
@@ -2660,14 +2702,14 @@
     hole.style.height = hgt + 'px';
 
     box.innerHTML =
-      '<div class="tour__n">' + (tourAt + 1) + ' / ' + TOUR.length + '</div>' +
+      '<div class="tour__n">' + (tourAt + 1) + ' / ' + TOURV.length + '</div>' +
       '<h4>' + esc(step.t) + '</h4>' +
       '<p>' + esc(step.b) + '</p>' +
       '<div class="tour__a">' +
         '<button class="tour__skip" id="tourSkip">跳過</button>' +
         (tourAt > 0 ? '<button class="btn btn--sm" id="tourPrev">上一步</button>' : '') +
         '<button class="btn btn--sm btn--go" id="tourNext">' +
-          (tourAt === TOUR.length - 1 ? '完成' : '下一步') + '</button>' +
+          (tourAt === TOURV.length - 1 ? '完成' : '下一步') + '</button>' +
       '</div>';
 
     /* 說明框的位置。
@@ -2943,7 +2985,7 @@
     invite_member: '邀請家人', join_family: '加入家庭',
     remove_member: '移出家庭', leave_family: '退出家庭', remove_group: '移除帳本',
     dissolve_family: '解散家庭', change_password: '改密碼', reset_password: '重設密碼',
-    verify_password_failed: '密碼確認失敗', lookup_user: '用帳號找人'
+    verify_password_failed: '密碼確認失敗', lookup_user: '用帳號找人', delete_account: '刪除帳號'
   };
 
   /* ---------- 共用 ---------- */
@@ -3458,6 +3500,14 @@
 
           '<div class="sec"><h2 class="sec__t">登入中的裝置</h2></div>' +
           '<div class="card card--flush" id="sessBox">' + skeleton(1) + '</div>' +
+
+          /* 登記的資料都要能刪，包含帳號本身（使用者 2026-10-20） */
+          '<div class="sec"><h2 class="sec__t">刪除帳號</h2></div>' +
+          '<div class="card dz">' +
+            '<p class="dz__t">刪除之後，你記的每一筆帳、只有你在用的帳本、預算、建議、通知都會刪掉，<b>救不回來</b>。' +
+              '名字和 email 會抹掉，之後可以用同一個 email 重新註冊。還在家庭裡的話，要先到「家庭成員」退出家庭。</p>' +
+            '<button class="btn btn--sm btn--danger" id="delMe">刪除我的帳號</button>' +
+          '</div>' +
         '</section>' +
 
         '<section class="duo__c">' +
@@ -4176,6 +4226,73 @@
       return;
     }
 
+    /* 刪一則建議：先從畫面拿掉，6 秒內可以按「復原」；沒按才真的刪 */
+    var adel = t.closest('[data-advdel]');
+    if (adel) {
+      var aid = adel.dataset.advdel;
+      var gone = ADV.filter(function (a) { return String(a.id) === String(aid); })[0];
+      var at = ADV.indexOf(gone), undone = false;
+      ADV = ADV.filter(function (a) { return a !== gone; });
+      ADVOPEN = null;
+      paintAdvices();
+      var advTimer = setTimeout(function () {
+        if (undone) return;
+        API.deleteAdvice(aid).catch(function (err) {
+          ADV.splice(at, 0, gone); paintAdvices();
+          toast(err.message || '刪不掉，再試一次', 'err');
+        });
+      }, 6200);
+      toast('已刪除這則建議', 'ok', function () {
+        undone = true; clearTimeout(advTimer);
+        ADV.splice(at, 0, gone); paintAdvices();
+      });
+      return;
+    }
+
+    /* 刪自訂分類：會改到別筆紀錄（改成「其他」），要再輸入一次密碼 */
+    var cdel = t.closest('[data-catdel]');
+    if (cdel) {
+      var cid = cdel.dataset.catdel, cname = cdel.dataset.catname;
+      danger({
+        title: '刪除分類「' + cname + '」',
+        detail: '用這個分類記的帳<b>不會消失</b>，會改到「其他」（收入改到「其他收入」）；這個分類的預算會一起拿掉。',
+        level: 'password',
+        ok: '確定刪除',
+        onOk: function () {
+          API.deleteCategory(cid).then(function (r) {
+            CATS = [];
+            var wrap = document.getElementById('fold-fcat');
+            if (wrap) FOLD_BUILD.fcat(wrap); else loadCats();
+            toast(r.moved ? '已刪除，' + r.moved + ' 筆紀錄改到「其他」' : '已刪除', 'ok');
+          }).catch(function (err) { toast(err.message || '刪不掉', 'err'); });
+        }
+      });
+      return;
+    }
+
+    /* 刪除帳號：救不回來，要密碼＋貼一段確認碼 */
+    if (t.closest('#delMe')) {
+      danger({
+        title: '刪除我的帳號',
+        detail: '你記的每一筆帳、帳本、預算、建議、通知都會刪掉，<b>救不回來</b>。',
+        level: 'full',
+        ok: '確定刪除帳號',
+        onOk: function () {
+          API.deleteAccount().then(function () {
+            if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
+            ME = null; CATS = [];
+            document.body.classList.remove('is-admin', 'role-child');
+            document.body.classList.add('is-out');
+            gateStep = 'landing';
+            location.hash = '#/login';
+            paint();
+            toast('帳號已經刪除', 'ok');
+          }).catch(function (err) { toast(err.message || '刪不掉', 'err'); });
+        }
+      });
+      return;
+    }
+
     var unsus = t.closest('[data-unsus]');
     if (unsus) {
       var uid = unsus.dataset.unsus;
@@ -4475,7 +4592,7 @@
         stopAdv();
         if (r.fallback) {
           /* AI 叫不動（503）：用同一批數字先整理的，不會存起來，所以直接畫，不重新讀 */
-          ADV = r.advices || [];
+          ADV = (r.advices || []).map(function (x) { return Object.assign(x, { temp: true }); });   // 沒存起來：不能刪
           ag.disabled = false; ag.textContent = '產生這個月的建議';
           var hint = document.getElementById('advHint');
           if (hint) hint.innerHTML = '<div class="nudge"><b>AI 暫時沒有回應</b><span>' + esc(r.note || '') + '</span></div>';
@@ -5077,6 +5194,32 @@
 
   window.addEventListener('hashchange', paint);
 
+  /* 同一台電腦開了好幾個分頁：別的分頁登出（或換人登入），這個分頁跟著換。
+     ⚠️ 不跟的話，這個分頁的通知每分鐘拿著已經登出的權杖去問，一直收到 401。 */
+  function tokenOwner(raw) {
+    try {
+      var t = String(JSON.parse(raw).accessToken || '').split('.');
+      if (t[0] === 'mock') return t[2];
+      return JSON.parse(global.atob(t[1].replace(/-/g, '+').replace(/_/g, '/'))).sub;
+    } catch (x) { return null; }
+  }
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'fambudget.auth') return;
+    /* 別的分頁只是續期（每 30 分鐘換一張新的）：同一個人，什麼都不用做 */
+    if (e.newValue && e.oldValue && tokenOwner(e.newValue) === tokenOwner(e.oldValue)) return;
+    if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
+    ME = null; CATS = [];
+    if (!e.newValue) {
+      document.body.classList.remove('is-admin', 'role-child');
+      document.body.classList.add('is-out');
+      location.hash = '#/login';
+    } else if (global.Notify) {
+      global.Notify.start();
+    }
+    paintWho();
+    paint();
+  });
+
   /* 更早的版本有一個顯示 API 模式的小徽章。那是給開發者看的，
      介面上已經拿掉——這裡留一個保險，元素不在就不要炸。 */
   var $mode = document.getElementById('mode');
@@ -5219,8 +5362,9 @@
     /* 第一次打開才問。網址帶 ?tour=1 可以重看一次。 */
     if (!a.loggedIn) return;
     if (/[?&]tour=1/.test(location.search)) {
-      try { localStorage.removeItem(TOUR_KEY); } catch (e) {}
       API.me().then(function (m) {
+        TOUR_UID = m.user.id;
+        try { localStorage.removeItem(tourKey()); } catch (e) {}
         if (!m.user.isPlatformAdmin) setTimeout(tourStart, 600);
       });
     } else {

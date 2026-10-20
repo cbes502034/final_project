@@ -261,7 +261,8 @@ window.DATA = {
              ['finance_habits', 'JSONB', '固定的財務安排 id 陣列'],
              ['finance_note', 'TEXT', '補充說明，最多 200 字。⚠️ 組 prompt 時標示成資料，不是指令（toolkit/profile.py）'],
              ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', ''],
-             ['last_active_at', 'TIMESTAMPTZ', '最後一次有登入狀態的請求。平台管理頁的紅綠燈看它，每 30 秒最多寫一次']] },
+             ['last_active_at', 'TIMESTAMPTZ', '最後一次有登入狀態的請求。平台管理頁的紅綠燈看它，每 30 秒最多寫一次'],
+             ['deleted_at', 'TIMESTAMPTZ', 'NULL = 正常。刪除帳號後只留墓碑：名字、email 抹掉，紀錄全部刪除（toolkit/account.py）']] },
 
     { t: 'savings_goals', label: '每月存款目標', note: '★ 註冊後的個人化設定第一步就填。改過的值保留歷史，不覆蓋',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],

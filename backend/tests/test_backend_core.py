@@ -630,7 +630,7 @@ def test_進度表把還沒做的算成待辦():
     p = progress()
     done = {r for v in p.values() for r in v["done"]}
     todo = {r for v in p.values() for r in v["todo"]}
-    assert len(done) + len(todo) == 75
+    assert len(done) + len(todo) == 79
     assert not (done & todo), "同一支不可以同時算完成又算待辦"
 
     still_stub = set()
@@ -817,13 +817,22 @@ def test_沒接住的錯誤回_JSON_正式環境不帶內部細節(monkeypatch):
     def boom():
         raise KeyError("users.password_hash")
 
-    c = TestClient(a, raise_server_exceptions=False)
-    monkeypatch.setattr(settings, "app_env", "development")
-    r = c.get("/boom")
-    assert r.status_code == 500 and "KeyError" in r.json()["detail"]
-    monkeypatch.setattr(settings, "app_env", "production")
-    r = c.get("/boom")
-    assert r.status_code == 500 and r.json() == {"detail": "系統發生錯誤，請稍後再試"}
+    # 500 會順手記進 error_logs：換成記憶體裡的 SQLite，不要去連設定檔裡的資料庫
+    # （本機沒開 PostgreSQL 時，連線會卡到逾時，整個測試就停住）
+    original = str(db.engine.url)
+    db.use_database("sqlite://")
+    db.create_all()
+    try:
+        c = TestClient(a, raise_server_exceptions=False)
+        monkeypatch.setattr(settings, "app_env", "development")
+        r = c.get("/boom")
+        assert r.status_code == 500 and "KeyError" in r.json()["detail"]
+        monkeypatch.setattr(settings, "app_env", "production")
+        r = c.get("/boom")
+        assert r.status_code == 500 and r.json() == {"detail": "系統發生錯誤，請稍後再試"}
+    finally:
+        db.drop_all()
+        db.use_database(original)
 
 
 def test_正式環境不印_SQL(monkeypatch):

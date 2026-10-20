@@ -28,6 +28,7 @@
     scope       可見範圍（聯集）        visible_users / co_parents / can_see_row
     roles       角色能做哪些治理動作    can_govern / require_govern
     security    防濫用規則與平台監控    login_blocked / ai_quota / presence / log_error
+    account     刪除自己的帳號          why_not_delete / delete_everything
     notify      通知發給誰（已去重）    recipients_for
     profile     理財習慣組成 prompt     to_prompt_block / clean_note
     family      家庭綁定（邀請碼、找人）  new_code / hash_code / lookup_status

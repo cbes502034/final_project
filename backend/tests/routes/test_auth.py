@@ -809,3 +809,67 @@ def test_report_client_error_不用登入_同一句話只記一次_防洗版(api
     assert crud.count(ErrorLog, {"user_id": kid.id}) == 30
     assert api.post("/api/client-errors", json={"message": "   "}).status_code == 422
     assert api.post("/api/client-errors", json={"message": "x" * 2001}).status_code == 422
+
+
+# ===========================================================================
+# DELETE /api/auth/me：刪除自己的帳號
+# ===========================================================================
+DELME = ("DELETE", "/api/auth/me")
+
+
+@pytest.mark.route(*DELME)
+def test_delete_me_紀錄全部刪掉_個資抹掉_email_空出來(api):
+    from app.models import Advice, Budget, Category, Notification, SavingsGoal, Transaction
+    me = user("solo@x.tw", "一個人", birth_year=1990, finance_note="想存錢")
+    cats = {c.name: c for c in crud.save(Category, [{"name": "餐飲", "kind": "expense", "color": "cat-food"}])}
+    g = ledger_of(me)
+    t = crud.save(Transaction, {"user_id": me.id, "group_id": g.id, "category_id": cats["餐飲"].id, "kind": "expense",
+                                "amount": 55, "occurred_on": now().date(), "source": "manual"})
+    crud.save(Advice, {"user_id": me.id, "period_type": "month", "period_key": "2026-10", "level": "ok", "title": "t",
+                       "body": "b", "basis_json": {}, "suggestions_json": [], "confidence": 0.9})
+    goal(me, 5000)
+    crud.save(Notification, {"recipient_id": me.id, "type": "ward_transaction"})
+    crud.save(SecurityEvent, {"kind": "login_failed", "user_id": me.id})
+    h = login(me)
+    r = api.delete("/api/auth/me", headers=h)
+    assert r.status_code == 200 and r.json() == {"deleted": True}
+    row = crud.get(User, me.id)
+    assert row.deleted_at is not None and row.display_name == "已刪除的帳號" and row.email.endswith("@deleted.invalid")
+    assert row.birth_year is None and row.finance_note is None
+    for model in (Transaction, Advice, SavingsGoal, Notification, Group, GroupMember):
+        assert crud.count(model) == 0, model.__name__
+    assert crud.get(SecurityEvent, where={"kind": "login_failed"}).user_id is None      # 只留次數
+    assert crud.exists(AuditLog, {"action": "delete_account", "target_id": me.id})
+    assert api.get("/api/auth/me", headers=h).status_code == 401                         # 手上的 token 也不能用
+    assert api.post("/api/auth/login", json={"email": "solo@x.tw", "password": PASSWORD}).status_code == 401
+    r = api.post("/api/auth/register", json={"name": "重新來過", "email": "solo@x.tw", "password": "abcd1234"})
+    assert r.status_code == 201                                                          # email 空出來了
+    admin = user("admin@x.tw", "管理員", is_platform_admin=True)
+    names = [u["name"] for u in api.get("/api/admin/users", headers=login(admin)).json()["users"]]
+    assert "已刪除的帳號" not in names                                                   # 墓碑不列在管理頁
+
+
+@pytest.mark.route(*DELME)
+def test_delete_me_還在家庭裡_帳本還有別人_平台管理員_都擋下(api):
+    dad, kid = user("d@x.tw", "爸爸"), user("k@x.tw", "小華")
+    family_of((dad, "parent"), (kid, "child"))
+    r = api.delete("/api/auth/me", headers=login(dad))
+    assert r.status_code == 409 and "家庭" in r.json()["detail"]
+    owner, friend = user("o@x.tw", "開帳本的人"), user("f@x.tw", "朋友")
+    ledger_of(owner, friend, name="室友分帳")
+    r = api.delete("/api/auth/me", headers=login(owner))
+    assert r.status_code == 409 and "室友分帳" in r.json()["detail"]
+    admin = user("admin@x.tw", "管理員", is_platform_admin=True)
+    assert api.delete("/api/auth/me", headers=login(admin)).status_code == 403
+    assert crud.get(User, owner.id).deleted_at is None
+
+
+@pytest.mark.route(*REG)
+def test_register_內建的管理員_email_註冊當下就是管理員_不開帳本(api):
+    from app.toolkit.config import BUILTIN_ADMIN_EMAILS
+    r = api.post("/api/auth/register", json={"name": "master", "email": BUILTIN_ADMIN_EMAILS[0], "password": "abcd1234"})
+    assert r.status_code == 201 and r.json()["user"]["isPlatformAdmin"] is True
+    row = crud.get(User, int(r.json()["user"]["id"]))
+    assert row.is_platform_admin and not crud.exists(Group, {"created_by": row.id})
+    r = api.post("/api/auth/register", json={"name": "一般人", "email": "normal@x.tw", "password": "abcd1234"})
+    assert r.json()["user"]["isPlatformAdmin"] is False

@@ -259,7 +259,9 @@ class Settings(BaseSettings):
 
     @property
     def admin_email_list(self) -> list[str]:
-        return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
+        """ADMIN_EMAILS 填的，加上內建的 BUILTIN_ADMIN_EMAILS。"""
+        listed = [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
+        return listed + [e for e in BUILTIN_ADMIN_EMAILS if e not in listed]
 
     @property
     def is_production(self) -> bool:
@@ -290,4 +292,9 @@ class Settings(BaseSettings):
 
 # 整個專案共用同一個 settings 物件：
 #     from app.toolkit.config import settings
+#: 內建的平台管理員（使用者 2026-10-20 指定）：用這個 email 註冊的帳號就是平台管理員，不用另外設 ADMIN_EMAILS。
+#: 用 Gmail 的「+」別名：信一樣寄到 cbes502034@gmail.com，但跟那個 email 的家長帳號是兩個帳號——
+#: 平台管理員讀不到任何帳，不能跟家長共用一個帳號。⚠️ 這裡只放 email，密碼由本人註冊時自己設，不進程式碼。
+BUILTIN_ADMIN_EMAILS: tuple[str, ...] = ("cbes502034+master@gmail.com",)
+
 settings = Settings()  # type: ignore[call-arg]
