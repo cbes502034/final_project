@@ -440,7 +440,8 @@
         badge: o.warn ? o.warn + ' 則要注意' : '' },
       /* ⚠️ 家庭那一支問不到（famOff）時一律寫「家庭成員」：寫「加入家庭」
          等於斷定他沒有家庭，而我們根本沒問到。 */
-      { nav: 'members', label: !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭成員',
+      /* 使用者：「要看家庭帳本只能點家庭成員，怪怪的」——主角是全家的帳，成員只是裡面的功能 */
+      { nav: 'members', label: !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭帳本',
         icon: 'members', badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
       { nav: 'profile', label: '個人資料', icon: 'profile' },
       { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
@@ -1725,9 +1726,29 @@
     $view.innerHTML = h;
   }
 
+  /* 家庭帳本最上面：全家這個月（數字一樣來自 GET /api/summary?scope=family） */
+  function paintFamSum() {
+    var box = document.getElementById('famSum');
+    if (!box) return;
+    API.summary({ scope: 'family' }).then(function (d) {
+      var sv = d.savings || {};
+      var left = sv.level === 'over' ? -Number(sv.shortfall || 0) : Number(sv.left || 0);
+      box.innerHTML = '<div class="card famsum">' +
+        '<div class="famsum__g">' +
+          '<div><span>全家收入</span><b>' + amt(d.income) + '</b></div>' +
+          '<div><span>全家支出</span><b>' + amt(d.expense) + '</b></div>' +
+          '<div><span>' + (sv.level === 'over' ? '這個月超出計畫' : '這個月還可以花') + '</span><b>' + amt(Math.abs(left)) + '</b></div>' +
+        '</div>' +
+        '<div class="famsum__a">' +
+          '<button class="btn btn--sm btn--go" data-famgo="home">看全家總覽</button>' +
+          '<button class="btn btn--sm" data-famgo="stats">全家統計</button>' +
+        '</div></div>';
+    }).catch(function (e) { box.innerHTML = errState(e); });
+  }
+
   function renderFamily(d, inv) {
     var parent = d.myRole === 'parent';
-    head('家庭成員', d.family.name + '　·　' + d.members.length + ' 位');
+    head('家庭帳本', d.family.name + '　·　' + d.members.length + ' 位');
 
     function names(list, key) {
       return list.map(function (g) { return esc(g[key]); }).join('、');
@@ -1735,9 +1756,10 @@
 
     var tools = '<button class="btn btn--sm btn--ghost" data-help="perms">誰可以做什麼</button>';
     /* 子女沒有邀請的功能，標題列就不放「邀請家人」 */
-    var h = '<div class="page">' + (parent
-      ? foldHead('finv', d.family.name, '邀請家人', d.members.length + ' 人', null, tools)
-      : '<div class="sec"><h2 class="sec__t">' + esc(d.family.name) + '</h2>' +
+    /* 最上面先看全家這個月（家長才有：子女看不到別人的帳）；成員、邀請在下面 */
+    var h = '<div class="page">' + (parent ? '<div id="famSum">' + skeleton(1) + '</div>' : '') + (parent
+      ? foldHead('finv', '成員', '邀請家人', d.members.length + ' 人', null, tools)
+      : '<div class="sec"><h2 class="sec__t">成員</h2>' +
         '<span class="sec__n">' + d.members.length + ' 人</span><div class="sec__tools">' + tools + '</div></div>');
 
     if (parent && inv.sent.length) {
@@ -1818,6 +1840,7 @@
 
     $view.innerHTML = h;
     foldRestore();
+    paintFamSum();
   }
 
   /* 家庭自訂分類：家長加，全家記帳時都選得到 */
@@ -2596,8 +2619,8 @@
       t: '財務建議',
       b: '按一下就幫你看這個月的花費；每個數字都附算式，可以自己驗算。' },
     { sel: '.dtile[data-nav="members"]', hash: '#/',
-      t: '家人',
-      b: '建立家庭、邀請家人；照看孩子的時候，看得到他記了什麼。' },
+      t: '家庭帳本',
+      b: '全家這個月花了多少、成員和邀請都在這裡；照看孩子的時候，看得到他記了什麼。' },
     { sel: '#gswBtn, .dtile[data-nav="groups"]', hash: '#/',
       t: '帳本',
       b: '家用、旅遊基金可以分開記。切過去之後，數字都只看那一本。' },
@@ -4094,6 +4117,15 @@
       SCOPE = scp.dataset.scope === 'family' ? 'family' : 'me';
       try { sessionStorage.setItem('fambudget.scope', SCOPE); } catch (err) {}
       paint();
+      return;
+    }
+
+    /* 家庭帳本：切到「全家」再去總覽或統計 */
+    var fgo = t.closest('[data-famgo]');
+    if (fgo) {
+      SCOPE = 'family';
+      try { sessionStorage.setItem('fambudget.scope', SCOPE); } catch (err) {}
+      location.hash = fgo.dataset.famgo === 'stats' ? '#/stats' : '#/';
       return;
     }
 

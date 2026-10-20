@@ -3913,3 +3913,11 @@ body[data-page="admin"] #searchBtn, body[data-page="admin"] #searchDrawer, body[
   color: var(--accent); font-size: 13.5px; font-weight: 500;
 }
 #view .lg__opt:hover { text-decoration: underline; }
+
+/* ---- 家庭帳本最上面：全家這個月 ---- */
+#view .famsum { display: grid; gap: 14px; margin-bottom: 18px; }
+#view .famsum__g { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+#view .famsum__g span { display: block; font-size: 12px; color: var(--ink-dim); margin-bottom: 4px; }
+#view .famsum__g b { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+#view .famsum__a { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 480px) { #view .famsum__g { grid-template-columns: 1fr 1fr; } }
