@@ -1665,6 +1665,24 @@ def test_新用戶的導覽步數照實際出現的算():
     assert "TOUR.length" not in paint and "TOUR[" not in paint, "步數與步驟要用 TOURV（看得到的那幾步）"
 
 
+def test_段落解析表格_補上分類就不再說缺():
+    """使用者回報：寫了 31000 沒寫「薪資」，分類標必填；選了薪資還是一直說缺少。
+    原因：沒有「還沒選」的空選項，瀏覽器把第一個（薪資）畫成已選、值卻是空的，再點同一個不算改變；
+    重算缺漏也只看金額與日期。"""
+    app = read("frontend/js/app.js")
+    fn = app[app.index("function batchMissing("):app.index("function renderBatch(")]
+    for need in ("m.push('amount')", "m.push('date')", "m.push('kind')", "m.push('cat')"):
+        assert need in fn, "缺漏要四個欄位一起算：少了 " + need
+    assert "c.kind !== it.kind" in fn, "分類跟收支對不上也算缺"
+    assert '<option value="" selected disabled>選分類</option>' in app
+    assert '<option value="" selected disabled>選收支</option>' in app
+    sync = app[app.index("function syncBatch("):app.index("function syncSaveState(")]
+    assert "batchMissing(batch[i])" in sync and "['amount', 'date', 'kind', 'cat']" in sync
+    # 選了「薪資」收支自動變收入；改了收支、舊分類對不上就清掉
+    assert "if (bit && bf === 'cat' && bcat) bit.kind = bcat.kind;" in app
+    assert "if (bit && bf === 'kind' && bcat && bcat.kind !== bit.kind) bit.cat = null;" in app
+
+
 def test_下拉面板浮在按鈕下面_不搬進版面():
     """帳本清單與通知面板曾經被搬進頂列和內容之間，佔真實空間把內容往下推。
     頁首改版後它們插在標題底下，一點開整頁就往下跳。"""

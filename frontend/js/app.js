@@ -1109,15 +1109,33 @@
     };
   }
 
+  /* 解析當下的狀態（是不是規則備援、說明）。改欄位重畫表格時沿用，不要把「AI 暫時沒有回應」的說明弄丟 */
+  var batchHead = { fallback: false, note: '' };
+  var MISS_HINT = '這一筆有欄位抽不到，補上才能存';
+
+  /* 這一筆還缺什麼。⚠️ 四個必填欄位都要看：只看金額、日期的話，收支和分類補好了「必填」也不會消失 */
+  function batchMissing(it) {
+    var m = [];
+    if (it.amount === null || it.amount === undefined || it.amount === '' || isNaN(it.amount)) m.push('amount');
+    if (!it.date) m.push('date');
+    if (it.kind !== 'expense' && it.kind !== 'income') m.push('kind');
+    var c = CATS.filter(function (x) { return x.id === it.cat; })[0];
+    if (!c || (it.kind && c.kind !== it.kind)) m.push('cat');
+    return m;
+  }
+
   function renderBatch(r) {
     var out = document.getElementById('paraOut');
     if (!out) return;
+    if (r.items !== batch) batchHead = { fallback: !!r.fallback, note: r.note || '' };   // 新的解析結果才換
     /* orig：解析當下的原始結果，之後使用者怎麼改都不動它。
        確認寫入時一起送出，後端比對「原本解析成什麼、使用者改成什麼」寫進 nlp_parses——
        那就是模型抓錯的標註（資料飛輪）。by 標出是模型還是前端規則解析的，規則的不能當模型的成績。 */
     batch = r.items.map(function (x) {
       var o = Object.assign({}, x);
       if (!o.orig) o.orig = { by: r.fallback ? 'rules' : 'model', date: x.date, amount: x.amount, kind: x.kind, cat: x.cat, merchant: x.merchant || '', note: x.note || '' };
+      o.missing = batchMissing(o);
+      if (!o.missing.length && o.hint === MISS_HINT) o.hint = '';
       return o;
     });
 
@@ -1125,8 +1143,8 @@
     var h = '<div class="prs">';
     /* 模型叫不動、改用前端規則切的：一直留著講清楚，不要只靠一閃而過的 toast——
        不然使用者看著表格，分不出這是模型還是規則的品質 */
-    if (r.fallback) {
-      h += '<div class="nudge"><b>AI 暫時沒有回應</b><span>' + esc(r.note || '先用簡易規則拆好了，每一筆請再看一眼。') + '</span></div>';
+    if (batchHead.fallback) {
+      h += '<div class="nudge"><b>AI 暫時沒有回應</b><span>' + esc(batchHead.note || '先用簡易規則拆好了，每一筆請再看一眼。') + '</span></div>';
     }
     h += '<div class="prs__h">這段話被切成 <b>' + batch.length + ' 筆</b>' +
       (miss ? '，其中 <b style="color:var(--warn)">' + miss + ' 筆有欄位缺漏</b>，補齊才能送出' : '') +
@@ -1146,8 +1164,23 @@
     syncSaveState();
   }
 
+  /* 分類選單：支出、收入兩組都列（這一筆的收支排前面），選了「薪資」收支就跟著變收入，不用先改收支。
+     還沒有分類（或分類跟收支對不上）時放一個「選分類」的空選項：不放的話瀏覽器會把第一個畫成已選，
+     使用者點同一個不算改變，怎麼選都補不上（實際發生過） */
+  function batchCatOptions(it) {
+    var known = it.missing.indexOf('cat') < 0;
+    var groups = it.kind === 'income' ? [['income', '收入'], ['expense', '支出']] : [['expense', '支出'], ['income', '收入']];
+    return (known ? '' : '<option value="" selected disabled>選分類</option>') +
+      groups.map(function (g) {
+        var list = cats(g[0]);
+        if (!list.length) return '';
+        return '<optgroup label="' + g[1] + '">' + list.map(function (c) {
+          return '<option value="' + c.id + '"' + (known && c.id === it.cat ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+        }).join('') + '</optgroup>';
+      }).join('');
+  }
+
   function batchRow(it, i) {
-    var kc = cats(it.kind);
     function miss(f) { return it.missing && it.missing.indexOf(f) >= 0; }
     function cell(field, inner, conf) {
       var low = conf !== undefined && conf > 0 && conf < 0.85;
@@ -1170,13 +1203,11 @@
       cell('amount', '<input data-b="amount" type="number" placeholder="缺" value="' +
            (it.amount === null || it.amount === undefined ? '' : it.amount) + '">', it.conf.amount) +
       cell('kind', '<select data-b="kind">' +
+           (miss('kind') ? '<option value="" selected disabled>選收支</option>' : '') +
            '<option value="expense"' + (it.kind === 'expense' ? ' selected' : '') + '>支出</option>' +
            '<option value="income"' + (it.kind === 'income' ? ' selected' : '') + '>收入</option>' +
            '</select>', it.conf.kind) +
-      cell('cat', '<select data-b="cat">' + kc.map(function (c) {
-             return '<option value="' + c.id + '"' + (c.id === it.cat ? ' selected' : '') +
-               '>' + esc(c.name) + '</option>';
-           }).join('') + '</select>', it.conf.cat) +
+      cell('cat', '<select data-b="cat">' + batchCatOptions(it) + '</select>', it.conf.cat) +
       cell('merchant', '<input data-b="merchant" type="text" placeholder="選填" value="' +
            esc(it.merchant || '') + '">') +
       '<button class="btbl__del" data-bdel="' + i + '" title="移除這一筆">&#10005;</button>' +
@@ -1193,15 +1224,13 @@
         var f = inp.dataset.b;
         batch[i][f] = f === 'amount'
           ? (inp.value === '' ? null : Number(inp.value))
-          : inp.value;
+          : (f === 'kind' || f === 'cat') && !inp.value ? null : inp.value;
       });
-      var m = [];
-      if (batch[i].amount === null || batch[i].amount === '' || isNaN(batch[i].amount)) m.push('amount');
-      if (!batch[i].date) m.push('date');
+      var m = batchMissing(batch[i]);
       batch[i].missing = m;
       row.classList.toggle('has-miss', m.length > 0);
 
-      ['amount', 'date'].forEach(function (f) {
+      ['amount', 'date', 'kind', 'cat'].forEach(function (f) {
         var inp = row.querySelector('[data-b="' + f + '"]');
         if (!inp) return;
         var wrap = inp.parentElement;
@@ -5154,9 +5183,18 @@
     var s = e.target.closest ? e.target.closest('select[data-f]') : null;
     if (s) { F[s.dataset.f] = s.value; loadTx(); }
     if (e.target.closest && e.target.closest('[data-b]')) {
-      // 收支方向改了，分類選項要跟著換
-      if (e.target.dataset.b === 'kind') { syncBatch(); renderBatch({ items: batch, note: '' }); }
-      else syncBatch();
+      var bf = e.target.dataset.b;
+      syncBatch();
+      /* 收支和分類要對得上：選了「薪資」收支就變收入；改了收支、原本的分類對不上就清掉讓他重選。
+         改完整張表重畫（選單的順序、「選分類」的空選項、必填的紅字都要跟著換） */
+      if ((bf === 'kind' || bf === 'cat') && batch) {
+        var brow = e.target.closest('.btbl__r');
+        var bit = brow && batch[Number(brow.dataset.bi)];
+        var bcat = bit && CATS.filter(function (c) { return c.id === bit.cat; })[0];
+        if (bit && bf === 'cat' && bcat) bit.kind = bcat.kind;
+        if (bit && bf === 'kind' && bcat && bcat.kind !== bit.kind) bit.cat = null;
+        renderBatch({ items: batch });
+      }
     }
   });
 
