@@ -2254,9 +2254,14 @@
       '<dl class="lg__f">' +
         '<dt>成員</dt><dd><div class="lg__who">' + who + add + '</div>' +
           (g.canEdit ? '' : '<div class="lg__hint">只有開這本帳的人可以加減成員</div>') + '</dd>' +
-        '<dt>月目標</dt><dd>' +
-          '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(g.id) + '" ' +
-            'value="' + (g.goal || 0) + '" aria-label="這本帳的每月存款目標"></dd>' +
+        /* 每月想存多少在「個人資料」（新用戶設定第一步）就設過了，這裡是「這本帳另外設」的選填：
+           ⚠️ 沒設的帳本預設收起來，只放一顆「另外設」；按了才出現輸入框（使用者：一直擺著輸入框很多餘）。 */
+        '<dt>存錢目標</dt><dd>' + (Number(g.goal) > 0
+          ? '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(g.id) + '" ' +
+              'value="' + Number(g.goal) + '" aria-label="這本帳的每月存款目標">' +
+            '<div class="lg__hint">填 0 就是不另外設，回到「個人資料」的每月想存</div>'
+          : '<button type="button" class="lg__opt" data-gopen="' + esc(g.id) + '">＋ 另外設這本帳的存錢目標（選填）</button>' +
+            '<div class="lg__hint">沒設就照「個人資料」的每月想存</div>') + '</dd>' +
         '<dt>通知</dt><dd>' +
           '<label class="lg__chk"><input type="checkbox" data-gnotify="' + esc(g.id) + '"' +
             (g.notify ? ' checked' : '') + '><span>這本帳有動靜就通知我</span></label></dd>' +
@@ -4331,6 +4336,17 @@
         document.getElementById('searchBtn').classList.remove('open');
         slideClose(sd2);
       }
+    }
+
+    /* 帳本的存錢目標：選填，按了才出現輸入框 */
+    var gop = t.closest('[data-gopen]');
+    if (gop) {
+      var gdd = gop.parentNode;
+      gdd.innerHTML = '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(gop.dataset.gopen) + '" ' +
+          'placeholder="這本帳每月想存多少" aria-label="這本帳的每月存款目標">' +
+        '<div class="lg__hint">填好、離開欄位就會存；沒設就照「個人資料」的每月想存</div>';
+      gdd.querySelector('input').focus();
+      return;
     }
 
     /* 停權。⚠️ 一定要有理由——沒有理由的停權就是任意封鎖，

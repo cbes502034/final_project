@@ -3906,3 +3906,10 @@ body[data-page="admin"] #searchBtn, body[data-page="admin"] #searchDrawer, body[
   font-size: 14px; font-weight: 500; line-height: 1.6;
 }
 .gate__err[hidden] { display: none; }
+
+/* ---- 帳本：另外設存錢目標（選填，按了才出現輸入框） ---- */
+#view .lg__opt {
+  padding: 6px 0; border: 0; background: transparent; cursor: pointer;
+  color: var(--accent); font-size: 13.5px; font-weight: 500;
+}
+#view .lg__opt:hover { text-decoration: underline; }

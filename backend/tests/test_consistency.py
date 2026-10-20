@@ -1720,6 +1720,15 @@ def test_登出後的頁面用預設樣式_不沿用上一個人的主題():
     assert "if (m.user.theme && m.user.theme !== currentTheme()) applyTheme(m.user.theme);" in app   # 登入後換回自己的
 
 
+def test_帳本的存錢目標是選填_預設收起來():
+    """使用者：個人資料已經設過存錢目標，帳本裡一直擺著輸入框很多餘——改成選填，按了才出現。"""
+    app = read("frontend/js/app.js")
+    assert "data-gopen=" in app and "另外設這本帳的存錢目標（選填）" in app
+    row = app[app.index("'<dt>存錢目標</dt><dd>'"):]
+    row = row[:row.index("'<dt>通知</dt>")]
+    assert row.index("Number(g.goal) > 0") < row.index("data-ggoal"), "沒設目標時不能直接擺輸入框"
+
+
 def test_下拉面板浮在按鈕下面_不搬進版面():
     """帳本清單與通知面板曾經被搬進頂列和內容之間，佔真實空間把內容往下推。
     頁首改版後它們插在標題底下，一點開整頁就往下跳。"""

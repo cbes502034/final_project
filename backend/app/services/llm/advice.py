@@ -202,6 +202,42 @@ def mislabeled(item: dict[str, Any], numbers: dict[str, Any]) -> bool:
     return False
 
 
+#: 內容在講風險的字：出現了就不能標「做得好」
+_RISK_WORDS = ("超支", "超出", "超過", "透支", "赤字", "不足", "吃緊", "偏高", "過高", "太高", "存不到", "快用完",
+               "用完", "警訊", "要注意", "小心")
+
+
+def settle_level(item: dict[str, Any], numbers: dict[str, Any]) -> str:
+    """建議前面的燈號（ok 良好／info 參考／warn 要注意）由程式依數字與內容決定，模型給的只當參考。
+
+    使用者回報：建議的內容沒問題，燈號卻跟內容對不上——明明在講超支，前面標「良好」。
+    規則只往嚴的方向調，不幫模型把「要注意」改輕：
+      · 內容講到風險（超支、超出、偏高、存不到…）→ warn
+      · 這個月已經超出可支配上限（savings.level = over）→ 不准 ok，至少 info
+      · 快用完了（near，用掉 80% 以上）→ 不准 ok，至少 info
+
+    >>> n = {"savings": {"level": "safe"}}
+    >>> settle_level({"level": "ok", "title": "餐飲偏高", "body": "餐飲佔支出 60%"}, n)
+    'warn'
+    >>> settle_level({"level": "ok", "title": "進度正常", "body": "用掉 30%"}, n)
+    'ok'
+    >>> settle_level({"level": "ok", "title": "日用品為主要支出", "body": "日用品佔 40%"}, {"savings": {"level": "over"}})
+    'info'
+    >>> settle_level({"level": "warn", "title": "注意交通", "body": "交通 2,600"}, n)
+    'warn'
+    """
+    level = item.get("level")
+    if level not in ("ok", "info", "warn"):
+        return level                     # 不合格的值原樣交回去，路由的 AdviceItem 會把整則丟掉
+    text = " ".join(str(item.get(k) or "") for k in ("title", "body"))
+    if any(w in text for w in _RISK_WORDS):
+        return "warn"
+    status = (numbers.get("savings") or {}).get("level") if isinstance(numbers.get("savings"), dict) else None
+    if status in ("over", "near") and level == "ok":
+        return "info"
+    return level
+
+
 def write_advices(numbers: dict[str, Any], finance_block: str = "") -> list[dict[str, Any]]:
     '''numbers 是 analytics 算好的數字。回傳 [{level, title, body, basis, suggest, conf}]。'''
     if not client.is_configured():
@@ -227,6 +263,7 @@ def write_advices(numbers: dict[str, Any], finance_block: str = "") -> list[dict
             continue
         one = {k: it[k] for k in keys if k in it}
         if grounded(one, allowed) and not mislabeled(one, numbers):
+            one["level"] = settle_level(one, numbers)          # 燈號以數字與內容為準，不全信模型
             out.append(one)
     if items and not out:
         raise client.ModelError(UNGROUNDED_MESSAGE)
