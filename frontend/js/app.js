@@ -2136,16 +2136,17 @@
       var temps = live.filter(function (g) { return g.kind === 'temp' && !g.settled; });
       var done = live.filter(function (g) { return g.kind === 'temp' && g.settled; });
 
-      /* 開一本新的：跟「記一筆」同一個做法，縮成標題右邊的按鈕 */
+      /* 開一本新的：整頁只有一顆「開一本帳」（跟「記一筆」同一個做法），常設或活動在表單裡選。
+         使用者：「開帳本的部分，一個統一的按鈕就好」 */
       var gnewForm =
         '<form class="card gnew" id="gnewF">' +
-          '<label class="fld fld--wide"><span>名字</span>' +
-            '<input type="text" id="gnName" placeholder="例如 旅遊基金、沖繩旅遊" required></label>' +
-          '<label class="fld"><span>種類</span>' +
+          '<label class="fld"><span>常設還是活動</span>' +
             '<select id="gnKind">' +
-              '<option value="standing">常設</option>' +
-              '<option value="temp">活動（有結束日）</option>' +
+              '<option value="standing">常設（家用、自己的零用）</option>' +
+              '<option value="temp">活動（旅遊、搬家，有結束日）</option>' +
             '</select></label>' +
+          '<label class="fld fld--wide"><span>名字</span>' +
+            '<input type="text" id="gnName" placeholder="例如 家用、沖繩旅遊" required></label>' +
           '<label class="fld"><span>顏色</span>' +
             /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份 */
             '<select id="gnColor">' +
@@ -2170,19 +2171,19 @@
         '</li>';
       }).join('') + '</ul></div>';
 
-      var h = '<div class="page"><div class="duo">' +
+      var h = '<div class="page">' +
+        foldBlock('gnew', '我的帳本', '開一本帳', gnewForm, live.length + ' 本', 'books') +
+        '<div class="duo">' +
         '<section class="duo__c">' +
-          foldBlock('gnew', '常設帳本', '開一本', gnewForm, standing.length + ' 本', 'books') +
+          '<div class="sec"><h2 class="sec__t">常設帳本</h2><span class="sec__n">' + standing.length + ' 本</span></div>' +
           ledgerList(standing) +
           (gone.length ? foldBlock('garch', '已封存', '看看', archHTML, String(gone.length) + ' 本', 'archive') : '') +
         '</section>' +
         '<section class="duo__c">' +
-          '<div class="sec"><h2 class="sec__t">活動帳本</h2><span class="sec__n">' + temps.length + ' 本</span>' +
-            /* 活動帳本也從自己這一欄開：打開同一張表單，種類直接選好「活動」 */
-            '<button class="btn btn--sm" data-gnew-temp>開活動帳本</button></div>' +
+          '<div class="sec"><h2 class="sec__t">活動帳本</h2><span class="sec__n">' + temps.length + ' 本</span></div>' +
           (temps.length
             ? ledgerList(temps)
-            : '<div class="card">' + emptyState('沒有進行中的活動', '出國、搬家這種有結束日的花費，開一本活動帳本來記。') + '</div>') +
+            : '<div class="card">' + emptyState('沒有進行中的活動', '出國、搬家這種有結束日的花費，按上面的「開一本帳」選「活動」。') + '</div>') +
           (done.length ? foldBlock('gdone', '已結算', '看看', ledgerList(done), String(done.length) + ' 本') : '') +
         '</section>' +
       '</div>';
@@ -4508,18 +4509,6 @@
         if (gb) gb.classList.remove('open');
         slideClose(gp2);
       }
-    }
-
-    /* 活動帳本那一欄的「開一本」：打開左邊的表單，種類先選好「活動」、結束日一起出現 */
-    if (t.closest('[data-gnew-temp]')) {
-      if (!FOLD.gnew) foldToggle('gnew');
-      var ks = document.getElementById('gnKind');
-      if (ks) { ks.value = 'temp'; }
-      var ew = document.getElementById('gnEndWrap');
-      if (ew) ew.hidden = false;
-      var nm = document.getElementById('gnName');
-      if (nm) { nm.scrollIntoView({ block: 'center', behavior: 'smooth' }); nm.focus(); }
-      return;
     }
 
     /* 選了「活動」才要填結束日 */
