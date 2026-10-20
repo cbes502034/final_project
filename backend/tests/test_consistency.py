@@ -1711,6 +1711,15 @@ def test_停權的理由在密碼上面_而且講清楚至少幾個字():
     assert "SUSPEND_REASON_MIN = 4" in roles and "var REASON_MIN = 4;" in app
 
 
+def test_登出後的頁面用預設樣式_不沿用上一個人的主題():
+    """使用者：「進入後如果有更改背景，在登出後一開始的頁面不要沿用，請自動固定為預設的樣式」。"""
+    app = read("frontend/js/app.js")
+    paint = app[app.index("function paint()"):]
+    paint = paint[:paint.index("if (ANY.indexOf(page) >= 0)")]
+    assert "if (!a.loggedIn && currentTheme() !== 'paper') applyTheme('paper');" in paint
+    assert "if (m.user.theme && m.user.theme !== currentTheme()) applyTheme(m.user.theme);" in app   # 登入後換回自己的
+
+
 def test_下拉面板浮在按鈕下面_不搬進版面():
     """帳本清單與通知面板曾經被搬進頂列和內容之間，佔真實空間把內容往下推。
     頁首改版後它們插在標題底下，一點開整頁就往下跳。"""

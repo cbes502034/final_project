@@ -3955,6 +3955,9 @@
     var parts = (location.hash || '#/').replace(/^#\/?/, '').split('/');
     var page = parts[0];
     API.authState().then(function (a) {
+      /* 沒登入（剛登出、登入過期、刪了帳號…）的頁面一律用預設樣式：主題是帳號的設定，
+         不能讓上一個人選的背景留在「開始使用」和登入頁上。登入之後下面會換回他自己的主題。 */
+      if (!a.loggedIn && currentTheme() !== 'paper') applyTheme('paper');
       if (ANY.indexOf(page) >= 0) { render(); return; }
       /* 登入閘。沒登入只能待在 login／register／forgot，
          登入了就別再讓他看登入頁。 */
