@@ -25,7 +25,7 @@ import websockets
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "report", "assets")
-TOUR_KEY = 'fambudget.tour'          # frontend/js/app.js 的 TOUR_KEY
+TOUR_KEY = 'fambudget.tour'          # frontend/js/app.js 的 TOUR_KEY（後面接 .<使用者 id>）
 CHROME = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
           r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"]
 
@@ -92,8 +92,10 @@ async def cdp(ws_url, shots, tokens, front, api):
             if who != current:
                 await send("Runtime.evaluate", expression="localStorage.setItem('fambudget.auth', %s)"
                            % json.dumps(json.dumps(tokens[who])))
-                # 導覽提示（「第一次用？」）標成看過，截圖才不會被它蓋住
-                await send("Runtime.evaluate", expression="localStorage.setItem(%s, 'done')" % json.dumps(TOUR_KEY))
+                # 導覽提示（「第一次用？」）標成看過，截圖才不會被它蓋住。
+                # 看過導覽記在帳號上（fambudget.tour.<id>），id 從權杖的 sub 拿
+                uid = json.loads(base64.urlsafe_b64decode(tokens[who]["accessToken"].split(".")[1] + "==="))["sub"]
+                await send("Runtime.evaluate", expression="localStorage.setItem(%s, 'done')" % json.dumps(TOUR_KEY + "." + str(uid)))
                 current = who
             await send("Page.navigate", url=front + "/" + hash_)
             await send("Runtime.evaluate", expression="location.reload()")

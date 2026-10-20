@@ -146,7 +146,8 @@ async def run(ws_url, tokens, only):
                 await evaluate("localStorage.setItem('fambudget.auth', %s)" % json.dumps(json.dumps(tokens[who])))
             else:
                 await evaluate("localStorage.removeItem('fambudget.auth')")
-            await evaluate("localStorage.setItem('fambudget.tour', 'done')")
+            # 看過導覽記在帳號上（fambudget.tour.<id>）：測試帳號（1 家長、3 子女）都標成看過
+            await evaluate("['.1', '.3'].forEach(function (k) { localStorage.setItem('fambudget.tour' + k, 'done'); })")
             # 網址帶一個不同的查詢參數：一定會重新載入，不會停在上一頁的狀態
             await send("Page.navigate", url="%s/?r=%d%s" % (FRONT, time.time() * 1000, hash_))
             await asyncio.sleep(6)

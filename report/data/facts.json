@@ -1,13 +1,13 @@
 {
  "routes": {
-  "認證": 24,
-  "記帳": 19,
-  "數字": 11,
-  "家庭": 21
+  "認證": 25,
+  "記帳": 20,
+  "數字": 12,
+  "家庭": 22
  },
- "routes_total": 75,
+ "routes_total": 79,
  "tables": 22,
- "tests": 803,
+ "tests": 833,
  "heldout": {
   "cases": 101,
   "items": 125,
@@ -427,25 +427,25 @@
   }
  },
  "e2e": {
-  "passed": 85,
-  "total": 85,
-  "when": "2026-10-20 00:10",
+  "passed": 95,
+  "total": 95,
+  "when": "2026-10-20 10:29",
   "by_domain": {
    "認證": {
-    "passed": 32,
-    "total": 32
+    "passed": 35,
+    "total": 35
    },
    "家庭": {
-    "passed": 17,
-    "total": 17
+    "passed": 20,
+    "total": 20
    },
    "記帳": {
-    "passed": 23,
-    "total": 23
+    "passed": 26,
+    "total": 26
    },
    "數字": {
-    "passed": 13,
-    "total": 13
+    "passed": 14,
+    "total": 14
    }
   },
   "model_steps": [
@@ -460,7 +460,7 @@
     ],
     "got": 503,
     "ok": true,
-    "ms": 26,
+    "ms": 19,
     "note": "503：模型沒設定，前端改用規則（預期）"
    },
    {
@@ -474,7 +474,7 @@
     ],
     "got": 503,
     "ok": true,
-    "ms": 23,
+    "ms": 25,
     "note": "503：模型沒設定，前端用同一批數字寫（預期）"
    }
   ]
