@@ -630,7 +630,7 @@
             <tr><td class="num">12</td><td class="tight">PATCH</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 <code>onboarded</code></td></tr>
             <tr><td class="num">13</td><td class="tight">PUT</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>上傳大頭貼。前端已縮到 256×256</td></tr>
             <tr><td class="num">14</td><td class="tight">DELETE</td><td class="rt">/api/auth/me/avatar</td><td class="tight">登入</td><td>移除大頭貼，改回顯示文字頭像</td></tr>
-            <tr><td class="num">85</td><td class="tight">DELETE</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>刪除自己的帳號：紀錄全部刪掉、個資抹掉，email 空出來。還在家庭裡不能刪</td></tr>
+            <tr><td class="num">85</td><td class="tight">DELETE</td><td class="rt">/api/auth/me</td><td class="tight">登入</td><td>刪除自己的帳號（帶密碼，後端核對）：紀錄全部刪掉、個資抹掉，email 空出來。還在家庭裡不能刪</td></tr>
             <tr><td class="num">62</td><td class="tight">GET</td><td class="rt">/api/admin/users</td><td class="tight">平台管理員</td><td>帳號清單（停權用）與即時的紅綠燈。⚠️ 刻意不回傳任何金額</td></tr>
             <tr><td class="num">63</td><td class="tight">POST</td><td class="rt">/api/admin/users/{user_id}/suspend</td><td class="tight">平台管理員</td><td>停權一個帳號。body: { reason }，理由必填</td></tr>
             <tr><td class="num">64</td><td class="tight">DELETE</td><td class="rt">/api/admin/users/{user_id}/suspend</td><td class="tight">平台管理員</td><td>解除停權</td></tr>

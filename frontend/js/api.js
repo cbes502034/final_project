@@ -2904,11 +2904,12 @@
       });
     },
 
-    deleteAccount: function () {
+    deleteAccount: function (password) {
       var s = load();
       return sleep(260).then(function () {
         var me = memberOf(s.me);
         if (me.isPlatformAdmin) throw oops('平台管理員的帳號不能在這裡刪除', 403);
+        if (!checkPw(s, me.id, password)) throw oops('密碼不正確', 400);     // 後端自己再核對一次
         if (me.familyId) throw oops('你還在一個家庭裡：先到「家庭成員」退出（或解散）家庭，才能刪除帳號', 409);
         global.DATA.members = global.DATA.members.filter(function (m) { return m.id !== me.id; });
         s.newUsers = (s.newUsers || []).filter(function (m) { return m.id !== me.id; });
@@ -3109,8 +3110,9 @@
       return req('/api/notifications' + qs({ ids: [].concat(ids || []).join(',') }), { method: 'DELETE' });
     },
     /* 刪除帳號之後，這台的登入一起清掉（後端已經讓手上的 token 失效） */
-    deleteAccount:     function ()      {
-      return req('/api/auth/me', { method: 'DELETE' }).then(function (d) { setTokens(null); return d; });
+    deleteAccount:     function (password) {
+      return req('/api/auth/me', { method: 'DELETE', body: { password: password } })
+        .then(function (d) { setTokens(null); return d; });
     },
     adminSecurityEvents: function ()    { return req('/api/admin/security-events'); },
     /* 回報畫面上出的錯。⚠️ 永遠不 reject：回報的地方再出錯，就會變成「回報回報失敗」的迴圈。

@@ -831,7 +831,7 @@ def test_delete_me_紀錄全部刪掉_個資抹掉_email_空出來(api):
     crud.save(Notification, {"recipient_id": me.id, "type": "ward_transaction"})
     crud.save(SecurityEvent, {"kind": "login_failed", "user_id": me.id})
     h = login(me)
-    r = api.delete("/api/auth/me", headers=h)
+    r = api.request("DELETE", "/api/auth/me", headers=h, json={"password": PASSWORD})
     assert r.status_code == 200 and r.json() == {"deleted": True}
     row = crud.get(User, me.id)
     assert row.deleted_at is not None and row.display_name == "已刪除的帳號" and row.email.endswith("@deleted.invalid")
@@ -853,15 +853,30 @@ def test_delete_me_紀錄全部刪掉_個資抹掉_email_空出來(api):
 def test_delete_me_還在家庭裡_帳本還有別人_平台管理員_都擋下(api):
     dad, kid = user("d@x.tw", "爸爸"), user("k@x.tw", "小華")
     family_of((dad, "parent"), (kid, "child"))
-    r = api.delete("/api/auth/me", headers=login(dad))
+    r = api.request("DELETE", "/api/auth/me", headers=login(dad), json={"password": PASSWORD})
     assert r.status_code == 409 and "家庭" in r.json()["detail"]
     owner, friend = user("o@x.tw", "開帳本的人"), user("f@x.tw", "朋友")
     ledger_of(owner, friend, name="室友分帳")
-    r = api.delete("/api/auth/me", headers=login(owner))
+    r = api.request("DELETE", "/api/auth/me", headers=login(owner), json={"password": PASSWORD})
     assert r.status_code == 409 and "室友分帳" in r.json()["detail"]
     admin = user("admin@x.tw", "管理員", is_platform_admin=True)
-    assert api.delete("/api/auth/me", headers=login(admin)).status_code == 403
+    assert api.request("DELETE", "/api/auth/me", headers=login(admin), json={"password": PASSWORD}).status_code == 403
     assert crud.get(User, owner.id).deleted_at is None
+
+
+@pytest.mark.route(*DELME)
+def test_delete_me_要帶密碼_錯了不刪_錯5次鎖住(api):
+    """救不回來的動作：手上只有 token 不夠，後端自己核對密碼。"""
+    me = user("solo@x.tw", "一個人")
+    h = login(me)
+    assert api.delete("/api/auth/me", headers=h).status_code == 422                         # 沒帶密碼
+    for _ in range(5):
+        r = api.request("DELETE", "/api/auth/me", headers=h, json={"password": "wrong-pass"})
+        assert r.status_code == 400 and r.json()["detail"] == "密碼不正確"
+    r = api.request("DELETE", "/api/auth/me", headers=h, json={"password": PASSWORD})
+    assert r.status_code == 429                                                              # 錯 5 次：對的也先停
+    assert crud.get(User, me.id).deleted_at is None
+    assert crud.count(AuditLog, {"action": "verify_password_failed", "actor_id": me.id}) == 5
 
 
 @pytest.mark.route(*REG)

@@ -148,7 +148,7 @@ async function rec(name, ...args) {
   // 刪除帳號：沒有家庭的人才能刪
   await A.register({ name: '路人', email: 'solo@wang.tw', password: 'solo-pass-12' });
   await A.login({ email: 'solo@wang.tw', password: 'solo-pass-12' });
-  await rec('deleteAccount');
+  await rec('deleteAccount', 'solo-pass-12');
   await A.login({ email: 'daming@wang.tw', password: 'daming-pass-2' });
   await rec('logoutAll');
   process.stdout.write(JSON.stringify(out));

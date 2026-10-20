@@ -214,7 +214,7 @@ final_project/
 | 12 | PATCH | `/api/auth/me` | 認證 | 登入 | 修改個人資料：顯示名稱、出生年、主題；個人化設定走完送 `onboarded: true` |
 | 13 | PUT | `/api/auth/me/avatar` | 認證 | 登入 | 上傳大頭貼。前端已縮到 256×256 |
 | 14 | DELETE | `/api/auth/me/avatar` | 認證 | 登入 | 移除大頭貼，改回顯示文字頭像 |
-| 85 | DELETE | `/api/auth/me` | 認證 | 登入 | 刪除自己的帳號：紀錄全部刪掉、個資抹掉（留墓碑），email 空出來。還在家庭裡、開的帳本還有別人不能刪 |
+| 85 | DELETE | `/api/auth/me` | 認證 | 登入 | 刪除自己的帳號（帶目前的密碼，後端自己核對）：紀錄全部刪掉、個資抹掉（留墓碑），email 空出來。還在家庭裡、開的帳本還有別人不能刪 |
 | 62 | GET | `/api/admin/users` | 認證 | 平台管理員 | 帳號清單（停權用）與即時的紅綠燈（presence）。⚠️ 刻意不回傳任何金額 |
 | 63 | POST | `/api/admin/users/{user_id}/suspend` | 認證 | 平台管理員 | 停權一個帳號。body: { reason }，理由必填 |
 | 64 | DELETE | `/api/admin/users/{user_id}/suspend` | 認證 | 平台管理員 | 解除停權 |

@@ -2979,7 +2979,7 @@ def delete_avatar(me: User, db: Session = Depends(get_db)):
 
 @router.delete("/auth/me", summary="刪除自己的帳號")
 @login_required
-def delete_me(me: User, db: Session = Depends(get_db)):
+def delete_me(body: VerifyPasswordIn, me: User, db: Session = Depends(get_db)):
     """刪除自己的帳號
 
     DELETE /api/auth/me
@@ -2990,10 +2990,11 @@ def delete_me(me: User, db: Session = Depends(get_db)):
         users 那一列留著當墓碑（deleted_at 填上時間）：稽核紀錄、他建立過的家庭還指著它。規則在 toolkit/account.py。
         ⚠️ 還在家庭裡不能刪：先退出或解散家庭——那兩條路已經處理好照看、零用金、帳本成員，這裡不重寫一次。
         ⚠️ 他開的帳本還有別人在用不能刪：別人的帳不能跟著他一起消失。
-        ⚠️ 前端先要求再輸入一次密碼（POST /api/auth/verify-password，錯 5 次鎖 15 分鐘），再打這一支。
+        ⚠️ 救不回來，所以**這一支自己核對密碼**（請求裡帶 password）：手上只有 token 的人刪不掉。
+           跟 POST /api/auth/verify-password 共用錯誤次數，15 分鐘內錯 5 次就先停。
 
     【前端怎麼打】
-        frontend/js/api.js 的 API.deleteAccount()
+        frontend/js/api.js 的 API.deleteAccount(password)
         個人資料頁最下面的「刪除帳號」：先輸入密碼、再打一段確認文字，成功之後清掉這台的登入、回到首頁。
 
     【誰能打】
@@ -3003,7 +3004,8 @@ def delete_me(me: User, db: Session = Depends(get_db)):
             me.id            他的 id
             me.family_id     他的家庭 id（還沒加入家庭是 None）
 
-    【請求參數】沒有
+    【請求參數】JSON（DELETE 也帶 body）
+        password   必填   目前的密碼
 
     【成功回應】狀態碼 200
         {"deleted": true}
@@ -3011,9 +3013,11 @@ def delete_me(me: User, db: Session = Depends(get_db)):
 
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                    detail
+        400     密碼不對                    密碼不正確
         403     平台管理員                  平台管理員的帳號不能在這裡刪除
         409     還在家庭裡                  你還在一個家庭裡：先到「家庭成員」退出（或解散）家庭，才能刪除帳號
         409     開的帳本還有別人在用        你開的帳本「…」還有別人在用：先把他們移出、或移除這本帳，才能刪除帳號
+        429     15 分鐘內密碼錯了 5 次      密碼錯太多次了，請 15 分鐘後再試
 
     【會用到的資料表】
         表                                                    讀／寫    用來做什麼
@@ -3021,18 +3025,21 @@ def delete_me(me: User, db: Session = Depends(get_db)):
         transactions、nlp_parses、notifications、groups、group_members、budgets、savings_goals、
         alert_rules、advices、allowances、guardianships、family_invites、accounts、sessions、password_resets  刪
         security_events、error_logs                           寫        user_id 改成 NULL（只留次數）
-        audit_logs                                            寫        delete_account
+        audit_logs                                            讀＋寫    數密碼錯幾次（verify_password_failed）；delete_account
 
     【每一步用的工具與資料庫方法】
-        步驟    呼叫                                                      做什麼
-        1 檢查  account.why_not_delete(me.id, me.family_id, db=db)        不能刪的原因；可以刪回 None
-        2 刪    account.delete_everything(me.id, db=db)                   刪紀錄、抹個資（只 flush）
-        3 稽核  crud.save(AuditLog, {…, "action": "delete_account"}, db=db)＋db.commit()
+        步驟      呼叫                                                      做什麼
+        1 數次數  crud.count(AuditLog, {…verify_password_failed…}, db=db)   15 分鐘內錯幾次
+        2 對密碼  passwords.verify_password(body.password, me.password_hash)
+        3 檢查    account.why_not_delete(me.id, me.family_id, db=db)        不能刪的原因；可以刪回 None
+        4 刪      account.delete_everything(me.id, db=db)                   刪紀錄、抹個資（只 flush）
+        5 稽核    crud.save(AuditLog, {…, "action": "delete_account"}, db=db)＋db.commit()
 
     【寫法步驟】
         1. 平台管理員 → 403
-        2. 還在家庭裡、開的帳本還有別人 → 409（講清楚要先做什麼）
-        3. 刪紀錄、抹個資、寫一筆稽核，同一個交易 db.commit()；回 {"deleted": true}
+        2. 15 分鐘內錯 5 次 → 429；密碼不對 → 記一筆、400
+        3. 還在家庭裡、開的帳本還有別人 → 409（講清楚要先做什麼）
+        4. 刪紀錄、抹個資、寫一筆稽核，同一個交易 db.commit()；回 {"deleted": true}
 
     【完整寫法】照下面兩步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -3063,12 +3070,27 @@ def delete_me(me: User, db: Session = Depends(get_db)):
             if me.is_platform_admin:
                 raise errors.forbidden("平台管理員的帳號不能在這裡刪除")
 
-            # 2. 還在家庭裡、自己開的帳本還有別人 → 409：先走那幾條路處理好，別人的帳不能跟著消失
+            # 2. 再核對一次密碼：救不回來的動作，不能只靠前端先問過（手上只有 token 的人刪不掉）
+            #    跟 verify-password 同一個計數：15 分鐘內錯 5 次就先停
+            since = datetime.now(timezone.utc) - timedelta(minutes=15)
+            failures = crud.count(AuditLog, {"actor_id": me.id, "action": "verify_password_failed",
+                                             "created_at__gte": since}, db=db)
+            if failures >= 5:
+                raise HTTPException(status_code=429, detail="密碼錯太多次了，請 15 分鐘後再試")
+            if not passwords.verify_password(body.password, me.password_hash):
+                crud.save(AuditLog, {"actor_id": me.id, "action": "verify_password_failed", "target_type": "user",
+                                     "target_id": me.id}, db=db)
+                if failures + 1 >= 5:
+                    security.record("verify_locked", db=db, user_id=me.id, detail="15 分鐘內錯了 5 次")
+                db.commit()
+                raise errors.bad_request("密碼不正確")
+
+            # 3. 還在家庭裡、自己開的帳本還有別人 → 409：先走那幾條路處理好，別人的帳不能跟著消失
             reason = account.why_not_delete(me.id, me.family_id, db=db)
             if reason:
                 raise errors.conflict(reason)
 
-            # 3. 紀錄全部刪掉、個資抹掉（同一個交易）；稽核留一筆，只記「有人刪了帳號」
+            # 4. 紀錄全部刪掉、個資抹掉（同一個交易）；稽核留一筆，只記「有人刪了帳號」
             uid = me.id
             account.delete_everything(uid, db=db)
             crud.save(AuditLog, {"actor_id": uid, "action": "delete_account", "target_type": "user", "target_id": uid,
@@ -3080,7 +3102,8 @@ def delete_me(me: User, db: Session = Depends(get_db)):
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
         2. 瀏覽器打開 http://localhost:8000/docs，找到 DELETE /api/auth/me
         3. 按右上角 Authorize，貼上一個測試帳號登入拿到的 accessToken（先記幾筆帳）
-        4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
+        4. 按 Try it out，body 填 {"password": "…"}，至少試這幾種，結果要跟右邊一樣：
+               密碼打錯            → 400（連錯 5 次 → 429）
                還在家庭裡          → 409
                沒有家庭            → 200；同一張 token 再打 GET /api/auth/me → 401；用原本的 email 登入 → 401
                原本的 email 再註冊 → 201（email 空出來了）
@@ -3091,12 +3114,27 @@ def delete_me(me: User, db: Session = Depends(get_db)):
     if me.is_platform_admin:
         raise errors.forbidden("平台管理員的帳號不能在這裡刪除")
 
-    # 2. 還在家庭裡、自己開的帳本還有別人 → 409：先走那幾條路處理好，別人的帳不能跟著消失
+    # 2. 再核對一次密碼：救不回來的動作，不能只靠前端先問過（手上只有 token 的人刪不掉）
+    #    跟 verify-password 同一個計數：15 分鐘內錯 5 次就先停
+    since = datetime.now(timezone.utc) - timedelta(minutes=15)
+    failures = crud.count(AuditLog, {"actor_id": me.id, "action": "verify_password_failed",
+                                     "created_at__gte": since}, db=db)
+    if failures >= 5:
+        raise HTTPException(status_code=429, detail="密碼錯太多次了，請 15 分鐘後再試")
+    if not passwords.verify_password(body.password, me.password_hash):
+        crud.save(AuditLog, {"actor_id": me.id, "action": "verify_password_failed", "target_type": "user",
+                             "target_id": me.id}, db=db)
+        if failures + 1 >= 5:
+            security.record("verify_locked", db=db, user_id=me.id, detail="15 分鐘內錯了 5 次")
+        db.commit()
+        raise errors.bad_request("密碼不正確")
+
+    # 3. 還在家庭裡、自己開的帳本還有別人 → 409：先走那幾條路處理好，別人的帳不能跟著消失
     reason = account.why_not_delete(me.id, me.family_id, db=db)
     if reason:
         raise errors.conflict(reason)
 
-    # 3. 紀錄全部刪掉、個資抹掉（同一個交易）；稽核留一筆，只記「有人刪了帳號」
+    # 4. 紀錄全部刪掉、個資抹掉（同一個交易）；稽核留一筆，只記「有人刪了帳號」
     uid = me.id
     account.delete_everything(uid, db=db)
     crud.save(AuditLog, {"actor_id": uid, "action": "delete_account", "target_type": "user", "target_id": uid,

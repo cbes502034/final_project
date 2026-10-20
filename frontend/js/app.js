@@ -2524,7 +2524,8 @@
     API.verifyPassword(pw).then(function () {
       var fn = dangerFn;
       dangerClose();
-      if (fn) fn(reason);
+      /* 密碼也交給動作本身：救不回來的（刪除帳號）後端會自己再核對一次，不只靠這裡 */
+      if (fn) fn(reason, pw);
     }).catch(function (err) {
       if (btn) { btn.disabled = false; btn.textContent = '確定刪除'; }
       dangerErr(err.message || '密碼不正確');
@@ -4277,8 +4278,8 @@
         detail: '你記的每一筆帳、帳本、預算、建議、通知都會刪掉，<b>救不回來</b>。',
         level: 'full',
         ok: '確定刪除帳號',
-        onOk: function () {
-          API.deleteAccount().then(function () {
+        onOk: function (_reason, pw) {
+          API.deleteAccount(pw).then(function () {
             if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
             ME = null; CATS = [];
             document.body.classList.remove('is-admin', 'role-child');

@@ -3168,6 +3168,6 @@ def test_登記的資料都有刪除的入口():
     app = read("frontend/js/app.js")
     assert 'data-advdel="' in app and "API.deleteAdvice(" in app, "建議要能刪"
     assert 'data-catdel="' in app and "API.deleteCategory(" in app, "自訂分類要能刪"
-    assert 'id="delMe"' in app and "API.deleteAccount()" in app, "帳號要能刪"
+    assert 'id="delMe"' in app and "API.deleteAccount(pw)" in app, "帳號要能刪"
     notify = read("frontend/js/notify.js")
     assert 'data-ndel="' in notify and 'id="bellClear"' in notify and "API.deleteNotifications(" in notify, "通知要能刪"

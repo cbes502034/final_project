@@ -291,8 +291,11 @@ def main() -> int:
     r.step("登出", "POST", "/api/auth/logout", token=tok["dad"], want=(200, 204),
            json_body={"refreshToken": refresh["dad"]})
     r.step("登出後 refresh 不能用", "POST", "/api/auth/refresh", want=(401,), json_body={"refreshToken": refresh["dad"]})
-    r.step("還在家庭裡不能刪帳號", "DELETE", "/api/auth/me", token=tok["kid"], want=(409,))
-    r.step("路人刪除自己的帳號", "DELETE", "/api/auth/me", token=tok["out"], check=lambda d: d.get("deleted") is True)
+    r.step("刪帳號密碼打錯不會刪", "DELETE", "/api/auth/me", token=tok["out"], want=(400,),
+           json_body={"password": "wrong-" + secrets.token_hex(4)})
+    r.step("還在家庭裡不能刪帳號", "DELETE", "/api/auth/me", token=tok["kid"], want=(409,), json_body={"password": pw["kid"]})
+    r.step("路人刪除自己的帳號", "DELETE", "/api/auth/me", token=tok["out"], json_body={"password": pw["out"]},
+           check=lambda d: d.get("deleted") is True)
     r.step("刪掉的帳號登不進去", "POST", "/api/auth/login", want=(401,),
            json_body={"email": mail["out"], "password": pw["out"]})
 
