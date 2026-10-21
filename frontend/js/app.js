@@ -444,7 +444,7 @@
       /* 使用者：「要看家庭帳本只能點家庭成員，怪怪的」——主角是全家的帳，成員只是裡面的功能 */
       /* 有家庭就寫他綁定的家庭名稱（例如「邱家」）；還沒有才寫「加入家庭」 */
       /* 個人模式（而且有「我｜全家」切換可用）不放家庭那一格：家庭的事在家庭模式處理 */
-      o.canFam && !o.fam ? null : { nav: 'members',
+      !o.fam && (o.canFam || !(o.fm && o.fm.family)) ? null : { nav: 'members',
         label: o.fm && o.fm.family && o.fm.family.name ? o.fm.family.name
           : !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭帳本',
         icon: 'members', badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
