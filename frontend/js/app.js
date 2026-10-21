@@ -977,15 +977,22 @@
        不然上次點過之後，每次開明細都只剩這個月 */
     if (!FLT_KEEP) { F.from = ''; F.to = ''; }
     FLT_KEEP = false;
-    var h = '<div class="page">';
-
-    /* 篩選放在標題那一列，跟「記一筆」並排——不要自己佔一整條 */
-    h += foldHead('entry', '所有紀錄', '記一筆', '', null, filterBar(), pickToggle());
-    h += '<div id="txList">' + skeleton(6) + '</div></div>';
-    $view.innerHTML = h;
-
-    foldRestore();
-    loadTx();
+    $view.innerHTML = '<div class="page">' + skeleton(6) + '</div>';
+    API.me().then(function (m) {
+      /* 家庭模式絕對沒有任何可以填寫記帳的地方：不畫「記一筆」與解析輸入區、不能勾選刪除，
+         右上角與手機底部的「記一筆」也一起收起來（body.in-family） */
+      var ro = scopeOf(m) === 'family';
+      document.body.classList.toggle('in-family', ro);
+      if (ro) FOLD.entry = false;
+      var h = '<div class="page">';
+      /* 篩選放在標題那一列，跟「記一筆」並排——不要自己佔一整條 */
+      h += ro ? '<div class="sec"><h2 class="sec__t">所有紀錄</h2><div class="sec__tools">' + filterBar() + '</div></div>'
+              : foldHead('entry', '所有紀錄', '記一筆', '', null, filterBar(), pickToggle());
+      h += '<div id="txList">' + skeleton(6) + '</div></div>';
+      $view.innerHTML = h;
+      foldRestore();
+      loadTx();
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
   }
 
   /* 理財習慣：拿來當財務建議的背景。
@@ -4104,6 +4111,7 @@
     }
     /* 記一筆：從哪裡按都直接打開記帳的輸入區 */
     if (t.closest('[data-quick="entry"]')) {
+      if (document.body.classList.contains('in-family')) return;      // 家庭模式沒有記帳
       if (/^#\/entry/.test(location.hash)) {
         if (!FOLD.entry) foldToggle('entry');
         var fw = document.getElementById('fold-entry');
