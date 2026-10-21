@@ -602,7 +602,7 @@
      ⚠️ 被監管的人看不到任何別人，包含監管他的人。
         監管是單向的：你看得到我，不代表我看得到你。
 
-     （早期版本讓家裡權限最高的人直接看全家。改掉是因為「家裡的階級」和
+     （早期版本讓家裡權限最高的人直接看家庭。改掉是因為「家裡的階級」和
        「可以看某個人的消費明細」是兩件事——後者要有明確的監管關係，
        這樣被監管的人才知道自己被誰看著。
 
@@ -905,12 +905,12 @@
     ['C04', /超市|全聯|日用|衛生紙|洗衣|清潔|好市多/],
     ['C01', /早餐|午餐|晚餐|宵夜|吃|飯|咖啡|飲料|麵包|便當|餐/]
   ];
-  var MERCHANTS = ['全家', '7-11', '萊爾富', '全聯', '家樂福', '好市多', '星巴克', '麥當勞', '加油站'];
+  var MERCHANTS = ['家庭', '7-11', '萊爾富', '全聯', '家樂福', '好市多', '星巴克', '麥當勞', '加油站'];
   /* 備註只留「買了什麼」：跟後端 services/llm/parse.py 的 item_of() 同一套規則
      （「接著去學校買了10元自動鉛筆」→「自動鉛筆」；「中午跟同事吃飯320」→「吃飯」） */
   var IT = {
     connect: /^(?:接著|然後|之後|後來|再來|最後|首先|順便|另外|還有|以及|加上|再|又|也|先|和|跟)+/,
-    who: /^(?:我們|我|他們|他|她|全家人|家裡|小孩|孩子|老婆|老公|媽媽|爸爸)/,
+    who: /^(?:我們|我|他們|他|她|家人|家裡|小孩|孩子|老婆|老公|媽媽|爸爸)/,
     time: /(?:今天|昨天|前天|大前天|明天|今早|今晚|昨晚|早上|上午|中午|下午|傍晚|晚上|半夜|凌晨|剛剛|剛才|上禮拜[一二三四五六日天]?|上週[一二三四五六日天]?|這禮拜[一二三四五六日天]?|禮拜[一二三四五六日天]|星期[一二三四五六日天]|週[一二三四五六日天]|\d{1,2}[\/月]\d{1,2}[日號]?|\d{1,2}[日號])/g,
     money: /(?:NT\$|\$)?\d[\d,]*(?:\.\d+)?萬?(?:元|塊錢|塊|圓)?|[零〇一二兩三四五六七八九十百千萬]+(?:元|塊錢|塊)|[零〇一二兩三四五六七八九]*[十百千萬][零〇一二兩三四五六七八九十百千萬]*/g,
     verb: /買了|買|吃了|吃|喝了|喝|花了|花|付了|付|繳了|繳|叫了|點了|訂了|搭了|搭|坐了|坐|租了|租|收到|領了|領|賣了|賣/g,
@@ -2471,8 +2471,8 @@
       return sleep(LATENCY).then(function () {
         var vis = visibleUsers(s.me);
         /* scope: 'me'     只有寫給我本人的
-                  'family' 全家的建議 ＋ 我監管的人的個人建議（家長才有）
-           ⚠️ 子女不會拿到全家的建議——那幾則是寫給家長看的，裡面會點名。 */
+                  'family' 家庭的建議 ＋ 我監管的人的個人建議（家長才有）
+           ⚠️ 子女不會拿到家庭的建議——那幾則是寫給家長看的，裡面會點名。 */
         var fam = f.scope === 'family' && vis.length > 1;
         var gone = s.deletedAdvices || [];
         var rows = D.advices.concat(s.advices || []).filter(function (a) {
@@ -2501,7 +2501,7 @@
       var scope = p.scope === 'family' ? 'family' : 'me';
       var me = memberOf(s.me) || {};
       if (scope === 'family' && !(isParentOf(s, me.familyId) && visibleUsers(s.me).length > 1)) {
-        return Promise.reject(oops('全家的建議只有家長、而且照看著家人時才能產生', 403));
+        return Promise.reject(oops('家庭的建議只有家長、而且照看著家人時才能產生', 403));
       }
       return Promise.all([mock.summary({ scope: scope }), mock.budgets({})]).then(function (r) {
         return sleep(700).then(function () {
@@ -2907,7 +2907,7 @@
       return sleep(120).then(function () { return { categories: clone(allCats(s)) }; });
     },
 
-    /* 新增家庭自訂分類：POST /api/categories。家長才能加，全家共用 */
+    /* 新增家庭自訂分類：POST /api/categories。家長才能加，家庭共用 */
     createCategory: function (p) {
       var s = load(); p = p || {};
       return sleep(220).then(function () {
@@ -2940,7 +2940,7 @@
         })[0];
         var mine = !!a && a.user === s.me, ours = !!a && a.scope === 'family' && !!me.familyId;
         if (!mine && !ours) throw oops('找不到這則建議', 404);
-        if (!mine && !isParentOf(s, me.familyId)) throw oops('全家的建議只有家長可以刪', 403);
+        if (!mine && !isParentOf(s, me.familyId)) throw oops('家庭的建議只有家長可以刪', 403);
         s.advices = (s.advices || []).filter(function (x) { return x.id !== id; });
         s.deletedAdvices = (s.deletedAdvices || []).concat([id]);
         save();

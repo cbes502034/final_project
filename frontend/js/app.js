@@ -360,11 +360,11 @@
   }
 
   /* ============================================================
-     我／全家
+     我／家庭
 
      家庭跟個人是**同一套畫面**，差別只在範圍：
        我    自己的數字，可以記帳、可以調整
-       全家  整理全家的資訊，**唯讀**——沒有「記一筆」，也沒有任何輸入框
+       家庭  整理家庭的資訊，**唯讀**——沒有「記一筆」，也沒有任何輸入框
 
      只有家長、而且真的有監管對象時才出現切換。子女只有「我」。
      ============================================================ */
@@ -388,7 +388,7 @@
   }
 
   function scopeSeg(m) {
-    return canFamily(m) ? seg('scope', [['me', '我'], ['family', '全家']], SCOPE) : '';
+    return canFamily(m) ? seg('scope', [['me', '我'], ['family', '家庭']], SCOPE) : '';
   }
 
   /* ============================================================
@@ -405,7 +405,7 @@
        2. 常用功能   收支明細、帳本、統計、財務建議、家庭成員、個人資料、使用說明（電腦版多一顆記一筆）
        3. 預算       一個分類一張小卡，右上角「調整預算 ›」（預算在個人資料設定）
        4. 今天       今天記的每一筆——一打開就知道今天的動向
-       全家模式在預算後面多「每個人的這個月」，今天的紀錄也換成全家的
+       家庭模式在預算後面多「每個人的這個月」，今天的紀錄也換成家庭的
 
      ⚠️ 趨勢圖在「統計」、完整明細與篩選在「收支明細」，這裡不重複放。
      ============================================================ */
@@ -423,7 +423,7 @@
   };
 
   /* 常用功能：原本側欄的東西都在這裡。
-     ⚠️ 全家模式只整理資訊，沒有「記一筆」——記帳永遠是記自己的。
+     ⚠️ 家庭模式只整理資訊，沒有「記一筆」——記帳永遠是記自己的。
      ⚠️ 這一區**不能**跟著 GET /api/summary 的成敗走。數字拿不到時整頁換成
         錯誤卡，功能格子要是也一起不見，使用者連登出都按不到——而登出是
         整個網站唯一的出口。所以 o 裡的東西全部可以是 undefined：
@@ -441,14 +441,14 @@
         badge: o.warn ? o.warn + ' 則要注意' : '' },
       /* ⚠️ 家庭那一支問不到（famOff）時一律寫「家庭成員」：寫「加入家庭」
          等於斷定他沒有家庭，而我們根本沒問到。 */
-      /* 使用者：「要看家庭帳本只能點家庭成員，怪怪的」——主角是全家的帳，成員只是裡面的功能 */
+      /* 使用者：「要看家庭帳本只能點家庭成員，怪怪的」——主角是家庭的帳，成員只是裡面的功能 */
       /* 有家庭就寫他綁定的家庭名稱（例如「邱家」）；還沒有才寫「加入家庭」 */
-      /* 個人模式（而且有「我｜全家」切換可用）不放家庭那一格：家庭的事在家庭模式處理 */
+      /* 個人模式（而且有「我｜家庭」切換可用）不放家庭那一格：家庭的事在家庭模式處理 */
       !o.fam && (o.canFam || !(o.fm && o.fm.family)) ? null : { nav: 'members',
         label: o.fm && o.fm.family && o.fm.family.name ? o.fm.family.name
           : !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭帳本',
         icon: 'members', badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
-      /* 全家模式不放個人資料：那裡全是個人的設定 */
+      /* 家庭模式不放個人資料：那裡全是個人的設定 */
       o.fam ? null : { nav: 'profile', label: '個人資料', icon: 'profile' },
       { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
       /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
@@ -487,7 +487,7 @@
      （伺服器在 UTC，直接用本機時間在別的時區會招呼錯）。
      --------------------------------------------------------- */
   /* 標題那一行：頭貼 ＋ 招呼 ＋ 哪個家庭的誰。
-     title／sub 傳了就用傳的（全家模式自己講「全家這個月」），沒傳就自己組。
+     title／sub 傳了就用傳的（家庭模式自己講「家庭這個月」），沒傳就自己組。
      ⚠️ fm 拿不到（那一支還沒做、或斷線，off: true）時不要寫「還沒有加入家庭」——
         他可能是有家庭的，只是我們問不到。那種情況退回顯示日期。 */
   function greet(user, fm, title, sub, act) {
@@ -525,7 +525,7 @@
         soft(API.groups({})),
         soft(API.advices({ scope: sc })),
         soft(API.members()),
-        /* 今天的紀錄：我的模式只看自己，全家模式看全家（下面再濾成統計算進去的那幾個人） */
+        /* 今天的紀錄：我的模式只看自己，家庭模式看家庭（下面再濾成統計算進去的那幾個人） */
         soft(API.transactions(Object.assign({ from: todayKey(), to: todayKey(), groupId: GROUP },
           fam ? {} : { userId: m.user.id })))
       ]).then(function (r) {
@@ -536,7 +536,7 @@
           return !fam || ids.indexOf(t.user) >= 0;
         });
         greet(m.user, fm,
-              fam && !d.__err ? '全家這個月' : '',
+              fam && !d.__err ? '家庭這個月' : '',
               fam && !d.__err ? d.members.length + ' 位家人的收支' : '',
               scopeSeg(m));
 
@@ -557,9 +557,9 @@
         h += d.__err ? errState(d.__err) :
           '<section class="wal wal--' + lv + '" aria-label="這個月的錢">' +
           '<a class="wal__strip wal__strip--1" href="' + go + '"' + (fam ? '' : ' data-flt="income"') + '>' +
-            '<span>' + (fam ? '全家收入' : '本月收入') + '</span><b>' + amt(d.income) + '</b>' + chev + '</a>' +
+            '<span>' + (fam ? '家庭收入' : '本月收入') + '</span><b>' + amt(d.income) + '</b>' + chev + '</a>' +
           '<a class="wal__strip wal__strip--2" href="' + go + '"' + (fam ? '' : ' data-flt="expense"') + '>' +
-            '<span>' + (fam ? '全家支出' : '本月支出') + '<small>' + d.count + ' 筆</small></span>' +
+            '<span>' + (fam ? '家庭支出' : '本月支出') + '<small>' + d.count + ' 筆</small></span>' +
             '<b>' + amt(d.expense) + '</b>' + chev + '</a>' +
           '<div class="wal__card">' +
             '<div class="wal__k">' + (lv === 'over' ? '這個月超出計畫' : '這個月還可以花') +
@@ -651,7 +651,7 @@
       else if (t.kind === 'expense') spent += t.amount;
     });
     var d = new Date(todayKey() + 'T12:00:00');
-    var h = '<div class="sec"><h2 class="sec__t">' + (fam ? '全家今天的紀錄' : '今天的紀錄') + '</h2>' +
+    var h = '<div class="sec"><h2 class="sec__t">' + (fam ? '家庭今天的紀錄' : '今天的紀錄') + '</h2>' +
       (rows.length ? '<span class="sec__n">' + rows.length + ' 筆</span>' : '') +
       '<a class="sec__link" href="#/entry">看全部 ›</a></div>';
 
@@ -688,11 +688,11 @@
 
   var LEVEL_TW = { safe: '進度穩穩的', near: '快到上限了', over: '超出計畫' };
 
-  /* 全家模式：每個人一列。點一列就進那個人的紀錄（唯讀） */
+  /* 家庭模式：每個人一列。點一列就進那個人的紀錄（唯讀） */
   function memberTable(members, total) {
     return '<div class="card card--flush"><table class="dt">' +
       '<thead><tr><th>成員</th><th class="rt">收入</th><th class="rt">支出</th>' +
-      '<th class="rt">結餘</th><th>佔全家支出</th></tr></thead><tbody>' +
+      '<th class="rt">結餘</th><th>佔家庭支出</th></tr></thead><tbody>' +
       members.map(function (u) {
         var net = u.income - u.expense;
         var share = total ? Math.round(u.expense / total * 100) : 0;
@@ -1097,7 +1097,7 @@
       '<div class="card__h"><span class="card__t">寫一段話，系統幫你拆成好幾筆</span>' +
       '<span class="card__s">解析後由你確認才寫入</span></div>' +
       '<textarea id="paraText" class="nlp__ta" rows="3" ' +
-      'placeholder="例如：早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500"></textarea>' +
+      'placeholder="例如：早上買早餐55，中午跟同事吃飯320，下午在家庭買咖啡，晚上加油1200，今天打工賺了1500"></textarea>' +
       '<div class="nlp__row">' +
         '<button class="btn btn--go" id="paraGo">解析這段話</button>' +
         '<button class="chip" id="paraEx">填一段範例看看</button>' +
@@ -1495,7 +1495,7 @@
   /* ============================================================
      03 統計：過去的趨勢
 
-     家長可以切「我／全家」。年度數列只有涵蓋全家每一個人時才算得出來，
+     家長可以切「我／家庭」。年度數列只有涵蓋家庭每一個人時才算得出來，
      算不出來的時候「按年」直接關掉，不給一份對不上的數字。
      ============================================================ */
   function vStats() {
@@ -1510,7 +1510,7 @@
     function render(m, sc, d) {
       if (STAT.period === 'year' && !d.yearly) STAT.period = 'month';
       var month = STAT.period === 'month';
-      head('統計', sc === 'family' ? '全家的收支' : '', scopeSeg(m));
+      head('統計', sc === 'family' ? '家庭的收支' : '', scopeSeg(m));
 
       var rows = month
         ? (d.monthly || []).map(function (r) { return { k: r.m, label: r.m.slice(5) + ' 月', income: r.income, expense: r.expense }; })
@@ -1578,14 +1578,14 @@
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
     API.me().then(function (m) {
       var sc = scopeOf(m);
-      head('財務建議', sc === 'family' ? '全家的建議，以及你照顧的家人的個人建議' : '', scopeSeg(m));
+      head('財務建議', sc === 'family' ? '家庭的建議，以及你照顧的家人的個人建議' : '', scopeSeg(m));
       return API.advices({ scope: sc }).then(function (d) {
         ADV = d.advices || [];
         $view.innerHTML =
           '<div class="page">' +
             '<div id="advHint"></div>' +
             '<p class="slow" id="advSlow" hidden>模型正在寫建議。主機閒置一陣子後第一次要多等一下，最久大約半分鐘。</p>' +
-            '<div class="sec"><h2 class="sec__t">' + (sc === 'family' ? '全家的建議' : '給你的建議') + '</h2>' +
+            '<div class="sec"><h2 class="sec__t">' + (sc === 'family' ? '家庭的建議' : '給你的建議') + '</h2>' +
               '<span class="sec__n" id="advN">' + ADV.length + ' 則</span>' +
               '<button class="btn btn--sm btn--go" id="advGen" data-gen-scope="' + sc + '">產生這個月的建議</button>' +
               '<div class="sec__tools"><label class="fsel fsel--q">' +
@@ -1638,7 +1638,7 @@
         '<button class="ad__h" data-adv="' + esc(a.id) + '">' +
           '<span class="ad__lv ad__lv--' + esc(a.level) + '">' + advLevel(a) + '</span>' +
           '<span class="ad__t">' + esc(a.title) + '</span>' +
-          '<span class="ad__m">' + esc(a.scope === 'family' ? '全家' : a.userName) + '</span>' +
+          '<span class="ad__m">' + esc(a.scope === 'family' ? '家庭' : a.userName) + '</span>' +
           '<span class="ad__p">' + esc(a.period) + '</span>' +
           '<svg class="ad__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
@@ -1648,7 +1648,7 @@
     }).join('');
   }
 
-  /* 這一則我能不能刪：自己的可以；全家的只有家長；照看的孩子的建議是孩子的，不能替他刪 */
+  /* 這一則我能不能刪：自己的可以；家庭的只有家長；照看的孩子的建議是孩子的，不能替他刪 */
   function advCanDelete(a) {
     var u = ME && ME.user;
     if (!u || a.temp) return false;               // AI 叫不動時暫時整理的那幾則沒有存起來，沒有東西可以刪
@@ -1751,7 +1751,7 @@
     $view.innerHTML = h;
   }
 
-  /* 家庭帳本最上面：全家這個月（數字一樣來自 GET /api/summary?scope=family） */
+  /* 家庭帳本最上面：家庭這個月（數字一樣來自 GET /api/summary?scope=family） */
   function paintFamSum() {
     var box = document.getElementById('famSum');
     if (!box) return;
@@ -1760,13 +1760,13 @@
       var left = sv.level === 'over' ? -Number(sv.shortfall || 0) : Number(sv.left || 0);
       box.innerHTML = '<div class="card famsum">' +
         '<div class="famsum__g">' +
-          '<div><span>全家收入</span><b>' + amt(d.income) + '</b></div>' +
-          '<div><span>全家支出</span><b>' + amt(d.expense) + '</b></div>' +
+          '<div><span>家庭收入</span><b>' + amt(d.income) + '</b></div>' +
+          '<div><span>家庭支出</span><b>' + amt(d.expense) + '</b></div>' +
           '<div><span>' + (sv.level === 'over' ? '這個月超出計畫' : '這個月還可以花') + '</span><b>' + amt(Math.abs(left)) + '</b></div>' +
         '</div>' +
         '<div class="famsum__a">' +
-          '<button class="btn btn--sm btn--go" data-famgo="home">看全家總覽</button>' +
-          '<button class="btn btn--sm" data-famgo="stats">全家統計</button>' +
+          '<button class="btn btn--sm btn--go" data-famgo="home">看家庭總覽</button>' +
+          '<button class="btn btn--sm" data-famgo="stats">家庭統計</button>' +
         '</div></div>';
     }).catch(function (e) { box.innerHTML = errState(e); });
   }
@@ -1781,7 +1781,7 @@
 
     var tools = '<button class="btn btn--sm btn--ghost" data-help="perms">誰可以做什麼</button>';
     /* 子女沒有邀請的功能，標題列就不放「邀請家人」 */
-    /* 最上面先看全家這個月（家長才有：子女看不到別人的帳）；成員、邀請在下面 */
+    /* 最上面先看家庭這個月（家長才有：子女看不到別人的帳）；成員、邀請在下面 */
     var h = '<div class="page">' + (parent ? '<div id="famSum">' + skeleton(1) + '</div>' : '') + (parent
       ? foldHead('finv', '成員', '邀請家人', d.members.length + ' 人', null, tools)
       : '<div class="sec"><h2 class="sec__t">成員</h2>' +
@@ -1868,13 +1868,13 @@
     paintFamSum();
   }
 
-  /* 家庭自訂分類：家長加，全家記帳時都選得到 */
+  /* 家庭自訂分類：家長加，家庭記帳時都選得到 */
   FOLD_BUILD.fcat = function (wrap) {
     wrap.innerHTML = skeleton(2);
     loadCats().then(function (list) {
       var mine = list.filter(function (c) { return c.custom; });
       wrap.innerHTML = '<div class="card fcat">' +
-        '<p class="fcat__h">系統分類不夠用的時候再加。加了之後，全家記帳、預算、統計都用得到。</p>' +
+        '<p class="fcat__h">系統分類不夠用的時候再加。加了之後，家庭記帳、預算、統計都用得到。</p>' +
         (mine.length
           ? '<div class="fcat__l">' + mine.map(function (c) {
               return '<span class="chip">' + esc(c.name) + '<small>' + (c.kind === 'income' ? '收入' : '支出') + '</small>' +
@@ -2371,7 +2371,7 @@
       t: '一句話就能記好幾筆',
       b: '<p>直接把今天花了什麼打成一段話，例如：</p>' +
          '<p class="hp__f">早上買早餐 55，中午跟同事吃飯 320，' +
-         '下午在全家買咖啡，晚上加油 1200</p>' +
+         '下午在家庭買咖啡，晚上加油 1200</p>' +
          '<p>系統會把它拆成一筆一筆，填好金額和分類讓你確認。' +
          '<b>確認之前不會存進去</b>，看到不對的地方直接改。</p>' +
          '<p>有時候會拆錯或猜錯分類——那很正常，改掉就好。' +
@@ -2632,7 +2632,7 @@
       b: '按一下就幫你看這個月的花費；每個數字都附算式，可以自己驗算。' },
     { sel: '.dtile[data-nav="members"]', hash: '#/',
       t: '家庭帳本',
-      b: '全家這個月花了多少、成員和邀請都在這裡；照看孩子的時候，看得到他記了什麼。' },
+      b: '家庭這個月花了多少、成員和邀請都在這裡；照看孩子的時候，看得到他記了什麼。' },
     { sel: '#gswBtn, .dtile[data-nav="groups"]', hash: '#/',
       t: '帳本',
       b: '家用、旅遊基金可以分開記。切過去之後，數字都只看那一本。' },
@@ -3068,7 +3068,7 @@
   };
 
   /* ---------- 共用 ---------- */
-  /* 第一層標題。有「我｜全家」切換的頁面，標題上方的小字跟著顯示「我的／全家」；
+  /* 第一層標題。有「我｜家庭」切換的頁面，標題上方的小字跟著顯示「我的／家庭」；
      act 是這一頁右上角的動作，可以不給。 */
   function head(t, sub, act) {
     $title.textContent = t;
@@ -3079,13 +3079,13 @@
     if (av) { av.innerHTML = ''; av.hidden = true; }
     var a = document.getElementById('pact');
     if (a) { a.innerHTML = act || ''; a.hidden = !act; }
-    /* 有「我／全家」切換的頁面，小字直接說現在看的是誰 */
+    /* 有「我／家庭」切換的頁面，小字直接說現在看的是誰 */
     var k = document.getElementById('pkick');
     var fam = /data-scope=/.test(act || '') && SCOPE === 'family';
-    if (k) k.textContent = /data-scope=/.test(act || '') ? (fam ? '全家' : '我的') : '';
-    /* 全家模式只整理資訊、不記帳：右上角和手機的「記一筆」一起收起來 */
-    /* 全家狀態還在，每一頁（家庭、主題、個人資料、帳本…）都不放「記一筆」：
-       記帳永遠記在自己身上，全家模式下出現它，對象就錯了 */
+    if (k) k.textContent = /data-scope=/.test(act || '') ? (fam ? '家庭' : '我的') : '';
+    /* 家庭模式只整理資訊、不記帳：右上角和手機的「記一筆」一起收起來 */
+    /* 家庭狀態還在，每一頁（家庭、主題、個人資料、帳本…）都不放「記一筆」：
+       記帳永遠記在自己身上，家庭模式下出現它，對象就錯了 */
     document.body.classList.toggle('in-family', SCOPE === 'family' && (!ME || canFamily(ME)));
   }
 
@@ -3636,7 +3636,7 @@
 
      算法全系統只有一條：可花上限的收入 ＝ max(這個月已入帳, 預計收入)。
      這裡選的只是「預計收入從哪裡來」，所以固定月薪、收入不固定（日薪、打工、接案）、
-     不想估的人都適用；全家模式也能直接加總。
+     不想估的人都適用；家庭模式也能直接加總。
      ⚠️ 換選項會讓首頁的「還可以花」、財務建議、提醒門檻一起重算——換之前先問一次。
      --------------------------------------------------------- */
   /* 這個月的收入怎麼估（三種都用同一條 max(已入帳, 預計)，只差在預計收入從哪裡來） */
@@ -4127,7 +4127,7 @@
       return;
     }
 
-    /* 我／全家：換範圍之後重畫這一頁 */
+    /* 我／家庭：換範圍之後重畫這一頁 */
     var scp = t.closest('[data-scope]');
     if (scp) {
       SCOPE = scp.dataset.scope === 'family' ? 'family' : 'me';
@@ -4136,7 +4136,7 @@
       return;
     }
 
-    /* 家庭帳本：切到「全家」再去總覽或統計 */
+    /* 家庭帳本：切到「家庭」再去總覽或統計 */
     var fgo = t.closest('[data-famgo]');
     if (fgo) {
       SCOPE = 'family';
@@ -4790,7 +4790,7 @@
     /* ---- 段落記帳 ---- */
     if (t.closest('#paraEx')) {
       document.getElementById('paraText').value =
-        '早上買早餐55，中午跟同事吃飯320，下午在全家買咖啡，晚上加油1200，今天打工賺了1500';
+        '早上買早餐55，中午跟同事吃飯320，下午在家庭買咖啡，晚上加油1200，今天打工賺了1500';
       document.getElementById('paraGo').click();
       return;
     }
@@ -5135,7 +5135,7 @@
       API.createCategory({ name: document.getElementById('catName').value, kind: document.getElementById('catKind').value })
         .then(function (c) {
           busy(f, false);
-          toast('加好了「' + c.name + '」，全家記帳都選得到', 'ok');
+          toast('加好了「' + c.name + '」，家庭記帳都選得到', 'ok');
           var wrap = document.getElementById('fold-fcat');
           if (wrap) FOLD_BUILD.fcat(wrap);
         }).catch(function (err) { busy(f, false); toast(err.message || '新增失敗', 'err'); });
