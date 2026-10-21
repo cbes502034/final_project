@@ -30,7 +30,7 @@ from app.guards import admin_required
 from app.models import AuditLog, ErrorLog, FamilyMember, SecurityEvent, User, UserSession
 from app.routers._stub import not_ready, stub
 from app.schemas.auth import ClientErrorIn, SuspendIn
-from app.toolkit import crud, errors, roles, security
+from app.toolkit import crud, email_verify, errors, roles, security
 from app.toolkit.db import get_db
 
 router = APIRouter(tags=["平台管理"])
@@ -110,7 +110,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
             from app.models import AuditLog, ErrorLog, FamilyMember, SecurityEvent, User, UserSession
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import ClientErrorIn, SuspendIn
-            from app.toolkit import crud, errors, roles, security
+            from app.toolkit import crud, email_verify, errors, roles, security
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -129,7 +129,16 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
 
             # 4. 只放身分欄位與上線狀態，任何金額都不給
             out = []
+            ttl = timedelta(minutes=email_verify.TOKEN_MINUTES)
             for u in users:
+                # 還沒點驗證信的帳號：連結還有效就列成「待驗證」；連結過期了就從後台消失（帳號也不能登入）
+                waiting = u.email_verified_at is None
+                if waiting:
+                    sent = u.email_verify_sent_at or u.created_at
+                    if sent.tzinfo is None:
+                        sent = sent.replace(tzinfo=timezone.utc)
+                    if now - sent > ttl:
+                        continue
                 last = security.last_seen(u)
                 out.append({
                     "id": str(u.id),
@@ -139,7 +148,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
                     "joined": u.created_at.date().isoformat(),
                     "suspendedAt": u.suspended_at.isoformat() if u.suspended_at else None,
                     "suspendedReason": u.suspended_reason,
-                    "presence": security.presence(last, u.id in signed_in, u.suspended_at is not None, now),
+                    "presence": "unverified" if waiting else security.presence(last, u.id in signed_in, u.suspended_at is not None, now),
                     "lastActiveAt": last.isoformat() if last else None,
                 })
             return {"users": out, "at": now.isoformat()}
@@ -169,7 +178,16 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
 
     # 4. 只放身分欄位與上線狀態，任何金額都不給
     out = []
+    ttl = timedelta(minutes=email_verify.TOKEN_MINUTES)
     for u in users:
+        # 還沒點驗證信的帳號：連結還有效就列成「待驗證」；連結過期了就從後台消失（帳號也不能登入）
+        waiting = u.email_verified_at is None
+        if waiting:
+            sent = u.email_verify_sent_at or u.created_at
+            if sent.tzinfo is None:
+                sent = sent.replace(tzinfo=timezone.utc)
+            if now - sent > ttl:
+                continue
         last = security.last_seen(u)
         out.append({
             "id": str(u.id),
@@ -179,7 +197,7 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
             "joined": u.created_at.date().isoformat(),
             "suspendedAt": u.suspended_at.isoformat() if u.suspended_at else None,
             "suspendedReason": u.suspended_reason,
-            "presence": security.presence(last, u.id in signed_in, u.suspended_at is not None, now),
+            "presence": "unverified" if waiting else security.presence(last, u.id in signed_in, u.suspended_at is not None, now),
             "lastActiveAt": last.isoformat() if last else None,
         })
     return {"users": out, "at": now.isoformat()}
@@ -255,7 +273,7 @@ def suspend_user(user_id: str, body: SuspendIn, me: User, db: Session = Depends(
             from app.models import AuditLog, ErrorLog, FamilyMember, SecurityEvent, User, UserSession
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import ClientErrorIn, SuspendIn
-            from app.toolkit import crud, errors, roles, security
+            from app.toolkit import crud, email_verify, errors, roles, security
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -386,7 +404,7 @@ def unsuspend_user(user_id: str, me: User, db: Session = Depends(get_db)):
             from app.models import AuditLog, ErrorLog, FamilyMember, SecurityEvent, User, UserSession
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import ClientErrorIn, SuspendIn
-            from app.toolkit import crud, errors, roles, security
+            from app.toolkit import crud, email_verify, errors, roles, security
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -501,7 +519,7 @@ def admin_errors(me: User, db: Session = Depends(get_db)):
             from app.models import AuditLog, ErrorLog, FamilyMember, SecurityEvent, User, UserSession
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import ClientErrorIn, SuspendIn
-            from app.toolkit import crud, errors, roles, security
+            from app.toolkit import crud, email_verify, errors, roles, security
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -640,7 +658,7 @@ def admin_security_events(me: User, db: Session = Depends(get_db)):
             from app.models import AuditLog, ErrorLog, FamilyMember, SecurityEvent, User, UserSession
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import ClientErrorIn, SuspendIn
-            from app.toolkit import crud, errors, roles, security
+            from app.toolkit import crud, email_verify, errors, roles, security
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
@@ -804,7 +822,7 @@ def report_client_error(body: ClientErrorIn, request: Request, db: Session = Dep
             from app.models import AuditLog, ErrorLog, FamilyMember, SecurityEvent, User, UserSession
             from app.routers._stub import not_ready, stub
             from app.schemas.auth import ClientErrorIn, SuspendIn
-            from app.toolkit import crud, errors, roles, security
+            from app.toolkit import crud, email_verify, errors, roles, security
             from app.toolkit.db import get_db
 
         第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。

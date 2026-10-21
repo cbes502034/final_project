@@ -3830,11 +3830,13 @@ body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #
   background: var(--down); box-shadow: 0 0 0 3px var(--down-wash);
 }
 #view .lamp--online { background: var(--up); box-shadow: 0 0 0 3px var(--up-wash); }
+#view .lamp--unverified { background: transparent; border: 2px dashed var(--ink-faint); }
 #view .lamp--idle { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-wash); }
 #view .lamp--suspended { background: var(--ink-dim); box-shadow: 0 0 0 3px var(--sunk); }
 #view .adm__users .dt__name { display: flex; align-items: center; gap: 12px; }
 #view .adm__st { font-size: 13px; font-weight: 600; color: var(--down); }
 #view .adm__st--online { color: var(--up); }
+#view .adm__st--unverified { color: var(--ink-soft); }
 #view .adm__st--idle { color: var(--warn); }
 
 #view .lvl, #view .src, #view .adm__code {

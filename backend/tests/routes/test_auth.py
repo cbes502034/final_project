@@ -720,18 +720,23 @@ REPORT = ("POST", "/api/client-errors")
 def test_admin_list_users_紅綠燈(api):
     admin = user("admin@x.tw", "管理員", is_platform_admin=True)
     t = now()
-    on = user("on@x.tw", "線上", last_active_at=t - timedelta(seconds=20))
-    idle = user("idle@x.tw", "剛離開", last_active_at=t - timedelta(minutes=5))
-    gone = user("gone@x.tw", "很久", last_active_at=t - timedelta(hours=2))
-    out = user("out@x.tw", "登出了", last_active_at=t - timedelta(seconds=10))
-    never = user("never@x.tw", "沒來過")
-    bad = user("bad@x.tw", "停權", last_active_at=t, suspended_at=t, suspended_reason="違規")
+    ok = {"email_verified_at": t}                          # 驗證過的才有「線上／離線」；沒驗證的是「待驗證」
+    on = user("on@x.tw", "線上", last_active_at=t - timedelta(seconds=20), **ok)
+    idle = user("idle@x.tw", "剛離開", last_active_at=t - timedelta(minutes=5), **ok)
+    gone = user("gone@x.tw", "很久", last_active_at=t - timedelta(hours=2), **ok)
+    out = user("out@x.tw", "登出了", last_active_at=t - timedelta(seconds=10), **ok)
+    never = user("never@x.tw", "沒來過", **ok)
+    bad = user("bad@x.tw", "停權", last_active_at=t, suspended_at=t, suspended_reason="違規", **ok)
+    user("wait@x.tw", "待驗證", email_verify_sent_at=t - timedelta(minutes=5))              # 連結還有效
+    user("dead@x.tw", "過期的", email_verify_sent_at=t - timedelta(days=1))                 # 連結過期：從後台消失
     for u in (on, idle, gone, never):
         session_for(u)
     session_for(out, revoked_at=t)                         # 按過登出：馬上是紅燈
     rows = {x["name"]: x for x in api.get("/api/admin/users", headers=login(admin)).json()["users"]}
     assert {k: v["presence"] for k, v in rows.items()} == {
-        "線上": "online", "剛離開": "idle", "很久": "offline", "登出了": "offline", "沒來過": "offline", "停權": "suspended"}
+        "線上": "online", "剛離開": "idle", "很久": "offline", "登出了": "offline", "沒來過": "offline", "停權": "suspended",
+        "待驗證": "unverified"}
+    assert "過期的" not in rows
     assert rows["沒來過"]["lastActiveAt"] is None and rows["線上"]["lastActiveAt"]
     # 一般帳號只要打任何一支有登入的路由，最後活動時間就會更新（30 秒內不重寫）
     api.get("/api/auth/me", headers=login(never))
@@ -742,7 +747,7 @@ def test_admin_list_users_紅綠燈(api):
     rows = {x["name"]: x for x in api.get("/api/admin/users", headers=login(admin)).json()["users"]}
     assert rows["沒來過"]["presence"] == "online"
     # 剛登入、還沒點任何地方：最後一次登入也算有動靜
-    fresh = user("fresh@x.tw", "剛登入", last_login_at=now() - timedelta(seconds=5))
+    fresh = user("fresh@x.tw", "剛登入", last_login_at=now() - timedelta(seconds=5), email_verified_at=now())
     session_for(fresh)
     rows = {x["name"]: x for x in api.get("/api/admin/users", headers=login(admin)).json()["users"]}
     assert rows["剛登入"]["presence"] == "online" and rows["剛登入"]["lastActiveAt"]

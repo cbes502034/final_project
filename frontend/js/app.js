@@ -2894,7 +2894,8 @@
           '<div class="sec"><h2 class="sec__t">帳號</h2><span class="sec__n" id="admUsersN"></span></div>' +
           '<div class="adm__legend" aria-hidden="true">' +
             '<span><i class="lamp lamp--online"></i>線上</span><span><i class="lamp lamp--idle"></i>剛離開</span>' +
-            '<span><i class="lamp lamp--offline"></i>離線</span><span><i class="lamp lamp--suspended"></i>停權</span></div>' +
+            '<span><i class="lamp lamp--offline"></i>離線</span><span><i class="lamp lamp--unverified"></i>待驗證</span>' +
+            '<span><i class="lamp lamp--suspended"></i>停權</span></div>' +
           '<div class="card card--flush" id="admUsers">' + skeleton(4) + '</div>' +
         '</section>' +
         '<section class="duo__c">' +
@@ -2983,7 +2984,7 @@
         p(now.getHours()) + ':' + p(now.getMinutes()) + ':' + p(now.getSeconds()) + '</p>';
   }
 
-  var LAMP_TW = { online: '線上', idle: '剛離開', offline: '離線', suspended: '停權' };
+  var LAMP_TW = { online: '線上', idle: '剛離開', offline: '離線', unverified: '待驗證', suspended: '停權' };
 
   /* 「3 分鐘前」用伺服器的時間算，不看這台電腦的時鐘 */
   function admAgo(iso, at) {
@@ -2997,7 +2998,7 @@
 
   function admUsers(users, at) {
     if (!users.length) return emptyState('還沒有使用者', '有人註冊之後會列在這裡');
-    var order = { online: 0, idle: 1, offline: 2, suspended: 3 };
+    var order = { online: 0, idle: 1, offline: 2, unverified: 3, suspended: 4 };
     users = users.slice().sort(function (a, b) {
       return (order[a.presence] - order[b.presence]) || String(b.lastActiveAt || '').localeCompare(String(a.lastActiveAt || ''));
     });
@@ -3009,7 +3010,7 @@
           '<td>' + (off
             ? '<span class="pill pill--over">已停權</span><small class="dt__why">' + esc(u.suspendedReason) + '</small>'
             : '<span class="adm__st adm__st--' + esc(u.presence) + '">' + esc(LAMP_TW[u.presence] || '') + '</span>' +
-              '<small class="dt__why">' + (u.presence === 'online' ? '正在使用' : '最後活動 ' + esc(admAgo(u.lastActiveAt, at))) + '</small>') + '</td>' +
+              '<small class="dt__why">' + (u.presence === 'online' ? '正在使用' : u.presence === 'unverified' ? '還沒點驗證信，連結過期就會從這裡消失' : '最後活動 ' + esc(admAgo(u.lastActiveAt, at))) + '</small>') + '</td>' +
           '<td class="rt">' + (off
             ? '<button class="gx gx--go" data-unsus="' + esc(u.id) + '">解除停權</button>'
             : '<button class="gx gx--warn" data-sus="' + esc(u.id) + '">停權</button>') + '</td></tr>';
