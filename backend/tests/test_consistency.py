@@ -3145,8 +3145,10 @@ def test_一個畫面不放兩個同樣的入口():
     assert "document.body.dataset.page = page || 'home';" in app
     assert "dtile--tabbar" in app and "#view .dtile--tabbar { display: none; }" in css
     assert ".appbar__home { display: none !important; }" in css
-    for page in ("advice", "members", "groups", "profile"):
-        assert 'body[data-page="%s"] #searchBtn' % page in css, page
+    # 頁首的搜尋與帳本切換只在用得到的頁面出現（使用者：「有些功能本身不會需要用到帳本，不要一直掛在上面當裝飾品」）
+    assert 'body:not([data-page="home"]):not([data-page="entry"]) #searchBtn' in css
+    assert ('body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #gsw '
+            '{ display: none !important; }') in css
     assert "wal__go" not in app and "wal__go" not in css
     # 帳本頁只有一顆「開一本帳」，常設或活動在表單裡選（使用者：「一個統一的按鈕就好」）
     assert "foldBlock('gnew', '進行中', '開一本帳'" in app and "data-gnew-temp" not in app

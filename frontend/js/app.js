@@ -3756,7 +3756,7 @@
      （以前塞在個人資料最下面，要往下找；現在首頁「換主題」直接進來）
      --------------------------------------------------------- */
   function vTheme() {
-    head('主題', '點一下就換，登入到哪個裝置都會記得');
+    head('主題', '');
     $view.innerHTML = '<div class="page">' + skeleton(2) + '</div>';
     API.me().then(function (m) {
       $view.innerHTML = '<div class="page"><div class="thm__row thm__row--page" id="thmRow">' +

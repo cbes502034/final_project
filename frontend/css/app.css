@@ -3640,14 +3640,14 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 
 /* 一頁只放一個「記一筆」：收支明細自己的標題列就有，右上角那顆收起來 */
 body[data-page="entry"] .appbar__add { display: none; }
-/* 頁首的「搜尋店家或備註」是搜明細用的：財務建議頁有自己的「搜尋建議」，
-   家庭成員、帳本、個人資料跟明細無關——這幾頁收起來，不要出現兩個搜尋框 */
-body[data-page="advice"] #searchBtn, body[data-page="advice"] #searchDrawer,
-body[data-page="members"] #searchBtn, body[data-page="members"] #searchDrawer,
-body[data-page="groups"] #searchBtn, body[data-page="groups"] #searchDrawer,
-body[data-page="profile"] #searchBtn, body[data-page="profile"] #searchDrawer,
-/* 平台管理頁沒有任何明細可以搜，帳本切換也用不到 */
-body[data-page="admin"] #searchBtn, body[data-page="admin"] #searchDrawer, body[data-page="admin"] #gsw { display: none !important; }
+/* 頁首的「搜尋店家或備註」與「全部帳本」是篩選明細用的，不是每一頁的裝飾：
+   搜尋只在總覽（打了會跳去明細）與收支明細出現；
+   帳本切換只在真的會跟著它變的三頁出現——總覽、收支明細、統計。
+   其他頁（財務建議、帳本、家庭、成員紀錄、個人資料、主題、平台管理…）一律收起來。
+   ⚠️ 用「只有這幾頁才顯示」而不是「這幾頁不顯示」：以後新增的頁面預設就乾淨，不會再多一個裝飾品。 */
+body:not([data-page="home"]):not([data-page="entry"]) #searchBtn,
+body:not([data-page="home"]):not([data-page="entry"]) #searchDrawer,
+body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #gsw { display: none !important; }
 
 /* ---------- RWD ---------- */
 @media (max-width: 1080px) {
