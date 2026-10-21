@@ -443,11 +443,13 @@
          等於斷定他沒有家庭，而我們根本沒問到。 */
       /* 使用者：「要看家庭帳本只能點家庭成員，怪怪的」——主角是全家的帳，成員只是裡面的功能 */
       /* 有家庭就寫他綁定的家庭名稱（例如「邱家」）；還沒有才寫「加入家庭」 */
-      { nav: 'members',
+      /* 個人模式（而且有「我｜全家」切換可用）不放家庭那一格：家庭的事在家庭模式處理 */
+      o.canFam && !o.fam ? null : { nav: 'members',
         label: o.fm && o.fm.family && o.fm.family.name ? o.fm.family.name
           : !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭帳本',
         icon: 'members', badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
-      { nav: 'profile', label: '個人資料', icon: 'profile' },
+      /* 全家模式不放個人資料：那裡全是個人的設定 */
+      o.fam ? null : { nav: 'profile', label: '個人資料', icon: 'profile' },
       { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
       /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
          整個網站只有這兩個地方進得去主題與登出，不能跟著一起消失。 */
@@ -585,7 +587,7 @@
 
         /* 2. 常用功能：這一區不靠任何一支 API，永遠畫得出來（登出在裡面） */
         h += quickTiles({ fam: fam, count: d.__err ? 0 : d.count, groups: gs.length,
-                          warn: warn, fm: fm, famOff: !!fm.__err });
+                          warn: warn, fm: fm, famOff: !!fm.__err, canFam: canFamily(m) });
         h += '</div>';
 
         /* 3. 預算：一個分類一張小卡 */
