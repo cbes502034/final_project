@@ -124,7 +124,8 @@
   var $toasts = document.getElementById('toasts');
 
   var ME = null;
-  var F = { userId: 'all', kind: 'all', source: 'all', q: '' };
+  var F = { userId: 'all', kind: 'all', source: 'all', q: '', from: '', to: '' };
+  var FLT_KEEP = false;        // 從總覽的「本月收入／支出」進來：保留篩好的本月與收支
 
   /* 目前在看哪一本帳。'all' = 全部（我看得到的所有帳本合起來）。
      存在 localStorage，重新整理不會跳回去。 */
@@ -441,13 +442,16 @@
       /* ⚠️ 家庭那一支問不到（famOff）時一律寫「家庭成員」：寫「加入家庭」
          等於斷定他沒有家庭，而我們根本沒問到。 */
       /* 使用者：「要看家庭帳本只能點家庭成員，怪怪的」——主角是全家的帳，成員只是裡面的功能 */
-      { nav: 'members', label: !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭帳本',
+      /* 有家庭就寫他綁定的家庭名稱（例如「邱家」）；還沒有才寫「加入家庭」 */
+      { nav: 'members',
+        label: o.fm && o.fm.family && o.fm.family.name ? o.fm.family.name
+          : !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭帳本',
         icon: 'members', badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
       { nav: 'profile', label: '個人資料', icon: 'profile' },
       { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
       /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
          整個網站只有這兩個地方進得去主題與登出，不能跟著一起消失。 */
-      { href: '#/profile/theme', label: '換主題', icon: 'theme' },
+      { nav: 'theme', label: '換主題', icon: 'theme' },
       { id: 'logout', label: '登出', icon: 'out', tone: 'out' }
     ];
     return '<section class="qk"><div class="qk__h"><h2 class="qk__t">常用功能</h2></div>' +
@@ -550,9 +554,9 @@
                  直接在這個位置講清楚是哪一支、誰負責。 */
         h += d.__err ? errState(d.__err) :
           '<section class="wal wal--' + lv + '" aria-label="這個月的錢">' +
-          '<a class="wal__strip wal__strip--1" href="' + go + '">' +
+          '<a class="wal__strip wal__strip--1" href="' + go + '"' + (fam ? '' : ' data-flt="income"') + '>' +
             '<span>' + (fam ? '全家收入' : '本月收入') + '</span><b>' + amt(d.income) + '</b>' + chev + '</a>' +
-          '<a class="wal__strip wal__strip--2" href="' + go + '">' +
+          '<a class="wal__strip wal__strip--2" href="' + go + '"' + (fam ? '' : ' data-flt="expense"') + '>' +
             '<span>' + (fam ? '全家支出' : '本月支出') + '<small>' + d.count + ' 筆</small></span>' +
             '<b>' + amt(d.expense) + '</b>' + chev + '</a>' +
           '<div class="wal__card">' +
@@ -960,8 +964,19 @@
      「記一筆」是有事才做的動作，不該一進來就佔掉半個版面——
      大部分時候使用者是來看自己花了什麼，不是來記帳的。
      要記的時候點 ＋，表單才長出來。 */
+  /* 這個月的第一天與最後一天（台灣時間，跟 todayKey 同一套） */
+  function monthSpan() {
+    var k = todayKey(), y = Number(k.slice(0, 4)), m = Number(k.slice(5, 7));
+    var last = new Date(y, m, 0).getDate();
+    return [k.slice(0, 7) + '-01', k.slice(0, 7) + '-' + (last < 10 ? '0' : '') + last];
+  }
+
   function vEntry() {
     head('收支明細', '');
+    /* 只有從總覽的「本月收入／支出」進來才帶著本月的篩選；從別的地方進來一律清掉，
+       不然上次點過之後，每次開明細都只剩這個月 */
+    if (!FLT_KEEP) { F.from = ''; F.to = ''; }
+    FLT_KEEP = false;
     var h = '<div class="page">';
 
     /* 篩選放在標題那一列，跟「記一筆」並排——不要自己佔一整條 */
@@ -1287,6 +1302,7 @@
         }).join('') + '</select></label>';
     }
     return '<div class="bar bar--inline">' +
+      (F.from ? '<span class="fchip">本月<button type="button" data-fclear aria-label="清掉本月的篩選">&#10005;</button></span>' : '') +
       sel('kind', '收支', [['all', '全部'], ['expense', '支出'], ['income', '收入']]) +
       sel('source', '來源', [['all', '全部'], ['nlp', 'AI 解析'], ['manual', '手動輸入']]) +
       '</div>';
@@ -2113,7 +2129,7 @@
      每一本帳可以各自設一個每月存款目標。
      ============================================================ */
   function vGroups() {
-    head('帳本', '家用、旅遊、自己的零用，分開記');
+    head('帳本', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
     Promise.all([API.groups({ includeArchived: true }), API.members()])
@@ -2128,25 +2144,23 @@
       var live = d.groups.filter(function (g) { return !g.archived; });
       var gone = d.groups.filter(function (g) { return g.archived; });
 
-      /* 常設／活動分成兩區，不是兩個分頁。
-         分頁會把一半藏起來——只有一本活動帳的時候，為它開一個分頁太重，
-         手機上多一層隱藏狀態也跟「看得到現在在哪一本」相反。
-         區塊則是全部看得到、只是分群；沒有活動帳本時整個區塊不出現。 */
-      var standing = live.filter(function (g) { return g.kind !== 'temp'; });
-      var temps = live.filter(function (g) { return g.kind === 'temp' && !g.settled; });
-      var done = live.filter(function (g) { return g.kind === 'temp' && g.settled; });
+      /* 帳本不分常設、活動：一份清單，有結束日的那幾本自己帶「到 10/31」的標籤。
+         ⚠️ 自己的基底帳本（註冊時開的「〈名字〉的帳本」）是所有紀錄的家，不是要管理的帳本，不放進這份清單；
+            要看全部紀錄走上面的帳本切換器。 */
+      var me = (fam.members || []).filter(function (m) { return m.id === fam.me; })[0];
+      var baseName = me ? String(me.name).slice(0, 17) + '的帳本' : '';
+      var mine = live.filter(function (g) { return g.name !== baseName; });
+      var open = mine.filter(function (g) { return !g.settled; });
+      var done = mine.filter(function (g) { return g.settled; });
 
-      /* 開一本新的：整頁只有一顆「開一本帳」（跟「記一筆」同一個做法），常設或活動在表單裡選。
-         使用者：「開帳本的部分，一個統一的按鈕就好」 */
+      /* 開一本新的：整頁只有一顆「開一本帳」（跟「記一筆」同一個做法）。
+         結束日選填：不填就一直記下去，填了到期會提醒。 */
       var gnewForm =
         '<form class="card gnew" id="gnewF">' +
-          '<label class="fld"><span>常設還是活動</span>' +
-            '<select id="gnKind">' +
-              '<option value="standing">常設（家用、自己的零用）</option>' +
-              '<option value="temp">活動（旅遊、搬家，有結束日）</option>' +
-            '</select></label>' +
           '<label class="fld fld--wide"><span>名字</span>' +
             '<input type="text" id="gnName" placeholder="例如 家用、沖繩旅遊" required></label>' +
+          '<label class="fld"><span>結束日（選填）</span>' +
+            '<input type="date" id="gnEnd"></label>' +
           '<label class="fld"><span>顏色</span>' +
             /* ⚠️ 顏色從 DATA.groupColors 來，不要再寫死一份 */
             '<select id="gnColor">' +
@@ -2154,9 +2168,6 @@
                 return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
               }).join('') +
             '</select></label>' +
-          /* 只有活動帳本要填結束日 */
-          '<label class="fld" id="gnEndWrap" hidden><span>結束日</span>' +
-            '<input type="date" id="gnEnd"></label>' +
           '<div class="form__act"><button class="btn btn--go btn--sm" type="submit">建立</button></div>' +
         '</form>';
 
@@ -2172,21 +2183,12 @@
       }).join('') + '</ul></div>';
 
       var h = '<div class="page">' +
-        foldBlock('gnew', '我的帳本', '開一本帳', gnewForm, live.length + ' 本', 'books') +
-        '<div class="duo">' +
-        '<section class="duo__c">' +
-          '<div class="sec"><h2 class="sec__t">常設帳本</h2><span class="sec__n">' + standing.length + ' 本</span></div>' +
-          ledgerList(standing) +
-          (gone.length ? foldBlock('garch', '已封存', '看看', archHTML, String(gone.length) + ' 本', 'archive') : '') +
-        '</section>' +
-        '<section class="duo__c">' +
-          '<div class="sec"><h2 class="sec__t">活動帳本</h2><span class="sec__n">' + temps.length + ' 本</span></div>' +
-          (temps.length
-            ? ledgerList(temps)
-            : '<div class="card">' + emptyState('沒有進行中的活動', '出國、搬家這種有結束日的花費，按上面的「開一本帳」選「活動」。') + '</div>') +
-          (done.length ? foldBlock('gdone', '已結算', '看看', ledgerList(done), String(done.length) + ' 本') : '') +
-        '</section>' +
-      '</div>';
+        foldBlock('gnew', '進行中', '開一本帳', gnewForm, open.length + ' 本', 'books') +
+        (open.length
+          ? ledgerList(open)
+          : '<div class="card">' + emptyState('還沒有帳本', '按右上角的「開一本帳」，旅遊、搬家、家用都可以。') + '</div>') +
+        (done.length ? foldBlock('gdone', '已結算', '看看', ledgerList(done), String(done.length) + ' 本') : '') +
+        (gone.length ? foldBlock('garch', '已封存', '看看', archHTML, String(gone.length) + ' 本', 'archive') : '');
 
       $view.innerHTML = h + '</div>';
       /* ⚠️ 重畫之後一定要叫它——不然使用者展開表單、按了建立，
@@ -2231,7 +2233,7 @@
           (g.settled ? '<span class="tag tag--soft">已結算</span>' : '') +
           (g.id === GROUP ? '<span class="tag tag--done">目前在看</span>' : '') +
         '</span>' +
-        '<span class="lg__m">' + esc(g.memberNames.join('、')) + '</span>' +
+        '<span class="lg__m">' + (g.memberNames.length > 1 ? esc(g.memberNames.join('、')) : '') + '</span>' +
         '<span class="lg__c">' + g.count + ' 筆</span>' +
         '<svg class="lg__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
           'stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>' +
@@ -3528,6 +3530,7 @@
   }
 
   function vProfile(at) {
+    if (at === 'theme') { location.replace('#/theme'); return; }
     head('個人資料', '');
     $view.innerHTML = '<div class="page">' + skeleton(3) + '</div>';
     API.me().then(function (m) {
@@ -3598,33 +3601,11 @@
           foldHead('fin', '理財習慣', '填寫') +
         '</section>' +
       '</div>' +
-
-      /* 主題設定：左右滑著挑，按一下就套用 */
-      '<section class="thm">' +
-        '<div class="sec"><h2 class="sec__t">主題設定</h2>' +
-          '<span class="sec__n">' + (global.DATA.themes || []).length + ' 套</span>' +
-          '<div class="thm__nav">' +
-            '<button type="button" data-thm-go="-1" aria-label="往左看">' +
-              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg></button>' +
-            '<button type="button" data-thm-go="1" aria-label="往右看">' +
-              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="thm__row" id="thmRow">' + themeCards(u.theme || currentTheme()) + '</div>' +
-      '</section>' +
       '</div>';
       $view.innerHTML = h;
-      var onCard = document.querySelector('.thm__i.on');
-      if (onCard && onCard.scrollIntoView) onCard.parentNode.scrollLeft = onCard.offsetLeft - 8;
       foldRestore();
       paintAlerts();
       paintSessions();
-      /* 從儀表板的「換主題」進來的（#/profile/theme）：直接捲到主題那一段，
-         不用自己往下找。主題設定本來就在這一頁的最下面。 */
-      if (at === 'theme') {
-        var thm = document.querySelector('.thm');
-        if (thm && thm.scrollIntoView) thm.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      }
       /* 從總覽的「設定收入怎麼算 ›」進來的：捲到收入那一張 */
       if (at === 'income') {
         var inc = document.getElementById('incCard');
@@ -3769,6 +3750,19 @@
         }).join('') + '</div></div>';
     }).catch(function (e) { wrap.innerHTML = errState(e); });
   };
+
+  /* ---------------------------------------------------------
+     主題：專門一頁，整頁都是預覽卡片，點一下就換
+     （以前塞在個人資料最下面，要往下找；現在首頁「換主題」直接進來）
+     --------------------------------------------------------- */
+  function vTheme() {
+    head('主題', '點一下就換，登入到哪個裝置都會記得');
+    $view.innerHTML = '<div class="page">' + skeleton(2) + '</div>';
+    API.me().then(function (m) {
+      $view.innerHTML = '<div class="page"><div class="thm__row thm__row--page" id="thmRow">' +
+        themeCards((m.user && m.user.theme) || currentTheme()) + '</div></div>';
+    }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
+  }
 
   /* 每一張預覽自己掛著 data-theme，裡面的顏色、圓角、字就是那一套的——
      不用另外準備截圖，主題改了預覽自動跟著變。 */
@@ -3972,7 +3966,7 @@
   var ROUTES = { '': vHome, entry: vEntry, stats: vStats,
                  advice: vAdvice, members: vMembers,
                  login: vLogin, register: vRegister, profile: vProfile,
-                 member: vMember, groups: vGroups, admin: vAdmin,
+                 member: vMember, groups: vGroups, admin: vAdmin, theme: vTheme,
                  setup: vSetup, forgot: vForgot, reset: vReset, verify: vVerify };
 
   var OPEN = ['login', 'register', 'forgot'];      // 沒登入也能看的頁（登入了就送回總覽）
@@ -4090,6 +4084,15 @@
     }
     var q = t.closest('[data-help]');
     if (q) { openHelp(q.dataset.help); return; }
+
+    /* 總覽的「本月收入／支出」：明細頁只顯示這個月、而且只有收入（或只有支出） */
+    var fl = t.closest('[data-flt]');
+    if (fl) {
+      var span = monthSpan();
+      F.kind = fl.dataset.flt; F.from = span[0]; F.to = span[1]; F.source = 'all'; F.q = '';
+      FLT_KEEP = true;
+    }
+    if (t.closest('[data-fclear]')) { F.from = ''; F.to = ''; F.kind = 'all'; vEntry(); return; }
 
     var tp = t.closest('[data-theme-pick]');
     if (tp) { chooseTheme(tp.dataset.themePick); return; }
@@ -4509,14 +4512,6 @@
         if (gb) gb.classList.remove('open');
         slideClose(gp2);
       }
-    }
-
-    /* 選了「活動」才要填結束日 */
-    var kindSel = t.closest('#gnKind');
-    if (kindSel) {
-      var wrap = document.getElementById('gnEndWrap');
-      if (wrap) wrap.hidden = kindSel.value !== 'temp';
-      return;
     }
 
     /* 有動靜通知我。⚠️ 預設關——開著的話光家用本月就是 93 則。 */
@@ -5165,13 +5160,12 @@
     if (f.id === 'gnewF') {
       e.preventDefault();
       busy(f, true, '建立中…');
-      var kind = (document.getElementById('gnKind') || {}).value || 'standing';
+      var ends = (document.getElementById('gnEnd') || {}).value || null;
       API.createGroup({
         name: document.getElementById('gnName').value,
         color: document.getElementById('gnColor').value,
-        kind: kind,
-        endsOn: kind === 'temp'
-          ? (document.getElementById('gnEnd') || {}).value : null
+        kind: ends ? 'temp' : 'standing',
+        endsOn: ends
       }).then(function (g) {
         busy(f, false);
         /* 開完就收起來。開帳本是一次性動作，不像記帳會連記好幾筆——

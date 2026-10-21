@@ -3554,6 +3554,22 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 #view .thm__st { font-size: 12px; font-weight: 700; color: var(--ink-faint); }
 #view .thm__i.on .thm__st { color: var(--accent); }
 #view .thm__d { display: block; padding: 0 4px; font-size: 12px; line-height: 1.45; color: var(--ink-faint); }
+/* 主題專頁：整頁排成格子，不用左右滑 */
+#view .thm__row--page {
+  grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; scroll-snap-type: none;
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); padding-bottom: 4px;
+}
+/* 明細頁上「本月」的篩選標籤，一鍵清掉 */
+#view .fchip {
+  display: inline-flex; align-items: center; gap: 6px; height: var(--ctl); padding: 0 6px 0 12px;
+  font-size: 13px; font-weight: 700; color: var(--accent); background: var(--accent-wash);
+  border: 1px solid var(--accent); border-radius: var(--r-pill);
+}
+#view .fchip button {
+  width: 22px; height: 22px; padding: 0; font-size: 11px; line-height: 1; color: inherit; cursor: pointer;
+  background: transparent; border: 0; border-radius: 50%;
+}
+#view .fchip button:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 #view .thm__nav { display: inline-flex; gap: 6px; margin-left: auto; }
 #view .thm__nav button {
   width: var(--ctl); height: var(--ctl); display: grid; place-items: center; padding: 0;
@@ -3694,6 +3710,7 @@ body[data-page="admin"] #searchBtn, body[data-page="admin"] #searchDrawer, body[
   #view .dtile__b { font-size: 10.5px; }
   #view .bgrid { grid-template-columns: minmax(0, 1fr); }
   #view .thm__row { grid-auto-columns: 150px; }
+  #view .thm__row--page { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-columns: auto; }
   .thm__pv { height: 176px; }
 }
 

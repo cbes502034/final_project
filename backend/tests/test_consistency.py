@@ -1514,7 +1514,7 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
     assert "quick: true" in home, "儀表板上要有「記一筆」"
     # 換主題與登出原本在右上角的帳號選單裡。選單拆掉之後搬進常用功能——
     # 整個網站只有這兩個地方進得去，不能跟著選單一起消失。
-    for part in ("docs/guide.html", "#/profile/theme", "id: 'logout'"):
+    for part in ("docs/guide.html", "nav: 'theme'", "id: 'logout'"):
         assert part in home, "常用功能少了 " + part
 
     # 其他頁面要能回到總覽；總覽本身不需要那顆鈕
@@ -1562,7 +1562,7 @@ def test_帳本頁進來只看得到帳本():
     assert mo, "app.js 裡找不到 vGroups"
     body = mo.group(1)
 
-    assert "foldBlock('gnew', '我的帳本', '開一本帳'" in body, "整頁一顆「開一本帳」，掛在帳本頁最上面"
+    assert "foldBlock('gnew', '進行中', '開一本帳'" in body, "整頁一顆「開一本帳」，掛在帳本頁最上面"
     assert "ledgerList(" in body, "帳本清單應該是收合列"
     assert "'誰在哪一本帳裡'" not in app, "「誰在哪一本帳裡」已經併進每一本帳的展開內容"
     assert "<table" not in body, "帳本不用表格"
@@ -1572,7 +1572,7 @@ def test_帳本頁進來只看得到帳本():
     assert "data-gdel" in lb and "data-gaddsel" in lb, "成員的加減應該在帳本展開的內容裡"
 
     plain = re.findall(r'<h2 class="sec__t">([^<\']+)', body)
-    assert set(plain) <= {"常設帳本", "活動帳本"}, "帳本頁多了攤開的區塊：%s" % plain
+    assert set(plain) <= set(), "帳本頁多了攤開的區塊：%s" % plain
 
 
 def test_不再出現監視感的提示語():
@@ -2368,7 +2368,7 @@ def test_常用功能不跟著_summary_一起消失():
 
     tiles = app[app.index("function quickTiles(o)"):app.index("function tile(t)")]
     assert "o = o || {}" in tiles, "什麼資料都沒有的時候也要畫得出來"
-    for part in ("id: 'logout'", "#/profile/theme"):
+    for part in ("id: 'logout'", "nav: 'theme'"):
         assert part in tiles, "常用功能少了 " + part
 
 
@@ -3149,7 +3149,7 @@ def test_一個畫面不放兩個同樣的入口():
         assert 'body[data-page="%s"] #searchBtn' % page in css, page
     assert "wal__go" not in app and "wal__go" not in css
     # 帳本頁只有一顆「開一本帳」，常設或活動在表單裡選（使用者：「一個統一的按鈕就好」）
-    assert "foldBlock('gnew', '我的帳本', '開一本帳'" in app and "data-gnew-temp" not in app
+    assert "foldBlock('gnew', '進行中', '開一本帳'" in app and "data-gnew-temp" not in app
     # 手機明細頁的「記一筆」只留分頁列那顆
     assert 'body[data-page="entry"] #view .fold__b[data-fold="entry"]:not(.on) { display: none; }' in css
 
