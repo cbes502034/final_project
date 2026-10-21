@@ -521,13 +521,17 @@ def test_set_allowance(api):
     family_of((dad, "parent"), (kid, "child"))
     guard(dad, kid)
     h = login(dad)
+    assert api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": 1}).status_code == 200
     r = api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": 3000})
     assert r.status_code == 200 and r.json() == {"wardId": str(kid.id), "wardName": "小華", "amount": 3000}
     api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": 3500})
     rows = crud.find(Allowance)
     assert len(rows) == 1 and int(rows[0].amount) == 3500 and rows[0].period_key is None
     assert api.put("/api/allowance", headers=h, json={"wardId": str(other.id), "amount": 1}).status_code == 403
-    assert api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": -1}).status_code == 422
+    for invalid in (0, -1, 0.5, 1.5, 1.0, "3000", "", None, True):
+        rejected = api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": invalid})
+        assert rejected.status_code == 422, (invalid, rejected.text)
+        assert int(crud.get(Allowance, rows[0].id).amount) == 3500
     assert crud.count(Transaction) == 0                                    # 零用金是設定，不是一筆支出
 
 

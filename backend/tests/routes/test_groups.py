@@ -252,7 +252,7 @@ SETTLE = ("POST", "/api/groups/{gid}/settle")
 
 
 @pytest.mark.route(*SETTLE)
-def test_settle_group_only_moves_the_callers_rows_and_keeps_other_members_active(api):
+def test_settle_group_copies_the_callers_rows_and_keeps_shared_history(api):
     me, mom, stranger = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽"), user("s@x.tw", "路人")
     cats = categories()
     trip = ledger_of(me, mom, name="旅遊", kind="temp")
@@ -265,20 +265,34 @@ def test_settle_group_only_moves_the_callers_rows_and_keeps_other_members_active
     r = api.post(f"/api/groups/{trip.id}/settle", headers=login(mom))
     assert r.status_code == 200, r.text
     result = r.json()
-    assert result["moved"] == 1 and result["closed"] is False and result["settledAt"] is None
+    assert result["copied"] == 1 and result["closed"] is False and result["settledAt"] is None
     personal = crud.get(Group, int(result["personalGroupId"]))
     assert personal.personal_owner_id == mom.id
-    assert crud.get(Transaction, hers.id).group_id == personal.id
+    assert crud.get(Transaction, hers.id).group_id == trip.id
+    assert crud.get(Transaction, hers.id).is_snapshot is True
+    copied = crud.get(Transaction, where={"copied_from_id": hers.id})
+    assert copied and copied.id != hers.id and copied.group_id == personal.id
+    assert copied.user_id == mom.id and copied.amount == hers.amount
+    assert copied.is_snapshot is False
     assert crud.get(Transaction, own.id).group_id == trip.id
-    assert crud.count(Transaction) == 2
+    assert crud.count(Transaction) == 3
     assert not crud.exists(GroupMember, {"group_id": trip.id, "user_id": mom.id})
     assert crud.exists(GroupMember, {"group_id": trip.id, "user_id": me.id})
     assert crud.get(Group, trip.id).settled_at is None
     assert api.post(f"/api/groups/{trip.id}/settle", headers=login(mom)).status_code == 403
     assert [g["id"] for g in api.get("/api/groups", headers=login(mom)).json()["groups"]] == [str(personal.id)]
     rows = api.get(f"/api/transactions?groupId={personal.id}", headers=login(mom)).json()["transactions"]
-    assert [t["id"] for t in rows] == [str(hers.id)]
+    assert [t["id"] for t in rows] == [str(copied.id)]
     assert all(t["user"] == str(mom.id) for t in rows)
+
+    shared_rows = api.get(f"/api/transactions?groupId={trip.id}", headers=login(me)).json()["transactions"]
+    assert {t["id"] for t in shared_rows} == {str(own.id), str(hers.id)}
+    hers_history = next(t for t in shared_rows if t["id"] == str(hers.id))
+    assert hers_history["amount"] == 20 and hers_history["snapshot"] is True
+    filtered = api.get(f"/api/transactions?groupId={trip.id}&userId={mom.id}", headers=login(me))
+    assert filtered.status_code == 200 and filtered.json()["total"] == 1
+    assert api.get("/api/summary?scope=me", headers=login(mom)).json()["expense"] == 20
+    assert api.get("/api/transactions", headers=login(mom)).json()["total"] == 1
 
     # The member who stayed can still add entries, then close the book last.
     added = api.post("/api/transactions", headers=login(me), json={
@@ -287,11 +301,11 @@ def test_settle_group_only_moves_the_callers_rows_and_keeps_other_members_active
     assert added.status_code == 201, added.text
     last = api.post(f"/api/groups/{trip.id}/settle", headers=login(me))
     assert last.status_code == 200, last.text
-    assert last.json()["closed"] and last.json()["moved"] == 2
+    assert last.json()["closed"] and last.json()["copied"] == 2
     closed = crud.get(Group, trip.id)
     assert closed.settled_at and closed.removed_at
     assert not crud.exists(GroupMember, {"group_id": trip.id})
-    assert crud.count(Transaction) == 3
+    assert crud.count(Transaction) == 6
     moved = crud.get(Transaction, own.id)
     assert (moved.occurred_on, moved.amount, moved.user_id) == original
     assert str(trip.id) not in [g["id"] for g in api.get("/api/groups", headers=login(me)).json()["groups"]]
@@ -308,14 +322,15 @@ def test_owner_can_merge_a_standing_book_and_transfer_management(api):
     r = api.post(f"/api/groups/{g.id}/settle", headers=login(owner))
     assert r.status_code == 200, r.text
     assert r.json()["closed"] is False
-    assert crud.get(Transaction, tx.id).group_id == int(r.json()["personalGroupId"])
+    assert crud.get(Transaction, tx.id).group_id == g.id
+    assert crud.get(Transaction, where={"copied_from_id": tx.id}).group_id == int(r.json()["personalGroupId"])
     assert crud.get(Group, g.id).created_by == member.id
     assert api.patch(f"/api/groups/{g.id}", headers=login(member), json={"name": "繼續使用"}).status_code == 200
     assert api.patch(f"/api/groups/{g.id}", headers=login(owner), json={"name": "不應該能改"}).status_code == 403
     # Zero-entry members can leave too; merging does not create duplicate transactions.
     last = api.post(f"/api/groups/{g.id}/settle", headers=login(member))
-    assert last.status_code == 200 and last.json()["moved"] == 0 and last.json()["closed"]
-    assert crud.count(Transaction) == 1
+    assert last.status_code == 200 and last.json()["copied"] == 0 and last.json()["closed"]
+    assert crud.count(Transaction) == 2
 
 
 @pytest.mark.route(*SETTLE)
@@ -331,6 +346,57 @@ def test_merge_reuses_personal_book_after_rename_and_protects_it(api):
     assert api.delete(f"/api/groups/{personal.id}", headers=login(me)).status_code == 400
     assert api.post(f"/api/groups/{personal.id}/members", headers=login(me), json={"userId": str(other.id)}).status_code == 400
     assert api.get("/api/groups", headers=login(me)).json()["groups"][0]["personal"] is True
+
+
+@pytest.mark.route(*SETTLE)
+def test_copy_preserves_history_without_doubling_family_spending_and_cannot_repeat(api):
+    from app.models import Allowance, Budget, NlpParse
+    from tests.routes.conftest import guard
+
+    parent, child = user("p@x.tw", "家長"), user("c@x.tw", "子女")
+    family_of((parent, "parent"), (child, "child"))
+    guard(parent, child)
+    shared = ledger_of(parent, child)
+    cat = categories()["餐飲"]
+    original = spend(child, shared, cat, 100)
+    crud.save(Transaction, {"id": original.id, "source": "nlp"})
+    crud.save(NlpParse, {"transaction_id": original.id, "user_id": child.id,
+                         "raw_text": "午餐100", "confidence": 0.9, "cat_confidence": 0.8})
+    crud.save(Allowance, {"payer_id": parent.id, "ward_id": child.id, "amount": 3000})
+    crud.save(Budget, {"user_id": child.id, "category_id": cat.id, "limit_amount": 200,
+                       "period_type": "month", "created_by": child.id})
+    h = login(child)
+    r = api.post(f"/api/groups/{shared.id}/settle", headers=h)
+    assert r.status_code == 200 and r.json()["copied"] == 1
+    personal_id = r.json()["personalGroupId"]
+    copied = crud.get(Transaction, where={"copied_from_id": original.id})
+    assert api.get("/api/summary?scope=family", headers=login(parent)).json()["expense"] == 100
+    assert api.get("/api/budgets", headers=h).json()["budgets"][0]["used"] == 100
+    assert api.get("/api/allowances", headers=login(parent)).json()["allowances"][0]["spent"] == 100
+    view = api.get(f"/api/transactions?groupId={personal_id}", headers=h).json()["transactions"][0]
+    assert view["raw"] == "午餐100" and view["parsed"]["conf"] == 0.9
+
+    # Rejoining cannot generate another copy of the same historical entry.
+    crud.save(GroupMember, {"group_id": shared.id, "user_id": child.id})
+    again = api.post(f"/api/groups/{shared.id}/settle", headers=h)
+    assert again.status_code == 200 and again.json()["copied"] == 0
+    assert crud.count(Transaction) == 2
+    assert api.patch(f"/api/transactions/{original.id}", headers=h, json={"amount": 999}).status_code == 409
+    assert api.delete(f"/api/transactions/{original.id}", headers=h).status_code == 409
+    assert api.delete(f"/api/transactions?ids={original.id},{copied.id}", headers=h).status_code == 409
+    assert crud.count(Transaction) == 2
+
+    # Personal corrections affect the copy while the shared book keeps the pre-settlement figures.
+    edited = api.patch(f"/api/transactions/{copied.id}", headers=h, json={"amount": 120})
+    assert edited.status_code == 200, edited.text
+    assert crud.get(Transaction, original.id).amount == 100
+    assert crud.get(Transaction, copied.id).amount == 120
+    assert api.get("/api/summary?scope=family", headers=login(parent)).json()["expense"] == 120
+    assert api.delete(f"/api/transactions/{copied.id}", headers=h).status_code == 200
+    assert crud.get(Transaction, original.id).amount == 100
+    history = api.get(f"/api/transactions?groupId={shared.id}", headers=login(parent)).json()
+    assert history["total"] == 1 and history["transactions"][0]["amount"] == 100
+    assert api.get("/api/summary?scope=family", headers=login(parent)).json()["expense"] == 0
 
 
 # ===========================================================================

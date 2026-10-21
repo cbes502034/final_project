@@ -53,6 +53,11 @@ class Transaction(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
     # FK → groups，這筆算在哪一本帳上。INDEX
     group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id"), nullable=False, index=True)
+    # 原帳本保留的合併前歷史；不再重複計入跨帳本收支。
+    is_snapshot: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # 個人帳本副本對應的原始歷史；原始紀錄刪除時保留副本。
+    copied_from_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True, unique=True)
     # FK → families，INDEX
     family_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("families.id"), nullable=True, index=True)
     # FK → accounts

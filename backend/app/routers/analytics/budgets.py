@@ -143,6 +143,8 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
                          "occurred_on__between": (start, end)}
                 if group_id is not None:
                     where["group_id"] = group_id
+                else:
+                    where["is_snapshot"] = False
                 for t in crud.find(Transaction, where, fields=("user_id", "category_id", "amount"), db=db):
                     key = (t["user_id"], t["category_id"])
                     spent[key] = money.add(spent.get(key), t["amount"])
@@ -211,6 +213,8 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
                  "occurred_on__between": (start, end)}
         if group_id is not None:
             where["group_id"] = group_id
+        else:
+            where["is_snapshot"] = False
         for t in crud.find(Transaction, where, fields=("user_id", "category_id", "amount"), db=db):
             key = (t["user_id"], t["category_id"])
             spent[key] = money.add(spent.get(key), t["amount"])

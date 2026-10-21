@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app import catalog
-from app.models import AuditLog, Group, GroupMember, Transaction, User
+from app.models import AuditLog, Group, GroupMember, NlpParse, Transaction, User
 from app.toolkit import crud, errors
 
 
@@ -33,8 +33,13 @@ def merge_personal(db, group, me):
         raise errors.bad_request("個人大帳本不能合併或退出")
 
     personal = ensure_personal(db, me)
-    moved = crud.save(Transaction, {"group_id": personal.id},
-                      where={"group_id": group.id, "user_id": me.id}, db=db)
+    originals = crud.find(Transaction, {
+        "group_id": group.id, "user_id": me.id, "is_snapshot": False,
+    }, order_by="id", db=db)
+    copies = []
+    for original in originals:
+        copied = copy_to_personal(db, original, personal.id)
+        copies.append({"originalId": str(original.id), "copyId": str(copied.id)})
     crud.remove(GroupMember, {"group_id": group.id, "user_id": me.id}, db=db)
     remaining = crud.find(GroupMember, {"group_id": group.id},
                           order_by=("joined_at", "user_id"), db=db)
@@ -49,7 +54,24 @@ def merge_personal(db, group, me):
         crud.save(Group, {"id": group.id, "settled_at": now, "removed_at": now}, db=db)
     crud.save(AuditLog, {
         "actor_id": me.id, "action": "merge_group", "target_type": "group", "target_id": group.id,
-        "meta_json": {"personalGroupId": str(personal.id), "moved": moved, "closed": not remaining},
+        "meta_json": {"personalGroupId": str(personal.id), "copied": len(copies),
+                      "copies": copies, "closed": not remaining},
     }, db=db)
-    return {"id": str(group.id), "personalGroupId": str(personal.id), "moved": moved,
+    return {"id": str(group.id), "personalGroupId": str(personal.id), "copied": len(copies),
             "closed": not remaining, "settledAt": now.isoformat() if not remaining else None}
+
+
+def copy_to_personal(db, original, personal_id):
+    """保留原帳本的歷史，建立獨立的個人副本；同一原始紀錄不重複複製。"""
+    copied = crud.get(Transaction, where={"copied_from_id": original.id}, db=db)
+    if copied is None:
+        values = {c.name: getattr(original, c.name) for c in Transaction.__table__.columns
+                  if c.name not in {"id", "group_id", "is_snapshot", "copied_from_id"}}
+        copied = crud.save(Transaction, {**values, "group_id": personal_id,
+                                        "copied_from_id": original.id, "is_snapshot": False}, db=db)
+        for parsed in crud.find(NlpParse, {"transaction_id": original.id}, db=db):
+            values = {c.name: getattr(parsed, c.name) for c in NlpParse.__table__.columns
+                      if c.name not in {"id", "transaction_id"}}
+            crud.save(NlpParse, {**values, "transaction_id": copied.id}, db=db)
+    crud.save(Transaction, {"id": original.id, "is_snapshot": True}, db=db)
+    return copied

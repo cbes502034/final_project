@@ -819,7 +819,7 @@
      ⚠️ 只是決定要不要畫按鈕。真正的檢查在 API（403／409），按鈕藏起來不是權限控制。 */
   function txLocked(t) {
     var g = TXGROUPS.filter(function (x) { return x.id === t.group; })[0];
-    return !!(g && g.settledAt);
+    return !!t.snapshot || !!(g && g.settledAt);
   }
   function txCan(t) { return isMine(t) && !txLocked(t); }
 
@@ -855,7 +855,7 @@
         (PICK.on ? '' : can
           ? '<button class="txr__ed" data-edit="' + esc(t.id) + '">修改</button>' +
             '<button class="del" data-del="' + esc(t.id) + '">刪除</button>'
-          : (isMine(t) ? '<span class="txr__lock" title="這本帳已經結算，紀錄不能改也不能刪">已結算</span>' : '')) +
+          : (isMine(t) ? '<span class="txr__lock" title="合併前的歷史或已結算紀錄不能修改，請到個人帳本修改副本">' + (t.snapshot ? '合併前紀錄' : '已結算') + '</span>' : '')) +
       '</td></tr>';
   }
 
@@ -2104,9 +2104,9 @@
         (!mine && d.guardianships.some(function (g) { return g.guardian === d.me && g.ward === id; })
           ? '<section class="duo__c"><div class="card allow">' +
               '<div class="allow__k">每個月給' + esc(callName(u.name)) + '的零用金' + helpBtn('allowance') + '</div>' +
-              '<label class="money"><i>NT$</i><input type="number" min="0" inputmode="numeric" ' +
-                'data-allow="' + esc(u.id) + '" value="' + (u.allowance || 0) + '" aria-label="每月零用金"></label>' +
-              '<div class="allow__h">改完離開欄位就會存好</div>' +
+              '<label class="money"><i>NT$</i><input type="number" min="1" step="1" inputmode="numeric" ' +
+                'data-allow="' + esc(u.id) + '" value="' + (u.allowance > 0 ? u.allowance : '') + '" placeholder="輸入正整數" aria-label="每月零用金"></label>' +
+              '<div class="allow__h">僅限正整數，改完離開欄位就會存好</div>' +
             '</div></section>'
           : '') +
       '</div>';
@@ -4537,7 +4537,7 @@
       var gid = gset.dataset.gsettle;
       danger({
         title: '合併到我的帳本',
-        detail: '只把<b>你自己記的明細</b>移到個人大帳本，並退出這本帳。' +
+        detail: '只把<b>你自己記的明細</b>複製到個人大帳本，原帳本會保留合併前的紀錄，並退出這本帳。' +
                 '<br>其他成員仍可繼續使用；如果你是開帳者，會移交管理權。最後一位成員退出時，才會關閉帳本。',
         level: 'password',
         ok: '確定合併',
@@ -4546,7 +4546,7 @@
             setGroup(r.personalGroupId);
             LG.open = null;
             paintGroups(); vGroups();
-            toast('你的明細已合併到個人大帳本，並已退出原帳本', 'ok');
+            toast('已複製明細到個人大帳本，原帳本紀錄保留，並已退出', 'ok');
           }).catch(function (err) { toast(err.message || '合併失敗', 'err'); });
         }
       });
@@ -5288,8 +5288,10 @@
     }
     var al = e.target.closest ? e.target.closest('[data-allow]') : null;
     if (al) {
-      var av = Number(al.value);
-      if (isNaN(av) || av < 0) { toast('零用金要是 0 以上的數字', 'err'); return; }
+      var ar = al.value.trim(), av = Number(ar);
+      if (!/^[0-9]+$/.test(ar) || !Number.isSafeInteger(av) || av <= 0) {
+        toast('零用金只能輸入正整數', 'err'); return;
+      }
       API.setAllowance(al.dataset.allow, av).then(function (r) {
         toast('每月給 ' + (r.wardName || '他') + ' ' + money(av), 'ok');
       }).catch(function (err) { toast('設定失敗：' + err.message, 'err'); });

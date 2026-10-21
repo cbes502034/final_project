@@ -14,7 +14,7 @@
 ===========================================================================
 ⚠️ 移除的是「帳本」，不是紀錄
 ===========================================================================
-新版逐人合併由 services/personal_ledger.py 執行：只搬本人明細到個人大帳本並退出，
+新版逐人合併由 services/personal_ledger.py 執行：只複製本人明細到個人大帳本並退出，原帳本保留唯讀歷史，
 其他成員繼續記帳，最後一位退出才關閉。以下的唯讀檢查保留給舊版結算狀態。
 
 紀錄是記帳的人的。移除之後每一筆仍在他自己的收支明細與統計裡，
@@ -150,7 +150,7 @@ def clean_patch(body: object) -> dict:
     return out
 
 
-def require_editable(me: object, owner: object, settled_at: object) -> None:
+def require_editable(me: object, owner: object, settled_at: object, snapshot: bool = False) -> None:
     """改或刪一筆紀錄之前的檢查。
 
     >>> require_editable("U1", "U1", None)
@@ -161,6 +161,8 @@ def require_editable(me: object, owner: object, settled_at: object) -> None:
     """
     if me != owner:
         raise Forbidden("這是別人的紀錄，你只能檢視")
+    if snapshot:
+        raise ValueError("這是合併前保留的歷史紀錄，請到個人帳本修改副本")
     if settled_at:
         raise ValueError("這本帳已經結算，裡面的紀錄不能再改或刪除")
 

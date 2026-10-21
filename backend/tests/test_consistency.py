@@ -1089,10 +1089,10 @@ def test_子女只有我的模式():
 
 
 def test_personal_merge_checks_the_author_before_moving_rows():
-    """合併只搬本人的明細，不能把其他成員的收支放進個人大帳本。"""
+    """合併只複製本人的明細，不能把其他成員的收支放進個人大帳本。"""
     api = read("frontend/js/api.js")
     body = re.search(r"settleGroup: function \(gid\) \{(.*?)\n    \},", api, re.S).group(1)
-    assert "t.user !== s.me" in body and "t.group = personal.id" in body
+    assert "t.user !== s.me" in body and "group: personal.id" in body
     service = read("backend/app/services/personal_ledger.py")
     assert '"group_id": group.id, "user_id": me.id' in service
 

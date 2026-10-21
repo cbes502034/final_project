@@ -180,7 +180,8 @@ def list_transactions(
             if userId and userId != "all":
                 target = int(userId) if userId.isdigit() else 0
                 members = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
-                if target not in users and target not in members:
+                if target not in users and target not in members and not crud.exists(
+                    Transaction, {"user_id": target, "group_id__in": groups}, db=db):
                     raise errors.forbidden("你沒有權限看這個人的紀錄")
                 where["user_id"] = target
 
@@ -190,6 +191,8 @@ def list_transactions(
                 if group_id not in groups:
                     raise errors.forbidden("你不在這本帳裡")
                 where["group_id"] = group_id
+            else:
+                where["is_snapshot"] = False
 
             # 5. 其他篩選
             try:
@@ -231,6 +234,8 @@ def list_transactions(
                     fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
                     rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
                 )
+                if t.is_snapshot:
+                    item["snapshot"] = True
                 item["merchant"] = t.merchant or ""
                 item["note"] = t.note or ""
                 p = parses.get(t.id)
@@ -285,7 +290,8 @@ def list_transactions(
     if userId and userId != "all":
         target = int(userId) if userId.isdigit() else 0
         members = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
-        if target not in users and target not in members:
+        if target not in users and target not in members and not crud.exists(
+            Transaction, {"user_id": target, "group_id__in": groups}, db=db):
             raise errors.forbidden("你沒有權限看這個人的紀錄")
         where["user_id"] = target
 
@@ -295,6 +301,8 @@ def list_transactions(
         if group_id not in groups:
             raise errors.forbidden("你不在這本帳裡")
         where["group_id"] = group_id
+    else:
+        where["is_snapshot"] = False
 
     # 5. 其他篩選
     try:
@@ -336,6 +344,8 @@ def list_transactions(
             fields=("id", "user_id", "occurred_on", "amount", "group_id", "kind", "category_id", "source"),
             rename={"user_id": "user", "occurred_on": "date", "group_id": "group", "category_id": "cat"},
         )
+        if t.is_snapshot:
+            item["snapshot"] = True
         item["merchant"] = t.merchant or ""
         item["note"] = t.note or ""
         p = parses.get(t.id)
@@ -722,7 +732,7 @@ def update_transaction(
         1 整理欄位  body.model_dump(exclude_unset=True)                            只拿有送來的欄位，變成 dict
                     ledger.clean_patch(dict)                                       沒東西、不認得、格式不對 → 丟 ValueError；回傳清過的 dict（金額變 Decimal）
         2 能不能改  crud.get(Group, row.group_id, db=db)                           用主鍵拿這筆所在的帳本
-                    ledger.require_editable(me.id, row.user_id, group.settled_at)  結算過丟 ValueError（本人檢查守衛已經做了）
+                    ledger.require_editable(me.id, row.user_id, group.settled_at, row.is_snapshot)  結算過丟 ValueError（本人檢查守衛已經做了）
         3 換帳本    crud.get(Group, where={"id": …, "removed_at__isnull": True}, db=db)  要換過去的那本（移除的當作不存在）
                     crud.exists(GroupMember, {"group_id": …, "user_id": me.id}, db=db)  我在不在裡面，回 True／False
                     ledger.require_open(target.settled_at)                         結算過丟 ValueError
@@ -771,7 +781,7 @@ def update_transaction(
             # 2. 這筆所在的帳本結算過就不能改
             group = crud.get(Group, row.group_id, db=db)
             try:
-                ledger.require_editable(me.id, row.user_id, group.settled_at)
+                ledger.require_editable(me.id, row.user_id, group.settled_at, row.is_snapshot)
             except ValueError as exc:
                 raise errors.conflict(str(exc)) from None
 
@@ -890,7 +900,7 @@ def update_transaction(
     # 2. 這筆所在的帳本結算過就不能改
     group = crud.get(Group, row.group_id, db=db)
     try:
-        ledger.require_editable(me.id, row.user_id, group.settled_at)
+        ledger.require_editable(me.id, row.user_id, group.settled_at, row.is_snapshot)
     except ValueError as exc:
         raise errors.conflict(str(exc)) from None
 
@@ -1015,7 +1025,7 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
     【每一步用的工具與資料庫方法】
         步驟        呼叫                                                          做什麼
         1 能不能刪  crud.get(Group, row.group_id, db=db)                          這筆所在的帳本
-                    ledger.require_editable(row.user_id, row.user_id, group.settled_at)  結算過丟 ValueError
+                    ledger.require_editable(row.user_id, row.user_id, group.settled_at, row.is_snapshot)  結算過丟 ValueError
         2 外鍵      crud.remove(Notification, {"transaction_id": row.id}, db=db)  刪掉符合條件的每一列，回傳刪了幾筆
                     crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id": row.id}, db=db)  有 where = 改所有符合的
         3 刪除      crud.remove(Transaction, id=row.id, db=db)                    用主鍵刪一筆
@@ -1050,7 +1060,7 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
             # 1. 結算過的帳本裡的紀錄不能刪
             group = crud.get(Group, row.group_id, db=db)
             try:
-                ledger.require_editable(row.user_id, row.user_id, group.settled_at)
+                ledger.require_editable(row.user_id, row.user_id, group.settled_at, row.is_snapshot)
             except ValueError as exc:
                 raise errors.conflict(str(exc)) from None
 
@@ -1095,7 +1105,7 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
     # 1. 結算過的帳本裡的紀錄不能刪
     group = crud.get(Group, row.group_id, db=db)
     try:
-        ledger.require_editable(row.user_id, row.user_id, group.settled_at)
+        ledger.require_editable(row.user_id, row.user_id, group.settled_at, row.is_snapshot)
     except ValueError as exc:
         raise errors.conflict(str(exc)) from None
 
@@ -1167,7 +1177,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
         1 整理 ids  ledger.clean_ids(ids or "")                                    "12, 13,12" → ["12", "13"]；空的、超過 100 筆丟 ValueError
         2 一次查完  crud.find(Transaction, {"id__in": numbers}, db=db)             一次把這些筆都拿出來
                     crud.find(Group, {"id__in": …, "settled_at__isnull": False}, fields="id", db=db)  哪幾本已經結算（isnull False = 不是 NULL）
-        3 逐筆檢查  ledger.require_editable(me.id, t.user_id, t.group_id in settled)  別人的丟 PermissionError，結算過的丟 ValueError
+        3 逐筆檢查  ledger.require_editable(me.id, t.user_id, t.group_id in settled, t.is_snapshot)  別人的丟 PermissionError，結算過的丟 ValueError
         4 一起刪    crud.remove(Notification, {"transaction_id__in": ids}, db=db)  刪通知
                     crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id__in": ids}, db=db)  拿掉解析紀錄的連結
                     crud.remove(Transaction, {"id__in": ids, "user_id": me.id}, db=db)  刪明細（多加 user_id 當保險）
@@ -1218,7 +1228,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
                 if t is None:
                     raise errors.not_found("找不到這筆紀錄：" + raw)
                 try:
-                    ledger.require_editable(me.id, t.user_id, t.group_id in settled)
+                    ledger.require_editable(me.id, t.user_id, t.group_id in settled, t.is_snapshot)
                 except PermissionError as exc:
                     raise errors.forbidden(str(exc) + "。這次一筆都沒有刪") from None
                 except ValueError as exc:
@@ -1280,7 +1290,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
         if t is None:
             raise errors.not_found("找不到這筆紀錄：" + raw)
         try:
-            ledger.require_editable(me.id, t.user_id, t.group_id in settled)
+            ledger.require_editable(me.id, t.user_id, t.group_id in settled, t.is_snapshot)
         except PermissionError as exc:
             raise errors.forbidden(str(exc) + "。這次一筆都沒有刪") from None
         except ValueError as exc:

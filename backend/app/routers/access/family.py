@@ -2606,7 +2606,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
         1 照看誰  crud.find(Guardianship, {"guardian_id": me.id, "ended_at__isnull": True}, fields="ward_id", order_by="id", db=db)  回傳 id 清單
         2 設定    crud.find(Allowance, {"payer_id": me.id, "ward_id__in": wards, "period_key__isnull": True}, db=db)  period_key 是 NULL 的就是「每月的預設值」
         3 花費    period.month_range(這個月)         起訖日
-                  crud.find(Transaction, {"user_id__in": wards, "kind": "expense", "occurred_on__between": …}, fields=("user_id", "amount"), db=db)  只拿兩個欄位
+                  crud.find(Transaction, {"is_snapshot": False, "user_id__in": wards, "kind": "expense", "occurred_on__between": …}, fields=("user_id", "amount"), db=db)  只拿兩個欄位
                   money.add(spent.get(uid), amount)  一個人一個人加
 
     【寫法步驟】
@@ -2655,7 +2655,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
             # 3. 這個月花了多少（從明細現算）
             start, end = period.month_range(period.current_month(datetime.now(timezone(timedelta(hours=8))).date()))
             spent = {}
-            for t in crud.find(Transaction, {"user_id__in": wards, "kind": "expense",
+            for t in crud.find(Transaction, {"is_snapshot": False, "user_id__in": wards, "kind": "expense",
                                              "occurred_on__between": (start, end)}, fields=("user_id", "amount"), db=db):
                 spent[t["user_id"]] = money.add(spent.get(t["user_id"]), t["amount"])
 
@@ -2694,7 +2694,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
     # 3. 這個月花了多少（從明細現算）
     start, end = period.month_range(period.current_month(datetime.now(timezone(timedelta(hours=8))).date()))
     spent = {}
-    for t in crud.find(Transaction, {"user_id__in": wards, "kind": "expense",
+    for t in crud.find(Transaction, {"is_snapshot": False, "user_id__in": wards, "kind": "expense",
                                      "occurred_on__between": (start, end)}, fields=("user_id", "amount"), db=db):
         spent[t["user_id"]] = money.add(spent.get(t["user_id"]), t["amount"])
 
@@ -2733,7 +2733,7 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
     【請求主體】body 是 AllowanceIn（app/schemas/family.py）
         欄位    型別  必填  說明
         wardId  字串  是    被照看的人
-        amount  數字  是    0 以上（負數 FastAPI 自動回 422）
+        amount  整數  是    正整數（0、負數、小數及非整數型別 FastAPI 自動回 422）
         範例：{"wardId": "5", "amount": 3000}
 
     【成功回應】狀態碼 200
@@ -2743,7 +2743,7 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
         狀態碼  什麼時候            detail
         403     我沒有在照看這個人  你沒有監管這個人
         403     不是家長            只有家長可以做這件事（守衛回）
-        422     amount 小於 0       （FastAPI 自動回）
+        422     amount 不是正整數   （FastAPI 自動回）
 
     【會用到的資料表】
         表             讀／寫  用來做什麼
@@ -2805,7 +2805,7 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
         4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
                設照看中的孩子 3000  → 200；再設 3500，allowances 還是只有一列
                設一個沒在照看的人   → 403
-               amount 填 -1         → 422
+               amount 填 0、-1、小數 → 422
         5. 打 GET /api/allowances → amount 是剛設的；GET /api/summary 的支出不能變
         6. 前端改成連你的後端（frontend/index.html 的 api-base），成員紀錄頁改零用金，重新整理後還在
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "set_allowance and u4f60" -v，要全部通過

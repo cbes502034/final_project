@@ -369,6 +369,8 @@ window.DATA = {
     { t: 'transactions', label: '收支明細', note: '核心表。所有統計都從這裡算。⚠️ 回給前端時四個欄位會改名：occurred_on→date、category_id→cat、user_id→user、group_id→group（crud.to_dict 的 rename）——所以 API 上的 date 在資料表裡叫 occurred_on',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
              ['group_id', 'BIGINT', 'FK → groups，這筆算在哪一本帳上。INDEX'],
+             ['is_snapshot', 'BOOLEAN', '合併前留在原帳本的唯讀歷史；跨帳本加總不重複計入'],
+             ['copied_from_id', 'BIGINT', 'FK → transactions，UNIQUE。個人副本的原始紀錄；刪除原始紀錄時設 NULL'],
              ['family_id', 'BIGINT', 'FK → families，INDEX'],
              ['account_id', 'BIGINT', 'FK → accounts'],
              ['category_id', 'BIGINT', 'FK → categories'],

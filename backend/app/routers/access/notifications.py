@@ -152,7 +152,7 @@ def list_notifications(
                 start, end = period.month_range(this_month)
                 mine = crud.find(Transaction, {"user_id": me.id, "kind__in": ["income", "expense"],
                                                "occurred_on__between": (start, end)},
-                                 fields=("group_id", "kind", "amount"), db=db)
+                                 fields=("group_id", "kind", "amount", "is_snapshot"), db=db)
                 goals = {}
                 for g in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
                     goals[g.group_id] = g.goal_amount                    # 整體目標的鍵是 None
@@ -161,7 +161,7 @@ def list_notifications(
                 pocket = analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
                 expected = analytics.expected_income(db, [me.id], this_month).get(me.id)
                 for rule in rules:
-                    rows = [t for t in mine if rule.group_id is None or t["group_id"] == rule.group_id]
+                    rows = [t for t in mine if (rule.group_id is None and not t["is_snapshot"]) or t["group_id"] == rule.group_id]
                     income = money.add(*[t["amount"] for t in rows if t["kind"] == "income"])
                     if rule.group_id is None:
                         income += pocket
@@ -246,7 +246,7 @@ def list_notifications(
         start, end = period.month_range(this_month)
         mine = crud.find(Transaction, {"user_id": me.id, "kind__in": ["income", "expense"],
                                        "occurred_on__between": (start, end)},
-                         fields=("group_id", "kind", "amount"), db=db)
+                         fields=("group_id", "kind", "amount", "is_snapshot"), db=db)
         goals = {}
         for g in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
             goals[g.group_id] = g.goal_amount                    # 整體目標的鍵是 None
@@ -256,7 +256,7 @@ def list_notifications(
         pocket = analytics.pocket_money(db, [me.id], this_month).get(me.id, money.ZERO)
         expected = analytics.expected_income(db, [me.id], this_month).get(me.id)
         for rule in rules:
-            rows = [t for t in mine if rule.group_id is None or t["group_id"] == rule.group_id]
+            rows = [t for t in mine if (rule.group_id is None and not t["is_snapshot"]) or t["group_id"] == rule.group_id]
             income = money.add(*[t["amount"] for t in rows if t["kind"] == "income"])
             if rule.group_id is None:
                 income += pocket

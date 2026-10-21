@@ -70,7 +70,7 @@ def expected_income(db: Any, users: list[int], period: str) -> dict[int, dict[st
     if auto:
         months = periods.recent_months(periods.shift_month(period, -1), 3)        # 上個月往前 3 個月
         start, end = periods.month_range(months[0])[0], periods.month_range(months[-1])[1]
-        for t in crud.find(Transaction, {"user_id__in": auto, "kind__in": ["income", "expense"],
+        for t in crud.find(Transaction, {"is_snapshot": False, "user_id__in": auto, "kind__in": ["income", "expense"],
                                          "occurred_on__between": (start, end)},
                            fields=("user_id", "kind", "amount", "occurred_on"), db=db):
             seen.setdefault(t["user_id"], set()).add(t["occurred_on"].isoformat()[:7])
@@ -123,6 +123,8 @@ def summary(db: Any, users: list[int], earners: list[int], period: str, group_id
              "occurred_on__between": (date(year - 2, 1, 1), date(year, 12, 31))}
     if group_id is not None:
         where["group_id"] = group_id
+    else:
+        where["is_snapshot"] = False
     rows = crud.find(Transaction, where, fields=("user_id", "category_id", "kind", "amount", "occurred_on"), db=db)
 
     # b. 一筆一筆分到桶子裡
@@ -188,7 +190,7 @@ def pocket_money(db: Any, users: list[int], period: str) -> dict[int, Any]:
     start, end = periods.month_range(period)
     recorded: dict[int, Any] = {}
     if cat_ids:
-        for t in crud.find(Transaction, {"user_id__in": list(setting), "kind": "income", "category_id__in": cat_ids,
+        for t in crud.find(Transaction, {"is_snapshot": False, "user_id__in": list(setting), "kind": "income", "category_id__in": cat_ids,
                                          "occurred_on__between": (start, end)}, fields=("user_id", "amount"), db=db):
             recorded[t["user_id"]] = recorded.get(t["user_id"], money.ZERO) + t["amount"]
     out = {}

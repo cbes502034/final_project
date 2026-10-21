@@ -376,7 +376,7 @@
     var months = [3, 2, 1].map(function (b) { return shiftMonth(global.DATA.meta.period, -b); });
     var seen = {}, earned = 0;
     s.transactions.forEach(function (t) {
-      if (t.user !== uid || (t.kind !== 'income' && t.kind !== 'expense')) return;
+      if (t.snapshot || t.user !== uid || (t.kind !== 'income' && t.kind !== 'expense')) return;
       var ym = String(t.date).slice(0, 7);
       if (months.indexOf(ym) < 0) return;
       seen[ym] = true;
@@ -1539,14 +1539,17 @@
         if (!g) throw oops('找不到這本帳', 404);
         if (memberIdsOf(gid).indexOf(s.me) < 0) throw oops('你不在這本帳裡', 403);
         if (g.personalOwner) throw oops('個人大帳本不能合併或退出', 400);
-        var personal = ensurePersonal(s.me), moved = 0;
+        var personal = ensurePersonal(s.me), copies = [];
         s.txPatch = s.txPatch || {};
         s.transactions.forEach(function (t) {
-          if (t.group !== gid || t.user !== s.me) return;
-          t.group = personal.id;
-          s.txPatch[t.id] = Object.assign({}, s.txPatch[t.id] || {}, { group: personal.id });
-          moved++;
+          if (t.group !== gid || t.user !== s.me || t.snapshot) return;
+          var copied = Object.assign(clone(t), { id: 'Ncopy' + t.id, group: personal.id,
+            copiedFrom: t.id, snapshot: false });
+          copies.push(copied);
+          t.snapshot = true;
+          s.txPatch[t.id] = Object.assign({}, s.txPatch[t.id] || {}, { snapshot: true });
         });
+        s.transactions = copies.concat(s.transactions);
         s.left = (s.left || []).concat([{ group: gid, user: s.me }]);
         var remaining = memberIdsOf(gid), at = new Date().toISOString();
         if (!remaining.length) {
@@ -1560,7 +1563,7 @@
         }
         pushAudit(s, 'merge_group', gid, '合併本人明細到個人大帳本');
         save();
-        return { id: gid, personalGroupId: personal.id, moved: moved,
+        return { id: gid, personalGroupId: personal.id, copied: copies.length,
           closed: !remaining.length, settledAt: remaining.length ? null : at };
       });
     },
@@ -1721,7 +1724,7 @@
               amount: allowanceOf(st.me, w),
               // 這個月花掉多少：從明細現算（人身上沒有彙總欄位）
               spent: st.transactions.filter(function (t) {
-                return t.user === w && t.kind === 'expense' && t.date.indexOf(global.DATA.meta.period) === 0;
+                return !t.snapshot && t.user === w && t.kind === 'expense' && t.date.indexOf(global.DATA.meta.period) === 0;
               }).reduce(function (n, t) { return n + t.amount; }, 0)
             };
           })
@@ -1735,8 +1738,8 @@
         if (wardsOf(st.me).indexOf(wardId) < 0) {
           var e = new Error('你沒有監管這個人'); e.status = 403; throw e;
         }
-        var v = Number(amount);
-        if (isNaN(v) || v < 0) throw new Error('零用金要是 0 以上的數字');
+        var v = amount;
+        if (!Number.isSafeInteger(v) || v <= 0) throw oops('零用金只能輸入正整數', 422);
         st.allowancePatch = (st.allowancePatch || []).concat([
           { payer: st.me, ward: wardId, amount: v }
         ]);
@@ -1830,7 +1833,7 @@
            B 會把共用帳本裡「別人的錢」算進這個人的總額——
            家用帳本裡配偶花的錢，不該出現在我的支出裡。 */
         var tx = s.transactions.filter(function (t) {
-          if (f.groupId && f.groupId !== 'all' && t.group !== f.groupId) return false;
+          if (f.groupId && f.groupId !== 'all' ? t.group !== f.groupId : t.snapshot) return false;
           return users.indexOf(t.user) >= 0 && t.date.indexOf(D.meta.period) === 0;
         });
         // 成員表上的 income / expense 是本月至今的合計（示範明細已含在內）；
@@ -1896,6 +1899,7 @@
         function rowFor(prefix) {
           var list = s.transactions.filter(function (t) {
             if (oneGroup && t.group !== f.groupId) return false;
+            if (!oneGroup && t.snapshot) return false;
             return users.indexOf(t.user) >= 0 && t.date.indexOf(prefix) === 0;
           });
           return {
@@ -1985,7 +1989,9 @@
 
         var vis = visibleUsers(s.me);
         var vgs = visibleGroups(s.me);
-        var askable = coMembers(s.me).concat(vis);
+        var askable = coMembers(s.me).concat(vis).concat(s.transactions.filter(function (t) {
+          return vgs.indexOf(t.group) >= 0;
+        }).map(function (t) { return t.user; }));
 
         /* 帶了 userId 但沒權限看那個人 → 擋下來，不要回空陣列。
            回空陣列的話前端分不出「這個人沒記帳」和「你不能看」。
@@ -2006,7 +2012,7 @@
 
         var rows = s.transactions.filter(function (t) {
           if (!canSeeRow(t, vis, vgs)) return false;
-          if (f.groupId && f.groupId !== 'all' && t.group !== f.groupId) return false;
+          if (f.groupId && f.groupId !== 'all' ? t.group !== f.groupId : t.snapshot) return false;
           if (f.userId && f.userId !== 'all' && t.user !== f.userId) return false;
           /* ⚠️ from／to／categoryId 早就在契約裡、也在上面的白名單裡，
              但以前這裡沒有真的篩——傳了等於沒傳，mock 下看不出來。
@@ -2133,6 +2139,7 @@
            按鈕藏起來不是權限控制，任何人都能自己呼叫這支。
            真後端必須做同樣的檢查（403），不可以只靠前端。 */
         if (t.user !== s.me) throw oops('這是別人的紀錄，你只能檢視', 403);
+        if (t.snapshot) throw oops('這是合併前保留的歷史紀錄，請到個人帳本修改副本', 409);
         if (ledgerLocked(t.group)) throw oops('這本帳已經結算，裡面的紀錄不能再改或刪除', 409);
         dropTx(s, [id]);
         save();
@@ -2159,6 +2166,7 @@
           var t = s.transactions.filter(function (x) { return x.id === id; })[0];
           if (!t) throw oops('找不到這筆紀錄：' + id, 404);
           if (t.user !== s.me) throw oops('裡面有別人的紀錄，你只能檢視。這次一筆都沒有刪', 403);
+          if (t.snapshot) throw oops('這是合併前保留的歷史紀錄，請到個人帳本修改副本', 409);
           if (ledgerLocked(t.group)) throw oops('裡面有結算過的帳本的紀錄，不能刪。這次一筆都沒有刪', 409);
         });
         dropTx(s, list);
@@ -2178,6 +2186,7 @@
         var t = s.transactions.filter(function (x) { return x.id === id; })[0];
         if (!t) throw oops('找不到這筆紀錄', 404);
         if (t.user !== s.me) throw oops('這是別人的紀錄，你只能檢視', 403);
+        if (t.snapshot) throw oops('這是合併前保留的歷史紀錄，請到個人帳本修改副本', 409);
         if (ledgerLocked(t.group)) throw oops('這本帳已經結算，裡面的紀錄不能再改或刪除', 409);
 
         p = p || {};
@@ -2313,7 +2322,7 @@
             var scopeTx = s.transactions.filter(function (t) {
               if (t.user !== s.me) return false;
               if (t.date.indexOf(D.meta.period) !== 0) return false;
-              return a.group ? t.group === a.group : true;
+              return a.group ? t.group === a.group : !t.snapshot;
             });
             var spent = scopeTx.filter(function (t) { return t.kind === 'expense'; })
               .reduce(function (n, t) { return n + t.amount; }, 0);
@@ -2360,7 +2369,7 @@
            我沒加入的帳，我會收到一則點進去卻看不到東西的通知。
            現在明細也是聯集，兩邊一致了。 */
         var rows = s.transactions
-          .filter(function (t) { return wards.indexOf(t.user) >= 0; })
+          .filter(function (t) { return !t.copiedFrom && wards.indexOf(t.user) >= 0; })
           .map(function (t) {
             var m = memberOf(t.user) || {};
             var c = catOf(s, t.cat) || {};
@@ -2457,7 +2466,7 @@
         function used(uid, cat) {
           return sum(s.transactions.filter(function (t) {
             return t.user === uid && t.cat === cat && t.date.indexOf(D.meta.period) === 0 &&
-              (!one || t.group === f.groupId);
+              (one ? t.group === f.groupId : !t.snapshot);
           }), 'expense');
         }
         return {

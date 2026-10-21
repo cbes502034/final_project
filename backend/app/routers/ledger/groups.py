@@ -1132,7 +1132,7 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
     POST /api/groups/{gid}/settle
 
     【這支做什麼】
-        每位成員都能操作，只移動本人明細並退出；不複製、不改金額與日期。
+        每位成員都能操作，只複製本人明細到個人大帳本並退出；原紀錄保留在原帳本作為唯讀歷史。
         其他成員繼續使用原帳本，建立者退出時移交管理權。最後一位退出才關閉。
 
     【前端怎麼打】
@@ -1145,7 +1145,7 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
         gid：要合併的帳本 id。
 
     【成功回應】
-        {"id": "1", "personalGroupId": "2", "moved": 2, "closed": false, "settledAt": null}
+        {"id": "1", "personalGroupId": "2", "copied": 2, "closed": false, "settledAt": null}
         settledAt 僅在最後一位成員退出、帳本關閉時有時間。
 
     【錯誤回應】
@@ -1156,7 +1156,7 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
 
     【每一步用的工具與資料庫方法】
         personal_ledger.merge_personal() 鎖住原帳本、確定本人的個人大帳本，
-        依 user_id 篩選並更新明細，移出成員，必要時移交管理權或關閉帳本。
+        依 user_id 篩選並複製明細，保留原帳本歷史，移出成員，必要時移交管理權或關閉帳本。
 
     【寫法步驟】
         合併與成員異動在同一個資料庫交易中執行，成功後才 db.commit()。
@@ -1186,7 +1186,7 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
             return result
 
     【做完怎麼確認】
-        成員合併後只能在自己的大帳本找到本人明細；其他人的明細及帳本仍可使用。
+        成員合併後可在個人大帳本找到副本，原帳本仍保留他的合併前紀錄，其他成員繼續使用。
     """
     from app.services.personal_ledger import merge_personal
     result = merge_personal(db, group, me)

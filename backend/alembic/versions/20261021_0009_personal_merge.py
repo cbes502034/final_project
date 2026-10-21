@@ -1,4 +1,4 @@
-"""個人大帳本及逐人合併；補回舊版結算紀錄，不複製或刪除明細。"""
+"""補齊個人大帳本；舊結算明細留在原處，由 0010 建立個人副本。"""
 from datetime import datetime, timezone
 
 from alembic import op
@@ -26,7 +26,6 @@ def backfill(conn):
     members = sa.Table("group_members", meta, autoload_with=conn)
     tx = sa.Table("transactions", meta, autoload_with=conn)
     now = datetime.now(timezone.utc)
-    personal = {}
     active = conn.execute(sa.select(users.c.id, users.c.display_name).where(
         users.c.is_platform_admin.is_(False), users.c.deleted_at.is_(None))).all()
     for uid, name in active:
@@ -50,19 +49,16 @@ def backfill(conn):
             if not conn.execute(sa.select(members.c.user_id).where(
                     members.c.group_id == gid, members.c.user_id == uid)).first():
                 conn.execute(members.insert().values(group_id=gid, user_id=uid, joined_at=now, notify=False))
-        personal[uid] = gid
 
-    # 舊版結算是整本鎖住；把每人的舊明細移回自己的大帳本，再關閉舊帳本。
+    # 舊版結算是整本鎖住。保留所有明細，0010 再複製到各人的大帳本。
     settled = sa.select(groups.c.id).where(groups.c.settled_at.is_not(None))
-    for uid, gid in personal.items():
-        conn.execute(tx.update().where(tx.c.user_id == uid, tx.c.group_id.in_(settled)).values(group_id=gid))
     conn.execute(members.delete().where(members.c.group_id.in_(settled)))
     conn.execute(groups.update().where(groups.c.settled_at.is_not(None), groups.c.removed_at.is_(None))
                  .values(removed_at=now))
 
 
 def downgrade():
-    # 明細已回到本人帳本，不倒搬，避免把部署後新增的資料混回舊帳。
+    # 保留帳本和明細，只移除本版的識別欄位。
     with op.batch_alter_table("groups") as batch:
         batch.drop_constraint("uq_groups_personal_owner_id", type_="unique")
         batch.drop_constraint("fk_groups_personal_owner", type_="foreignkey")

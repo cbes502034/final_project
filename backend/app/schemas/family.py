@@ -50,7 +50,7 @@ class GuardianshipIn(BaseModel):
 
 class AllowanceIn(BaseModel):
     wardId: str
-    amount: float = Field(ge=0)
+    amount: int = Field(gt=0, strict=True, description="每月零用金，只接受正整數")
 
 
 class ReadOneIn(BaseModel):

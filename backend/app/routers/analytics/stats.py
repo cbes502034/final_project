@@ -300,6 +300,8 @@ def get_summary(
                          "occurred_on__between": (date(year - 2, 1, 1), date(year, 12, 31))}
                 if group_id is not None:
                     where["group_id"] = group_id
+                else:
+                    where["is_snapshot"] = False
                 rows = crud.find(Transaction, where, fields=("user_id", "category_id", "kind", "amount", "occurred_on"), db=db)
 
                 # b. 一筆一筆分到桶子裡
