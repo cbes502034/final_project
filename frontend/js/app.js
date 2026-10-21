@@ -2302,7 +2302,7 @@
             (g.notify ? ' checked' : '') + '><span>這本帳有動靜就通知我</span></label></dd>' +
       '</dl>' +
       '<div class="lg__acts">' +
-        '<button class="btn btn--sm" data-gopen="' + esc(g.id) + '">看這本的 ' + g.count + ' 筆紀錄 →</button>' +
+        '<button class="btn btn--sm" data-gview="' + esc(g.id) + '">看這本的 ' + g.count + ' 筆紀錄 →</button>' +
         '<span class="lg__sp"></span>' +
         (g.kind === 'temp' && !g.settled && g.canEdit
           ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">結算</button>' : '') +
@@ -4642,9 +4642,9 @@
     var lgh = t.closest('[data-lg]');
     if (lgh) { ledgerToggle(lgh.dataset.lg); return; }
 
-    var gopen = t.closest('[data-gopen]');
-    if (gopen) {
-      setGroup(gopen.dataset.gopen);
+    var gview = t.closest('[data-gview]');
+    if (gview) {
+      setGroup(gview.dataset.gview);
       paintGroups();
       location.hash = '#/entry';
       return;
