@@ -121,7 +121,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
         3 密碼   passwords.hash_password(body.password)      先檢查強度（太弱丟 WeakPassword），再算雜湊
           限量   security.source_of(request)                 來源 IP（Render 前面有代理，不能用 request.client.host）
                  security.register_blocked(ip, db=db)        太多了回要給使用者看的話（第一次擋下時記一筆 register_limited）
-        4 帳本   crud.save(Group, {"name": …, "color": catalog.GROUP_COLORS[0], "created_by": user.id, "kind": "standing"}, db=db)
+        4 帳本   crud.save(Group, {"name": …, "color": catalog.GROUP_COLORS[0], "created_by": user.id, "personal_owner_id": user.id, "kind": "standing"}, db=db)
                  crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)  自己加進去
         4 寄信   mailer.is_configured()                      寄得出信嗎？寄不出（本機開發）就直接算驗證過
         5 記錄   security.record("register", db=db, user_id=…, ip=ip)  記一筆，下一次數得到
@@ -207,7 +207,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
             #    順便開一本自己的帳本：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了（平台管理員不記帳，不開）
             if not admin:
                 group = crud.save(Group, {"name": name[:17] + "的帳本", "color": catalog.GROUP_COLORS[0],
-                                          "created_by": user.id, "kind": "standing"}, db=db)
+                                          "created_by": user.id, "personal_owner_id": user.id, "kind": "standing"}, db=db)
                 crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)
 
             # 5. 註冊完**不登入**：記一筆（數「同一個來源註冊了幾個」用），寫進去
@@ -306,7 +306,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
     #    順便開一本自己的帳本：每一筆都要記在某本帳上，沒有帳本的新帳號連第一筆都記不了（平台管理員不記帳，不開）
     if not admin:
         group = crud.save(Group, {"name": name[:17] + "的帳本", "color": catalog.GROUP_COLORS[0],
-                                  "created_by": user.id, "kind": "standing"}, db=db)
+                                  "created_by": user.id, "personal_owner_id": user.id, "kind": "standing"}, db=db)
         crud.save(GroupMember, {"group_id": group.id, "user_id": user.id}, db=db)
 
     # 5. 註冊完**不登入**：記一筆（數「同一個來源註冊了幾個」用），寫進去

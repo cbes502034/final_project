@@ -83,7 +83,8 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
         overdue  活動帳本、還沒結算、而且 endsOn 已經過了（台灣的今天）
         count    這本帳的筆數。我在這本帳裡，這本帳的每一筆我都看得到（可見範圍的 B 路），所以就是全部筆數——跟點進去看到的一樣
         goal     我在這本帳的每月存款目標（savings_goals 最新的一列），沒設過是 0
-        canEdit  我是不是建立的人（改名、加人、封存、結算都只有建立的人能做）
+        canEdit  我是不是建立的人（改名、加人、封存只有建立的人能做；合併每位成員都能做）
+        personal 個人大帳本，依 personal_owner_id 識別
         notify   我自己在這本帳的通知開關（group_members.notify）
 
     【錯誤回應】
@@ -131,12 +132,11 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
             # 1. 我加入的帳本（移除的一律不列；沒帶 includeArchived 也不列封存的）
             mine = crud.find(GroupMember, {"user_id": me.id}, db=db)
-            where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True}
+            where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True, "settled_at__isnull": True}
             if not includeArchived:
                 where["archived_at__isnull"] = True
             groups = crud.find(Group, where, order_by="id", db=db)
@@ -177,6 +177,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
                     "count": counts[g.id],
                     "goal": goals.get(g.id, 0),
                     "canEdit": g.created_by == me.id,
+                    "personal": g.personal_owner_id == me.id,
                     "notify": notify_on.get(g.id, False),
                 })
             return {"me": str(me.id), "groups": out}
@@ -196,24 +197,9 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
-    from collections import Counter
-    from datetime import date, datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app import catalog
-    from app.guards import block_admin, current_user, in_group
-    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
-    from app.toolkit import crud, errors, ledger
-    from app.toolkit.db import get_db
-
-
     # 1. 我加入的帳本（移除的一律不列；沒帶 includeArchived 也不列封存的）
     mine = crud.find(GroupMember, {"user_id": me.id}, db=db)
-    where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True}
+    where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True, "settled_at__isnull": True}
     if not includeArchived:
         where["archived_at__isnull"] = True
     groups = crud.find(Group, where, order_by="id", db=db)
@@ -254,6 +240,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
             "count": counts[g.id],
             "goal": goals.get(g.id, 0),
             "canEdit": g.created_by == me.id,
+            "personal": g.personal_owner_id == me.id,
             "notify": notify_on.get(g.id, False),
         })
     return {"me": str(me.id), "groups": out}
@@ -585,8 +572,10 @@ def update_group(
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
+
+            if group.personal_owner_id is not None and body.archived:
+                raise errors.bad_request("個人大帳本不能封存")
 
             sent = body.model_fields_set
             changes = {}
@@ -659,20 +648,8 @@ def update_group(
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
-    from collections import Counter
-    from datetime import date, datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app import catalog
-    from app.guards import block_admin, current_user, in_group
-    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
-    from app.toolkit import crud, errors, ledger
-    from app.toolkit.db import get_db
-
+    if group.personal_owner_id is not None and body.archived:
+        raise errors.bad_request("個人大帳本不能封存")
 
     sent = body.model_fields_set
     changes = {}
@@ -810,8 +787,10 @@ def archive_or_remove_group(
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
+
+            if group.personal_owner_id is not None:
+                raise errors.bad_request("個人大帳本不能封存、移除或加入其他成員")
 
             now = datetime.now(timezone.utc)
 
@@ -853,20 +832,8 @@ def archive_or_remove_group(
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
-    from collections import Counter
-    from datetime import date, datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app import catalog
-    from app.guards import block_admin, current_user, in_group
-    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
-    from app.toolkit import crud, errors, ledger
-    from app.toolkit.db import get_db
-
+    if group.personal_owner_id is not None:
+        raise errors.bad_request("個人大帳本不能封存、移除或加入其他成員")
 
     now = datetime.now(timezone.utc)
 
@@ -974,8 +941,10 @@ def add_group_member(
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
+
+            if group.personal_owner_id is not None:
+                raise errors.bad_request("個人大帳本不能封存、移除或加入其他成員")
 
             # 1. 只能加同一個家庭的人（平台管理員不屬於任何家庭，也加不進來）
             user_id = int(body.userId) if body.userId.isdigit() else 0
@@ -1007,23 +976,9 @@ def add_group_member(
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    
 
-    from collections import Counter
-    from datetime import date, datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app import catalog
-    from app.guards import block_admin, current_user, in_group
-    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
-    from app.toolkit import crud, errors, ledger
-    from app.toolkit.db import get_db
-
-
+    if group.personal_owner_id is not None:
+        raise errors.bad_request("個人大帳本不能封存、移除或加入其他成員")
 
     # 1. 只能加同一個家庭的人（平台管理員不屬於任何家庭，也加不進來）
     user_id = int(body.userId) if body.userId.isdigit() else 0
@@ -1169,57 +1124,45 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
     # raise not_ready("DELETE /api/groups/{gid}/members/{user_id}", OWNER)
 
 
-@router.post("/groups/{gid}/settle", summary="結算活動帳本")
-# @stub
-def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depends(get_db)):
-    """結算活動帳本
+@router.post("/groups/{gid}/settle", summary="把自己的明細合併到個人大帳本")
+def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user),
+                 db: Session = Depends(get_db)):
+    """把自己的明細合併到個人大帳本
 
     POST /api/groups/{gid}/settle
 
     【這支做什麼】
-        結算活動帳本（kind = temp）：標記結束，之後這本帳唯讀——記帳、修改、刪除都回 409。
-        ⚠️ 結算不搬動任何一筆紀錄，也不改變任何人的可見範圍。結算過的才能「移除」。
+        每位成員都能操作，只移動本人明細並退出；不複製、不改金額與日期。
+        其他成員繼續使用原帳本，建立者退出時移交管理權。最後一位退出才關閉。
 
     【前端怎麼打】
-        frontend/js/api.js 的 API.settleGroup(gid)
-        帳本頁活動帳本的「結算」（過了結束日會提醒，但不會自動結算）。
+        API.settleGroup(gid)，帳本頁的「合併到我的帳本」。
 
     【誰能打】
-        登入、沒被停權，而且這本帳是自己開的。參數 group=Depends(in_group("gid", owner=True)) 已經擋好了：
-            沒登入 → 401；被停權 → 403
-            {gid} 不是數字、找不到、或已經移除 → 404「找不到這本帳」
-            不是建立這本帳的人 → 403「只有建立這本帳的人可以做這件事」
-        所以函式裡不用再檢查。group 就是那本帳（Group 物件），group.created_by 就是我。
+        登入、未停權且仍在帳本中的成員；一般及活動帳本都適用。
 
-    【請求主體】沒有
+    【路徑參數】
+        gid：要合併的帳本 id。
 
-    【成功回應】狀態碼 200
-        {"id": "6", "settledAt": "2026-10-05T10:00:00+00:00"}
+    【成功回應】
+        {"id": "1", "personalGroupId": "2", "moved": 2, "closed": false, "settledAt": null}
+        settledAt 僅在最後一位成員退出、帳本關閉時有時間。
 
-    【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
-        狀態碼  什麼時候                     detail
-        400     一般帳本（kind = standing）  只有活動帳本需要結算
-        403     不是建立的人                 只有建立這本帳的人可以做這件事（守衛回）
-        409     已經結算過了                 這本帳已經結算過了
+    【錯誤回應】
+        400 個人大帳本不能合併或退出；403 你不在這本帳裡；404 找不到這本帳。
 
     【會用到的資料表】
-        表      讀／寫  用來做什麼
-        groups  寫      設 settled_at
+        groups、group_members、transactions、users、audit_logs。
 
     【每一步用的工具與資料庫方法】
-        步驟      呼叫                                                          做什麼
-        1 設時間  datetime.now(timezone.utc)                                    現在（UTC）；資料庫的時間一律存 UTC
-                  crud.save(Group, {"id": group.id, "settled_at": now}, db=db)  改那一本
-                  db.commit()                                                   寫進去
-        · 之後記帳、修改、刪除的路由用 ledger.require_open／require_editable 擋，這支不用管。
+        personal_ledger.merge_personal() 鎖住原帳本、確定本人的個人大帳本，
+        依 user_id 篩選並更新明細，移出成員，必要時移交管理權或關閉帳本。
 
     【寫法步驟】
-        1. 不是活動帳本 → 400；已經結算 → 409
-        2. 設 settled_at = 現在，db.commit()
-        3. 回 {"id", "settledAt"}
+        合併與成員異動在同一個資料庫交易中執行，成功後才 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：這個檔案共用的 import
 
             from collections import Counter
             from datetime import date, datetime, timedelta, timezone
@@ -1235,63 +1178,20 @@ def settle_group(group=Depends(in_group("gid", owner=True)), db: Session = Depen
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：呼叫共用的合併服務，成功後一次提交
 
-            # 1. 只有活動帳本、而且還沒結算的才能結算
-            if group.kind != "temp":
-                raise errors.bad_request("只有活動帳本需要結算")
-            if group.settled_at is not None:
-                raise errors.conflict("這本帳已經結算過了")
-
-            # 2. 標記結算時間（之後這本帳唯讀；紀錄一筆都不動）
-            now = datetime.now(timezone.utc)
-            crud.save(Group, {"id": group.id, "settled_at": now}, db=db)
+            from app.services.personal_ledger import merge_personal
+            result = merge_personal(db, group, me)
             db.commit()
-            return {"id": str(group.id), "settledAt": now.isoformat()}
+            return result
 
     【做完怎麼確認】
-        1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
-        2. 瀏覽器打開 http://localhost:8000/docs，找到 POST /api/groups/{gid}/settle
-        3. 按右上角 Authorize，貼上「建立這本帳的人」登入拿到的 accessToken
-        4. 按 Try it out，至少試這幾種，結果要跟右邊一樣：
-               結算一本活動帳本  → 200，有 settledAt
-               再結算一次        → 409
-               結算一般帳本      → 400
-        5. 往這本帳記一筆（POST /api/transactions 帶 groupId）→ 409
-        6. 前端改成連你的後端（frontend/index.html 的 api-base），帳本頁按「結算」，那本帳的紀錄不再有修改／刪除鈕
-        7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "settle_group and u4f60" -v，要全部通過
-           （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
-            -k 直接打中文比不到任何測試，會印出 0 selected）
+        成員合併後只能在自己的大帳本找到本人明細；其他人的明細及帳本仍可使用。
     """
-
-
-    from collections import Counter
-    from datetime import date, datetime, timedelta, timezone
-
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
-
-    from app import catalog
-    from app.guards import block_admin, current_user, in_group
-    from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
-    from app.toolkit import crud, errors, ledger
-    from app.toolkit.db import get_db
-
-    # 1. 只有活動帳本、而且還沒結算的才能結算
-    if group.kind != "temp":
-        raise errors.bad_request("只有活動帳本需要結算")
-    if group.settled_at is not None:
-        raise errors.conflict("這本帳已經結算過了")
-
-    # 2. 標記結算時間（之後這本帳唯讀；紀錄一筆都不動）
-    now = datetime.now(timezone.utc)
-    crud.save(Group, {"id": group.id, "settled_at": now}, db=db)
+    from app.services.personal_ledger import merge_personal
+    result = merge_personal(db, group, me)
     db.commit()
-    return {"id": str(group.id), "settledAt": now.isoformat()}
-    # raise not_ready("POST /api/groups/{gid}/settle", OWNER)
+    return result
 
 
 @router.patch("/groups/{gid}/notify", summary="這本帳有動靜要不要通知我")

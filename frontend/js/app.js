@@ -660,7 +660,7 @@
       var one = GROUP !== 'all';
       return h + '<div class="card tdy tdy--empty">' +
         (one
-          ? emptyState('這本帳今天還沒有紀錄', '右上角切回「全部帳本」，就看得到今天所有的紀錄。')
+          ? emptyState('這本帳今天還沒有紀錄', '可從右上角切換其他帳本查看紀錄。')
           : emptyState('今天還沒有記帳', fam ? '家人今天記的帳會出現在這裡。' : '花了什麼，說一句話就記好了。')) +
         (fam ? '' : '<div class="tdy__go"><button class="btn btn--go btn--sm" data-quick="entry">記一筆</button></div>') +
       '</div>';
@@ -782,7 +782,7 @@
        這個防護漏掉過一次：家庭總覽加了 if (d.monthly)，統計頁沒加，
        於是「選了某一本帳 → 打開統計」整頁變成「讀取失敗」。 */
     if (!rows || !rows.length) {
-      return emptyState('近 6 個月看不到', '月趨勢只有在「全部帳本」時算得出來。');
+      return emptyState('近 6 個月看不到', '這本帳目前沒有可顯示的月趨勢。');
     }
     var max = Math.max.apply(null, rows.map(function (r) { return Math.max(r.income, r.expense); })) || 1;
     return '<div class="bars">' + rows.map(function (r, i) {
@@ -1522,7 +1522,7 @@
         '</div></div>';
 
       if (month && !d.monthly) {
-        h += '<div class="card">' + emptyState('選了單一帳本時看不到趨勢', '切回「全部帳本」就看得到。') + '</div>';
+        h += '<div class="card">' + emptyState('選了單一帳本時看不到趨勢', '這本帳目前沒有可顯示的月趨勢。') + '</div>';
       } else {
         h += '<div class="duo">' +
           '<section class="duo__c"><div class="card card--flush">' +
@@ -2155,10 +2155,8 @@
 
       /* 帳本不分常設、活動：一份清單，有結束日的那幾本自己帶「到 10/31」的標籤。
          ⚠️ 自己的基底帳本（註冊時開的「〈名字〉的帳本」）是所有紀錄的家，不是要管理的帳本，不放進這份清單；
-            要看全部紀錄走上面的帳本切換器。 */
-      var me = (fam.members || []).filter(function (m) { return m.id === fam.me; })[0];
-      var baseName = me ? String(me.name).slice(0, 17) + '的帳本' : '';
-      var mine = live.filter(function (g) { return g.name !== baseName; });
+            個人大帳本與合併後的本人紀錄，從上面的帳本切換器查看。 */
+      var mine = live.filter(function (g) { return !g.personal; });
       var open = mine.filter(function (g) { return !g.settled; });
       var done = mine.filter(function (g) { return g.settled; });
 
@@ -2304,8 +2302,8 @@
       '<div class="lg__acts">' +
         '<button class="btn btn--sm" data-gview="' + esc(g.id) + '">看這本的 ' + g.count + ' 筆紀錄 →</button>' +
         '<span class="lg__sp"></span>' +
-        (g.kind === 'temp' && !g.settled && g.canEdit
-          ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">結算</button>' : '') +
+        (!g.personal && !g.settled
+          ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">合併到我的帳本</button>' : '') +
         (g.canEdit
           ? '<button class="gx" data-garch="' + esc(g.id) +
             '" title="收起這本帳。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
@@ -3912,21 +3910,17 @@
     return (latin ? latin[0] : a.charAt(0)).toUpperCase();
   }
 
-  /* 帳本切換器。只有一本帳的時候不顯示——一個只有一個選項的下拉是雜訊。 */
-  function paintGroups() {
+  /* 帳本切換器：只列可使用的帳本；失效選擇回到本人的個人大帳本。 */
+  function paintGroups(required) {
     var box = document.getElementById('gsw');
-    if (!box) return;
-    API.groups().then(function (d) {
-      var gs = d.groups || [];
-      box.hidden = gs.length < 2;
-      if (box.hidden) { setGroup('all'); return; }
-
-      // 選到的帳本如果已經看不到了（被移出或封存），退回全部
-      if (GROUP !== 'all' && !gs.some(function (g) { return g.id === GROUP; })) setGroup('all');
-
-      var cur = GROUP === 'all'
-        ? { name: '全部帳本', color: 'var(--ink-faint)' }
-        : gs.filter(function (g) { return g.id === GROUP; })[0];
+    if (!box) return Promise.resolve();
+    return API.groups().then(function (d) {
+      var gs = (d.groups || []).filter(function (g) { return !g.settled && !g.archived; });
+      box.hidden = !gs.length;
+      if (!gs.length) throw new Error('沒有可用的帳本，請重新登入後再試');
+      var personal = gs.filter(function (g) { return g.personal; })[0];
+      if (!gs.some(function (g) { return g.id === GROUP; })) setGroup((personal || gs[0]).id);
+      var cur = gs.filter(function (g) { return g.id === GROUP; })[0];
 
       /* 兩種長相都畫出來，由 body 上的 class 決定顯示哪一種：
            方案一（bar-text）文字 ＋ 抽屜
@@ -3945,9 +3939,6 @@
             'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
         '</button>' +
         '<div class="gsw__p" id="gswPanel" hidden>' +
-          '<button class="gsw__i' + (GROUP === 'all' ? ' on' : '') + '" data-group="all">' +
-            '<span class="gsw__d" style="background:var(--ink-faint)"></span>' +
-            '<span class="gsw__m"><b>全部帳本</b><i>我看得到的全部合起來</i></span></button>' +
           gs.map(function (g) {
             return '<button class="gsw__i' + (g.id === GROUP ? ' on' : '') +
               '" data-group="' + esc(g.id) + '">' +
@@ -3960,7 +3951,7 @@
           '<a class="gsw__more" href="#/groups">管理帳本 →</a>' +
         '</div>';
       pushForDrawer();
-    }).catch(function () { box.hidden = true; });
+    }).catch(function (err) { box.hidden = true; if (required) throw err; });
   }
 
   function paintWho() {
@@ -4022,6 +4013,7 @@
         /* 分類（含家庭自訂）先拿到，記帳、統計的下拉才完整。
            ⚠️ 拿不到就照實空著——用到分類的地方會自己顯示是哪一支還沒做。 */
         return (admin || CATS.length ? Promise.resolve() : loadCats().catch(function () {}))
+          .then(function () { return admin ? null : paintGroups(true); })
           .then(render);
       }).catch(function (e) {
         /* 權杖失效（後端說沒登入）→ 回登入頁；其他錯誤直接講出是哪一支 */
@@ -4539,22 +4531,23 @@
       return;
     }
 
-    /* 結算。⚠️ 它不搬動任何一筆紀錄，也不改變誰看得到——
-       只是把這本帳標記結束、之後不能再往裡面記。 */
+    /* 只合併本人的明細並退出；其他成員繼續使用，最後一位退出才關閉。 */
     var gset = t.closest('[data-gsettle]');
     if (gset) {
       var gid = gset.dataset.gsettle;
       danger({
-        title: '結算這本活動帳本',
-        detail: '結算之後<b>不能再往裡面記帳</b>，紀錄會留著、也還看得到。' +
-                '<br>已經花掉的錢本來就算在你的收支裡，<b>數字不會變</b>。',
+        title: '合併到我的帳本',
+        detail: '只把<b>你自己記的明細</b>移到個人大帳本，並退出這本帳。' +
+                '<br>其他成員仍可繼續使用；如果你是開帳者，會移交管理權。最後一位成員退出時，才會關閉帳本。',
         level: 'password',
-        ok: '確定結算',
+        ok: '確定合併',
         onOk: function () {
-          API.settleGroup(gid).then(function () {
+          API.settleGroup(gid).then(function (r) {
+            setGroup(r.personalGroupId);
+            LG.open = null;
             paintGroups(); vGroups();
-            toast('已結算', 'ok');
-          }).catch(function (err) { toast(err.message || '結算失敗', 'err'); });
+            toast('你的明細已合併到個人大帳本，並已退出原帳本', 'ok');
+          }).catch(function (err) { toast(err.message || '合併失敗', 'err'); });
         }
       });
       return;
@@ -5506,7 +5499,7 @@
   var $foot = document.querySelector('.foot');
   if ($foot) $foot.textContent = API.mode === 'http' ? '家庭記帳　·　花錢，心裡有數' : '家庭記帳　·　資料只存在這台瀏覽器';
   API.authState().then(function (a) {
-    if (a.loggedIn) { paintWho(); paintGroups(); }
+    if (a.loggedIn) { paintWho(); }
     paint();
   });
 

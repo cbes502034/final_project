@@ -42,6 +42,9 @@ class Group(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # FK → users
     created_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    # 每人唯一的大帳本；一般／共用帳本為 NULL，不依名稱判斷。
+    personal_owner_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id"), nullable=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     # NULL = 使用中。封存不刪除，舊紀錄要留著
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

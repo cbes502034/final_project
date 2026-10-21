@@ -685,6 +685,20 @@
       .filter(function (g) { return withArchived || !g.archived; });
   }
 
+  function ensurePersonal(uid) {
+    var s = load();
+    var personal = allGroups(true).filter(function (g) { return g.personalOwner === uid; })[0];
+    if (!personal) {
+      var u = memberOf(uid) || {};
+      personal = { id: 'GP' + uid, name: String(u.name || '我').slice(0, 17) + '的帳本',
+        color: global.DATA.groupColors[0].id, owner: uid, personalOwner: uid,
+        kind: 'standing', settledAt: null, created: todayStr() };
+      s.newGroups = (s.newGroups || []).concat([personal]);
+      s.joined = (s.joined || []).concat([{ group: personal.id, user: uid, notify: false }]);
+    }
+    return personal;
+  }
+
   /* 某個人在某本帳上的每月存款目標。沒設過就是 0。 */
   function goalOf(userId, groupId) {
     var s = load();
@@ -1060,6 +1074,7 @@
           emailVerified: false        // 還沒點驗證信（真後端註冊完會寄一封）
         };
         global.DATA.members.push(u);
+        ensurePersonal(u.id);
         s.newUsers = (s.newUsers || []).concat([clone(u)]);
         s.passwords = s.passwords || {};
         s.passwords[u.id] = pwHash(p.password);
@@ -1478,12 +1493,14 @@
     groups: function (f) {
       var s = load(); f = f || {};
       return sleep(LATENCY).then(function () {
+        ensurePersonal(s.me);
+        save();
         var mine = visibleGroups(s.me, true);
         var vis = visibleUsers(s.me);
         return {
           me: s.me,
           groups: allGroups(!!f.includeArchived)
-            .filter(function (g) { return mine.indexOf(g.id) >= 0; })
+            .filter(function (g) { return mine.indexOf(g.id) >= 0 && !g.settledAt; })
             .map(function (g) {
               var members = memberIdsOf(g.id);
               /* 活動帳本到期了沒。⚠️ 只是一個判斷，不是排程——
@@ -1491,6 +1508,7 @@
               var overdue = g.kind === 'temp' && !g.settledAt && g.endsOn &&
                 g.endsOn < todayStr();
               return Object.assign(clone(g), {
+                personal: g.personalOwner === s.me,
                 kind: g.kind || 'standing',
                 settled: !!g.settledAt,
                 overdue: !!overdue,
@@ -1502,7 +1520,7 @@
                    只用群組篩的話，面板寫 10 筆、點進去只有 7 筆——
                    因為裡面有 3 筆是我不能看的那個人記的。 */
                 count: s.transactions.filter(function (t) {
-                  return t.group === g.id && vis.indexOf(t.user) >= 0;
+                  return t.group === g.id;
                 }).length,
                 goal: goalOf(s.me, g.id),
                 canEdit: g.owner === s.me,
@@ -1513,27 +1531,37 @@
       });
     },
 
-    /* 結算一本活動帳本。
-
-       ⚠️ 結算**不搬動任何一筆紀錄**。紀錄本來就屬於這本帳，也本來就
-       出現在每個成員自己的收支明細裡（可見範圍是聯集）。結算做的是
-       兩件事：把這本帳標記成結束、之後不能再往裡面記。
-
-       所以它也**不會改變任何人的可見範圍**——監管者早就看得到監管對象
-       在任何帳本的紀錄了。這一點跟最早的設計不同，是因為可見範圍後來
-       從交集改成聯集，那個隱私顧慮自己消失了。 */
+    /* 每位成員只合併自己的明細；其餘成員繼續使用。 */
     settleGroup: function (gid) {
       var s = load();
       return sleep(320).then(function () {
-        var g = allGroups(true).filter(function (x) { return x.id === gid; })[0];
-        if (!g) throw new Error('找不到這本帳');
-        if (g.kind !== 'temp') throw new Error('只有活動帳本需要結算');
-        if (g.owner !== s.me) throw new Error('只有開這本帳的人可以結算');
-        if (g.settledAt) throw new Error('這本帳已經結算過了');
-        s.settled = (s.settled || []).concat([
-          { group: gid, at: new Date().toISOString() }]);
+        var g = groupOf(gid);
+        if (!g) throw oops('找不到這本帳', 404);
+        if (memberIdsOf(gid).indexOf(s.me) < 0) throw oops('你不在這本帳裡', 403);
+        if (g.personalOwner) throw oops('個人大帳本不能合併或退出', 400);
+        var personal = ensurePersonal(s.me), moved = 0;
+        s.txPatch = s.txPatch || {};
+        s.transactions.forEach(function (t) {
+          if (t.group !== gid || t.user !== s.me) return;
+          t.group = personal.id;
+          s.txPatch[t.id] = Object.assign({}, s.txPatch[t.id] || {}, { group: personal.id });
+          moved++;
+        });
+        s.left = (s.left || []).concat([{ group: gid, user: s.me }]);
+        var remaining = memberIdsOf(gid), at = new Date().toISOString();
+        if (!remaining.length) {
+          s.settled = (s.settled || []).concat([{ group: gid, at: at }]);
+          s.removed = (s.removed || []).concat([gid]);
+        } else {
+          s.settled = (s.settled || []).filter(function (x) { return x.group !== gid; });
+          s.groupPatch = s.groupPatch || {};
+          s.groupPatch[gid] = Object.assign({}, s.groupPatch[gid] || {}, { settledAt: null },
+            g.owner === s.me ? { owner: remaining[0] } : {});
+        }
+        pushAudit(s, 'merge_group', gid, '合併本人明細到個人大帳本');
         save();
-        return { id: gid, settledAt: s.settled[s.settled.length - 1].at };
+        return { id: gid, personalGroupId: personal.id, moved: moved,
+          closed: !remaining.length, settledAt: remaining.length ? null : at };
       });
     },
 
@@ -1614,6 +1642,7 @@
       return sleep(240).then(function () {
         var g = groupOf(gid);
         if (!g) throw new Error('找不到這個群組');
+        if (g.personalOwner) throw oops('個人大帳本不能封存、移除或加入其他成員', 400);
         if (g.owner !== s.me) { var e = new Error('只有建立者可以封存'); e.status = 403; throw e; }
         /* ⚠️ 封存不是刪除。裡面的記帳紀錄還在——真刪了那些紀錄會變成孤兒。 */
         s.archived = (s.archived || []).concat([gid]);
@@ -1633,6 +1662,7 @@
       return sleep(260).then(function () {
         var g = groupOf(gid);
         if (!g) throw oops('找不到這本帳', 404);
+        if (g.personalOwner) throw oops('個人大帳本不能封存、移除或加入其他成員', 400);
         if (g.owner !== s.me) throw oops('只有建立這本帳的人可以移除', 403);
         if (!g.settledAt) throw oops('只有結算過的活動帳本可以移除；還在用的帳本請改用封存', 409);
         s.removed = (s.removed || []).concat([gid]);
@@ -1648,6 +1678,7 @@
       return sleep(240).then(function () {
         var g = groupOf(gid);
         if (!g) throw new Error('找不到這個群組');
+        if (g.personalOwner) throw oops('個人大帳本不能封存、移除或加入其他成員', 400);
         if (g.owner !== s.me) { var e = new Error('只有建立者可以加人'); e.status = 403; throw e; }
         var who = memberOf(userId);
         var me = memberOf(s.me);
@@ -1837,12 +1868,12 @@
         /* 選了某一本帳 → 用那本帳自己的目標；沒選 → 用整體目標。
            這就是「每個月的存錢目標可以有好幾個設定」的意思。 */
         var goal = users.reduce(function (n, u) {
-          if (f.groupId && f.groupId !== 'all') return n + goalOf(u, f.groupId);
+          if (f.groupId && f.groupId !== 'all' && (groupOf(f.groupId) || {}).personalOwner !== u) return n + goalOf(u, f.groupId);
           var m = memberOf(u);
           return n + (m && m.savingsGoal ? m.savingsGoal : 0);
         }, 0);
         /* 預計收入還沒入帳的部分也算進上限（選了帳本就不估：預計收入是整個人的） */
-        var oneBook = f.groupId && f.groupId !== 'all';
+        var oneBook = f.groupId && f.groupId !== 'all' && (groupOf(f.groupId) || {}).personalOwner !== s.me;
         var pending = 0, exps = [];
         if (!oneBook) earners.forEach(function (u) {
           var e = expectedOf(s, u);

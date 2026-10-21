@@ -1088,23 +1088,13 @@ def test_子女只有我的模式():
     assert "'parent'" in body and "visible" in body
 
 
-def test_結算不可以搬動任何一筆紀錄():
-    """結算只是把帳本標記結束，不是把紀錄換一本帳。
-
-    最早的設計是「結算＝把紀錄歸戶到個人時間軸」，那會改變 group_id，
-    也就改變了誰看得到。後來可見範圍從交集改成聯集——監管者本來就看得到
-    監管對象在任何帳本的紀錄——那個顧慮自己消失了，結算也就不必搬東西。
-
-    搬動紀錄是不可逆的；標記結束是可逆的。能不搬就不要搬。
-    """
+def test_personal_merge_checks_the_author_before_moving_rows():
+    """合併只搬本人的明細，不能把其他成員的收支放進個人大帳本。"""
     api = read("frontend/js/api.js")
-    mo = re.search(r"settleGroup: function \(gid\) \{(.*?)\n    \},", api, re.S)
-    assert mo, "api.js 裡找不到 settleGroup"
-    body = mo.group(1)
-
-    for bad in ("t.group =", ".group =", "transactions"):
-        assert bad not in body, "結算動到紀錄了：" + bad
-    assert "s.settled" in body, "結算應該只寫一筆結算標記"
+    body = re.search(r"settleGroup: function \(gid\) \{(.*?)\n    \},", api, re.S).group(1)
+    assert "t.user !== s.me" in body and "t.group = personal.id" in body
+    service = read("backend/app/services/personal_ledger.py")
+    assert '"group_id": group.id, "user_id": me.id' in service
 
 
 def test_活動帳本一定要有結束日():
@@ -2580,10 +2570,14 @@ const tryIt = p => p.then(r => r, e => ({ error: e.message, status: e.status || 
   const tx0 = (await API.transactions({ userId: 'U1' })).total;
 
   out.removeUnsettled = await tryIt(API.removeGroup('G1'));
-  await API.settleGroup('G4');
+  const legacy = JSON.parse(localStorage.getItem('fambudget.state.v2'));
+  legacy.settled = [{ group: 'G4', at: new Date().toISOString() }];
+  localStorage.setItem('fambudget.state.v2', JSON.stringify(legacy));
+  API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
   API = boot();                                   // 重新整理之後結算還在
   await API.login({ email: 'jianguo@lin.tw', password: PW });
-  out.settledAfterReload = (await API.groups({})).groups.find(g => g.id === 'G4').settled;
+  out.settledAfterReload = !(await API.groups({})).groups.some(g => g.id === 'G4');
   out.addToSettled = await tryIt(API.createTransaction({ groupId: 'G4', date: '2026-09-10', amount: 9, kind: 'expense', cat: 'C01' }));
   out.defaultNotSettled = (await API.createTransaction({ date: '2026-09-10', amount: 9, kind: 'expense', cat: 'C01' })).group;
   await API.deleteTransaction && null;
@@ -2709,7 +2703,11 @@ const txOf = async (API, id) => (await API.transactions({})).transactions.find(t
   out.newAfterReload = await txOf(API, n1.id);
 
   // ---- 結算過的帳本：不能改、不能刪、不能搬進去 ----
-  await API.settleGroup('G4');
+  const legacy = JSON.parse(localStorage.getItem('fambudget.state.v2'));
+  legacy.settled = [{ group: 'G4', at: new Date().toISOString() }];
+  localStorage.setItem('fambudget.state.v2', JSON.stringify(legacy));
+  API = boot();
+  await API.login({ email: 'jianguo@lin.tw', password: PW });
   out.editSettled = await tryIt(API.updateTransaction('T1044', { amount: 1 }));
   out.deleteSettled = await tryIt(API.deleteTransaction('T1044'));
   out.moveIntoSettled = await tryIt(API.updateTransaction('T1048', { groupId: 'G4' }));

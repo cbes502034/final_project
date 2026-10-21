@@ -427,6 +427,7 @@ window.DATA = {
              ['color', 'TEXT', '圖表與標籤的顏色'],
              ['note', 'TEXT', '這本帳是做什麼的，建立的人寫'],
              ['created_by', 'BIGINT', 'FK → users'],
+             ['personal_owner_id', 'BIGINT', 'FK → users，UNIQUE。個人大帳本的本人；其他帳本為 NULL'],
              ['created_at', 'TIMESTAMPTZ', ''],
              ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著'],
              ['kind', 'TEXT', "'standing' 常設 / 'temp' 臨時（有結束日、會結算）"],

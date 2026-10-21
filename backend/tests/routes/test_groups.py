@@ -252,17 +252,85 @@ SETTLE = ("POST", "/api/groups/{gid}/settle")
 
 
 @pytest.mark.route(*SETTLE)
-def test_settle_group(api):
-    me, mom = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽")
+def test_settle_group_only_moves_the_callers_rows_and_keeps_other_members_active(api):
+    me, mom, stranger = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽"), user("s@x.tw", "路人")
+    cats = categories()
     trip = ledger_of(me, mom, name="旅遊", kind="temp")
-    home = ledger_of(me, name="家用")
-    h = login(me)
-    assert api.post("/api/groups/%d/settle" % trip.id, headers=login(mom)).status_code == 403
-    r = api.post("/api/groups/%d/settle" % trip.id, headers=h)
-    assert r.status_code == 200 and r.json()["id"] == str(trip.id) and r.json()["settledAt"]
-    assert crud.get(Group, trip.id).settled_at is not None
-    assert api.post("/api/groups/%d/settle" % trip.id, headers=h).status_code == 409
-    assert api.post("/api/groups/%d/settle" % home.id, headers=h).status_code == 400
+    own = spend(me, trip, cats["餐飲"], 10)
+    hers = spend(mom, trip, cats["餐飲"], 20)
+    original = (own.occurred_on, own.amount, own.user_id)
+    assert api.post(f"/api/groups/{trip.id}/settle", headers=login(stranger)).status_code == 403
+
+    # A non-owner can merge independently, without closing the shared book.
+    r = api.post(f"/api/groups/{trip.id}/settle", headers=login(mom))
+    assert r.status_code == 200, r.text
+    result = r.json()
+    assert result["moved"] == 1 and result["closed"] is False and result["settledAt"] is None
+    personal = crud.get(Group, int(result["personalGroupId"]))
+    assert personal.personal_owner_id == mom.id
+    assert crud.get(Transaction, hers.id).group_id == personal.id
+    assert crud.get(Transaction, own.id).group_id == trip.id
+    assert crud.count(Transaction) == 2
+    assert not crud.exists(GroupMember, {"group_id": trip.id, "user_id": mom.id})
+    assert crud.exists(GroupMember, {"group_id": trip.id, "user_id": me.id})
+    assert crud.get(Group, trip.id).settled_at is None
+    assert api.post(f"/api/groups/{trip.id}/settle", headers=login(mom)).status_code == 403
+    assert [g["id"] for g in api.get("/api/groups", headers=login(mom)).json()["groups"]] == [str(personal.id)]
+    rows = api.get(f"/api/transactions?groupId={personal.id}", headers=login(mom)).json()["transactions"]
+    assert [t["id"] for t in rows] == [str(hers.id)]
+    assert all(t["user"] == str(mom.id) for t in rows)
+
+    # The member who stayed can still add entries, then close the book last.
+    added = api.post("/api/transactions", headers=login(me), json={
+        "date": now().date().isoformat(), "amount": 30, "kind": "expense", "cat": str(cats["餐飲"].id),
+        "groupId": str(trip.id), "merchant": "午餐"})
+    assert added.status_code == 201, added.text
+    last = api.post(f"/api/groups/{trip.id}/settle", headers=login(me))
+    assert last.status_code == 200, last.text
+    assert last.json()["closed"] and last.json()["moved"] == 2
+    closed = crud.get(Group, trip.id)
+    assert closed.settled_at and closed.removed_at
+    assert not crud.exists(GroupMember, {"group_id": trip.id})
+    assert crud.count(Transaction) == 3
+    moved = crud.get(Transaction, own.id)
+    assert (moved.occurred_on, moved.amount, moved.user_id) == original
+    assert str(trip.id) not in [g["id"] for g in api.get("/api/groups", headers=login(me)).json()["groups"]]
+    assert api.post(f"/api/groups/{closed.id}/settle", headers=login(me)).status_code == 404
+    assert api.post(f"/api/groups/{personal.id}/settle", headers=login(mom)).status_code == 400
+
+
+@pytest.mark.route(*SETTLE)
+def test_owner_can_merge_a_standing_book_and_transfer_management(api):
+    owner, member = user("o@x.tw", "開帳者"), user("m@x.tw", "成員")
+    g = ledger_of(owner, member)
+    cats = categories()
+    tx = spend(owner, g, cats["餐飲"], 15)
+    r = api.post(f"/api/groups/{g.id}/settle", headers=login(owner))
+    assert r.status_code == 200, r.text
+    assert r.json()["closed"] is False
+    assert crud.get(Transaction, tx.id).group_id == int(r.json()["personalGroupId"])
+    assert crud.get(Group, g.id).created_by == member.id
+    assert api.patch(f"/api/groups/{g.id}", headers=login(member), json={"name": "繼續使用"}).status_code == 200
+    assert api.patch(f"/api/groups/{g.id}", headers=login(owner), json={"name": "不應該能改"}).status_code == 403
+    # Zero-entry members can leave too; merging does not create duplicate transactions.
+    last = api.post(f"/api/groups/{g.id}/settle", headers=login(member))
+    assert last.status_code == 200 and last.json()["moved"] == 0 and last.json()["closed"]
+    assert crud.count(Transaction) == 1
+
+
+@pytest.mark.route(*SETTLE)
+def test_merge_reuses_personal_book_after_rename_and_protects_it(api):
+    me, other = user("o@x.tw", "本人"), user("m@x.tw", "家人")
+    family_of((me, "parent"), (other, "parent"))
+    personal = ledger_of(me, name="改名的大帳本", personal_owner_id=me.id)
+    first, second = ledger_of(me, name="第一本"), ledger_of(me, name="第二本")
+    for source in (first, second):
+        r = api.post(f"/api/groups/{source.id}/settle", headers=login(me))
+        assert r.status_code == 200 and r.json()["personalGroupId"] == str(personal.id)
+    assert crud.count(Group, {"personal_owner_id": me.id}) == 1
+    assert api.delete(f"/api/groups/{personal.id}", headers=login(me)).status_code == 400
+    assert api.post(f"/api/groups/{personal.id}/members", headers=login(me), json={"userId": str(other.id)}).status_code == 400
+    assert api.get("/api/groups", headers=login(me)).json()["groups"][0]["personal"] is True
 
 
 # ===========================================================================

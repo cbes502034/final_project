@@ -31,6 +31,24 @@ SUM = ("GET", "/api/summary")
 
 
 @pytest.mark.route(*SUM)
+def test_personal_book_keeps_profile_goal_and_expected_income(api):
+    me = user("personal@x.tw", "本人", income_mode="fixed", expected_income=50000)
+    personal = ledger_of(me, name="本人的帳本", personal_owner_id=me.id)
+    separate = ledger_of(me, name="尚未合併")
+    cats = categories()
+    spend(me, personal, cats["餐飲"], 100)
+    spend(me, separate, cats["餐飲"], 200)
+    goal(me, 10000)
+    r = api.get(f"/api/summary?scope=me&groupId={personal.id}", headers=login(me))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["expense"] == 100 and body["count"] == 1
+    assert body["members"][0]["savingsGoal"] == 10000
+    assert body["expectedIncome"]["amount"] == 50000
+    assert body["savings"]["goal"] == 10000
+
+
+@pytest.mark.route(*SUM)
 def test_summary_個人_只算自己記的_transfer_不算(api):
     me, mom = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽")
     cats = categories()

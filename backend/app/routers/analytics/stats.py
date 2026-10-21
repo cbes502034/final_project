@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from app import catalog
 from app.guards import block_admin, visible_scope
-from app.models import Allowance, FamilyMember, Guardianship, SavingsGoal, User
+from app.models import Allowance, FamilyMember, Group, Guardianship, SavingsGoal, User
 from app.routers._stub import not_ready, stub
 from app.services import analytics
 from app.toolkit import crud, errors, images, money, period
@@ -172,7 +172,7 @@ def get_summary(
 
             from app import catalog
             from app.guards import block_admin, visible_scope
-            from app.models import Allowance, FamilyMember, Guardianship, SavingsGoal, User
+            from app.models import Allowance, FamilyMember, Group, Guardianship, SavingsGoal, User
             from app.routers._stub import not_ready, stub
             from app.services import analytics
             from app.toolkit import crud, errors, images, money, period
@@ -207,8 +207,11 @@ def get_summary(
             per_user = nums["perUser"]
 
             # 5. 存款目標：選了帳本用那本帳的，沒選用整體的；每個人最新的一筆
+            selected = crud.get(Group, group_id, db=db) if group_id is not None else None
+            personal = selected is not None and selected.personal_owner_id == me.id
+            settings_group = None if personal else group_id
             goals = {}
-            for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id": group_id}, order_by="id", db=db):
+            for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id": settings_group}, order_by="id", db=db):
                 goals[row.user_id] = row.goal_amount
             # 零用金：被照看的人沒記到的那部分，照家長的設定補進可支配上限（只在算自己的時候；
             #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
@@ -216,7 +219,7 @@ def get_summary(
             mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
             # 預計收入：月底才領薪水、日薪、打工的人，還沒入帳前先照預計的算——收入用 max(已入帳, 預計)，入帳後不會重複算。
             #           選了帳本就不估：預計收入是整個人的，不屬於哪一本帳
-            expected = analytics.expected_income(db, list(people), this_month) if group_id is None else {}
+            expected = analytics.expected_income(db, list(people), this_month) if group_id is None or personal else {}
             pending = {u: analytics.pending_income(expected.get(u), per_user[u]["income"] + pocket.get(u, money.ZERO))
                        for u in people}
             mine_pending = money.add(*[pending[u] for u in earners])
@@ -373,8 +376,11 @@ def get_summary(
     per_user = nums["perUser"]
 
     # 5. 存款目標：選了帳本用那本帳的，沒選用整體的；每個人最新的一筆
+    selected = crud.get(Group, group_id, db=db) if group_id is not None else None
+    personal = selected is not None and selected.personal_owner_id == me.id
+    settings_group = None if personal else group_id
     goals = {}
-    for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id": group_id}, order_by="id", db=db):
+    for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id": settings_group}, order_by="id", db=db):
         goals[row.user_id] = row.goal_amount
     # 零用金：被照看的人沒記到的那部分，照家長的設定補進可支配上限（只在算自己的時候；
     #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
@@ -382,7 +388,7 @@ def get_summary(
     mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
     # 預計收入：月底才領薪水、日薪、打工的人，還沒入帳前先照預計的算——收入用 max(已入帳, 預計)，入帳後不會重複算。
     #           選了帳本就不估：預計收入是整個人的，不屬於哪一本帳
-    expected = analytics.expected_income(db, list(people), this_month) if group_id is None else {}
+    expected = analytics.expected_income(db, list(people), this_month) if group_id is None or personal else {}
     pending = {u: analytics.pending_income(expected.get(u), per_user[u]["income"] + pocket.get(u, money.ZERO))
                for u in people}
     mine_pending = money.add(*[pending[u] for u in earners])
