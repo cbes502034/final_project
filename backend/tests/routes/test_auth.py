@@ -186,14 +186,22 @@ def test_logout_撤銷這一台_重複登出也成功(api):
 @pytest.mark.route(*LOGOUT_ALL)
 def test_logout_all(api):
     me, other = user("d@x.tw", "爸爸"), user("o@x.tw", "別人")
-    session_for(me)
-    session_for(me)
+    current, refresh = session_for(me)
+    second, second_refresh = session_for(me)
     session_for(me, revoked_at=now())
-    c, _ = session_for(other)
-    r = api.post("/api/auth/logout-all", headers=login(me))
-    assert r.status_code == 200 and r.json() == {"revoked": 2}
-    assert crud.count(UserSession, {"user_id": me.id, "revoked_at__isnull": True}) == 0
-    assert crud.get(UserSession, c.id).revoked_at is None
+    unrelated, _ = session_for(other)
+    access = tokens.make_access_token(me.id, extra={"sid": str(current.id)})
+    headers = {"Authorization": "Bearer " + access}
+    r = api.post("/api/auth/logout-all", headers=headers)
+    assert r.status_code == 200 and r.json() == {"revoked": 1}
+    assert crud.get(UserSession, current.id).revoked_at is None
+    assert crud.get(UserSession, second.id).revoked_at is not None
+    assert crud.get(UserSession, unrelated.id).revoked_at is None
+    assert api.get("/api/auth/me", headers=headers).status_code == 200
+    other_access = tokens.make_access_token(me.id, extra={"sid": str(second.id)})
+    assert api.get("/api/auth/me", headers={"Authorization": "Bearer " + other_access}).status_code == 401
+    assert api.post("/api/auth/refresh", json={"refreshToken": second_refresh}).status_code == 401
+    assert api.post("/api/auth/refresh", json={"refreshToken": refresh}).status_code == 200
 
 
 # ===========================================================================

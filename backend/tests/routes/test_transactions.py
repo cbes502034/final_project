@@ -37,7 +37,8 @@ def test_list_transactions_看得到的是監管與同帳本的聯集(api):
     one = next(t for t in body["transactions"] if t["id"] == str(by_kid.id))
     assert one == {"id": str(by_kid.id), "user": str(kid.id), "date": today(), "amount": 30, "group": str(kids_own.id),
                    "kind": "expense", "cat": str(cats["餐飲"].id), "source": "manual", "merchant": "全家",
-                   "note": "", "raw": "", "parsed": {"conf": 1, "catConf": 1}}
+                   "note": "", "raw": "", "parsed": {"conf": 1, "catConf": 1},
+                   "activityId": str(kids_own.id), "activityName": kids_own.name, "userName": kid.display_name}
 
 
 @pytest.mark.route(*LIST)

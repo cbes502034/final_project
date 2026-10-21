@@ -77,7 +77,7 @@ from sqlalchemy.orm import Session
 
 from app.toolkit import crud, errors, password_reset, security, tokens
 from app.toolkit.db import get_db
-from app.toolkit.deps import bearer, current_user_id
+from app.toolkit.deps import bearer, current_token_payload, current_user_id
 
 __all__ = [
     "current_user", "guard", "protect",
@@ -96,13 +96,24 @@ def _models():
 # ===========================================================================
 # 目前登入的人
 # ===========================================================================
-def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_db)):
+def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_db),
+                 payload: dict = Depends(current_token_payload)):
     """驗 token → 撈使用者 → 擋停權 → 記最後活動時間 → 掛上家庭與角色。每一個守衛的第一步。"""
     m = _models()
     user = db.get(m.User, uid)
     if user is None or user.deleted_at is not None:
         # 刪除帳號之後，手上那張 access token（最多 30 分鐘）也不能再用
         raise errors.unauthorized("登入資訊無效，請重新登入")
+    if isinstance(payload, dict) and payload.get("sid"):
+        import uuid
+        from datetime import datetime, timezone
+        try:
+            sid = uuid.UUID(payload["sid"])
+        except (ValueError, TypeError):
+            raise errors.unauthorized("登入資訊無效，請重新登入") from None
+        if not crud.exists(m.UserSession, {"id": sid, "user_id": uid, "revoked_at__isnull": True,
+                                          "expires_at__gt": datetime.now(timezone.utc)}, db=db):
+            raise errors.unauthorized("這台裝置已登出，請重新登入")
     if user.suspended_at is not None:
         # ⚠️ 已經登入的人被停權，下一次請求就要擋，不是等他 token 過期
         raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範"))

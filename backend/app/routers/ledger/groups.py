@@ -31,7 +31,7 @@ from app import catalog
 from app.guards import block_admin, current_user, in_group
 from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
 from app.routers._stub import not_ready, stub
-from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
 from app.toolkit import crud, errors, ledger
 from app.toolkit.db import get_db
 
@@ -128,7 +128,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -330,7 +330,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -419,7 +419,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
     from app.guards import block_admin, current_user, in_group
     from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
     from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
     from app.toolkit import crud, errors, ledger
     from app.toolkit.db import get_db
 
@@ -568,7 +568,7 @@ def update_group(
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -783,7 +783,7 @@ def archive_or_remove_group(
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -937,7 +937,7 @@ def add_group_member(
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -1061,7 +1061,7 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -1105,7 +1105,7 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
     from app.guards import block_admin, current_user, in_group
     from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
     from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
     from app.toolkit import crud, errors, ledger
     from app.toolkit.db import get_db
 
@@ -1174,7 +1174,7 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -1263,7 +1263,7 @@ def set_group_notify(
             from app.guards import block_admin, current_user, in_group
             from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
             from app.routers._stub import not_ready, stub
-            from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
             from app.toolkit import crud, errors, ledger
             from app.toolkit.db import get_db
 
@@ -1300,7 +1300,7 @@ def set_group_notify(
     from app.guards import block_admin, current_user, in_group
     from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
     from app.routers._stub import not_ready, stub
-    from app.schemas.group import GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+    from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
     from app.toolkit import crud, errors, ledger
     from app.toolkit.db import get_db
 
@@ -1309,3 +1309,231 @@ def set_group_notify(
     db.commit()
     return {"group": str(group.id), "notify": body.notify}
     # raise not_ready("PATCH /api/groups/{gid}/notify", OWNER)
+
+
+@router.post("/groups/{gid}/invites", summary="建立活動邀請")
+@block_admin
+def invite_activity(body: ActivityInviteIn, group=Depends(in_group("gid", owner=True)), me: User = Depends(current_user), db: Session = Depends(get_db)):
+    """建立活動邀請
+
+    POST /api/groups/{gid}/invites
+
+    【這支做什麼】
+        建立活動邀請。活動成員與家庭關係分開，不會加入對方家庭或建立監管。
+    【前端怎麼打】
+        活動頁的邀請朋友、輸入邀請碼或接受邀請。
+    【誰能打】
+        已登入的一般使用者；建立邀請限活動建立者，回覆限收件者。
+    【請求主體】
+        依對應 schema；邀請 email 留空時產生一次性邀請碼，七日到期。
+    【成功回應】
+        邀請 id、活動 id 與狀態；建立邀請碼時才回明碼。
+    【錯誤回應】
+        403 沒有權限；404 找不到邀請或朋友；409 已加入、邀請過期或活動已結束。
+    【會用到的資料表】
+        activity_invites、groups、group_members、users。
+    【每一步用的工具與資料庫方法】
+        activity_invites 共用服務，鎖住邀請及活動後執行成員異動。
+    【寫法步驟】
+        驗證身分與邀請，執行並在成功後 commit。
+    【完整寫法】
+        第一步：共用 import
+
+            from collections import Counter
+            from datetime import date, datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, Query
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import block_admin, current_user, in_group
+            from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.toolkit import crud, errors, ledger
+            from app.toolkit.db import get_db
+
+        第二步：套用以下函式內容
+
+            from app.services.activity_invites import create
+            result = create(db, group, me, body.email, body.label)
+            db.commit()
+            return result
+
+    【做完怎麼確認】
+        跨家庭朋友接受後只加入活動；過期、重複或別人的邀請不能使用。
+    """
+    from app.services.activity_invites import create
+    result = create(db, group, me, body.email, body.label)
+    db.commit()
+    return result
+
+
+@router.get("/group-invites", summary="我的活動邀請")
+@block_admin
+def list_activity_invites(me: User, db: Session = Depends(get_db)):
+    """我的活動邀請
+
+    GET /api/group-invites
+
+    【這支做什麼】
+        我的活動邀請。活動成員與家庭關係分開，不會加入對方家庭或建立監管。
+    【前端怎麼打】
+        活動頁的邀請朋友、輸入邀請碼或接受邀請。
+    【誰能打】
+        已登入的一般使用者；建立邀請限活動建立者，回覆限收件者。
+    【請求主體】
+        依對應 schema；邀請 email 留空時產生一次性邀請碼，七日到期。
+    【成功回應】
+        邀請 id、活動 id 與狀態；建立邀請碼時才回明碼。
+    【錯誤回應】
+        403 沒有權限；404 找不到邀請或朋友；409 已加入、邀請過期或活動已結束。
+    【會用到的資料表】
+        activity_invites、groups、group_members、users。
+    【每一步用的工具與資料庫方法】
+        activity_invites 共用服務，鎖住邀請及活動後執行成員異動。
+    【寫法步驟】
+        驗證身分與邀請，執行並在成功後 commit。
+    【完整寫法】
+        第一步：共用 import
+
+            from collections import Counter
+            from datetime import date, datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, Query
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import block_admin, current_user, in_group
+            from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.toolkit import crud, errors, ledger
+            from app.toolkit.db import get_db
+
+        第二步：套用以下函式內容
+
+            from app.services.activity_invites import listing
+            return listing(db, me)
+
+    【做完怎麼確認】
+        跨家庭朋友接受後只加入活動；過期、重複或別人的邀請不能使用。
+    """
+    from app.services.activity_invites import listing
+    return listing(db, me)
+
+
+@router.post("/group-invites/join", summary="使用邀請碼加入活動")
+@block_admin
+def join_activity(body: ActivityJoinIn, me: User, db: Session = Depends(get_db)):
+    """使用邀請碼加入活動
+
+    POST /api/group-invites/join
+
+    【這支做什麼】
+        使用邀請碼加入活動。活動成員與家庭關係分開，不會加入對方家庭或建立監管。
+    【前端怎麼打】
+        活動頁的邀請朋友、輸入邀請碼或接受邀請。
+    【誰能打】
+        已登入的一般使用者；建立邀請限活動建立者，回覆限收件者。
+    【請求主體】
+        依對應 schema；邀請 email 留空時產生一次性邀請碼，七日到期。
+    【成功回應】
+        邀請 id、活動 id 與狀態；建立邀請碼時才回明碼。
+    【錯誤回應】
+        403 沒有權限；404 找不到邀請或朋友；409 已加入、邀請過期或活動已結束。
+    【會用到的資料表】
+        activity_invites、groups、group_members、users。
+    【每一步用的工具與資料庫方法】
+        activity_invites 共用服務，鎖住邀請及活動後執行成員異動。
+    【寫法步驟】
+        驗證身分與邀請，執行並在成功後 commit。
+    【完整寫法】
+        第一步：共用 import
+
+            from collections import Counter
+            from datetime import date, datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, Query
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import block_admin, current_user, in_group
+            from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.toolkit import crud, errors, ledger
+            from app.toolkit.db import get_db
+
+        第二步：套用以下函式內容
+
+            from app.services.activity_invites import respond
+            result = respond(db, me, code=body.code)
+            db.commit()
+            return result
+
+    【做完怎麼確認】
+        跨家庭朋友接受後只加入活動；過期、重複或別人的邀請不能使用。
+    """
+    from app.services.activity_invites import respond
+    result = respond(db, me, code=body.code)
+    db.commit()
+    return result
+
+
+@router.post("/group-invites/{invite_id}", summary="回覆或取消活動邀請")
+@block_admin
+def respond_activity_invite(invite_id: str, body: ActivityRespondIn, me: User, db: Session = Depends(get_db)):
+    """回覆或取消活動邀請
+
+    POST /api/group-invites/{invite_id}
+
+    【這支做什麼】
+        回覆或取消活動邀請。活動成員與家庭關係分開，不會加入對方家庭或建立監管。
+    【前端怎麼打】
+        活動頁的邀請朋友、輸入邀請碼或接受邀請。
+    【誰能打】
+        已登入的一般使用者；建立邀請限活動建立者，回覆限收件者。
+    【請求主體】
+        依對應 schema；邀請 email 留空時產生一次性邀請碼，七日到期。
+    【成功回應】
+        邀請 id、活動 id 與狀態；建立邀請碼時才回明碼。
+    【錯誤回應】
+        403 沒有權限；404 找不到邀請或朋友；409 已加入、邀請過期或活動已結束。
+    【會用到的資料表】
+        activity_invites、groups、group_members、users。
+    【每一步用的工具與資料庫方法】
+        activity_invites 共用服務，鎖住邀請及活動後執行成員異動。
+    【寫法步驟】
+        驗證身分與邀請，執行並在成功後 commit。
+    【完整寫法】
+        第一步：共用 import
+
+            from collections import Counter
+            from datetime import date, datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, Query
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import block_admin, current_user, in_group
+            from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.toolkit import crud, errors, ledger
+            from app.toolkit.db import get_db
+
+        第二步：套用以下函式內容
+
+            from app.services.activity_invites import respond
+            result = respond(db, me, invite_id=int(invite_id) if invite_id.isdigit() else 0, action=body.action)
+            db.commit()
+            return result
+
+    【做完怎麼確認】
+        跨家庭朋友接受後只加入活動；過期、重複或別人的邀請不能使用。
+    """
+    from app.services.activity_invites import respond
+    result = respond(db, me, invite_id=int(invite_id) if invite_id.isdigit() else 0, action=body.action)
+    db.commit()
+    return result

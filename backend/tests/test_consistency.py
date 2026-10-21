@@ -1552,14 +1552,14 @@ def test_帳本頁進來只看得到帳本():
     assert mo, "app.js 裡找不到 vGroups"
     body = mo.group(1)
 
-    assert "foldBlock('gnew', '進行中', '開一本帳'" in body, "整頁一顆「開一本帳」，掛在帳本頁最上面"
+    assert "foldBlock('gnew', '進行中', '建立活動'" in body, "整頁一顆「開一本帳」，掛在帳本頁最上面"
     assert "ledgerList(" in body, "帳本清單應該是收合列"
     assert "'誰在哪一本帳裡'" not in app, "「誰在哪一本帳裡」已經併進每一本帳的展開內容"
     assert "<table" not in body, "帳本不用表格"
     assert "foldRestore()" in body, "重畫之後沒有 foldRestore()"
 
     lb = re.search(r"function ledgerBody\(g\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "data-gdel" in lb and "data-gaddsel" in lb, "成員的加減應該在帳本展開的內容裡"
+    assert "data-gdel" in lb and "activity-invite" in lb, "成員管理與朋友邀請應該在活動展開的內容裡"
 
     plain = re.findall(r'<h2 class="sec__t">([^<\']+)', body)
     assert set(plain) <= set(), "帳本頁多了攤開的區塊：%s" % plain
@@ -1713,7 +1713,7 @@ def test_登出後的頁面用預設樣式_不沿用上一個人的主題():
 def test_帳本的存錢目標是選填_預設收起來():
     """使用者：個人資料已經設過存錢目標，帳本裡一直擺著輸入框很多餘——改成選填，按了才出現。"""
     app = read("frontend/js/app.js")
-    assert "data-gopen=" in app and "另外設這本帳的存錢目標（選填）" in app
+    assert "data-gopen=" in app and "另外設這個活動的存錢目標（選填）" in app
     row = app[app.index("'<dt>存錢目標</dt><dd>'"):]
     row = row[:row.index("'<dt>通知</dt>")]
     assert row.index("Number(g.goal) > 0") < row.index("data-ggoal"), "沒設目標時不能直接擺輸入框"
@@ -3149,7 +3149,7 @@ def test_一個畫面不放兩個同樣的入口():
             '{ display: none !important; }') in css
     assert "wal__go" not in app and "wal__go" not in css
     # 帳本頁只有一顆「開一本帳」，常設或活動在表單裡選（使用者：「一個統一的按鈕就好」）
-    assert "foldBlock('gnew', '進行中', '開一本帳'" in app and "data-gnew-temp" not in app
+    assert "foldBlock('gnew', '進行中', '建立活動'" in app and "data-gnew-temp" not in app
     # 手機明細頁的「記一筆」只留分頁列那顆
     assert 'body[data-page="entry"] #view .fold__b[data-fold="entry"]:not(.on) { display: none; }' in css
 

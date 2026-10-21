@@ -371,6 +371,7 @@ window.DATA = {
              ['group_id', 'BIGINT', 'FK → groups，這筆算在哪一本帳上。INDEX'],
              ['is_snapshot', 'BOOLEAN', '合併前留在原帳本的唯讀歷史；跨帳本加總不重複計入'],
              ['copied_from_id', 'BIGINT', 'FK → transactions，UNIQUE。個人副本的原始紀錄；刪除原始紀錄時設 NULL'],
+             ['origin_group_id', 'BIGINT', 'FK → groups，來源活動。INDEX'],
              ['family_id', 'BIGINT', 'FK → families，INDEX'],
              ['account_id', 'BIGINT', 'FK → accounts'],
              ['category_id', 'BIGINT', 'FK → categories'],
@@ -436,6 +437,14 @@ window.DATA = {
              ['ends_on', 'DATE', '臨時帳本的結束日。常設為 NULL'],
              ['settled_at', 'TIMESTAMPTZ', 'NULL = 還沒結算。結算後這本帳唯讀'],
              ['removed_at', 'TIMESTAMPTZ', 'NULL = 還在。只有結算過的才能移除；移除不能復原，紀錄一筆都不刪']] },
+
+    { t: 'activity_invites', label: '活動邀請', note: '邀請碼或帳號邀請，不改變家庭關係',
+      cols: [['id', 'BIGSERIAL', 'PK'], ['group_id', 'BIGINT', 'FK → groups'],
+             ['inviter_id', 'BIGINT', 'FK → users'], ['invitee_id', 'BIGINT', 'FK → users'],
+             ['code_hash', 'TEXT', 'UNIQUE，只存雜湊'], ['label', 'TEXT', '邀請碼備註'],
+             ['status', 'TEXT', 'pending／accepted／declined／cancelled'],
+             ['expires_at', 'TIMESTAMPTZ', ''], ['created_at', 'TIMESTAMPTZ', ''],
+             ['responded_at', 'TIMESTAMPTZ', '']] },
 
     { t: 'group_members', label: '帳本成員', note: '可見範圍的另一條路：我在這本帳裡就看得到這本帳',
       cols: [['group_id', 'BIGINT', 'PK, FK → groups'],

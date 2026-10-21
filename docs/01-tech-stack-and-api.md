@@ -61,7 +61,7 @@
 | **Pydantic** | v2 | 請求／回應驗證 | **強制結構化輸出的關鍵**，LLM 回傳也用它驗 |
 | **pydantic-settings** | 2.6+ | 環境變數管理 | 設定集中，不散落在各處 |
 | **SQLAlchemy** | 2.0 | ORM | 2.0 的型別標註對新手比較友善 |
-| **Alembic** | 1.14+ | 資料庫遷移 | 22 張表一定會改，沒有遷移工具會很痛苦 |
+| **Alembic** | 1.14+ | 資料庫遷移 | 23 張表一定會改，沒有遷移工具會很痛苦 |
 | **psycopg** | 3.2+ | PostgreSQL 驅動 | `[binary]` 版有預編譯輪檔，不用編譯 |
 | **PyJWT** | 2.10+ | JWT 簽發驗證 | 比 python-jose 維護更活躍 |
 | **passlib[bcrypt]** | 1.7+ | 密碼雜湊 | **絕不自己實作密碼雜湊** |
@@ -150,9 +150,9 @@ final_project/
 │   │   ├── ownership.py         分工的單一事實來源（誰負責哪支路由、哪些檔案）
 │   │   ├── catalog.py           固定清單（角色、權限表、理財選項、系統分類…），正本是 data.js
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
-│   │   ├── models/              22 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
+│   │   ├── models/              23 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
-│   │   ├── routers/             79 支路由，一個領域一個資料夾。還沒做的回 501
+│   │   ├── routers/             84 支路由，一個領域一個資料夾。還沒做的回 501
 │   │   │   ├── auth/            認證（auth.py、admin.py）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/          記帳（transactions、nlp、categories、groups）
 │   │   │   ├── analytics/       數字（stats、budgets、alerts、advices）
@@ -165,7 +165,7 @@ final_project/
 │   │       ├── analytics.py     所有加總（數字）
 │   │       ├── permission.py    可見範圍（家庭）
 │   │       └── evaluation.py    模型評測指標
-│   ├── alembic/                 資料庫遷移（versions/ 一版一版往上加，現在是 22 張表）
+│   ├── alembic/                 資料庫遷移（versions/ 一版一版往上加，現在是 23 張表）
 │   ├── tests/                   pytest（routes/：每一支路由的驗收測試；fixtures/：假後端）
 │   ├── tools/                   eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生
 │   ├── eval/                    留出集與評測結果
@@ -186,7 +186,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **79 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **84 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `本人` / `家長` / `監管者` / `建立者` / `平台管理員`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -200,7 +200,7 @@ final_project/
 | 2 | POST | `/api/auth/login` | 認證 | 公開 | 登入。回傳 access + refresh token |
 | 3 | POST | `/api/auth/refresh` | 認證 | 公開 | 用 refresh token 換新的 access token |
 | 4 | POST | `/api/auth/logout` | 認證 | 登入 | 撤銷目前的 refresh token |
-| 5 | POST | `/api/auth/logout-all` | 認證 | 登入 | 撤銷所有裝置的 token |
+| 5 | POST | `/api/auth/logout-all` | 認證 | 登入 | 撤銷其他裝置的 token，保留目前裝置 |
 | 6 | GET | `/api/auth/me` | 認證 | 登入 | 目前使用者、家庭角色、看得到誰、被誰監管 |
 | 7 | PATCH | `/api/auth/password` | 認證 | 登入 | 修改密碼，同時讓其他 session 失效。舊密碼不對回 400 |
 | 74 | POST | `/api/auth/password-reset` | 認證 | 公開 | 忘記密碼：寄一次性的重設連結（Brevo）。**有沒有這個帳號都回同一句話** |
@@ -286,6 +286,11 @@ final_project/
 | 30 | DELETE | `/api/groups/{gid}/members/{user_id}` | 記帳 | 建立者 | 把某個人移出這本帳 |
 | 31 | POST | `/api/groups/{gid}/settle` | 記帳 | 本人（開帳本的人） | 結算活動帳本。之後唯讀，不能再往裡面記 |
 | 32 | PATCH | `/api/groups/{gid}/notify` | 記帳 | 帳本成員 | 這本帳有動靜要不要通知我。body: { notify } |
+| 86 | GET | `/api/transactions/archive` | 記帳 | 登入 | 收支明細年月包裹 |
+| 87 | POST | `/api/groups/{gid}/invites` | 記帳 | 登入 | 建立活動邀請 |
+| 88 | GET | `/api/group-invites` | 記帳 | 登入 | 我的活動邀請 |
+| 89 | POST | `/api/group-invites/join` | 記帳 | 登入 | 使用邀請碼加入活動 |
+| 90 | POST | `/api/group-invites/{invite_id}` | 記帳 | 登入 | 回覆或取消活動邀請 |
 | 58 | GET | `/api/allowances` | 家庭 | 登入 | 我每月給每個被監管者多少零用金 |
 | 59 | PUT | `/api/allowance` | 家庭 | 監管者 | 設定零用金。body: { wardId, amount } |
 | 65 | GET | `/api/audit` | 家庭 | 平台管理員 | 稽核紀錄：誰做了什麼。⚠️ 只記動作，不記金額 |
@@ -434,7 +439,7 @@ final_project/
 
 ## 5-1　每一支路由的規格，寫在那一支的說明字串裡
 
-`backend/app/routers/` 底下（一個領域一個資料夾）的 79 支路由，每一支的說明字串都有同樣的十一個段落：
+`backend/app/routers/` 底下（一個領域一個資料夾）的 84 支路由，每一支的說明字串都有同樣的十一個段落：
 
 ```
 【這支做什麼】【前端怎麼打】【誰能打】【請求主體／查詢參數】【成功回應】【錯誤回應】

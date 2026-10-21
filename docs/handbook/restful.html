@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RESTful API 說明書</title>
-<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 79 支路由哪裡符合、哪裡故意不符合。">
+<meta name="description" content="從零開始講 REST：網址是名詞、動作是方法、狀態碼是回應的一部分，並且誠實檢查本專案 84 支路由哪裡符合、哪裡故意不符合。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -100,12 +100,12 @@ td.verdict-fix { color: var(--down); white-space: nowrap; }
         REST 不是技術，是一套<b>取名字的約定</b>。約定好之後，
         別人看到你的網址就猜得出它會做什麼——不用問你、不用翻文件。<br>
         這份文件會先用<b>圖書館</b>把概念講完，再回頭誠實檢查
-        我們自己的 79 支路由：哪些符合、哪些故意不符合、哪些可以改。
+        我們自己的 84 支路由：哪些符合、哪些故意不符合、哪些可以改。
       </p>
       <div class="hero__meta">
         <div class="mchip"><span>預計閱讀</span><b>25 分鐘</b></div>
         <div class="mchip"><span>前置知識</span><b>看過 FastAPI 說明書</b></div>
-        <div class="mchip"><span>本專案</span><b>79 支路由</b></div>
+        <div class="mchip"><span>本專案</span><b>84 支路由</b></div>
       </div>
     </header>
     <!-- 這一頁的重點：先講結論，細節在下面每一節 -->
@@ -520,7 +520,7 @@ DELETE /books/5
 
     <!-- ============ 08 ============ -->
     <section class="sec" id="ours">
-      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 79 支</h2></div>
+      <div class="sec__h"><span class="sec__n">08</span><h2>誠實檢查我們自己的 84 支</h2></div>
       <p class="sec__lead">
         我把本專案的每一支路由都對上面的規則檢查過（清單跟 <code>backend/app/ownership.py</code> 一致，有測試對）。
         結果是：<b>79 支裡有 42 支完全符合，37 支嚴格說不符合 REST 慣例。</b>
@@ -538,7 +538,7 @@ DELETE /books/5
         <table>
           <thead><tr><th>路由</th></tr></thead>
           <tbody>
-            <tr><td class="rt">POST /api/auth/password-reset<br>GET /api/auth/sessions<br>GET /api/admin/users<br>GET /api/admin/errors<br>GET /api/admin/security-events<br>POST /api/client-errors<br>DELETE /api/auth/me<br>DELETE /api/advices/{aid}<br>DELETE /api/categories/{cid}<br>DELETE /api/notifications<br>GET /api/transactions<br>POST /api/transactions<br>PATCH /api/transactions/{tx_id}<br>DELETE /api/transactions/{tx_id}<br>DELETE /api/transactions<br>GET /api/categories<br>POST /api/categories<br>GET /api/groups<br>POST /api/groups<br>PATCH /api/groups/{gid}<br>POST /api/groups/{gid}/members<br>DELETE /api/groups/{gid}/members/{user_id}<br>GET /api/budgets<br>GET /api/savings-goals<br>GET /api/alerts<br>POST /api/alerts<br>PATCH /api/alerts/{aid}<br>DELETE /api/alerts/{aid}<br>GET /api/advices<br>GET /api/family/invites<br>POST /api/family/invites<br>DELETE /api/family/invites/{invite_id}<br>PATCH /api/family/members/{user_id}<br>DELETE /api/family/members/{user_id}<br>GET /api/guardianships<br>POST /api/guardianships<br>DELETE /api/guardianships/{gid}<br>GET /api/notifications<br>PATCH /api/notifications/{nid}<br>PATCH /api/notifications<br>GET /api/allowances<br>GET /api/audit</td></tr>
+            <tr><td class="rt">POST /api/auth/password-reset<br>GET /api/auth/sessions<br>GET /api/admin/users<br>GET /api/admin/errors<br>GET /api/admin/security-events<br>POST /api/client-errors<br>DELETE /api/auth/me<br>DELETE /api/advices/{aid}<br>DELETE /api/categories/{cid}<br>DELETE /api/notifications<br>GET /api/transactions/archive<br>POST /api/groups/{gid}/invites<br>GET /api/group-invites<br>POST /api/group-invites/join<br>POST /api/group-invites/{invite_id}<br>GET /api/transactions<br>POST /api/transactions<br>PATCH /api/transactions/{tx_id}<br>DELETE /api/transactions/{tx_id}<br>DELETE /api/transactions<br>GET /api/categories<br>POST /api/categories<br>GET /api/groups<br>POST /api/groups<br>PATCH /api/groups/{gid}<br>POST /api/groups/{gid}/members<br>DELETE /api/groups/{gid}/members/{user_id}<br>GET /api/budgets<br>GET /api/savings-goals<br>GET /api/alerts<br>POST /api/alerts<br>PATCH /api/alerts/{aid}<br>DELETE /api/alerts/{aid}<br>GET /api/advices<br>GET /api/family/invites<br>POST /api/family/invites<br>DELETE /api/family/invites/{invite_id}<br>PATCH /api/family/members/{user_id}<br>DELETE /api/family/members/{user_id}<br>GET /api/guardianships<br>POST /api/guardianships<br>DELETE /api/guardianships/{gid}<br>GET /api/notifications<br>PATCH /api/notifications/{nid}<br>PATCH /api/notifications<br>GET /api/allowances<br>GET /api/audit</td></tr>
           </tbody>
         </table>
       </div>
@@ -733,14 +733,14 @@ DELETE /books/5
       <div class="note">
         <div class="note__k">動工前先看這兩份</div>
         <p><a href="fastapi.html">FastAPI 說明書</a> —— 怎麼用程式把這些實作出來<br>
-        <a href="api.html">API 瀏覽</a> —— 本專案 79 支路由的完整清單<br>
+        <a href="api.html">API 瀏覽</a> —— 本專案 84 支路由的完整清單<br>
         還有 <code>docs/02-前後端串接契約.md</code> —— 每一支「我送什麼、你吐什麼」</p>
       </div>
     </section>
 
     <footer class="foot">
       <div>家庭記帳與財務控管系統 · RESTful API 說明書</div>
-      <div class="mono">79 ROUTES · 5 METHODS</div>
+      <div class="mono">84 ROUTES · 5 METHODS</div>
     </footer>
 
   </div>

@@ -37,3 +37,16 @@ class GroupMemberIn(BaseModel):
 
 class NotifyIn(BaseModel):
     notify: bool
+
+
+class ActivityInviteIn(BaseModel):
+    email: str | None = Field(default=None, max_length=254)
+    label: str = Field(default="朋友", min_length=1, max_length=30)
+
+
+class ActivityJoinIn(BaseModel):
+    code: str = Field(min_length=1, max_length=30)
+
+
+class ActivityRespondIn(BaseModel):
+    action: str = Field(pattern="^(accept|decline|cancel)$")

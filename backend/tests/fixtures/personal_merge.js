@@ -23,7 +23,7 @@ async function checkUI() {
   assert.equal(ui.txLocked({ snapshot: true, group: 'shared' }), true);
   await ui.paintGroups(true);
   assert.equal(ui.GROUP, 'personal');
-  assert.ok(box.innerHTML.includes('data-group="personal"'));
+  assert.ok(!box.innerHTML.includes('data-group="personal"'));
   assert.ok(!box.innerHTML.includes('data-group="all"'));
   assert.ok(!box.innerHTML.includes('data-group="closed"'));
   ui.GROUP = 'closed';
@@ -31,7 +31,8 @@ async function checkUI() {
   assert.equal(ui.GROUP, 'personal');
   books.splice(0, 1); books.splice(1, 1);
   await ui.paintGroups(true);
-  assert.equal(box.hidden, false); // Even a lone personal book stays selected and labelled.
+  assert.equal(box.hidden, false);
+  assert.ok(box.innerHTML.includes('目前尚未建立活動'));
   const html = ui.ledgerBody({ id: 'shared', members: [], count: 2, canEdit: false });
   assert.ok(html.includes('data-gsettle="shared"')); // Non-owners can merge.
   assert.ok(html.includes('data-gview="shared"'));
@@ -69,6 +70,13 @@ async function checkMock() {
   assert.ok(!(await c.API.groups()).groups.some(g => g.id === 'G1'));
   assert.equal((await c.API.summary({ scope: 'me' })).expense, 10);
   assert.equal((await c.API.transactions({})).total, 1);
+  const origin = await c.API.transactions({ groupId: merged.personalGroupId, q: '旅行', activityId: 'G1' });
+  assert.equal(origin.total, 1);
+  assert.equal(origin.transactions[0].activityName, '旅行');
+  c.__FAMBUDGET_TODAY__ = '2027-01-31';
+  assert.equal((await c.API.transactionArchive({ groupId: merged.personalGroupId })).nextPackAt, '2027-02-01T00:00:00+08:00');
+  await c.API.logoutAll();
+  assert.equal((await c.API.me()).user.id, 'U1');
   // Reload as the remaining member: original history, personal copy, and ownership persist.
   saved = JSON.parse(storage['fambudget.state.v2']); saved.me = 'U2';
   storage['fambudget.state.v2'] = JSON.stringify(saved);
@@ -84,6 +92,36 @@ async function checkMock() {
   assert.equal(last.closed, true);
   assert.equal(last.copied, 1);
   assert.ok(!(await c.API.groups()).groups.some(g => g.id === 'G1'));
+  const past = await c.API.transactions({ groupId: last.personalGroupId, activityId: 'G1', q: '旅行' });
+  assert.equal(past.total, 1);
+  assert.equal(past.transactions[0].activityName, '旅行');
 }
-(async () => { await checkUI(); await checkMock(); console.log('personal merge UI and mock checks passed'); })()
+function checkArchive() {
+  class Clock extends Date { static now() { return Date.parse('2026-12-31T16:00:00Z'); } }
+  let loaded = 0;
+  const ui = { Date: Clock, ARCHIVE: { current: '2026-12', month: '2026-12' },
+    location: { hash: '#/entry' }, F: { activityId: 'all' }, esc: String,
+    skeleton: () => 'loading', emptyState: () => 'empty', loadTx: () => { loaded++; } };
+  vm.createContext(ui);
+  vm.runInContext(['taipeiMonth', 'monthRange', 'archiveMarkup', 'archiveRollover'].map(extract).join('\n'), ui);
+  assert.equal(ui.taipeiMonth(Date.parse('2026-12-31T15:59:59Z')), '2026-12');
+  assert.equal(ui.taipeiMonth(Date.parse('2026-12-31T16:00:00Z')), '2027-01');
+  assert.equal(ui.monthRange('2024-02').join(','), '2024-02-01,2024-02-29');
+  assert.equal(ui.monthRange('2025-02').join(','), '2025-02-01,2025-02-28');
+  ui.archiveRollover();
+  assert.equal(ui.ARCHIVE.month, '2027-01');
+  assert.equal(loaded, 1);
+  ui.archiveRollover();
+  assert.equal(loaded, 1);
+  const data = { currentMonth: '2027-01', activities: [], years: [
+    { year: '2026', months: [{ month: '2026-12', count: 250, packed: true }] }] };
+  const html = ui.archiveMarkup(data);
+  assert.ok(html.includes('2026 年') && !html.includes('2027 年'));
+  assert.ok(html.includes('250 筆 · 已打包'));
+  assert.ok(!html.includes('id="txList"')); // Closed months do not mount detailed rows.
+  ui.ARCHIVE.month = '2026-12';
+  assert.ok(ui.archiveMarkup(data).includes('id="txList"'));
+  assert.ok(ui.archiveMarkup({currentMonth:'2027-01', activities:[], years:[]}).includes('empty'));
+}
+(async () => { checkArchive(); await checkUI(); await checkMock(); console.log('personal merge, archive UI and mock checks passed'); })()
   .catch(err => { console.error(err); process.exitCode = 1; });

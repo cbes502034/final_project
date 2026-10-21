@@ -79,10 +79,18 @@ async function rec(name, ...args) {
   await rec('groups', {});
   await rec('updateGroup', g.id, { note: '日常開銷，全家共用' });
   await rec('addGroupMember', g.id, kid.user.id);
+  const activityCode = await rec('inviteActivity', g.id, {});
+  await rec('activityInvites');
+  await A.login({ email: 'meiling@wang.tw', password: 'meiling-pass-1' });
+  await rec('joinActivity', activityCode.code);
+  await A.login({ email: 'daming@wang.tw', password: 'daming-pass-1' });
+  const cancelled = await rec('inviteActivity', g.id, {});
+  await rec('respondActivityInvite', cancelled.id, 'cancel');
   await rec('setGroupNotify', g.id, true);
   const t1 = await rec('createTransaction', { date: '2026-09-13', amount: 1280, kind: 'expense', cat: 'C01', groupId: g.id, merchant: '全聯', note: '一週的菜' });
   await A.createTransaction({ date: '2026-09-01', amount: 62000, kind: 'income', cat: 'I01', groupId: g.id, merchant: '', note: '九月薪水' });
   await rec('transactions', { from: '2026-09-01', to: '2026-09-30' });
+  await rec('transactionArchive', { groupId: g.id, activityId: g.id, q: '家用' });
   await rec('updateTransaction', t1.id, { amount: 1350, note: '一週的菜＋水果' });
   const p1 = await rec('nlpParse', '早餐55');
   const pb = await rec('nlpParseBatch', '早上買早餐55，晚上加油1200');

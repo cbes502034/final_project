@@ -68,7 +68,8 @@ def copy_to_personal(db, original, personal_id):
         values = {c.name: getattr(original, c.name) for c in Transaction.__table__.columns
                   if c.name not in {"id", "group_id", "is_snapshot", "copied_from_id"}}
         copied = crud.save(Transaction, {**values, "group_id": personal_id,
-                                        "copied_from_id": original.id, "is_snapshot": False}, db=db)
+                                        "copied_from_id": original.id, "origin_group_id": original.group_id,
+                                        "is_snapshot": False}, db=db)
         for parsed in crud.find(NlpParse, {"transaction_id": original.id}, db=db):
             values = {c.name: getattr(parsed, c.name) for c in NlpParse.__table__.columns
                       if c.name not in {"id", "transaction_id"}}

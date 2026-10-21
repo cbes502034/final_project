@@ -45,6 +45,7 @@ def list_transactions(
     request: Request,
     userId: str | None = None,
     groupId: str | None = None,
+    activityId: str | None = None,
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
     categoryId: str | None = None,
@@ -163,58 +164,16 @@ def list_transactions(
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
             # 1. 不認得的查詢參數直接擋（默默忽略的話，篩選沒生效也看不出來）
-            allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page"}
+            allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page", "activityId"}
             unknown = sorted(set(request.query_params) - allowed)
             if unknown:
                 raise errors.unprocessable("不認得的篩選參數：" + "、".join(unknown))
 
-            # 2. 我看得到的人、看得到的帳本；兩條路一定是「或」
-            users, groups = visible_scope(me, db)
-            where = {"and": [{"or": [{"user_id__in": users}, {"group_id__in": groups}]}]}
-
-            # 3. 帶了 userId：要是我查得到的人，不然 403（不要回空陣列）
-            if userId and userId != "all":
-                target = int(userId) if userId.isdigit() else 0
-                members = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
-                if target not in users and target not in members and not crud.exists(
-                    Transaction, {"user_id": target, "group_id__in": groups}, db=db):
-                    raise errors.forbidden("你沒有權限看這個人的紀錄")
-                where["user_id"] = target
-
-            # 4. 帶了 groupId：要是我加入的帳本
-            if groupId and groupId != "all":
-                group_id = int(groupId) if groupId.isdigit() else 0
-                if group_id not in groups:
-                    raise errors.forbidden("你不在這本帳裡")
-                where["group_id"] = group_id
-            else:
-                where["is_snapshot"] = False
-
-            # 5. 其他篩選
-            try:
-                if from_:
-                    where["occurred_on__gte"] = date.fromisoformat(from_)
-                if to:
-                    where["occurred_on__lte"] = date.fromisoformat(to)
-            except ValueError:
-                raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
-            if categoryId:
-                where["category_id"] = int(categoryId) if categoryId.isdigit() else 0
-            if kind and kind != "all":
-                if kind not in ("income", "expense", "transfer"):
-                    raise errors.unprocessable("kind 只能是 income、expense 或 transfer")
-                where["kind"] = kind
-            if source and source != "all":
-                if source not in ("manual", "nlp", "import"):
-                    raise errors.unprocessable("source 只能是 manual、nlp 或 import")
-                where["source"] = source
-            if q and q.strip():
-                word = q.strip()
-                where["and"].append({"or": [{"merchant__icontains": word}, {"note__icontains": word}]})
+            from app.services.transaction_query import filters, annotate
+            where = filters(db, me, userId, groupId, from_, to, categoryId, kind, source, q, activityId)
 
             # 6. 查一頁：新的在前，一頁 200 筆
             result = crud.find(Transaction, where, order_by=("-occurred_on", "-id"), page=page, size=200, db=db)
@@ -245,6 +204,7 @@ def list_transactions(
                 else:
                     item["parsed"] = {"conf": 1, "catConf": 1}
                 out.append(item)
+            annotate(db, rows, out)
             return {"transactions": out, "total": result["total"]}
 
     【做完怎麼確認】
@@ -263,68 +223,18 @@ def list_transactions(
     """
 
 
-    from datetime import date, datetime, timezone
 
-    from fastapi import APIRouter, Depends, Query, Request
-    from sqlalchemy.orm import Session
 
-    from app.guards import block_admin, current_user, own, visible_scope
-    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.transaction import TransactionIn, TransactionPatchIn
-    from app.toolkit import crud, errors, ledger, money, notify
-    from app.toolkit.db import get_db
 
 
     # 1. 不認得的查詢參數直接擋（默默忽略的話，篩選沒生效也看不出來）
-    allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page"}
+    allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page", "activityId"}
     unknown = sorted(set(request.query_params) - allowed)
     if unknown:
         raise errors.unprocessable("不認得的篩選參數：" + "、".join(unknown))
 
-    # 2. 我看得到的人、看得到的帳本；兩條路一定是「或」
-    users, groups = visible_scope(me, db)
-    where = {"and": [{"or": [{"user_id__in": users}, {"group_id__in": groups}]}]}
-
-    # 3. 帶了 userId：要是我查得到的人，不然 403（不要回空陣列）
-    if userId and userId != "all":
-        target = int(userId) if userId.isdigit() else 0
-        members = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
-        if target not in users and target not in members and not crud.exists(
-            Transaction, {"user_id": target, "group_id__in": groups}, db=db):
-            raise errors.forbidden("你沒有權限看這個人的紀錄")
-        where["user_id"] = target
-
-    # 4. 帶了 groupId：要是我加入的帳本
-    if groupId and groupId != "all":
-        group_id = int(groupId) if groupId.isdigit() else 0
-        if group_id not in groups:
-            raise errors.forbidden("你不在這本帳裡")
-        where["group_id"] = group_id
-    else:
-        where["is_snapshot"] = False
-
-    # 5. 其他篩選
-    try:
-        if from_:
-            where["occurred_on__gte"] = date.fromisoformat(from_)
-        if to:
-            where["occurred_on__lte"] = date.fromisoformat(to)
-    except ValueError:
-        raise errors.unprocessable("日期要是 YYYY-MM-DD") from None
-    if categoryId:
-        where["category_id"] = int(categoryId) if categoryId.isdigit() else 0
-    if kind and kind != "all":
-        if kind not in ("income", "expense", "transfer"):
-            raise errors.unprocessable("kind 只能是 income、expense 或 transfer")
-        where["kind"] = kind
-    if source and source != "all":
-        if source not in ("manual", "nlp", "import"):
-            raise errors.unprocessable("source 只能是 manual、nlp 或 import")
-        where["source"] = source
-    if q and q.strip():
-        word = q.strip()
-        where["and"].append({"or": [{"merchant__icontains": word}, {"note__icontains": word}]})
+    from app.services.transaction_query import filters, annotate
+    where = filters(db, me, userId, groupId, from_, to, categoryId, kind, source, q, activityId)
 
     # 6. 查一頁：新的在前，一頁 200 筆
     result = crud.find(Transaction, where, order_by=("-occurred_on", "-id"), page=page, size=200, db=db)
@@ -355,6 +265,7 @@ def list_transactions(
         else:
             item["parsed"] = {"conf": 1, "catConf": 1}
         out.append(item)
+    annotate(db, rows, out)
     return {"transactions": out, "total": result["total"]}
     # raise not_ready("GET /api/transactions", OWNER)
 
@@ -1304,3 +1215,93 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
     db.commit()
     return {"deleted": wanted}
     # raise not_ready("DELETE /api/transactions", OWNER)
+
+
+@router.get("/transactions/archive", summary="收支明細的年月包裹")
+@block_admin
+def transaction_archive(me: User, groupId: str | None = None, kind: str | None = None,
+                        source: str | None = None, q: str | None = None, activityId: str | None = None,
+                        db: Session = Depends(get_db)):
+    """收支明細的年月包裹
+
+    GET /api/transactions/archive
+
+    【這支做什麼】
+        依交易日期彙總有紀錄的年份及月份，不載入整份詳細明細。
+    【前端怎麼打】
+        API.transactionArchive()；月份展開後才查該月的 transactions。
+    【誰能打】
+        已登入的一般使用者，使用與明細相同的可見範圍。
+    【查詢參數】
+        groupId、kind、source、q、activityId，含活動名稱搜尋。
+    【成功回應】
+        years、activities、currentMonth、nextPackAt；時間依 Asia/Taipei。
+    【錯誤回應】
+        403 不在活動內；422 不合法的篩選參數。
+    【會用到的資料表】
+        transactions、groups，及可見範圍相關資料表。
+    【每一步用的工具與資料庫方法】
+        共用 filters()，SQL 依年及月 GROUP BY 計數。
+    【寫法步驟】
+        查年月摘要、來源活動，回傳下一次月底打包時間；不搬動資料。
+    【完整寫法】
+        第一步：共用 import
+
+            from datetime import date, datetime, timezone
+
+            from fastapi import APIRouter, Depends, Query, Request
+            from sqlalchemy.orm import Session
+
+            from app.guards import block_admin, current_user, own, visible_scope
+            from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.transaction import TransactionIn, TransactionPatchIn
+            from app.toolkit import crud, errors, ledger, money, notify
+            from app.toolkit.db import get_db
+
+        第二步：套用以下函式內容
+
+            from datetime import timedelta
+            from sqlalchemy import select, extract, func
+            from app.services.transaction_query import filters
+            where = filters(db, me, groupId=groupId, kind=kind, source=source, q=q, activityId=activityId)
+            year, month = extract("year", Transaction.occurred_on), extract("month", Transaction.occurred_on)
+            rows = db.execute(select(year.label("year"), month.label("month"), func.count().label("count"))
+                              .where(crud.build_where(Transaction, where)).group_by(year, month).order_by(year.desc(), month.desc())).all()
+            now = datetime.now(timezone(timedelta(hours=8)))
+            current = now.strftime("%Y-%m")
+            next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            years = {}
+            for y, m, count in rows:
+                key = f"{int(y):04d}-{int(m):02d}"
+                years.setdefault(str(int(y)), []).append({"month": key, "count": count, "packed": key < current})
+            ids = set(db.scalars(select(func.coalesce(Transaction.origin_group_id, Transaction.group_id))
+                                 .where(crud.build_where(Transaction, where)).distinct()))
+            activities = crud.find(Group, {"id__in": ids, "personal_owner_id__isnull": True}, order_by="name", db=db)
+            return {"years": [{"year": y, "months": months} for y, months in years.items()],
+                    "activities": [{"id": str(g.id), "name": g.name} for g in activities],
+                    "currentMonth": current, "nextPackAt": next_month.isoformat()}
+
+    【做完怎麼確認】
+        大量歷史明細只先取得年月計數；月底之後舊月份自動標記 packed。
+    """
+    from datetime import timedelta
+    from sqlalchemy import select, extract, func
+    from app.services.transaction_query import filters
+    where = filters(db, me, groupId=groupId, kind=kind, source=source, q=q, activityId=activityId)
+    year, month = extract("year", Transaction.occurred_on), extract("month", Transaction.occurred_on)
+    rows = db.execute(select(year.label("year"), month.label("month"), func.count().label("count"))
+                      .where(crud.build_where(Transaction, where)).group_by(year, month).order_by(year.desc(), month.desc())).all()
+    now = datetime.now(timezone(timedelta(hours=8)))
+    current = now.strftime("%Y-%m")
+    next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    years = {}
+    for y, m, count in rows:
+        key = f"{int(y):04d}-{int(m):02d}"
+        years.setdefault(str(int(y)), []).append({"month": key, "count": count, "packed": key < current})
+    ids = set(db.scalars(select(func.coalesce(Transaction.origin_group_id, Transaction.group_id))
+                         .where(crud.build_where(Transaction, where)).distinct()))
+    activities = crud.find(Group, {"id__in": ids, "personal_owner_id__isnull": True}, order_by="name", db=db)
+    return {"years": [{"year": y, "months": months} for y, months in years.items()],
+            "activities": [{"id": str(g.id), "name": g.name} for g in activities],
+            "currentMonth": current, "nextPackAt": next_month.isoformat()}

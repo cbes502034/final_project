@@ -14,7 +14,7 @@
    POST   /api/auth/login                      登入
    POST   /api/auth/refresh                    用 refresh token 換新的 access token
    POST   /api/auth/logout                     登出（撤銷這一台的 refresh token）
-   POST   /api/auth/logout-all                 登出所有裝置
+   POST   /api/auth/logout-all                 登出其他裝置
    GET    /api/auth/me                         我是誰
    PATCH  /api/auth/password                   改密碼
    POST   /api/auth/password-reset             忘記密碼：寄重設信
@@ -36,7 +36,7 @@
    GET    /api/admin/security-events           安全事件
    POST   /api/client-errors                   回報畫面上出的錯
 
-   記帳（20 支）
+   記帳（25 支）
    GET    /api/transactions                     收支明細
    POST   /api/transactions                     手動新增一筆
    PATCH  /api/transactions/{tx_id}             修改一筆
@@ -57,6 +57,12 @@
    DELETE /api/groups/{gid}/members/{user_id}   把人移出這本帳
    POST   /api/groups/{gid}/settle              結算活動帳本
    PATCH  /api/groups/{gid}/notify              這本帳有動靜要不要通知我
+
+   GET   /api/transactions/archive  收支明細年月包裹
+   POST   /api/groups/{gid}/invites  建立活動邀請
+   GET   /api/group-invites  我的活動邀請
+   POST   /api/group-invites/join  使用邀請碼加入活動
+   POST   /api/group-invites/{invite_id}  回覆或取消活動邀請
 
    數字（12 支）
    GET    /api/summary            個人／家庭摘要
@@ -198,7 +204,7 @@
         /* ⚠️ 新增一種要存的狀態，這裡跟 save() 兩邊都要加。
            suspended／audit 漏過一次：停權在同一頁看起來有效，
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
-        ['newGroups', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed', 'txPatch', 'txGone', 'resets',
+        ['newGroups', 'activityInvites', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed', 'txPatch', 'txGone', 'resets',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
          'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians',
          'passwords', 'advices', 'customCategories', 'newGuardians', 'dissolved'].forEach(function (k) {
@@ -233,6 +239,7 @@
         dissolved: state.dissolved || [],
         patch: state.patch || {},
         newUsers: state.newUsers || [],
+        activityInvites: state.activityInvites || [],
         newGroups: state.newGroups || [],
         groupPatch: state.groupPatch || {},
         joined: state.joined || [],
@@ -683,6 +690,17 @@
       })
       .filter(function (g) { return (s.removed || []).indexOf(g.id) < 0; })   // 移除的連「已封存」都不列
       .filter(function (g) { return withArchived || !g.archived; });
+  }
+
+  function txActivity(t) {
+    var st = load(), source = t.originGroup;
+    if (!source && t.copiedFrom) {
+      var original = st.transactions.filter(function (x) { return x.id === t.copiedFrom; })[0];
+      source = original && original.group;
+    }
+    var gid = source || t.group;
+    var g = groupOf(gid) || global.DATA.groups.concat(st.newGroups || []).filter(function (x) { return x.id === gid; }).map(function (x) { return Object.assign({}, x, (st.groupPatch || {})[x.id]); })[0];
+    return g && !g.personalOwner ? { activityId: g.id, activityName: g.name } : { activityId: null, activityName: '自行記錄' };
   }
 
   function ensurePersonal(uid) {
@@ -1420,14 +1438,9 @@
       });
     },
 
-    /* 登出所有裝置（包含這一台）。真後端把這個人所有 sessions 設 revoked_at */
+    /* 登出其他裝置；保留目前裝置的 token 與登入狀態。 */
     logoutAll: function () {
-      var s = load();
-      return sleep(220).then(function () {
-        s.auth = { loggedIn: false };
-        save();
-        return { revoked: 1 };
-      });
+      return sleep(220).then(function () { return { revoked: 0 }; });
     },
 
     /* 理財習慣。⚠️ 它會被放進財務建議的 prompt，所以：
@@ -1544,7 +1557,7 @@
         s.transactions.forEach(function (t) {
           if (t.group !== gid || t.user !== s.me || t.snapshot) return;
           var copied = Object.assign(clone(t), { id: 'Ncopy' + t.id, group: personal.id,
-            copiedFrom: t.id, snapshot: false });
+            copiedFrom: t.id, originGroup: gid, snapshot: false });
           copies.push(copied);
           t.snapshot = true;
           s.txPatch[t.id] = Object.assign({}, s.txPatch[t.id] || {}, { snapshot: true });
@@ -1980,7 +1993,7 @@
            ⚠️ 這一段是有來由的：前端曾經送 user=U3，而契約寫的是 userId。
            mock 當時默默忽略不認得的參數，所以「篩選沒生效」在 mock 下
            看起來完全正常——直到接上真後端才會發現。寧可現在就吵。 */
-        var OK = ['userId', 'groupId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page'];
+        var OK = ['userId', 'groupId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page', 'activityId'];
         Object.keys(f).forEach(function (k) {
           if (OK.indexOf(k) < 0) {
             throw new Error('不認得的篩選參數「' + k + '」，契約上只有：' + OK.join('、'));
@@ -2022,8 +2035,10 @@
           if (f.categoryId && t.cat !== f.categoryId) return false;
           if (f.kind && f.kind !== 'all' && t.kind !== f.kind) return false;
           if (f.source && f.source !== 'all' && (t.source || 'manual') !== f.source) return false;
+          var activity = txActivity(t);
+          if (f.activityId && f.activityId !== 'all' && (f.activityId === 'none' ? activity.activityId !== null : activity.activityId !== f.activityId)) return false;
           if (f.q) {
-            var hay = (t.merchant + ' ' + (t.note || '') + ' ' + (t.raw || '')).toLowerCase();
+            var hay = (t.merchant + ' ' + (t.note || '') + ' ' + (t.raw || '') + ' ' + activity.activityName).toLowerCase();
             if (hay.indexOf(f.q.toLowerCase()) < 0) return false;
           }
           return true;
@@ -2036,7 +2051,7 @@
         return {
           transactions: rows.map(function (t) {
             var c = catOf(s, t.cat);
-            return Object.assign(clone(t), {
+            return Object.assign(clone(t), txActivity(t), {
               userName: memberOf(t.user).name,
               catName: c ? c.name : '',
               catColor: c ? c.color : '#5B7085'
@@ -2044,6 +2059,66 @@
           }),
           total: rows.length
         };
+      });
+    },
+
+    transactionArchive: function (f) {
+      return mock.transactions(f || {}).then(function (d) {
+        var current = todayStr().slice(0, 7), years = {}, activities = {};
+        d.transactions.forEach(function (t) {
+          var month = t.date.slice(0, 7), year = month.slice(0, 4);
+          years[year] = years[year] || {};
+          years[year][month] = (years[year][month] || 0) + 1;
+          if (t.activityId) activities[t.activityId] = t.activityName;
+        });
+        var y = Number(current.slice(0, 4)), m = Number(current.slice(5)) + 1;
+        if (m === 13) { y++; m = 1; }
+        var n = y + '-' + (m < 10 ? '0' : '') + m + '-01T00:00:00+08:00';
+        return { years: Object.keys(years).sort().reverse().map(function (y) {
+          return { year: y, months: Object.keys(years[y]).sort().reverse().map(function (m) { return { month: m, count: years[y][m], packed: m < current }; }) };
+        }), activities: Object.keys(activities).map(function (id) { return { id: id, name: activities[id] }; }), currentMonth: current, nextPackAt: n };
+      });
+    },
+
+    inviteActivity: function (gid, p) {
+      var st = load(); p = p || {};
+      return sleep(150).then(function () {
+        var g = groupOf(gid);
+        if (!g || g.owner !== st.me || g.personalOwner || g.settledAt || g.archived) throw oops('你不能邀請加入這個活動', 403);
+        var friend = p.email && global.DATA.members.filter(function (u) { return u.email.toLowerCase() === p.email.trim().toLowerCase(); })[0];
+        if (p.email && (!friend || friend.isPlatformAdmin)) throw oops('找不到這個朋友的帳號', 404);
+        if (friend && memberIdsOf(gid).indexOf(friend.id) >= 0) throw oops('這位朋友已經在活動裡', 409);
+        if (friend && (st.activityInvites || []).some(function (r) { return r.groupId === gid && r.invitee === friend.id && r.status === 'pending' && Date.parse(r.expiresAt) > Date.now(); })) throw oops('邀請已送出，等待朋友回覆', 409);
+        var row = { id: stampId('AI'), groupId: gid, inviter: st.me, invitee: friend ? friend.id : null,
+          code: friend ? null : newCode(), label: p.label || '朋友', status: 'pending', expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() };
+        st.activityInvites = (st.activityInvites || []).concat([row]); save(); return clone(row);
+      });
+    },
+    activityInvites: function () {
+      var st = load();
+      return sleep(120).then(function () { return { invites: (st.activityInvites || []).filter(function (r) {
+        var g = groupOf(r.groupId); return g && !g.archived && !g.settledAt && r.status === 'pending' && Date.parse(r.expiresAt) > Date.now() && (r.invitee === st.me || g.owner === st.me);
+      }).map(function (r) { return Object.assign(clone(r), { code: null, groupName: groupOf(r.groupId).name, incoming: r.invitee === st.me, kind: r.code ? 'code' : 'account' }); }) }; });
+    },
+    joinActivity: function (code) {
+      var st = load(), row = (st.activityInvites || []).filter(function (r) { return r.code && normCode(r.code) === normCode(code); })[0];
+      if (!row) return Promise.reject(oops('找不到邀請碼', 404));
+      return mock.respondActivityInvite(row.id, 'accept', true);
+    },
+    respondActivityInvite: function (id, action, byCode) {
+      var st = load();
+      return sleep(120).then(function () {
+        var row = (st.activityInvites || []).filter(function (r) { return r.id === id; })[0], g = row && groupOf(row.groupId);
+        if (!row || !g) throw oops('找不到邀請', 404);
+        if (row.status !== 'pending' || Date.parse(row.expiresAt) <= Date.now()) throw oops('邀請已使用或已過期', 409);
+        if (action === 'cancel' ? g.owner !== st.me && row.inviter !== st.me : !byCode && row.invitee !== st.me) throw oops('這份邀請不是給你的', 403);
+        if (action === 'accept') {
+          if (g.settledAt || g.archived || memberIdsOf(g.id).indexOf(st.me) >= 0) throw oops('活動已結束或你已加入', 409);
+          st.left = (st.left || []).filter(function (x) { return x.group !== g.id || x.user !== st.me; });
+          st.joined = (st.joined || []).concat([{ group: g.id, user: st.me, notify: false }]);
+        }
+        row.status = { accept: 'accepted', decline: 'declined', cancel: 'cancelled' }[action]; save();
+        return { id: id, groupId: g.id, groupName: g.name, status: row.status };
       });
     },
 
@@ -3262,6 +3337,11 @@
     notifications:     function (f)     { return req('/api/notifications' + qs(f)); },
     readNotification:  function (i)     { return req('/api/notifications/' + encodeURIComponent(i), { method: 'PATCH', body: { read: true } }); },
     readNotifications: function (u)     { return req('/api/notifications', { method: 'PATCH', body: { readUntil: u } }); },
+    transactionArchive: function (f) { return req('/api/transactions/archive' + qs(f)); },
+    inviteActivity: function (g, p) { return req('/api/groups/' + encodeURIComponent(g) + '/invites', { method: 'POST', body: p || {} }); },
+    activityInvites: function () { return req('/api/group-invites'); },
+    joinActivity: function (code) { return req('/api/group-invites/join', { method: 'POST', body: { code: code } }); },
+    respondActivityInvite: function (id, action) { return req('/api/group-invites/' + encodeURIComponent(id), { method: 'POST', body: { action: action } }); },
     groups:            function (f)     { return req('/api/groups' + qs(f)); },
     createGroup:       function (p)     { return req('/api/groups', { method: 'POST', body: p }); },
     settleGroup:       function (g)     { return req('/api/groups/' + g + '/settle', { method: 'POST' }); },
@@ -3303,7 +3383,7 @@
     dissolveFamily:    function ()      { return req('/api/family', { method: 'DELETE' }); },
     sessions:          function ()      { return req('/api/auth/sessions'); },
     logoutAll:         function ()      {
-      return req('/api/auth/logout-all', { method: 'POST' }).then(function (d) { setTokens(null); return d; });
+      return req('/api/auth/logout-all', { method: 'POST' });
     },
     reset:             function ()      { return Promise.resolve({ reset: false, note: '真後端不提供重置' }); }
   };
@@ -3329,6 +3409,12 @@
         路由與負責人跟 backend/app/ownership.py 對齊，有測試擋。
      ============================================================ */
   var FN = {
+    transactionArchive: ['GET /api/transactions/archive', '記帳'],
+    inviteActivity: ['POST /api/groups/{gid}/invites', '記帳'],
+    activityInvites: ['GET /api/group-invites', '記帳'],
+    joinActivity: ['POST /api/group-invites/join', '記帳'],
+    respondActivityInvite: ['POST /api/group-invites/{invite_id}', '記帳'],
+
     me:                 ['GET /api/auth/me', '認證'],
     authState:          [null, '前端'],
     renew:              [null, '前端'],
@@ -3548,7 +3634,7 @@
   var LOOKUP = { cats: null, people: null, me: null };
   /* 家庭、分類、名字改了，對照表要重拿 */
   var LOOKUP_STALE = ['createCategory', 'createFamily', 'joinFamily', 'acceptInvite', 'removeMember',
-    'leaveFamily', 'dissolveFamily', 'changeMemberRole', 'updateProfile', 'login', 'logout', 'register'];
+    'leaveFamily', 'dissolveFamily', 'changeMemberRole', 'updateProfile', 'joinActivity', 'respondActivityInvite', 'login', 'logout', 'register'];
 
   function lookups() {
     var jobs = [];

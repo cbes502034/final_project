@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>使用說明</title>
-<meta name="description" content="家庭記帳的使用說明：三分鐘上手、記帳、總覽、帳本、提醒、家人、個人資料與主題。">
+<meta name="description" content="家庭記帳的使用說明：三分鐘上手、記帳、總覽、活動、提醒、家人、個人資料與主題。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;display=swap">
@@ -266,7 +266,7 @@
   <nav class="g-toc" aria-label="目錄">
     <a href="#write"><span class="g-ic"><svg aria-hidden="true"><use href="#i-entry"/></svg></span>記帳</a>
     <a href="#read"><span class="g-ic"><svg aria-hidden="true"><use href="#i-home"/></svg></span>總覽</a>
-    <a href="#books"><span class="g-ic"><svg aria-hidden="true"><use href="#i-book"/></svg></span>帳本</a>
+    <a href="#books"><span class="g-ic"><svg aria-hidden="true"><use href="#i-book"/></svg></span>活動</a>
     <a href="#alert"><span class="g-ic"><svg aria-hidden="true"><use href="#i-bell"/></svg></span>提醒</a>
     <a href="#family"><span class="g-ic"><svg aria-hidden="true"><use href="#i-family"/></svg></span>家人</a>
     <a href="#me"><span class="g-ic"><svg aria-hidden="true"><use href="#i-user"/></svg></span>個人與主題</a>
@@ -292,7 +292,9 @@
         <li><b>會記住你的改法</b><span>分類改過一次（例如文具改成教育），下次同樣的東西就照你的改法，那一筆下面會寫「照你之前的改法」</span></li>
         <li><b>等太久</b><span>按鈕上會顯示已經等了幾秒；超過 8 秒會說明原因（主機閒置後第一次要多等一下）</span></li>
         <li><b>只記一筆</b><span>切到「單筆手動」，自己填金額、分類、店家</span></li>
-        <li><b>記錯了</b><span>收支明細每一列右邊按<em>修改</em>：金額、日期、分類、帳本都能改；別人的只能看</span></li>
+        <li><b>年月包裹</b><span>在儀表板開啟「收支明細」，依序展開年份、月份後查看明細。每月 1 日 00:00（台北時間），上月明細自動打包；已打包的紀錄仍能搜尋及修改。</span></li>
+        <li><b>來源活動</b><span>明細會顯示來源活動，也能從來源活動選單篩選，或直接搜尋活動名稱。自行記錄的明細會標示「自行記錄」。</span></li>
+        <li><b>記錯了</b><span>收支明細每一列右邊按<em>修改</em>：金額、日期、分類、活動都能改；別人的只能看</span></li>
         <li><b>一次刪很多筆</b><span>收支明細按「選取多筆」，勾好按「刪除 N 筆」；其中一筆刪不了就<em>一筆都不刪</em></span></li>
       </ul>
     </div>
@@ -314,7 +316,7 @@
         <li><b>疊在一起的卡</b><span>後面露出<em>本月收入</em>、<em>本月支出</em>，最前面是<em>這個月還可以花</em></span></li>
         <li><b>點收入或支出</b><span>點「本月收入」只看這個月的收入明細、點「本月支出」只看支出；明細頁上的「本月」標籤按 ✕ 就看全部</span></li>
         <li><b>進度條</b><span>看的是「離存不到錢還有多遠」：接近上限變黃，超過變紅</span></li>
-        <li><b>常用功能</b><span>所有功能都在這；圖示下的小字是現況，例如「4 本」「2 則要注意」</span></li>
+        <li><b>常用功能</b><span>所有功能都在這；圖示下的小字是現況，例如「4 個活動」「2 則要注意」</span></li>
         <li><b>預算小卡</b><span>一個分類一張，看是哪一類把錢吃掉；右上角「調整預算 ›」直接到個人資料的每月預算</span></li>
         <li><b>今天的紀錄</b><span>最下面：今天花多少、收多少，和今天記的每一筆</span></li>
         <li><b>我｜家庭</b><span>家長可以切到家庭，整理家庭的數字，<em>只能看、不能記帳</em></span></li>
@@ -323,27 +325,27 @@
     </div>
   </section>
 
-  <!-- 帳本 -->
+  <!-- 活動 -->
   <section class="g-sec" id="books">
     <div class="g-sec__l">
       <div class="g-sec__h">
         <span class="g-ic"><svg aria-hidden="true"><use href="#i-book"/></svg></span>
-        <div><div class="g-sec__n">03</div><h2>帳本</h2></div>
+        <div><div class="g-sec__n">03</div><h2>活動</h2></div>
       </div>
       <p class="g-sec__lead">把不同用途的錢分開：家用、旅遊基金、自己的零用。</p>
-      <div class="g-where"><span>常用功能 › 帳本</span><span>總覽、明細、統計標題右邊的帳本選單</span></div>
-      <div class="g-eg"><i>分類和帳本差在哪</i><b>分類</b>是錢花在什麼；<b>帳本</b>是算在哪一份預算。同樣吃飯，聚餐算家用、出國吃的算旅遊基金。</div>
+      <div class="g-where"><span>常用功能 › 活動</span><span>總覽、明細、統計標題右邊的活動選單</span></div>
+      <div class="g-eg"><i>分類和活動差在哪</i><b>分類</b>是錢花在什麼；<b>活動</b>是算在哪一份預算。同樣吃飯，聚餐算家用、出國吃的算旅遊基金。</div>
     </div>
     <div class="g-sec__r">
       <ul class="g-pts">
-        <li><b>開一本帳</b><span>帳本頁「進行中」右邊的「＋ 開一本帳」，填名字就好；<em>結束日選填</em>，旅行、婚禮這種有結束日的就填上。誰都可以開，開的人管這本</span></li>
-        <li><b>一份清單</b><span>帳本不分種類，進行中的都在同一份清單；自己的總帳本（註冊時開的「〈名字〉的帳本」）不放在這裡</span></li>
-        <li><b>切換</b><span>切過去之後，總覽、明細和統計的數字都只算那一本；其他頁面用不到，所以不顯示選單</span></li>
-        <li><b>各自的目標</b><span>點開那本帳就能填它自己的月目標，跟整體目標各算各的</span></li>
-        <li><b>有結束日的帳本</b><span>過了結束日<em>不會自動結束</em>，每位成員可自行按「合併到我的帳本」，只合併自己的明細並退出，其他成員繼續記帳</span></li>
+        <li><b>建立活動</b><span>活動頁「進行中」右邊的「＋ 建立活動」，填名字就好；<em>結束日選填</em>，旅行、婚禮這種有結束日的就填上。誰都可以開，建立者可管理成員</span></li>
+        <li><b>一份清單</b><span>活動不分種類，進行中的都在同一份清單；個人的收支明細請從儀表板開啟，不放在上方活動選單</span></li>
+        <li><b>切換</b><span>切過去之後，總覽、明細和統計的數字都只算該活動；其他頁面用不到，所以不顯示選單</span></li>
+        <li><b>各自的目標</b><span>點開該活動就能填它自己的月目標，跟整體目標各算各的</span></li>
+        <li><b>有結束日的活動</b><span>過了結束日<em>不會自動結束</em>，每位成員可自行按「複製到收支明細並退出」，只合併自己的明細並退出，其他成員繼續記帳</span></li>
         <li><b>封存</b><span>收起來不用，<em>不是刪除</em>；在「已封存」隨時叫回來</span></li>
-        <li><b>移除</b><span>最後一位成員合併後，原帳本會自動關閉並從清單消失；每人的明細都保留在自己的大帳本</span></li>
-        <li><b>加人</b><span>加進來的人看得到這本帳的所有紀錄，其他本看不到；目前只能加家人</span></li>
+        <li><b>移除</b><span>最後一位成員合併後，原活動會自動關閉並從清單消失；每人的明細都保留在自己的收支明細</span></li>
+        <li><b>加人</b><span>加進來的人看得到這個活動的所有紀錄，其他活動看不到；可用獨立的活動邀請碼，或朋友註冊的 Email 邀請，無須先加入家庭</span></li>
       </ul>
     </div>
   </section>
@@ -366,7 +368,7 @@
         <li><b>針對某本帳</b><span>例如「旅遊基金花到九成就叫我」</span></li>
         <li><b>不會一直吵</b><span>同一個門檻<em>一個月只響一次</em>，下個月重新開始</span></li>
         <li><b>暫停</b><span>把開關關掉就好，設定會留著</span></li>
-        <li><b>帳本動靜</b><span>在帳本裡打開「有動靜通知我」才會通知，預設是關的</span></li>
+        <li><b>活動動靜</b><span>在活動裡打開「有動靜通知我」才會通知，預設是關的</span></li>
         <li><b>一次記很多筆</b><span>家人一段話記了 4 筆，鈴鐺裡合成一則「記了 4 筆，共 NT$ 285」，點一下全部已讀</span></li>
       </ul>
     </div>
@@ -426,7 +428,7 @@
         <li><b>主題存在帳號上</b><span>換手機登入也一樣；家人各選各的</span></li>
         <li><b>理財習慣</b><span>選理財風格、目標、固定安排，財務建議會參考</span></li>
         <li><b>每月預算</b><span>「每月預算」裡替每個支出分類填上限，離開欄位就存好；填 0 就是不設</span></li>
-        <li><b>登入中的裝置</b><span>看得到在哪裡登入過；覺得怪怪的就按「<em>登出所有裝置</em>」，再重設密碼</span></li>
+        <li><b>登入中的裝置</b><span>只列出其他登入中的裝置；按「<em>登出其他裝置</em>」會讓其他裝置立即登出，目前這台仍保持登入</span></li>
       </ul>
       <div class="g-note"><b>不是投資建議</b><span>填了定期定額只是讓系統知道錢去哪，系統不提供投資、保險、稅務建議。</span></div>
     </div>
@@ -454,31 +456,31 @@
         </details>
         <details>
           <summary>為什麼看不到某個家人的紀錄？</summary>
-          <div class="a">孩子要有家長按了「開始照看」才看得到；家長之間同一個家庭就互相看得到。跟你共用帳本的人，只看得到那本帳裡的紀錄。</div>
+          <div class="a">孩子要有家長按了「開始照看」才看得到；家長之間同一個家庭就互相看得到。跟你共用活動的人，只看得到該活動裡的紀錄。</div>
         </details>
         <details>
           <summary>結算之後紀錄去哪了？</summary>
-          <div class="a">按「合併到我的帳本」後，只有你自己記的明細會複製到「〈名字〉的帳本」，原帳本保留合併前的紀錄，其他成員仍看得到，你同時退出原帳本。其他人仍可繼續使用；最後一位成員合併後，原帳本會關閉並從清單消失。</div>
+          <div class="a">按「複製到收支明細並退出」後，只有你自己記的明細會複製到「〈名字〉的活動」，原活動保留合併前的紀錄，其他成員仍看得到，你同時退出原活動。其他人仍可繼續使用；最後一位成員合併後，原活動會關閉並從清單消失。</div>
         </details>
         <details>
-          <summary>結算過的帳本裡記錯了，可以改嗎？</summary>
-          <div class="a">個人大帳本的副本可以修改或刪除；原帳本保留合併前的歷史，不會跟著副本改變。整體收支只計算一次。</div>
+          <summary>結算過的活動裡記錯了，可以改嗎？</summary>
+          <div class="a">收支明細的副本可以修改或刪除；原活動保留合併前的歷史，不會跟著副本改變。整體收支只計算一次。</div>
         </details>
         <details>
           <summary>「今天」「這個月」是照什麼算的？</summary>
-          <div class="a">照<b>你手機或電腦上的日期</b>。記一筆時日期預設是今天，一段話裡的「昨天」也從今天往回算；帳本過了結束日沒，也是跟今天比。</div>
+          <div class="a">照<b>你手機或電腦上的日期</b>。記一筆時日期預設是今天，一段話裡的「昨天」也從今天往回算；活動過了結束日沒，也是跟今天比。</div>
         </details>
         <details>
-          <summary>結算完的帳本可以刪掉嗎？</summary>
-          <div class="a">不需要另外刪除。最後一位成員合併後，原帳本會自動關閉，每人的明細都留在自己的大帳本。若只是暫時收起尚在使用的帳本，開帳者可以選「封存」。</div>
+          <summary>結算完的活動可以刪掉嗎？</summary>
+          <div class="a">不需要另外刪除。最後一位成員合併後，原活動會自動關閉，每人的明細都留在自己的收支明細。若只是暫時收起尚在使用的活動，開帳者可以選「封存」。</div>
         </details>
         <details>
           <summary>有人記帳，我會被通知嗎？</summary>
-          <div class="a">兩種情況會：<b>你監管的人</b>記帳，或你在帳本打開了「有動靜通知我」。同一筆只通知一次。</div>
+          <div class="a">兩種情況會：<b>你監管的人</b>記帳，或你在活動打開了「有動靜通知我」。同一筆只通知一次。</div>
         </details>
         <details>
-          <summary>把人移出帳本會怎樣？</summary>
-          <div class="a">他之後看不到<b>別人</b>記在那本帳的紀錄，也不能再往那本帳記。他<b>自己記過的不會不見</b>，還在他自己的收支明細裡。</div>
+          <summary>把人移出活動會怎樣？</summary>
+          <div class="a">他之後看不到<b>別人</b>記在該活動的紀錄，也不能再往該活動記。他<b>自己記過的不會不見</b>，還在他自己的收支明細裡。</div>
         </details>
         <details>
           <summary>財務建議的數字可靠嗎？</summary>
@@ -502,7 +504,7 @@
         </details>
         <details>
           <summary>重要的動作為什麼要再輸入一次密碼？</summary>
-          <div class="a">移出家人、退出或解散家庭、改角色、移除帳本這些<b>做了就回不去</b>的動作，會先請你再輸入一次密碼（解散還要打一段確認碼），免得手機借給別人時被誤按。</div>
+          <div class="a">移出家人、退出或解散家庭、改角色、移除活動這些<b>做了就回不去</b>的動作，會先請你再輸入一次密碼（解散還要打一段確認碼），免得手機借給別人時被誤按。</div>
         </details>
         <details>
           <summary>畫面寫「這一塊暫時讀不到」怎麼辦？</summary>

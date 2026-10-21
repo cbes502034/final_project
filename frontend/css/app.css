@@ -3940,3 +3940,45 @@ body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #
 #view .famsum__g b { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
 #view .famsum__a { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 480px) { #view .famsum__g { grid-template-columns: 1fr 1fr; } }
+
+/* 收支明細：依年月展開；活動邀請可在窄螢幕自然換行。 */
+.archive-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 12px 0 18px; }
+.archive-tools small { color: var(--ink-dim); font-size: 12px; }
+.archive-year { margin: 14px 0; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); overflow: hidden; }
+.archive-year > summary { padding: 17px 20px; cursor: pointer; font-weight: 700; }
+.archive-year > summary span { margin-left: 12px; font-size: 12px; font-weight: 400; color: var(--ink-dim); }
+.archive-months { padding: 0 16px 16px; }
+.archive-month { border-top: 1px solid var(--line); }
+.archive-month__button { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 4px; border: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.archive-month__button span { color: var(--ink-dim); font-size: 12px; }
+.archive-month__button i { margin-left: auto; color: var(--accent); font-size: 12px; font-style: normal; }
+.archive-more { display: block; margin: 16px auto; }
+.txr__activity { max-width: 180px; overflow-wrap: anywhere; font-size: 12px; }
+.txr__activity-mobile { display: none; }
+.gsw-empty { color: var(--ink-dim); font-size: 12px; }
+.gsw-create { margin-left: 8px; font-size: 12px; color: var(--accent); }
+.activity-join { margin-bottom: 22px; }
+.activity-join form, .activity-email { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.activity-join label, .activity-email label { display: grid; gap: 7px; flex: 1 1 220px; min-width: 0; font-size: 13px; }
+.activity-join input, .activity-email input { width: 100%; min-width: 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); font: inherit; }
+.activity-incoming, .activity-pending { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 15px 0; border-top: 1px solid var(--line); margin-top: 15px; }
+.activity-incoming > div { display: flex; gap: 8px; }
+.activity-invite-panel { width: 100%; margin-top: 12px; }
+.activity-invite-panel summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+.activity-invite-panel p { color: var(--ink-dim); font-size: 12px; line-height: 1.7; }
+.activity-code { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.activity-code strong { font-family: var(--mono); font-size: 20px; letter-spacing: 2px; }
+.activity-code small { color: var(--ink-dim); }
+.activity-pending span { overflow-wrap: anywhere; min-width: 0; }
+@media (max-width: 760px) {
+  .txr__activity { display: none; }
+  .txr__activity-mobile { display: block; color: var(--ink-dim); margin-top: 4px; font-size: 11px; font-weight: 400; overflow-wrap: anywhere; }
+  .archive-year > summary { padding: 14px 12px; }
+  .archive-months { padding: 0 6px 10px; }
+  .archive-tools { align-items: stretch; }
+  .archive-tools .fsel { width: 100%; }
+  .archive-tools select { max-width: 100%; }
+  .activity-join input, .activity-email input { font-size: 16px; }
+  .activity-email button, .activity-join form > button { flex: 1 1 100%; }
+  .gsw-empty { display: inline-block; max-width: 120px; white-space: normal; }
+}

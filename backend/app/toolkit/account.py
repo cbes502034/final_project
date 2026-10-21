@@ -78,10 +78,18 @@ def delete_everything(user_id: int, *, db) -> dict:
                                         {"created_by": user_id}]}, db=db)
     crud.remove(m.FamilyInvite, {"or": [{"inviter_id": user_id}, {"invitee_id": user_id}]}, db=db)
 
+    crud.remove(m.ActivityInvite, {"or": [{"inviter_id": user_id}, {"invitee_id": user_id},
+                                           {"group_id__in": groups or [0]}]}, db=db)
+
     # 3. 帳本：他自己在用的帳本整本刪，別人的帳本只把他移出
     crud.remove(m.GroupMember, {"or": [{"user_id": user_id}, {"group_id__in": groups or [0]}]}, db=db)
     if groups:
-        crud.remove(m.Group, {"id__in": groups}, db=db)
+        # 其他人的收支明細仍可能引用已結束的活動；保留活動名稱供來源搜尋。
+        referenced = set(crud.find(m.Transaction, {"origin_group_id__in": groups}, fields="origin_group_id", db=db))
+        removable = [gid for gid in groups if gid not in referenced]
+        count["groups"] = len(removable)
+        if removable:
+            crud.remove(m.Group, {"id__in": removable}, db=db)
     crud.remove(m.Account, {"user_id": user_id}, db=db)
 
     # 4. 登入：工作階段、重設密碼連結；安全事件與錯誤紀錄只留次數，不留是誰

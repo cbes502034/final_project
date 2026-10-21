@@ -70,3 +70,18 @@ class GroupMember(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     # 這本帳有動靜要不要通知我。預設 false
     notify: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class ActivityInvite(Base):
+    """活動邀請，與家庭成員及監管關係完全分開。"""
+    __tablename__ = "activity_invites"
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("groups.id"), nullable=False)
+    inviter_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    invitee_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    code_hash: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
+    label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API 瀏覽</title>
-<meta name="description" content="家庭記帳系統的 79 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
+<meta name="description" content="家庭記帳系統的 84 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -40,7 +40,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>79 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>84 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -95,7 +95,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">79 ROUTES · 4 MODULES</div>
+    <div class="mono">84 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -132,9 +132,9 @@
       res: '{ "ok": true }',
       note: '登出是設 <code>sessions.revoked_at</code>，不刪除紀錄——稽核要看得到歷史。回 <code>204</code> 也可以，前端不看回應；重複登出、token 已經失效也要成功，不要噴 400。' },
     { n: 5, o: 'm1', m: 'POST', p: '/api/auth/logout-all', a: '登入',
-      d: '撤銷所有裝置的 token',
+      d: '撤銷其他裝置的 token，保留目前裝置',
       res: '{ "revoked": 1 }',
-      note: '包含這一台：前端收到就清掉本機 token、回登入頁。' },
+      note: '保留目前這台：只撤銷其他裝置，前端保留本機 token 與目前頁面。' },
     { n: 6, o: 'm1', m: 'GET', p: '/api/auth/me', a: '登入',
       d: '目前使用者、家庭角色、看得到誰、被誰監管',
       res: '{\n  "user": {\n    "id": "U1",\n    "name": "王大明",\n    "email": "daming@wang.tw",\n    "role": "parent",\n    "familyId": "F1",\n    "avatar": "明",\n    "age": 48,\n    "joined": "2026-09-14",\n    "savingsGoal": 0,\n    "onboardedAt": "2026-09-14T18:31:39.711Z",\n    "birthYear": 1978,\n    "theme": "sky",\n    "avatarUrl": null\n  },\n  "family": { "id": "F1", "name": "王家", "period": "2026-09" },\n  "visible": ["U1", "U2", "U3"],\n  "queryable": ["U1", "U2", "U3"],\n  "guardedBy": []\n}',
@@ -481,7 +481,12 @@
       d: '健康檢查（Render 用）' },
     { n: 67, o: 'sys', m: 'GET', p: '/docs', a: '公開',
       d: 'FastAPI 自動產生的 OpenAPI 文件',
-      note: '後端上線後<b>這支才是真正能送出請求的地方</b>。' }
+      note: '後端上線後<b>這支才是真正能送出請求的地方</b>。' },
+    { n: 86, o: 'm2', m: 'GET', p: '/api/transactions/archive', a: '登入', d: '收支明細年月包裹', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
+    { n: 87, o: 'm2', m: 'POST', p: '/api/groups/{gid}/invites', a: '登入', d: '建立活動邀請', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
+    { n: 88, o: 'm2', m: 'GET', p: '/api/group-invites', a: '登入', d: '我的活動邀請', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
+    { n: 89, o: 'm2', m: 'POST', p: '/api/group-invites/join', a: '登入', d: '使用邀請碼加入活動', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
+    { n: 90, o: 'm2', m: 'POST', p: '/api/group-invites/{invite_id}', a: '登入', d: '回覆或取消活動邀請', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' }
   ];
 
   var VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];

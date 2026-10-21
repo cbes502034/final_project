@@ -4,7 +4,7 @@
 ===========================================================================
 這個檔案是幹嘛的
 ===========================================================================
-79 支路由分成四個領域（認證、記帳、數字、家庭）。哪一支屬於哪個領域只寫在這裡，
+84 支路由分成四個領域（認證、記帳、數字、家庭）。哪一支屬於哪個領域只寫在這裡，
 錯誤卡上的「屬於：記帳」、API 瀏覽頁的分組、規格文件的路由清單都要跟這裡對得上，
 `pytest` 會檢查有沒有走散。
 
@@ -165,6 +165,7 @@ MEMBERS: list[Member] = [
         ),
         routes=[
             ("GET", "/api/transactions"),
+            ("GET", "/api/transactions/archive"),
             ("POST", "/api/transactions"),
             ("PATCH", "/api/transactions/{tx_id}"),
             ("DELETE", "/api/transactions/{tx_id}"),
@@ -184,6 +185,10 @@ MEMBERS: list[Member] = [
             ("DELETE", "/api/groups/{gid}/members/{user_id}"),
             ("POST", "/api/groups/{gid}/settle"),
             ("PATCH", "/api/groups/{gid}/notify"),
+            ("POST", "/api/groups/{gid}/invites"),
+            ("GET", "/api/group-invites"),
+            ("POST", "/api/group-invites/join"),
+            ("POST", "/api/group-invites/{invite_id}"),
         ],
         files=[
             "app/routers/ledger/__init__.py",
