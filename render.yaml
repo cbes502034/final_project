@@ -18,8 +18,9 @@ services:
   - type: web
     name: fambudget-web
     runtime: static
-    buildCommand: ""
-    staticPublishPath: ./frontend
+    # 依資源內容產生版本碼，避免新畫面載入 CDN 裡的舊 api.js。
+    buildCommand: node tools/build_frontend.js
+    staticPublishPath: ./dist/frontend
     pullRequestPreviewsEnabled: false
     # 這裡刻意沒有 rewrite 規則。
     # 前端走的是 hash 路由（#/entry），瀏覽器只會跟伺服器要 "/"，

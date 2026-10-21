@@ -6,6 +6,7 @@ venv/
 .pytest_cache/
 *.db
 .DS_Store
+dist/
 
 # 微調產物（模型檔動輒 1 GB，放 Hugging Face，不放 git）
 *.gguf

@@ -277,7 +277,7 @@ http://localhost:5174/?api=                         切回 mock
 
    | 名稱 | 型態 | 來源 |
    |---|---|---|
-   | `fambudget-web` | Static Site | `./frontend` |
+   | `fambudget-web` | Static Site | `./dist/frontend`（由 `frontend/` 建置） |
    | `fambudget-backend` | Web Service (Python) | `./backend` |
    | `fambudget-db` | PostgreSQL | — |
 
@@ -311,9 +311,14 @@ http://localhost:5174/?api=                         切回 mock
 
 ### 靜態站台的資產版號
 
-`frontend/index.html` 裡的 `?v=NN` 是給瀏覽器看的快取版號。
-**改了 CSS 或 JS 一定要把這個數字往上加**，否則使用者的瀏覽器
-會繼續用舊的快取檔案，你會以為部署沒生效。
+部署先執行 `node tools/build_frontend.js`，將網站輸出到 `dist/frontend/`。
+建置會依每個 JS／CSS 的 SHA-256 內容產生 `?v=內容版本碼`，同步更新各 HTML 的資源連結，
+避免新畫面呼叫了 CDN 快取中的舊 API 方法。來源檔案不會被建置改寫。
+
+若 Render 前端服務是手動建立的，請同步設定 **Build Command** 為
+`node tools/build_frontend.js`、**Publish Directory** 為 `dist/frontend`（Root Directory 留空），再重新部署。
+Blueprint 使用 `render.yaml` 中相同的設定。本機直接開 `frontend/` 時仍使用入口檔的數字版號；
+修改來源資源後也要更新該版號。
 
 ---
 
