@@ -3082,7 +3082,9 @@
     var fam = /data-scope=/.test(act || '') && SCOPE === 'family';
     if (k) k.textContent = /data-scope=/.test(act || '') ? (fam ? '全家' : '我的') : '';
     /* 全家模式只整理資訊、不記帳：右上角和手機的「記一筆」一起收起來 */
-    document.body.classList.toggle('in-family', fam);
+    /* 全家狀態還在，每一頁（家庭、主題、個人資料、帳本…）都不放「記一筆」：
+       記帳永遠記在自己身上，全家模式下出現它，對象就錯了 */
+    document.body.classList.toggle('in-family', SCOPE === 'family' && (!ME || canFamily(ME)));
   }
 
   function animate() {
