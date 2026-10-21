@@ -71,6 +71,57 @@ CAPTION_JS = r"""
 })
 """
 
+#: 畫面上的滑鼠游標。無頭 Chrome 錄不到真的游標，所以畫一個：
+#: 從上一個位置滑到目標（0.8 秒）→ 停一下 → 點的地方出現波紋 → 才真的點下去，看的人跟得上。
+#: sel 是 CSS 選擇器；寫成 "text:開始使用" 是找畫面上有這幾個字的按鈕或連結。sel 是 null 時只把游標放回上次的位置（換頁之後）。
+CURSOR_JS = r"""
+(async function (sel, x0, y0, pause, doClick) {
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var cur = document.getElementById('qa-cur');
+  if (!cur) {
+    cur = document.createElement('div'); cur.id = 'qa-cur';
+    cur.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M2 1.5l7.8 20 2.7-8.1 8-2.8z" ' +
+      'fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    cur.setAttribute('style', 'position:fixed;left:0;top:0;width:28px;height:28px;z-index:2147483647;pointer-events:none;' +
+      'filter:drop-shadow(0 2px 3px rgba(0,0,0,.45));transition:transform .8s cubic-bezier(.45,0,.25,1);' +
+      'transform:translate(' + (x0 - 2) + 'px,' + (y0 - 2) + 'px)');
+    document.documentElement.appendChild(cur);
+    await sleep(60);
+  }
+  if (!sel) return [x0, y0];
+  var el = null;
+  if (sel.indexOf('text:') === 0) {
+    var want = sel.slice(5);
+    el = Array.prototype.filter.call(document.querySelectorAll('a,button,label,summary,[data-nav],[data-quick]'),
+      function (e) { return e.offsetParent !== null && e.textContent.trim().indexOf(want) >= 0; })[0];
+  } else {
+    el = document.querySelector(sel);
+  }
+  if (!el) return null;
+  var r = el.getBoundingClientRect();
+  if (r.top < 70 || r.bottom > innerHeight - 100) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    await sleep(750);
+    r = el.getBoundingClientRect();
+  }
+  var x = Math.round(r.left + Math.min(r.width / 2, 70)), y = Math.round(r.top + r.height / 2);
+  cur.style.transform = 'translate(' + (x - 2) + 'px,' + (y - 2) + 'px)';
+  await sleep(850);
+  await sleep(pause * 1000);
+  if (doClick) {
+    var rip = document.createElement('div');
+    rip.setAttribute('style', 'position:fixed;left:' + (x - 20) + 'px;top:' + (y - 20) + 'px;width:40px;height:40px;' +
+      'border:3px solid #2BFFE0;border-radius:50%;z-index:2147483646;pointer-events:none');
+    document.documentElement.appendChild(rip);
+    rip.animate([{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: 500 });
+    setTimeout(function () { rip.remove(); }, 520);
+    await sleep(180);
+    el.click();
+  }
+  return [x, y];
+})
+"""
+
 CARD_CSS = """
 html,body{margin:0;height:100%;background:#0b0f14;color:#e6edf3;font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif}
 body{background-image:linear-gradient(#1f2a36 1px,transparent 1px),linear-gradient(90deg,#1f2a36 1px,transparent 1px);background-size:48px 48px}
@@ -133,7 +184,9 @@ async def run(ws_url, tokens, workdir):
         await c.send("Page.enable")
         await c.send("Runtime.enable")
         await c.send("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=1, mobile=False)
-        total = 24
+        # 步驟數＝這支腳本裡呼叫 cap() 的次數（以前寫死，加步驟忘了改就會出現 26 / 24）
+        total = io.open(__file__, encoding="utf-8").read().count("await " + "cap(")
+        pos = [W // 2, H // 2]
         step = [0]
         where = [TAG_LIVE]
 
@@ -150,6 +203,19 @@ async def run(ws_url, tokens, workdir):
                 await c.js("(%s)(%d, %d, %s, %s, %s)" % (CAPTION_JS, step[0], total, json.dumps(shown["title"]),
                                                          json.dumps(shown["desc"]), json.dumps(where[0])))
 
+        async def click(sel, pause=0.6, do=True):
+            """游標移過去、停一下、波紋、點下去。找不到就跳過（不讓整支影片停住）。"""
+            r = await c.js("(%s)(%s, %d, %d, %s, %s)" % (CURSOR_JS, json.dumps(sel), pos[0], pos[1], pause,
+                                                          "true" if do else "false"), wait=True)
+            # 點下去如果整頁換掉，回傳值會拿不到（或不是兩個數字）：沿用上一個位置就好
+            if isinstance(r, (list, tuple)) and len(r) == 2:
+                pos[0], pos[1] = int(r[0]), int(r[1])
+            return r is not None
+
+        async def point():
+            # 換頁之後游標會被清掉：放回上次的位置，不要突然消失
+            await c.js("(%s)(null, %d, %d, 0, false)" % (CURSOR_JS, pos[0], pos[1]), wait=True)
+
         async def go(url, wait=5.0, ready=None, keep=1.0):
             # 從按下去到畫面準備好的這一段快轉成最多 keep 秒
             t0 = time.time()
@@ -161,6 +227,8 @@ async def run(ws_url, tokens, workdir):
             else:
                 await asyncio.sleep(max(0.0, wait - 0.6))
             await recap()
+            if not url.startswith("file:"):
+                await point()
             c.ff.append((t0, time.time(), keep))
 
         def uid_of(who):
@@ -189,7 +257,7 @@ async def run(ws_url, tokens, workdir):
             return "file:///" + path.replace("\\", "/")
 
         # 片頭（不算步驟）
-        await go(card_url("open", card_html("FAMBUDGET · QA WALKTHROUGH · 2026-10-21", "家庭記帳<br>完整測試流程",
+        await go(card_url("open", card_html("FAMBUDGET · QA WALKTHROUGH · 2026-10-22", "家庭記帳<br>完整測試流程",
                                             ["未登入 → 新用戶註冊 → 家長記帳與建議 → 刪除 → 家庭與權限 → 平台管理 → 手機版",
                                              "右上角標 LIVE 是在 Render 正式網站實測；標 LOCAL 是本機示範資料（同一份程式）",
                                              "每一步下方的字幕說明正在驗證什麼"])), 0.5)
@@ -203,7 +271,7 @@ async def run(ws_url, tokens, workdir):
         await go(FRONT + "/?r=%d#/login" % (time.time() * 1000), ready="document.body.innerText.includes('開始使用')")
         await cap("首頁", "還沒登入時，先說清楚這個系統能做什麼")
         await asyncio.sleep(4)
-        await c.js("var b=[...document.querySelectorAll('a,button')].find(e=>e.textContent.includes('開始使用')); if(b) b.click()")
+        await click("text:開始使用")
         await asyncio.sleep(1.5)
         await cap("登入", "測試帳號已經登入過；影片用登入後的狀態，不在畫面上輸入密碼")
         await asyncio.sleep(3.5)
@@ -228,39 +296,42 @@ async def run(ws_url, tokens, workdir):
         await go(LOCAL + "/?api=&r=%d#/register" % (time.time() * 1000), ready="document.getElementById('rgName')")
         step[0] -= 1
         await cap("註冊", "只要名字、email、密碼；建好之後寄一封確認信")
+        await click("#rgName", pause=0.3)
         await c.js("""(async (n, m) => { const t = async (id, v) => { const el = document.getElementById(id); el.focus();
                       for (const ch of v) { el.value += ch; await new Promise(r => setTimeout(r, 70)); } };
                       await t('rgName', n); await t('rgEmail', m); })(%s, %s)""" % (
             json.dumps("林小安"), json.dumps("xiaoan.demo@example.com")), wait=True)
         # 密碼是這次隨機產生的假值（本機示範模式，不是任何真帳號），一次填好，畫面上只看得到圓點
+        await click("#rgPw", pause=0.2)
         await c.js("document.getElementById('rgPw').value = %s" % json.dumps("Demo-" + secrets.token_hex(5)))
         await asyncio.sleep(1.2)
-        await c.js("document.querySelector('#regF button[type=submit]').click()")
+        await click("#regF button[type=submit]")
         await until("document.getElementById('regNote')", 15)
         await asyncio.sleep(0.6)
         await cap("去收信", "註冊完不會直接登入：回到登入頁請他去收信，email 已經填好")
         await asyncio.sleep(5)
-        await c.js("document.querySelector('#regNote a').click()")
+        await click("#regNote a")
         await until("document.getElementById('suGoal')", 15)
         await asyncio.sleep(0.8)
         await recap()
         await cap("點了驗證信", "第一次點就直接登入、接著做個人化設定；沒驗證的人進不了這一頁")
         await asyncio.sleep(2.5)
-        await c.js("var b=document.querySelector('[data-su-goal=\"5000\"]'); if(b) b.click()")
+        await click('[data-su-goal="5000"]')
         await asyncio.sleep(1.8)
-        await c.js("var b=document.querySelector('#suGoalF button[type=submit]'); if(b) b.click()")
+        await click("#suGoalF button[type=submit]")
         await until("document.getElementById('suFinF') || document.getElementById('thmRow')", 15)
         await asyncio.sleep(2.5)
-        await c.js("var b=document.querySelector('[data-su-done]'); if(b) b.click()")
+        await click("[data-su-done]")
         await until("document.getElementById('tourYes')", 15)
         await asyncio.sleep(1.2)
         await cap("新手導覽", "第一次進來會問要不要導覽，照畫面上看得到的東西帶一遍")
         await asyncio.sleep(2.5)
-        await c.js("document.getElementById('tourYes').click()")
+        await click("#tourYes")
         await until("document.getElementById('tourNext')", 10)
         for _ in range(8):
-            await asyncio.sleep(2.6)
-            last = await c.js("var n=document.getElementById('tourNext'); var t=n?n.textContent:''; if(n) n.click(); t")
+            await asyncio.sleep(1.4)
+            last = await c.js("var n=document.getElementById('tourNext'); n?n.textContent:''")
+            await click("#tourNext", pause=0.3)
             if last != "下一步":
                 break
         await asyncio.sleep(1.5)
@@ -277,23 +348,33 @@ async def run(ws_url, tokens, workdir):
         await asyncio.sleep(1)
         step[0] -= 1
         await cap("家長總覽", "這個月還可以花多少＝收入－每月想存；各分類預算用了幾成，超過的標紅")
-        await asyncio.sleep(6)
+        await asyncio.sleep(5)
+
+        await click('[data-flt="income"]')
+        await until("document.querySelector('.fchip') && document.querySelector('#txList .txr')", 20)
+        await recap()
+        await point()
+        await cap("本月收入", "點「本月收入」就只看這個月的收入（點支出就只看支出）；「本月」標籤按 ✕ 看全部")
+        await asyncio.sleep(4)
+        await go(LOCAL + "/#/", ready="document.querySelector('.wal__v') && document.querySelector('[data-quick=\"entry\"]')")
 
         await cap("段落記帳", "一句話記好幾筆：直接打一段平常講話的句子")
         t0 = time.time()
-        await c.js("var b=document.querySelector('[data-quick=\"entry\"]'); if(b) b.click()")
+        await click('[data-quick="entry"]')
         await asyncio.sleep(0.8)
         await recap()
-        await c.js("var m=document.querySelector('[data-mode=\"para\"]'); if(m && !m.classList.contains('on')) m.click()")
+        if await c.js("!!(document.querySelector('[data-mode=\"para\"]') && !document.querySelector('[data-mode=\"para\"]').classList.contains('on'))"):
+            await click('[data-mode="para"]')
         await until("document.querySelector('textarea') && document.querySelector('#txList .dt, #txList table, #txList .card')", 40)
         await recap()
         c.ff.append((t0, time.time(), 1.0))
+        await click("textarea", pause=0.3)
         text = "早上買蛋餅 45，接著去學校買了10元自動鉛筆，晚上全聯買牙膏 89"
         await c.js("""(async (t) => { const ta = document.querySelector('textarea'); ta.focus(); ta.value = '';
                       for (const ch of t) { ta.value += ch; ta.dispatchEvent(new Event('input', {bubbles:true}));
                       await new Promise(r => setTimeout(r, 80)); } })(%s)""" % json.dumps(text), wait=True)
         await asyncio.sleep(1)
-        await c.js("document.getElementById('paraGo').click()")
+        await click("#paraGo")
         await cap("AI 解析中", "本機沒有接模型（線上接 Claude）：後端回 503，前端先用規則拆好，一樣要人確認才存")
         t0 = time.time()
         await until("document.getElementById('paraSave')", 40)
@@ -302,7 +383,7 @@ async def run(ws_url, tokens, workdir):
         await c.js("var r=document.querySelector('.btbl, #paraSave'); if(r) r.scrollIntoView({block:'center'})")
         await cap("解析結果", "備註只留項目（「接著去學校買了10元自動鉛筆」→「自動鉛筆」），原句小字附在下面對照")
         await asyncio.sleep(8)
-        await c.js("document.getElementById('paraSave').click()")
+        await click("#paraSave")
         t0 = time.time()
         await until("!document.getElementById('paraSave')", 20)
         await asyncio.sleep(1.5)
@@ -324,36 +405,35 @@ async def run(ws_url, tokens, workdir):
         step[0] -= 1
         await cap("財務建議", "按「產生這個月的建議」：數字由資料庫先算好，模型只寫句子；本機沒接模型就用同一批數字整理")
         await asyncio.sleep(2)
-        await c.js("var b=document.getElementById('advGen'); if(b) b.click()")
+        await click("#advGen")
         t0 = time.time()
         await asyncio.sleep(2)
         await until("document.getElementById('advGen') && !document.getElementById('advGen').disabled", 45)
         c.ff.append((t0, time.time(), 3.0))
         await asyncio.sleep(1)
-        await c.js("var h=document.querySelector('.ad__h'); if(h) h.click()")
+        await click(".ad__h")
         await asyncio.sleep(1)
         await cap("建議的依據", "每個數字都附算式、找得到出處；線上 Claude 寫的也逐一檢查，不合格的那一則不顯示")
         await asyncio.sleep(7)
 
         await c.js("window.scrollTo({top: 0, behavior: 'smooth'})")
         await asyncio.sleep(0.8)
-        await c.js("var b=document.getElementById('bell'); if(b) b.click()")
+        await click("#bell")
         await until("document.querySelector('.bell__del')", 10)
         await asyncio.sleep(0.8)
         await cap("刪除", "登記的資料都能刪：通知每則右邊的 ×、已讀的一次清掉；建議 6 秒內可復原；自訂分類、帳號本身也能刪")
         await asyncio.sleep(3)
-        await c.js("var d=document.querySelector('.bell__del'); if(d) d.click()")
+        await click(".bell__del")
         await asyncio.sleep(3)
-        await c.js("var b=document.getElementById('bell'); if(b) b.click()")
+        await click("#bell")
         await asyncio.sleep(1)
 
         step[0] += 1
         shown.update(title="預算", desc="總覽的「調整預算 ›」直接打開個人資料的每月預算")
         await go(LOCAL + "/#/", ready="document.querySelector('a[href=\"#/profile/budget\"]')")
-        await c.js("document.querySelector('a[href=\"#/profile/budget\"]').scrollIntoView({block:'center'})")
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
+        await click('a[href="#/profile/budget"]')
         t0 = time.time()
-        await c.js("document.querySelector('a[href=\"#/profile/budget\"]').click()")
         await until("document.querySelector('#fold-bud input[data-budget]') || document.querySelectorAll('#fold-bud input').length > 2", 40)
         await recap()
         c.ff.append((t0, time.time(), 1.0))
@@ -366,15 +446,29 @@ async def run(ws_url, tokens, workdir):
         shown.update(title="帳本", desc="整頁只有一顆「開一本帳」，常設或活動在表單裡選")
         await go(LOCAL + "/#/groups", ready="document.querySelector('[data-fold=\"gnew\"]') && document.querySelector('.lgl')")
         step[0] -= 1
-        await cap("帳本", "整頁只有一顆「開一本帳」；常設帳本與活動帳本分兩區，一本帳平常只佔一行")
+        await cap("帳本", "不分常設、活動，只有一份清單；一本帳平常只佔一行，點開才有細節")
         await asyncio.sleep(3.5)
-        await c.js("var b=document.querySelector('[data-fold=\"gnew\"]'); if(b) b.click()")
-        await asyncio.sleep(1.2)
-        await c.js("var k=document.getElementById('gnKind'); if(k){k.value='temp'; k.dispatchEvent(new Event('change',{bubbles:true}));"
-                   " var w=document.getElementById('gnEndWrap'); if(w) w.hidden=false;}")
+        await click('[data-fold="gnew"]')
         await asyncio.sleep(0.8)
-        await cap("開一本帳", "常設或活動在表單裡選；選「活動」才要填結束日")
+        await click("#gnName", pause=0.3)
+        await c.js("""(async (t) => { const el = document.getElementById('gnName'); el.focus(); el.value = '';
+                      for (const ch of t) { el.value += ch; await new Promise(r => setTimeout(r, 90)); } })(%s)"""
+                   % json.dumps("沖繩旅遊"), wait=True)
+        await click("#gnEnd", pause=0.4, do=False)
+        await cap("開一本帳", "填名字就好；結束日選填，旅行這種有結束日的再填（示範到這裡，不真的建立）")
         await asyncio.sleep(5)
+
+        await go(LOCAL + "/#/", ready="document.querySelector('[data-nav=\"theme\"]')")
+        await click('[data-nav="theme"]')
+        await until("document.querySelectorAll('.thm__i').length > 3", 20)
+        await recap()
+        await point()
+        await cap("主題", "自己一頁，八套排成卡片，按一下就換；存在帳號上，換裝置登入也一樣")
+        await asyncio.sleep(2)
+        await click('[data-theme-pick="tech"]')
+        await asyncio.sleep(3)
+        await click('[data-theme-pick="sky"]')
+        await asyncio.sleep(2)
 
         step[0] += 1
         shown.update(title="家庭成員", desc="邀請碼過期會被拒絕、重複加入會被擋；家長照看子女")
@@ -440,7 +534,8 @@ async def run(ws_url, tokens, workdir):
         await c.js("localStorage.removeItem('fambudget.auth')")
         shown.clear()
         await go(card_url("end", card_html("RESULT", "測試結果", [
-            "兩輪 26 個問題全部修正、重新部署，並在線上驗證", "詳細內容：家庭記帳_測試報告.pdf、家庭記帳_使用者評分與改善建議.pdf"],
+            "兩輪 26 個問題全部修正並在線上驗證；第三輪照使用者的回饋把畫面收乾淨",
+            "詳細內容：家庭記帳_測試報告.pdf、家庭記帳_使用者評分與改善建議.pdf"],
             [("99→100%", "AI 解析整題完全正確"), ("11 / 11", "AI 建議數字全對"), ("4 / 4", "過期後關閉存取"),
              ("57.6→85.7", "使用者評分平均")])), 1, keep=0.5)
         await asyncio.sleep(6)

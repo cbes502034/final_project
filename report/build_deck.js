@@ -637,9 +637,28 @@ async function build() {
   { x: 0.9, y: 5.1, w: 5.5, h: 1.45 });
   card(s, 6.85, 4.5, 5.85, 2.15, "qa-files", "F7F9FC");
   text(s, "交付的佐證", { x: 7.15, y: 4.65, w: 5.3, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
-  s.addText(["線上測試報告（PDF，每個問題附重現步驟與修正後的驗證）", "使用者評分與改善建議（PDF）", "完整測試流程影片（約 3 分鐘）", "AI 線上評測結果與資料庫核對查詢"].map((t, j, a) => ({ text: t, options: { bullet: true, breakLine: j < a.length - 1 } })),
+  s.addText(["線上測試報告（PDF，每個問題附重現步驟與修正後的驗證）", "使用者評分與改善建議（PDF）", "完整測試流程影片（約 4 分鐘，游標標出每一次點擊）", "AI 線上評測結果與資料庫核對查詢"].map((t, j, a) => ({ text: t, options: { bullet: true, breakLine: j < a.length - 1 } })),
     { x: 7.15, y: 5.1, w: 5.35, h: 1.45, fontSize: 13, color: C.text1, paraSpaceAfter: 4, valign: "top", isTextBox: true, margin: 0 });
   s.addNotes("自動測試之外，我們在部署好的正式網站上，用測試工程師的角度把每個功能實測一遍：收得到的信、寫進資料庫的資料、過期之後關不關得掉、AI 的每一個數字對不對。兩輪一共找到 26 個問題，全部修正、重新部署，再到線上驗一次；第二輪補的是平台管理、防濫用、註冊收信、刪除功能和 AI 的備註。接著換成一般使用者的角度逐項打分，平均從 57.6 分到 85.7 分，低於六十分的功能歸零。");
+
+  // 第三輪：使用者本人看過畫面之後的回饋（10/21）
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "評測與測試" });
+  s.addText("第三輪：照使用者的話把畫面收乾淨", { placeholder: "title" });
+  shot(s, "groups.png", 0.7, 1.5, 6.9, 1.6, "shot-groups");
+  const third = [
+    ["FiBookOpen", "帳本只剩一份清單", "不分常設、活動；一顆「開一本帳」，結束日選填"],
+    ["FiFilter", "收入、支出各自點進去", "點本月收入只看收入、點支出只看支出"],
+    ["FiHome", "寫家庭的名字", "常用功能那格寫「林家」，不寫「家庭帳本」"],
+    ["FiDroplet", "主題自己一頁", "八套排成卡片，按一下就換"],
+    ["FiEyeOff", "用不到的不掛著", "搜尋、帳本切換只在用得到的頁面出現"],
+  ];
+  for (let i = 0; i < third.length; i++) {
+    const y = 1.5 + i * 1.02;
+    await iconCircle(s, third[i][0], 8.0, y, 0.55, C.accent1, HEX.lt1, "third-c" + i);
+    text(s, third[i][1], { x: 8.7, y: y - 0.04, w: 4.05, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
+    text(s, third[i][2], { x: 8.7, y: y + 0.36, w: 4.05, h: 0.5, fontSize: 12.5, color: C.accent5 });
+  }
+  s.addNotes("前兩輪是我們用測試帳號替使用者走一遍；第三輪是使用者本人打開網站，指出看了會困惑的地方。共同點是同一件事講太多遍、用不到的東西一直掛著。我們照他的話收乾淨：帳本只剩一份清單、收入支出各自點進去、首頁寫家庭的名字、主題自己一頁、搜尋和帳本切換只在用得到的頁面出現。");
 
   // ============================================================ 結語
   pres.addSection({ title: "結語" });
