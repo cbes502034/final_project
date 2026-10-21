@@ -16,7 +16,8 @@ const { applyTheme } = require("./lib/apply_theme.js");
 const HERE = __dirname;
 const facts = JSON.parse(fs.readFileSync(path.join(HERE, "data", "facts.json"), "utf8"));
 const asset = (n) => path.join(HERE, "assets", n);
-const OUT = path.join(HERE, "家庭記帳_期末報告.pptx");
+// 可以帶一個檔名另存（PowerPoint 開著舊檔、或不想蓋掉手動修改的時候）：node report/build_deck.js 新檔名.pptx
+const OUT = process.argv[2] ? path.resolve(process.argv[2]) : path.join(HERE, "家庭記帳_期末報告.pptx");
 
 const THEME = {
   name: "FamBudget",
@@ -652,7 +653,8 @@ async function build() {
     "免費主機會休眠：第一次開要等一下",
   ];
   const nxt = ["把使用者改過的解析（nlp_parses.user_corrected）收進下一版留出集與訓練資料",
-    "微調模型跑同一份題目，跟線上那一套放在同一張表比較", "建議加上「跟上個月比」的趨勢敘述（數字一樣由資料庫先算）", "家長端的零用金超支即時通知"];
+    "微調模型跑同一份題目，跟線上那一套放在同一張表比較", "建議加上「跟上個月比」的趨勢敘述（數字一樣由資料庫先算）",
+    "家庭改成開放式（下一頁）"];
   const col2 = [["FiAlertTriangle", C.accent3, "限制", lim], ["FiArrowRight", C.accent1, "下一步", nxt]];
   for (let i = 0; i < 2; i++) {
     const [ic, col, head, items] = col2[i];
@@ -664,6 +666,26 @@ async function build() {
       { x: x + 0.35, y: 2.75, w: 5.3, h: 3.7, fontSize: 15, color: C.text1, paraSpaceAfter: 10, valign: "top", isTextBox: true, margin: 0 });
   }
   s.addNotes("最後是限制與下一步。最重要的限制是資料由 AI 產生；下一步是把使用者真的改過的解析收回來，變成真實的評測與訓練資料。");
+
+  // 下一版：使用者回饋之後定案的家庭改版（docs/06-家庭與個人.md）。後端第一段已完成，前端下一版上線
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "結語" });
+  s.addText("下一版：從「照看子女」改成開放式家庭", { placeholder: "title" });
+  const redo = [
+    ["FiUsers", C.accent1, "成員一律平等", "拿掉家長／子女與照看、零用金；誰看得到我的帳由我自己決定。動到別人的資料要輸入自己的密碼"],
+    ["FiLayers", C.accent2, "個人／家庭兩種模式", "功能一樣、各有基底與帳本；家庭的明細來自每個人自己選擇「併進家庭」的，個人照算、家庭也算"],
+    ["FiSettings", C.accent3, "家庭的初始化設定", "建立的人先填家庭想存多少、收入怎麼估；AI 建議也能針對全家產生。家庭模式的主題每個人自己選"],
+    ["FiBookOpen", C.accent1, "帳本只剩合併與刪除", "一顆「開一本帳」；活動帳本可設存錢目標（綠光）、花費上限（紅光）與到期日，到期可合併或延長"],
+    ["FiCalendar", C.accent2, "每月自動打包", "過去的月份收成一包：筆數、收入、支出合計，點開才看每一筆"],
+  ];
+  for (let i = 0; i < redo.length; i++) {
+    const [ic, col, head, body] = redo[i];
+    const y = 1.5 + i * 1.02;
+    card(s, 0.6, y, 12.1, 0.9, "redo-" + i);
+    await iconCircle(s, ic, 0.8, y + 0.15, 0.6, col, HEX.lt1, "redo-ic-" + i);
+    text(s, head, { x: 1.6, y: y + 0.1, w: 3.2, h: 0.7, fontSize: 17, bold: true, color: C.text2, valign: "middle" });
+    text(s, body, { x: 4.8, y: y + 0.08, w: 7.7, h: 0.74, fontSize: 13, color: C.text1, valign: "middle" });
+  }
+  s.addNotes("這是展示前根據使用者回饋定案的下一版。使用者說：這不應該是管理、控制子女的系統，而是開放式的。所以成員一律平等，家庭的帳來自每個人自己選擇併進去的明細，兩邊都算。後端第一段已經完成、測試全部通過，前端會在下一版上線。");
 
   s = pres.addSlide({ masterName: "TITLE_DARK", sectionTitle: "結語" });
   s.addText("謝謝聆聽", { placeholder: "title" });

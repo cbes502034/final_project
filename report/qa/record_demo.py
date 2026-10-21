@@ -35,7 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FRONT = "https://fambudget-web.onrender.com"
 BACKEND = "https://fambudget-backend-tdvg.onrender.com"
 LOCAL = "http://localhost:5195"
-LOCAL_API = "http://localhost:8010"
+LOCAL_API = "http://127.0.0.1:8010"          # 用 IPv4：無頭 Chrome 會把 localhost 先解析成 IPv6，本機後端只聽 IPv4
 TAG_LIVE = "LIVE · fambudget-web.onrender.com"
 DEMO = "LOCAL · 本機示範資料（林家；同一份程式，本機沒接模型）"
 CHROME = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -189,7 +189,7 @@ async def run(ws_url, tokens, workdir):
             return "file:///" + path.replace("\\", "/")
 
         # 片頭（不算步驟）
-        await go(card_url("open", card_html("FAMBUDGET · QA WALKTHROUGH · 2026-10-20", "家庭記帳<br>完整測試流程",
+        await go(card_url("open", card_html("FAMBUDGET · QA WALKTHROUGH · 2026-10-21", "家庭記帳<br>完整測試流程",
                                             ["未登入 → 新用戶註冊 → 家長記帳與建議 → 刪除 → 家庭與權限 → 平台管理 → 手機版",
                                              "右上角標 LIVE 是在 Render 正式網站實測；標 LOCAL 是本機示範資料（同一份程式）",
                                              "每一步下方的字幕說明正在驗證什麼"])), 0.5)
@@ -360,6 +360,20 @@ async def run(ws_url, tokens, workdir):
         await asyncio.sleep(1.5)
         step[0] -= 1
         await cap("預算", "總覽的「調整預算 ›」直接打開個人資料的每月預算")
+        await asyncio.sleep(5)
+
+        step[0] += 1
+        shown.update(title="帳本", desc="整頁只有一顆「開一本帳」，常設或活動在表單裡選")
+        await go(LOCAL + "/#/groups", ready="document.querySelector('[data-fold=\"gnew\"]') && document.querySelector('.lgl')")
+        step[0] -= 1
+        await cap("帳本", "整頁只有一顆「開一本帳」；常設帳本與活動帳本分兩區，一本帳平常只佔一行")
+        await asyncio.sleep(3.5)
+        await c.js("var b=document.querySelector('[data-fold=\"gnew\"]'); if(b) b.click()")
+        await asyncio.sleep(1.2)
+        await c.js("var k=document.getElementById('gnKind'); if(k){k.value='temp'; k.dispatchEvent(new Event('change',{bubbles:true}));"
+                   " var w=document.getElementById('gnEndWrap'); if(w) w.hidden=false;}")
+        await asyncio.sleep(0.8)
+        await cap("開一本帳", "常設或活動在表單裡選；選「活動」才要填結束日")
         await asyncio.sleep(5)
 
         step[0] += 1

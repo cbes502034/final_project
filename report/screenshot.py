@@ -42,7 +42,7 @@ SHOTS = [
     ("home_mobile", "dad", "#/", 390, 844, "", 2.5),
     ("admin", "admin", "#/admin", 1280, 800, "", 3),
     ("admin_mobile", "admin", "#/admin", 390, 844, "", 3),
-    ("parse", "dad", "#/", 1280, 800, "PARSE", 8),
+    ("parse", "dad", "#/entry", 1280, 800, "PARSE", 8),
 ]
 
 #: 段落記帳：按「記一筆」、選段落記帳、貼一段話、按解析
@@ -51,7 +51,7 @@ PARSE_JS = r"""
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const byText = (sel, txt) => [...document.querySelectorAll(sel)].find(e => e.textContent.trim().includes(txt));
   const tile = byText('a,button,[data-quick],.qt', '記一筆'); if (tile) tile.click();
-  await sleep(800);
+  await sleep(1500);
   const ta = document.querySelector('textarea');
   if (!ta) return 'no textarea';
   ta.focus();
