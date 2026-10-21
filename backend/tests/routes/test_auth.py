@@ -405,17 +405,17 @@ def test_register_寄出驗證信_點連結之前是未驗證(api, outbox):
     row = crud.get(User, int(r.json()["user"]["id"]))
     assert email_verify.read_token(token) == (row.id, "daming@wang.tw")
     assert row.email_verified_at is None and row.email_verify_sent_at is not None
-    # 沒點信就先登入：登得進去，但個人化設定標不了完成（前端停在「請先到信箱點驗證連結」）
-    h = {"Authorization": "Bearer " + api.post("/api/auth/login", json={"email": "daming@wang.tw",
-                                                                         "password": "abcd1234"}).json()["accessToken"]}
-    assert api.get("/api/auth/me", headers=h).json()["user"]["emailVerified"] is False
-    r = api.patch("/api/auth/me", headers=h, json={"onboarded": True})
-    assert r.status_code == 403 and "驗證連結" in r.json()["detail"]
+    # 沒點信就登入：被擋下，給一句看得懂的提示（密碼打錯還是 401，不洩漏帳號有沒有驗證）
+    r = api.post("/api/auth/login", json={"email": "daming@wang.tw", "password": "abcd1234"})
+    assert r.status_code == 403 and "驗證信箱" in r.json()["detail"]
+    assert api.post("/api/auth/login", json={"email": "daming@wang.tw", "password": "wrong-pw1"}).status_code == 401
     # 點了信：登入（拿到 token），接著可以完成設定
     v = api.post("/api/auth/verify-email", json={"token": token}).json()
     assert v["loggedIn"] is True and v["user"]["onboardedAt"] is None
     h2 = {"Authorization": "Bearer " + v["accessToken"]}
     assert api.patch("/api/auth/me", headers=h2, json={"onboarded": True}).status_code == 200
+    # 驗證過之後就能用密碼登入
+    assert api.post("/api/auth/login", json={"email": "daming@wang.tw", "password": "abcd1234"}).status_code == 200
 
 
 @pytest.mark.route(*REG)

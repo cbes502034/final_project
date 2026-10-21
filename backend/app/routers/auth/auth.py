@@ -393,6 +393,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         狀態碼  什麼時候                detail
         401     沒有這個帳號、或密碼錯  email 或密碼不對
         403     密碼對，但帳號被停權    這個帳號已被停權：（停權理由）
+        403     密碼對，但還沒驗證信箱  這個帳號還沒驗證信箱：請先到信箱點驗證連結再登入（平台管理員不擋；沒設定寄信服務的環境也不擋）
         429     同一個 email 錯太多次   密碼錯太多次了，請 15 分鐘後再試
         429     同一個來源錯太多次      這台裝置登入失敗太多次了，請 15 分鐘後再試
 
@@ -478,6 +479,10 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             except PermissionError:
                 raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範")) from None
 
+            # 還沒點驗證信的人不能登入（寄得出信的環境才擋；平台管理員不擋，不然沒人進得了管理頁）
+            if user.email_verified_at is None and not user.is_platform_admin and mailer.is_configured():
+                raise errors.forbidden("這個帳號還沒驗證信箱：請先到信箱點驗證連結再登入（找不到信的話看一下垃圾信件）")
+
             # 4. 寫一列 sessions（只存 refresh token 的指紋），記最後登入時間
             now = datetime.now(timezone.utc)
             refresh, expires = tokens.make_refresh_token(user.id)
@@ -560,6 +565,10 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         roles.require_active(user.suspended_at)
     except PermissionError:
         raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範")) from None
+
+    # 還沒點驗證信的人不能登入（寄得出信的環境才擋；平台管理員不擋，不然沒人進得了管理頁）
+    if user.email_verified_at is None and not user.is_platform_admin and mailer.is_configured():
+        raise errors.forbidden("這個帳號還沒驗證信箱：請先到信箱點驗證連結再登入（找不到信的話看一下垃圾信件）")
 
     # 4. 寫一列 sessions（只存 refresh token 的指紋），記最後登入時間
     now = datetime.now(timezone.utc)
