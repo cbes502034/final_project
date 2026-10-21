@@ -4,10 +4,9 @@
 負責人：成員1（認證）　✦ 分支：m1-auth
 
 ===========================================================================
-現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
+本檔路由已實作；下方保留可執行教學與前後端契約。
 ===========================================================================
-要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
-裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
+修改功能時請同步下方範例，並執行對應的路由測試。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -88,6 +87,45 @@ def admin_list_users(me: User, db: Session = Depends(get_db)):
         ⚠️ 只讀不寫，不用 db.commit()。
 
 
+
+    【完整寫法】
+        第一步：檔案最上面的匯入。
+
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+            from datetime import datetime, timezone
+
+            from fastapi import APIRouter, Depends
+            from sqlalchemy.orm import Session
+
+            from app.guards import admin_required
+            from app.models import AuditLog, FamilyMember, User, UserSession
+            from app.routers._stub import not_ready, stub
+            from app.schemas.auth import SuspendIn
+            from app.toolkit import crud, errors, roles
+            from app.toolkit.db import get_db
+
+        第二步：函式內容（保留原有裝飾器、參數與說明）。
+
+            # 1. 所有一般帳號（其他平台管理員不列）
+            users = crud.find(User, {"is_platform_admin": False}, order_by="id", db=db)
+
+            # 2. 每個人的家庭角色
+            role_of = {m.user_id: m.role for m in crud.find(FamilyMember, {"status": "active"}, db=db)}
+
+            # 3. 只放身分欄位，任何金額都不給
+            out = []
+            for u in users:
+                out.append({
+                    "id": str(u.id),
+                    "name": u.display_name,
+                    "email": u.email,
+                    "role": role_of.get(u.id),
+                    "joined": u.created_at.date().isoformat(),
+                    "suspendedAt": u.suspended_at.isoformat() if u.suspended_at else None,
+                    "suspendedReason": u.suspended_reason,
+                })
+            return {"users": out}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -180,6 +218,51 @@ def suspend_user(user_id: str, body: SuspendIn, me: User, db: Session = Depends(
 
 
 
+    【完整寫法】
+        第一步：檔案最上面的匯入。
+
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+            from datetime import datetime, timezone
+
+            from fastapi import APIRouter, Depends
+            from sqlalchemy.orm import Session
+
+            from app.guards import admin_required
+            from app.models import AuditLog, FamilyMember, User, UserSession
+            from app.routers._stub import not_ready, stub
+            from app.schemas.auth import SuspendIn
+            from app.toolkit import crud, errors, roles
+            from app.toolkit.db import get_db
+
+        第二步：函式內容（保留原有裝飾器、參數與說明）。
+
+            # 1. 找人
+            target = crud.get(User, int(user_id) if user_id.isdigit() else 0, db=db)
+            if target is None:
+                raise errors.not_found("找不到這個帳號")
+
+            # 2. 一定要有理由
+            try:
+                why = roles.clean_suspend_reason(body.reason)
+            except ValueError as exc:
+                raise errors.unprocessable(str(exc)) from None
+
+            # 3. 平台管理員不能停（停掉最後一個就沒有人能解除了）
+            try:
+                roles.require_suspendable(target.is_platform_admin)
+            except PermissionError as exc:
+                raise errors.forbidden(str(exc)) from None
+
+            # 4. 停權（不刪任何資料）、所有登入撤銷、寫稽核
+            now = datetime.now(timezone.utc)
+            crud.save(User, {"id": target.id, "suspended_at": now, "suspended_reason": why}, db=db)
+            crud.save(UserSession, {"revoked_at": now}, where={"user_id": target.id, "revoked_at__isnull": True}, db=db)
+            crud.save(AuditLog, {"actor_id": me.id, "action": "suspend_user", "target_type": "user",
+                                 "target_id": target.id, "meta_json": {"note": why}}, db=db)
+            db.commit()
+            return {"id": str(target.id), "suspendedAt": now.isoformat()}
+
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
         2. 瀏覽器打開 http://localhost:8000/docs，找到 POST /api/admin/users/{user_id}/suspend
@@ -268,6 +351,39 @@ def unsuspend_user(user_id: str, me: User, db: Session = Depends(get_db)):
         3. 回 {"id", "suspendedAt": null}
 
 
+
+    【完整寫法】
+        第一步：檔案最上面的匯入。
+
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
+            from datetime import datetime, timezone
+
+            from fastapi import APIRouter, Depends
+            from sqlalchemy.orm import Session
+
+            from app.guards import admin_required
+            from app.models import AuditLog, FamilyMember, User, UserSession
+            from app.routers._stub import not_ready, stub
+            from app.schemas.auth import SuspendIn
+            from app.toolkit import crud, errors, roles
+            from app.toolkit.db import get_db
+
+        第二步：函式內容（保留原有裝飾器、參數與說明）。
+
+            # 1. 找人，而且要是停權中的
+            target = crud.get(User, int(user_id) if user_id.isdigit() else 0, db=db)
+            if target is None:
+                raise errors.not_found("找不到這個帳號")
+            if target.suspended_at is None:
+                raise errors.bad_request("這個帳號沒有被停權")
+
+            # 2. 解除、寫稽核
+            crud.save(User, {"id": target.id, "suspended_at": None, "suspended_reason": None}, db=db)
+            crud.save(AuditLog, {"actor_id": me.id, "action": "unsuspend_user", "target_type": "user",
+                                 "target_id": target.id, "meta_json": {"note": "解除停權"}}, db=db)
+            db.commit()
+            return {"id": str(target.id), "suspendedAt": None}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload

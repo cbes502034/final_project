@@ -35,6 +35,7 @@ import http.server
 import io
 import os
 import shutil
+import signal
 import socket
 import socketserver
 import subprocess
@@ -285,8 +286,25 @@ def serve_frontend(port: int) -> socketserver.TCPServer:
     handler = functools.partial(QuietHandler, directory=FRONTEND)
     socketserver.TCPServer.allow_reuse_address = True
     httpd = socketserver.ThreadingTCPServer(("127.0.0.1", port), handler)
+    httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd
+
+
+def stop_services(httpd, api=None) -> None:
+    """關閉時暫緩第二次 Ctrl+C，確保前後端都釋放資源。"""
+    previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        try:
+            httpd.shutdown()
+        finally:
+            httpd.server_close()
+    finally:
+        try:
+            if api is not None:
+                stop_tree(api)
+        finally:
+            signal.signal(signal.SIGINT, previous)
 
 
 # ======================================================================
@@ -295,7 +313,7 @@ def serve_frontend(port: int) -> socketserver.TCPServer:
 def main() -> None:
     ap = argparse.ArgumentParser(description="一鍵把家庭記帳跑起來")
     ap.add_argument("--front-only", action="store_true", help="只跑前端（mock 模式）")
-    ap.add_argument("--reset", action="store_true", help="砍掉本機的 SQLite 重建")
+    ap.add_argument("--reset", action="store_true", help="清除並重建本機資料庫（包含 PostgreSQL 資料）")
     ap.add_argument("--port", type=int, default=5174, help="前端的埠號（預設 5174）")
     ap.add_argument("--api-port", type=int, default=8000, help="後端的埠號（預設 8000）")
     args = ap.parse_args()
@@ -317,7 +335,7 @@ def main() -> None:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            httpd.shutdown()
+            stop_services(httpd)
             say("\n關掉了。")
         return
 
@@ -378,8 +396,7 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        httpd.shutdown()
-        stop_tree(api)
+        stop_services(httpd, api)
         say("\n關掉了。")
 
 

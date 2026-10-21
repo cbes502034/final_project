@@ -1,6 +1,6 @@
 """家庭、邀請、監管、零用金、稽核、通知（成員4）。怎麼跑、兩種對象的差別：看 conftest.py 的檔頭。"""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -184,6 +184,11 @@ def test_家長可以單獨刪掉一組邀請碼(api):
     listed = api.get("/api/family/invites", headers=login(dad)).json()["codes"]
     assert [c["label"] for c in listed] == ["給兒子", "給女兒"], "新的在前，而且要帶名字"
     assert all(c["code"] is None and c["id"] for c in listed), "明碼不可以回，id 要回（刪的時候用）"
+    created = {c["id"]: c for c in (a, b)}
+    for code in listed:
+        expires = datetime.fromisoformat(code["expiresAt"])
+        assert expires.tzinfo is not None, "到期時間要包含時區，避免清單比建立畫面早八小時"
+        assert expires == datetime.fromisoformat(created[code["id"]]["expiresAt"])
 
     r = api.delete("/api/family/invites/" + a["id"], headers=login(dad))
     assert r.status_code == 200 and r.json()["status"] == "cancelled"

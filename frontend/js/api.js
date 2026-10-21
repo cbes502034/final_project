@@ -2800,10 +2800,16 @@
   var NO_RETRY = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
 
   function req(path, opt, retried) {
+    var sentToken = (tokens() || {}).accessToken;
     return send(path, opt).then(function (r) {
       /* 401 → 自動換新的 access token，再把剛才那個請求重送一次。
          沒有這段的話，access token 30 分鐘一到，使用者就被踢出去一次。 */
       if (r.status === 401 && !retried && NO_RETRY.indexOf(path.split('?')[0]) < 0) {
+        // 另一個請求已續期完成：重用新權杖，避免遲到的 401 再消耗一次 refresh token。
+        var current = tokens();
+        if (current && current.accessToken && current.accessToken !== sentToken) {
+          return req(path, opt, true);
+        }
         return doRefresh().then(function () { return req(path, opt, true); });
       }
       if (!r.ok) return fail(r, path);
@@ -2819,24 +2825,44 @@
     if (refreshing) return refreshing;
 
     var t = tokens();
-    if (!t || !t.refreshToken) return Promise.reject(new Error('尚未登入'));
+    if (!t || !t.refreshToken) {
+      var missing = new Error('登入已過期，請重新登入');
+      missing.status = 401;
+      return Promise.reject(missing);
+    }
 
     refreshing = send('/api/auth/refresh', {
       method: 'POST', body: { refreshToken: t.refreshToken }
     }).then(function (r) {
-      if (!r.ok) { setTokens(null); return fail(r, '/api/auth/refresh'); }
+      if (!r.ok) return fail(r, '/api/auth/refresh');
       return r.json();
     }).then(function (d) {
+      var current = tokens();
+      if (!current || current.refreshToken !== t.refreshToken) {
+        var changed = new Error('登入狀態已變更，請重新操作');
+        changed.status = 401;
+        throw changed;
+      }
+      if (!d || typeof d.accessToken !== 'string' || !d.accessToken) {
+        throw new Error('登入服務回應不完整，請稍後重試');
+      }
       setTokens({
         accessToken: d.accessToken,
         refreshToken: d.refreshToken || t.refreshToken,
         expiresIn: d.expiresIn || t.expiresIn
       });
+      return d;
+    }).catch(function (e) {
+      var current = tokens();
+      if ([400, 401, 403].indexOf(e.status) >= 0 && current && current.refreshToken === t.refreshToken) {
+        setTokens(null);
+      }
+      throw e;
+    }).then(function (d) {
       refreshing = null;
       return d;
     }, function (e) {
       refreshing = null;
-      setTokens(null);
       throw e;
     });
     return refreshing;

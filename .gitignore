@@ -6,3 +6,6 @@ venv/
 .pytest_cache/
 *.db
 .DS_Store
+model_training/.cache/
+model_training/recovery/
+model_training/artifacts/

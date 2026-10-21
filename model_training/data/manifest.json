@@ -1,0 +1,10 @@
+{
+  "source": "hand-authored category labels with synthetic templates; not real user data",
+  "seed": 42,
+  "split_strategy": "disjoint template families",
+  "counts": {
+    "train": 150,
+    "validation": 90,
+    "test": 91
+  }
+}

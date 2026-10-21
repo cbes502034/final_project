@@ -924,6 +924,7 @@
 
   var MODE = 'para';          // 'para' 段落批次 ｜ 'single' 單筆手動。兩者互斥
   var batch = null;           // 段落解析結果，尚未寫入
+  var batchSaving = false;
 
   /* 記帳頁：明細先出來。
 
@@ -936,7 +937,7 @@
 
     /* 篩選放在標題那一列，跟「記一筆」並排——不要自己佔一整條 */
     h += foldHead('entry', '所有紀錄', '記一筆', '', null, filterBar(), pickToggle());
-    h += '<div id="txList">' + skeleton(6) + '</div></div>';
+    h += '<div id="entryLedger"></div><div id="txList">' + skeleton(6) + '</div></div>';
     $view.innerHTML = h;
 
     foldRestore();
@@ -1170,7 +1171,7 @@
     var lbl = document.getElementById('paraLbl');
     if (n) n.textContent = batch.length;
     if (lbl) lbl.textContent = bad > 0 ? ('還有 ' + bad + ' 筆缺欄位，共') : '確認並寫入';
-    btn.disabled = bad > 0 || batch.length === 0;
+    btn.disabled = batchSaving || bad > 0 || batch.length === 0;
   }
 
   /* ============================================================
@@ -1235,6 +1236,15 @@
          明細照樣列得出來（明細本身是另一支），但要講一句為什麼沒有帳本名稱——
          不講的話那一欄空白，看起來像「這幾筆沒有歸到任何帳本」。 */
       TXGROUPS = r[1].__err ? [] : (r[1].groups || []);
+      var ledgerHint = document.getElementById('entryLedger');
+      if (ledgerHint) {
+        var writable = TXGROUPS.some(function (g) { return !g.archived && !g.settled; });
+        ledgerHint.innerHTML = r[1].__err || writable ? '' :
+          '<div class="card"><div class="card__h"><span class="card__t">先準備一本帳本</span></div>' +
+          '<p>目前沒有可以記帳的帳本。建立後可直接儲存，已填寫的內容會保留。</p>' +
+          '<button class="btn btn--go" id="entryCreateLedger">建立個人帳本</button> ' +
+          '<a class="btn" href="#/groups">管理帳本</a></div>';
+      }
       renderTx();
       if (r[1].__err) box.insertAdjacentHTML('afterbegin', errState(r[1].__err));
     }).catch(function (e) { box.innerHTML = errState(e); });
@@ -4172,20 +4182,43 @@
       return;
     }
 
+    var createLedger = t.closest('#entryCreateLedger');
+    if (createLedger) {
+      if (createLedger.disabled) return;
+      createLedger.disabled = true;
+      createLedger.textContent = '建立中…';
+      API.createGroup({ name: '個人帳本', kind: 'standing' }).then(function (g) {
+        GROUP = g.id;
+        loadTx();
+        toast('個人帳本已建立，可以儲存剛才的內容', 'ok');
+      }).catch(function (err) {
+        createLedger.disabled = false;
+        createLedger.textContent = '建立個人帳本';
+        toast(err.message || '建立失敗', 'err');
+      });
+      return;
+    }
+
     if (t.closest('#paraSave')) {
+      if (batchSaving || !batch) return;
       syncBatch();
       var bad = batch.filter(function (x) { return x.missing && x.missing.length; }).length;
       if (bad) { toast('還有 ' + bad + ' 筆缺欄位', 'err'); return; }
       var n = batch.length;
+      batchSaving = true;
+      syncSaveState();
       // 記進目前正在看的那一本帳
       if (GROUP !== 'all' && batch.length) batch[0].groupId = GROUP;
       API.nlpConfirmBatch(batch).then(function () {
-        document.getElementById('paraOut').innerHTML = '';
-        document.getElementById('paraText').value = '';
+        if (document.getElementById('paraOut')) document.getElementById('paraOut').innerHTML = '';
+        if (document.getElementById('paraText')) document.getElementById('paraText').value = '';
         batch = null;
         loadTx();
         toast('已一次寫入 ' + n + ' 筆', 'ok');
-      }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); });
+      }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); }).then(function () {
+        batchSaving = false;
+        syncSaveState();
+      });
       return;
     }
 
@@ -4198,6 +4231,7 @@
     /* ---- 單筆手動 ---- */
     if (t.closest('#singleSave')) {
       var btn = t.closest('#singleSave');
+      if (btn.disabled) return;
       var box = document.getElementById('entryBox');
       var v = {};
       Array.prototype.forEach.call(box.querySelectorAll('[data-s]'), function (i) {
@@ -4223,6 +4257,7 @@
         return;
       }
 
+      btn.disabled = true;
       API.createTransaction({
         date: v.date, amount: Number(v.amount), kind: v.kind, cat: v.cat,
         merchant: v.merchant, note: v.note,
@@ -4230,7 +4265,10 @@
         groupId: GROUP === 'all' ? null : GROUP
       }).then(function () {
         renderMode(); loadTx(); toast('已寫入一筆', 'ok');
-      }).catch(function (err) { toast('寫入失敗：' + err.message, 'err'); });
+      }).catch(function (err) {
+        btn.disabled = false;
+        toast('寫入失敗：' + err.message, 'err');
+      });
       return;
     }
 
@@ -4818,8 +4856,15 @@
        就只能重新登入——這時候硬留在畫面上，下一個動作還是會 401。 */
     API.renew().then(function () {
       idleClose();
-    }, function () {
-      idleLogout('登入已經過期，請重新登入');
+    }, function (err) {
+      if (err && [400, 401, 403].indexOf(err.status) >= 0) {
+        idleLogout('登入已經過期，請重新登入');
+        return;
+      }
+      idleBusy = false;
+      idleLeft = IDLE_GRACE;
+      if (b) { b.disabled = false; b.textContent = '重新連線'; }
+      toast('暫時無法連線，請檢查網路後再試。尚未儲存的內容仍保留。', 'err');
     });
   }
 

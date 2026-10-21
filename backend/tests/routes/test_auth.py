@@ -183,11 +183,11 @@ def test_logout_撤銷這一台_重複登出也成功(api):
 @pytest.mark.route(*LOGOUT_ALL)
 def test_logout_all(api):
     me, other = user("d@x.tw", "爸爸"), user("o@x.tw", "別人")
-    session_for(me)
+    current, _ = session_for(me)
     session_for(me)
     session_for(me, revoked_at=now())
     c, _ = session_for(other)
-    r = api.post("/api/auth/logout-all", headers=login(me))
+    r = api.post("/api/auth/logout-all", headers=login_as(me, current))
     assert r.status_code == 200 and r.json() == {"revoked": 2}
     assert crud.count(UserSession, {"user_id": me.id, "revoked_at__isnull": True}) == 0
     assert crud.get(UserSession, c.id).revoked_at is None

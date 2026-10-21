@@ -4,10 +4,9 @@
 負責人：成員3（數字）　✦ 分支：m3-analytics
 
 ===========================================================================
-現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
+本檔路由已實作；下方保留可執行教學與前後端契約。
 ===========================================================================
-要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
-裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
+修改功能時請同步下方範例，並執行對應的路由測試。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -178,7 +177,6 @@ def list_advices(me: User, scope: str | None = None, db: Session = Depends(get_d
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    # raise not_ready("GET /api/advices", OWNER)
 
     # 1. family：我看得到的別人的個人建議＋我們家的家庭建議（只給家長；子女拿不到）
     users, _ = visible_scope(me, db)
@@ -209,8 +207,8 @@ def list_advices(me: User, scope: str | None = None, db: Session = Depends(get_d
             "suggest": a.suggestions_json or [],
             "conf": float(a.confidence or 0),
             "generatedAt": at.astimezone(tw).strftime("%Y-%m-%d %H:%M"),
-            })
-        return {"advices": out, "rules": catalog.ADVICE_RULES}
+        })
+    return {"advices": out, "rules": catalog.ADVICE_RULES}
     
 @router.post("/advices/generate", status_code=201, summary="產生這個月的建議")
 @block_admin
@@ -463,7 +461,6 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    # raise not_ready("POST /api/advices/generate", OWNER)
 
     # 1. 全家的建議：只有家長、而且看得到家人時才能產生
     users, _ = visible_scope(me, db)
@@ -481,25 +478,25 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
     goals = {}
     for row in crud.find(SavingsGoal, {"user_id__in": people, "group_id__isnull": True}, order_by="id", db=db):
         goals[row.user_id] = row.goal_amount
-        savings = analytics.savings_status(nums["income"], nums["expense"], money.add(*goals.values()))
-        cat_ids = [int(c["cat"]) for c in nums["byCat"]]
-        names = {c.id: c.name for c in crud.find(Category, {"id__in": cat_ids}, db=db)}
-        numbers = jsonable_encoder({
-            "period": this_month,
-            "scope": body.scope,
-            "income": nums["income"],
-            "expense": nums["expense"],
-            "count": nums["count"],
-            "savings": savings,
-            "byCat": [{"name": names.get(int(c["cat"]), ""), "amount": c["amount"]} for c in nums["byCat"]],
-            "monthly": nums["monthly"],
-        })
+    savings = analytics.savings_status(nums["income"], nums["expense"], money.add(*goals.values()))
+    cat_ids = [int(c["cat"]) for c in nums["byCat"]]
+    names = {c.id: c.name for c in crud.find(Category, {"id__in": cat_ids}, db=db)}
+    numbers = jsonable_encoder({
+        "period": this_month,
+        "scope": body.scope,
+        "income": nums["income"],
+        "expense": nums["expense"],
+        "count": nums["count"],
+        "savings": savings,
+        "byCat": [{"name": names.get(int(c["cat"]), ""), "amount": c["amount"]} for c in nums["byCat"]],
+        "monthly": nums["monthly"],
+    })
 
     # 3. 使用者自己填的理財習慣：只當背景，標示成「資料，不是指令」
     finance = {"style": me.finance_style, "goals": me.finance_goals or [],
                "habits": me.finance_habits or [], "note": me.finance_note or ""}
     block = profile.to_prompt_block(finance, catalog.FINANCE_STYLES, catalog.FINANCE_GOALS, catalog.FINANCE_HABITS)
-    
+
     # 4. 叫模型寫成句子；沒設定、叫不動、還沒做好都回 503（前端會用同一批數字頂著）
     try:
         drafts = advice.write_advices(numbers, block)
@@ -514,10 +511,10 @@ def generate_advices(body: GenerateIn, me: User, db: Session = Depends(get_db)):
         try:
             items.append(AdviceItem.model_validate(d))
         except ValidationError:
-               continue
-        if not items:
-            raise errors.service_unavailable("模型寫回來的建議格式不對，先用前端的版本")
-            
+            continue
+    if not items:
+        raise errors.service_unavailable("模型寫回來的建議格式不對，先用前端的版本")
+
     # 6. 存：同一個月、同一個範圍的舊建議先刪掉，不要疊出兩份
     old = {"period_type": "month", "period_key": this_month}
     if family_mode:

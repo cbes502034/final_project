@@ -1,0 +1,25 @@
+{
+  "method": "readable source reconstructed from prior implementation and surviving bytecode; not byte-for-byte Git restoration",
+  "original_prompt_sha256": "b5daa4545a24e9da975eefe5236fc0963184c07c1d1f165cf36be1e2e1e809d4",
+  "original_training_data_sha256": "fcde05d1800f89d9095f7d55da6d707fe05c778a5876a500f2c52f24400188e3",
+  "data_counts": {
+    "train": 150,
+    "validation": 90,
+    "test": 91
+  },
+  "live_inference_test": {
+    "input": "午餐100 晚餐200",
+    "passed": true
+  },
+  "preserved_existing_backend_files": [
+    "backend/app/services/llm/parse.py",
+    "backend/app/routers/ledger/nlp.py"
+  ],
+  "unit_tests_passed": 10,
+  "training_smoke": {
+    "steps": 1,
+    "offline_save_passed": true,
+    "first_loss_matches_original": true,
+    "original_weights_overwritten": false
+  }
+}

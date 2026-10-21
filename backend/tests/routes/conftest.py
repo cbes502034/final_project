@@ -51,7 +51,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app import routers  # noqa: E402
 from app.models import (  # noqa: E402
-    Category, Family, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal, Transaction, User,
+    Category, Family, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal, Transaction, User, UserSession,
 )
 from app.routers._stub import is_stub  # noqa: E402
 from app.toolkit import crud, db, money, passwords, tokens  # noqa: E402
@@ -243,7 +243,13 @@ def today() -> str:
 
 
 def login(user):
-    return {"Authorization": "Bearer " + tokens.make_access_token(user.id)}
+    refresh, expires = tokens.make_refresh_token(user.id)
+    session = crud.save(UserSession, {
+        "user_id": user.id,
+        "refresh_token_hash": tokens.fingerprint(refresh),
+        "expires_at": expires,
+    })
+    return {"Authorization": "Bearer " + tokens.make_access_token(user.id, extra={"sid": str(session.id)})}
 
 
 def user(email, name, **extra):

@@ -47,6 +47,8 @@
 - `app/schemas/transaction.py`
 - `app/schemas/nlp.py`
 - `app/services/llm/parse.py`
+- `app/services/llm/expense_rules.py`
+- `app/services/llm/expenses.py`
 
 
 ---

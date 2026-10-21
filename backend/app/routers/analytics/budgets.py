@@ -4,10 +4,9 @@
 負責人：成員3（數字）　✦ 分支：m3-analytics
 
 ===========================================================================
-現在每一支都回 501（後端還沒做這一支），**守衛與主體模型已經接好**
+本檔路由已實作；下方保留可執行教學與前後端契約。
 ===========================================================================
-要做的事：刪掉那一支上面的 `@stub`，再把 `raise not_ready(...)` 那一行換成說明字串裡的第二步。
-裝飾器、參數、檔案最上面的 import 都已經放好最終版本，不用動。
+修改功能時請同步下方範例，並執行對應的路由測試。
 * 誰能打這一支：已經由守衛擋好（看 @xxx_required 或 Depends(...)），不用自己再判斷身分
 * 前端送什麼、要回什麼：docs/02-前後端串接契約.md 同名的章節
 * 增刪改查：app/toolkit/crud.py（find／get／save／remove／to_dict）
@@ -533,7 +532,6 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
 @router.get("/savings-goals", summary="整體＋各帳本的存款目標")
 @block_admin
 # @stub
-@stub
 def list_savings_goals(me: User, db: Session = Depends(get_db)):
     """整體＋各帳本的存款目標
 

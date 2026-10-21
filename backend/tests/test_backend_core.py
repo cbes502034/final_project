@@ -449,7 +449,11 @@ def _probe_app():
 
 
 def _auth(user):
-    return {"Authorization": "Bearer " + tokens.make_access_token(user.id)}
+    refresh, expires = tokens.make_refresh_token(user.id)
+    session = crud.save(models.UserSession, {
+        "user_id": user.id, "refresh_token_hash": tokens.fingerprint(refresh), "expires_at": expires,
+    })
+    return {"Authorization": "Bearer " + tokens.make_access_token(user.id, extra={"sid": str(session.id)})}
 
 
 def test_沒登入_壞掉的權杖_被停權(sqlite):
@@ -467,6 +471,7 @@ def test_帳號被刪掉之後舊權杖不能用(sqlite):
     c = _probe_app()
     u = _user()
     h = _auth(u)
+    crud.remove(models.UserSession, {"user_id": u.id})
     crud.remove(User, id=u.id)
     assert c.get("/me", headers=h).status_code == 401
 
@@ -571,16 +576,15 @@ def test_一次性連結_找不到_過期_用過都回同一句(sqlite):
 # ===========================================================================
 # 真正的 app：還沒做的路由
 # ===========================================================================
-def test_還沒做的路由_沒登入先被守衛擋_登入後回_501_講出是哪一支誰負責(sqlite):
+def test_家庭路由_需要登入_沒有家庭回空資料(sqlite):
     from app.main import app
 
     c = TestClient(app)
     assert c.get("/api/family").status_code == 401
     u = _user()
     r = c.get("/api/family", headers=_auth(u))
-    assert r.status_code == 501
-    body = r.text
-    assert "GET /api/family" in body and "成員4" in body
+    assert r.status_code == 200
+    assert r.json()["family"] is None
 
 
 def test_每一支還沒做的路由都寫著自己的路徑與負責人():

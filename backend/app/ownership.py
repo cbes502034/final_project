@@ -201,6 +201,8 @@ MEMBERS: list[Member] = [
             "app/schemas/transaction.py",
             "app/schemas/nlp.py",
             "app/services/llm/parse.py",
+            "app/services/llm/expense_rules.py",
+            "app/services/llm/expenses.py",
         ],
         llm=(
             "段落切分策略、欄位抽取 prompt、few-shot 範例的挑選、低信心的判準。"
