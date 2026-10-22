@@ -10,12 +10,21 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
 
 class FamilyIn(BaseModel):
     name: str = Field(min_length=1, max_length=20)
+    goalAmount: Decimal = Field(default=0, ge=0, max_digits=14, decimal_places=2)
+    goalNote: str = Field(default="", max_length=300)
+
+
+class FamilyGoalPatchIn(BaseModel):
+    model_config = {"extra": "forbid"}
+    goalAmount: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    goalNote: str = Field(default="", max_length=300)
 
 
 class InviteCodeIn(BaseModel):

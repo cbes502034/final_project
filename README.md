@@ -53,7 +53,7 @@ final_project/
 │   │   ├── toolkit/     ★   寫好的工具：config · db · crud · tokens · passwords · scope · family …
 │   │   ├── models/          22 張表（SQLAlchemy），跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/         請求主體（Pydantic，一個檔案一個主人）
-│   │   ├── routers/         85 支路由，**一個領域一個資料夾**；還沒做的回 501
+│   │   ├── routers/         86 支路由，**一個領域一個資料夾**；還沒做的回 501
 │   │   │   ├── auth/        認證（登入那幾支已經做好）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/      記帳
 │   │   │   ├── analytics/   數字

@@ -56,7 +56,8 @@ async function rec(name, ...args) {
   await rec('verifyEmail', 'x'.repeat(43));
   await rec('sessions');
   await rec('categories');
-  await rec('createFamily', { name: '王家' });
+  await rec('createFamily', { name: '王家', goalAmount: 100000, goalNote: '全家旅行' });
+  await rec('updateFamilyGoal', { goalAmount: 120000, goalNote: '共同旅行基金' });
   const code = await rec('createInviteCode', { role: 'parent', label: '給外婆' });
   const found = await rec('lookupUser', 'xiaohua@wang.tw');
   await rec('sendInvite', { userId: found.user.id, role: 'child' });

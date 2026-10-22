@@ -15,7 +15,7 @@ async function checkUI() {
     { id: 'personal', name: '自己的帳本', count: 1, personal: true },
     { id: 'closed', name: '已結算', settled: true }];
   const ui = { document: { getElementById: () => box }, API: { groups: async () => ({ groups: books }) },
-    GROUP: 'all', esc: String, tint: String, money: String, pushForDrawer() {},
+    GROUP: 'all', isFamily: () => false, esc: String, tint: String, money: String, pushForDrawer() {},
     setGroup(id) { ui.GROUP = id; }, LG: { fam: { members: [] } } };
   vm.createContext(ui);
   ui.TXGROUPS = [];
@@ -58,6 +58,8 @@ async function checkMock() {
     return c;
   }
   let c = open();
+  assert.equal((await c.API.summary({ scope: 'me' })).expense, 0);
+  assert.equal((await c.API.summary({ scope: 'me', groupId: 'G1' })).expense, 30);
   const merged = await c.API.settleGroup('G1');
   assert.equal(merged.copied, 1);
   assert.equal(merged.closed, false);
@@ -85,6 +87,7 @@ async function checkMock() {
   assert.equal(rows.find(g => g.id === 'G1').count, 2);
   assert.equal(rows.find(g => g.id === 'G1').canEdit, true);
   const history = (await c.API.transactions({ groupId: 'G1' })).transactions;
+  assert.equal((await c.API.summary({ scope: 'me', groupId: 'G1' })).expense, 30);
   assert.equal(history.length, 2);
   assert.equal(history.find(t => t.id === 'T1').amount, 10);
   assert.equal(history.find(t => t.id === 'T1').snapshot, true);

@@ -52,12 +52,13 @@ def test_personal_book_keeps_profile_goal_and_expected_income(api):
 def test_summary_個人_只算自己記的_transfer_不算(api):
     me, mom = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽")
     cats = categories()
-    home = ledger_of(me, mom)
+    home = ledger_of(me, personal_owner_id=me.id)
+    shared = ledger_of(me, mom)
     spend(me, home, cats["薪資"], 50000)
     spend(me, home, cats["餐飲"], 30000)
     spend(me, home, cats["其他"], 2000)
     spend(me, home, cats["其他"], 9999, kind="transfer")
-    spend(mom, home, cats["餐飲"], 700)                      # 共用帳本裡別人的錢不算我的
+    spend(mom, shared, cats["餐飲"], 700)                      # 共用帳本裡別人的錢不算我的
     spend(me, home, cats["餐飲"], 400, day=_last_month())
     goal(me, 10000)
     r = api.get("/api/summary", headers=login(me))
@@ -82,10 +83,10 @@ def test_summary_家庭_孩子的收入另外算_每個人各自的燈號(api):
     family_of((dad, "parent"), (mom, "parent"), (kid, "child"))
     guard(dad, kid)
     cats = categories()
-    g = ledger_of(dad)
-    kg = ledger_of(kid, name="小華的")
+    g = ledger_of(dad, personal_owner_id=dad.id)
+    kg = ledger_of(kid, name="小華的", personal_owner_id=kid.id)
     spend(dad, g, cats["薪資"], 40000)
-    spend(mom, g, cats["餐飲"], 5000)
+    spend(mom, ledger_of(mom, personal_owner_id=mom.id), cats["餐飲"], 5000)
     spend(kid, kg, cats["其他收入"], 3000)
     spend(kid, kg, cats["餐飲"], 1200)
     crud.save(Allowance, {"payer_id": dad.id, "ward_id": kid.id, "amount": 3000})
@@ -99,8 +100,9 @@ def test_summary_家庭_孩子的收入另外算_每個人各自的燈號(api):
     assert set(by) == {str(dad.id), str(mom.id), str(kid.id)}
     assert by[str(mom.id)]["savingsLevel"] == "over" and by[str(dad.id)]["savingsLevel"] == "safe"
     assert by[str(kid.id)]["role"] == "child" and by[str(kid.id)]["income"] == 3000
-    # 子女打 family 也只看得到自己
-    kb = api.get("/api/summary?scope=family", headers=login(kid)).json()
+    # 家庭模式只開放家長；子女保留個人模式。
+    assert api.get("/api/summary?scope=family", headers=login(kid)).status_code == 403
+    kb = api.get("/api/summary", headers=login(kid)).json()
     assert [m["id"] for m in kb["members"]] == [str(kid.id)] and kb["income"] == 3000
 
 
@@ -111,7 +113,7 @@ def test_summary_孩子的零用金算進可支配上限_自己有記就不重�
     family_of((dad, "parent"), (kid, "child"))
     guard(dad, kid)
     cats = categories()
-    kg = ledger_of(kid, name="零用錢")
+    kg = ledger_of(kid, name="零用錢", personal_owner_id=kid.id)
     spend(kid, kg, cats["餐飲"], 808)
     crud.save(Allowance, {"payer_id": dad.id, "ward_id": kid.id, "amount": 3000})
     b = api.get("/api/summary", headers=login(kid)).json()
@@ -133,7 +135,7 @@ def test_summary_月底才發薪_先用預計收入_入帳後不重複算(api):
     """使用者實際遇到：月底才領薪水、月初就開始記帳，收入是 0，「這個月還可以花」一開始就是負的。"""
     me = user("g@x.tw", "女朋友", income_mode="fixed", expected_income=31000)
     cats = categories()
-    g = ledger_of(me)
+    g = ledger_of(me, personal_owner_id=me.id)
     spend(me, g, cats["餐飲"], 2000)
     goal(me, 5000)
     b = api.get("/api/summary", headers=login(me)).json()
@@ -150,7 +152,7 @@ def test_summary_月底才發薪_先用預計收入_入帳後不重複算(api):
     spend(me, g, cats["薪資"], 4000)
     assert api.get("/api/summary", headers=login(me)).json()["savings"]["allowance"] == 30000
     # 只算某一本帳：預計收入是整個人的，不估
-    assert api.get("/api/summary?groupId=%s" % g.id, headers=login(me)).json()["expectedIncome"] is None
+    assert api.get("/api/summary?groupId=%s" % g.id, headers=login(me)).json()["expectedIncome"]["pending"] == 0
 
 
 @pytest.mark.route(*SUM)
@@ -158,7 +160,7 @@ def test_summary_收入不固定_用近三個月有記帳的月份平均(api):
     """日薪、打工、接案：最近 3 個有記帳的月份平均；沒記帳的月份不算，有記帳但沒收入的要算。"""
     me = user("p@x.tw", "打工的人")                                           # 預設 auto
     cats = categories()
-    g = ledger_of(me)
+    g = ledger_of(me, personal_owner_id=me.id)
     spend(me, g, cats["薪資"], 12000, day=_months_ago(1))
     spend(me, g, cats["餐飲"], 300, day=_months_ago(2))                       # 有記帳、沒收入：要算
     spend(me, g, cats["薪資"], 99999, day=_months_ago(4))                     # 超過 3 個月：不算
@@ -183,7 +185,7 @@ def test_summary_收入不固定_用近三個月有記帳的月份平均(api):
 def test_summary_只算某一本帳_與錯誤(api):
     me, stranger = user("d@x.tw", "爸爸"), user("s@x.tw", "路人")
     cats = categories()
-    a, b = ledger_of(me, name="家用"), ledger_of(me, name="旅遊")
+    a, b = ledger_of(me, name="家用", personal_owner_id=me.id), ledger_of(me, name="旅遊")
     theirs = ledger_of(stranger, name="別人的")
     spend(me, a, cats["餐飲"], 100)
     spend(me, b, cats["餐飲"], 900)
@@ -191,7 +193,7 @@ def test_summary_只算某一本帳_與錯誤(api):
     goal(me, 500, group=b)
     body = api.get("/api/summary?groupId=%d" % b.id, headers=login(me)).json()
     assert body["expense"] == 900 and body["savings"]["goal"] == 500 and body["monthly"][-1]["expense"] == 900
-    assert api.get("/api/summary?groupId=all", headers=login(me)).json()["expense"] == 1000
+    assert api.get("/api/summary?groupId=all", headers=login(me)).json()["expense"] == 100
     assert api.get("/api/summary?groupId=%d" % theirs.id, headers=login(me)).status_code == 403
     assert api.get("/api/summary?scope=all", headers=login(me)).status_code == 422
 
@@ -208,7 +210,7 @@ def test_list_budgets_已花從明細算_看得到的人才有(api):
     dad, kid, stranger = user("d@x.tw", "爸爸"), user("k@x.tw", "小華"), user("s@x.tw", "路人")
     guard(dad, kid)
     cats = categories()
-    a, b = ledger_of(dad, kid, name="家用"), ledger_of(dad, name="旅遊")
+    a, b = ledger_of(dad, name="家用", personal_owner_id=dad.id), ledger_of(dad, name="旅遊")
     crud.save(Budget, [
         {"user_id": dad.id, "category_id": cats["餐飲"].id, "period_type": "month", "limit_amount": 1000},
         {"user_id": kid.id, "category_id": cats["其他"].id, "period_type": "month", "limit_amount": 100},
@@ -218,14 +220,14 @@ def test_list_budgets_已花從明細算_看得到的人才有(api):
     spend(dad, a, cats["餐飲"], 300)
     spend(dad, b, cats["餐飲"], 400)
     spend(dad, a, cats["餐飲"], 999, day=_last_month())
-    spend(kid, a, cats["其他"], 150)
+    spend(kid, ledger_of(kid, personal_owner_id=kid.id), cats["其他"], 150)
     r = api.get("/api/budgets", headers=login(dad))
     assert r.status_code == 200, r.text
     rows = r.json()["budgets"]
     assert [(x["user"], x["used"], x["over"], x["pct"]) for x in rows] == [
-        (str(kid.id), 150, True, 1.5), (str(dad.id), 700, False, 0.7)]
+        (str(kid.id), 150, True, 1.5), (str(dad.id), 300, False, 0.3)]
     assert rows[1] == {"user": str(dad.id), "period": "month", "cat": str(cats["餐飲"].id), "limit": 1000,
-                       "used": 700, "over": False, "pct": 0.7}
+                       "used": 300, "over": False, "pct": 0.3}
     rows = api.get("/api/budgets?groupId=%d" % b.id, headers=login(dad)).json()["budgets"]
     assert [(x["user"], x["used"]) for x in rows] == [(str(dad.id), 400), (str(kid.id), 0)]
     theirs = ledger_of(stranger, name="別人的")
@@ -410,9 +412,10 @@ def test_list_advices_子女拿不到全家的(api):
     assert (one["scope"], one["user"], one["basis"], one["suggest"], one["conf"], len(one["generatedAt"])) == \
         ("user", str(dad.id), ["收入 1 − 目標 0"], ["維持"], 0.9, 16)
     fam_rows = api.get("/api/advices?scope=family", headers=login(dad)).json()["advices"]
-    assert {a["id"] for a in fam_rows} == {str(kids.id), str(whole.id)}
+    assert {a["id"] for a in fam_rows} == {str(whole.id)}
     assert next(a for a in fam_rows if a["id"] == str(whole.id))["scope"] == "family"
-    kid_rows = api.get("/api/advices?scope=family", headers=login(kid)).json()["advices"]
+    assert api.get("/api/advices?scope=family", headers=login(kid)).status_code == 403
+    kid_rows = api.get("/api/advices", headers=login(kid)).json()["advices"]
     assert [a["id"] for a in kid_rows] == [str(kids.id)]
 
 
@@ -437,7 +440,7 @@ GOOD = {"level": "warn", "title": "快用完了", "body": "已經用掉 86%。",
 def test_generate_advices_數字先算好_不合格的丟掉_同月蓋掉舊的(api, model):
     me = user("d@x.tw", "爸爸", finance_style="safe", finance_note="我有房貸")
     cats = categories()
-    g = ledger_of(me)
+    g = ledger_of(me, personal_owner_id=me.id)
     spend(me, g, cats["薪資"], 20000)
     spend(me, g, cats["餐飲"], 8600)
     goal(me, 10000)
@@ -466,7 +469,7 @@ def test_generate_advices_數字先算好_不合格的丟掉_同月蓋掉舊的(
 def test_generate_advices_收入方式當背景_上限含預計收入_不准推測社會階層(api, model):
     me = user("g@x.tw", "女朋友", income_mode="fixed", expected_income=31000, income_type="salary_end")
     cats = categories()
-    g = ledger_of(me)
+    g = ledger_of(me, personal_owner_id=me.id)
     spend(me, g, cats["餐飲"], 2000)
     goal(me, 5000)
     model["reply"] = {"advices": [{**GOOD, "basis": ["支出 2,000 ÷ 可以花 26,000"], "body": "用掉 7%。"}]}
@@ -490,10 +493,10 @@ def test_generate_advices_權限與模型的問題(api, model, monkeypatch):
              "suggest": ["每天睡前記一次"], "conf": 0.8}
     model["reply"] = {"advices": [empty]}
     assert api.post("/api/advices/generate", headers=login(kid), json={"scope": "family"}).status_code == 403
-    assert api.post("/api/advices/generate", headers=login(solo), json={"scope": "family"}).status_code == 403
+    assert api.post("/api/advices/generate", headers=login(solo), json={"scope": "family"}).status_code == 201
     r = api.post("/api/advices/generate", headers=login(dad), json={"scope": "family"})
     assert r.status_code == 201 and r.json()["advices"][0]["scope"] == "family"
-    row = crud.get(Advice, where={"user_id": None})
+    row = crud.get(Advice, where={"user_id": None, "family_id": fam.id})
     assert row.family_id == fam.id
     model["reply"] = {"advices": [{"title": "全部不合格"}]}
     assert api.post("/api/advices/generate", headers=login(dad), json={}).status_code == 503
@@ -505,7 +508,7 @@ def test_generate_advices_權限與模型的問題(api, model, monkeypatch):
     monkeypatch.setattr(client, "is_configured", lambda: False)
     assert api.post("/api/advices/generate", headers=login(dad), json={}).status_code == 503
     assert api.post("/api/advices/generate", headers=login(dad), json={"scope": "all"}).status_code == 422
-    assert crud.count(Advice) == 1
+    assert crud.count(Advice) == 2
 
 
 @pytest.mark.route(*GEN)

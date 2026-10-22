@@ -369,7 +369,7 @@
        我    自己的數字，可以記帳、可以調整
        家庭  整理家庭的資訊，**唯讀**——沒有「記一筆」，也沒有任何輸入框
 
-     只有家長、而且真的有監管對象時才出現切換。子女只有「我」。
+     家庭建立後家長即可切換。子女維持個人模式。
      ============================================================ */
   var SCOPE = (function () {
     try { return sessionStorage.getItem('fambudget.scope') === 'family' ? 'family' : 'me'; }
@@ -377,10 +377,21 @@
   })();
 
   function canFamily(m) {
-    return !!(m && m.user && m.user.role === 'parent' && (m.visible || []).length > 1);
+    return !!(m && m.user && m.user.role === 'parent' && !!m.user.familyId);
   }
 
   function scopeOf(m) { return canFamily(m) ? SCOPE : 'me'; }
+
+  var CURRENT_ACTIVITY = null;
+  function isFamily() { return scopeOf(ME) === 'family'; }
+  function activeActivity() { return !isFamily() && CURRENT_ACTIVITY && CURRENT_ACTIVITY.id === GROUP ? CURRENT_ACTIVITY : null; }
+  function modeName() { return isFamily() ? '家庭' : activeActivity() ? '活動' : '個人'; }
+  function targetFilter() { return { scope: isFamily() ? 'family' : 'me', groupId: isFamily() ? null : GROUP }; }
+  function returnPersonal() {
+    setGroup(PERSONAL_GROUP); CURRENT_ACTIVITY = null; ENTRY_ACTIVITY = null;
+    F.activityId = 'all'; F.userId = 'all';
+    if (location.hash === '#/' || !location.hash) paint(); else location.hash = '#/';
+  }
 
   function seg(key, opts, cur, off) {
     return '<div class="seg" role="group">' + opts.map(function (o) {
@@ -391,13 +402,13 @@
   }
 
   function scopeSeg(m) {
-    return canFamily(m) ? seg('scope', [['me', '我'], ['family', '家庭']], SCOPE) : '';
+    return canFamily(m) ? seg('scope', [['me', '個人'], ['family', '家庭']], SCOPE) : '';
   }
 
   /* ============================================================
      01 總覽：這個月現在怎樣
 
-     只放四個數字、存款目標、預算。圖表在「統計」，紀錄在「收支明細」——
+     只放四個數字、存款目標、預算。圖表在「統計」，紀錄在「個人帳本」——
      主頁什麼都塞，使用者反而找不到最重要的那一個數字。
      ============================================================ */
   /* ============================================================
@@ -405,12 +416,12 @@
 
      照富邦新版的首頁：沒有側欄，所有功能都嵌在這一頁上。
        1. 疊卡       後面露出收入、支出，最前面是這個月還可以花
-       2. 常用功能   收支明細、活動、統計、財務建議、家庭成員、個人資料、使用說明（電腦版多一顆記一筆）
+       2. 常用功能   個人帳本、活動、統計、財務建議、家庭成員、個人資料、使用說明（電腦版多一顆記一筆）
        3. 預算       一個分類一張小卡，右上角「調整預算 ›」（預算在個人資料設定）
        4. 今天       今天記的每一筆——一打開就知道今天的動向
        家庭模式在預算後面多「每個人的這個月」，今天的紀錄也換成家庭的
 
-     ⚠️ 趨勢圖在「統計」、完整明細與篩選在「收支明細」，這裡不重複放。
+     ⚠️ 趨勢圖在「統計」、完整明細與篩選在「個人帳本」，這裡不重複放。
      ============================================================ */
   var TILE_IC = {
     add: '<path d="M12 5v14M5 12h14"/>',
@@ -433,31 +444,19 @@
         那幾個角標（幾筆、幾本、幾則）沒有就不顯示，格子照樣在。 */
   function quickTiles(o) {
     o = o || {};
+    var name = modeName(), activity = !!activeActivity();
     var tiles = [
       o.fam ? null : { quick: true, label: '記一筆', icon: 'add', tone: 'add' },
-      /* 角標是「本月」的筆數（跟 GET /api/summary 的 count 同一個範圍）；
-         明細頁列的是所有月份，不寫「本月」看起來就像數字對不上 */
-      { nav: 'entry', label: '收支明細', icon: 'entry', badge: o.count ? '本月 ' + o.count + ' 筆' : '' },
-      { nav: 'groups', label: '活動', icon: 'groups', badge: o.groups ? o.groups + ' 個' : '' },
-      { nav: 'stats', label: '統計', icon: 'stats' },
-      { nav: 'advice', label: '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '',
-        badge: o.warn ? o.warn + ' 則要注意' : '' },
-      /* ⚠️ 家庭那一支問不到（famOff）時一律寫「家庭成員」：寫「加入家庭」
-         等於斷定他沒有家庭，而我們根本沒問到。 */
-      /* 使用者：「要看家庭活動只能點家庭成員，怪怪的」——主角是家庭的帳，成員只是裡面的功能 */
-      /* 有家庭就寫他綁定的家庭名稱（例如「邱家」）；還沒有才寫「加入家庭」 */
-      /* 個人模式（而且有「我｜家庭」切換可用）不放家庭那一格：家庭的事在家庭模式處理 */
-      !o.fam && (o.canFam || !(o.fm && o.fm.family)) ? null : { nav: 'members',
-        label: o.fm && o.fm.family && o.fm.family.name ? o.fm.family.name
-          : !o.famOff && o.fm && o.fm.family === null ? '加入家庭' : '家庭活動',
-        icon: 'members', badge: o.fm && o.fm.family ? o.fm.members.length + ' 人' : '' },
-      /* 家庭模式不放個人資料：那裡全是個人的設定 */
+      { nav: 'entry', label: name + '帳本', icon: 'entry', badge: o.count ? '本月 ' + o.count + ' 筆' : '' },
+      activity ? { nav: 'groups', label: '活動管理', icon: 'groups', badge: activeActivity().name } : null,
+      o.fam ? null : { nav: 'stats', label: name + '財務狀況', icon: 'stats' },
+      { nav: 'advice', label: name + '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '', badge: o.warn ? o.warn + ' 則要注意' : '' },
+      o.fam ? { nav: 'members', label: o.fm && o.fm.family ? o.fm.family.name : '家庭', icon: 'members',
+        badge: o.fm && o.fm.members ? o.fm.members.length + ' 人' : '' } : null,
       o.fam ? null : { nav: 'profile', label: '個人資料', icon: 'profile' },
-      { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
-      /* 這兩格原本在右上角的帳號選單裡。選單拆掉之後搬過來——
-         整個網站只有這兩個地方進得去主題與登出，不能跟著一起消失。 */
+      activity ? null : { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
       { nav: 'theme', label: '換主題', icon: 'theme' },
-      { id: 'logout', label: '登出', icon: 'out', tone: 'out' }
+      activity ? null : { id: 'logout', label: '登出', icon: 'out', tone: 'out' }
     ];
     return '<section class="qk"><div class="qk__h"><h2 class="qk__t">常用功能</h2></div>' +
       '<nav class="dgrid" aria-label="功能">' + tiles.filter(Boolean).map(tile).join('') + '</nav></section>';
@@ -523,14 +522,14 @@
       greet(m.user);
       var sc = scopeOf(m), fam = sc === 'family';
       return Promise.all([
-        soft(API.summary({ scope: sc, groupId: GROUP })),
-        soft(API.budgets({ groupId: GROUP })),
+        soft(API.summary(targetFilter())),
+        soft(API.budgets(targetFilter())),
         soft(API.groups({})),
-        soft(API.advices({ scope: sc })),
+        soft(API.advices(targetFilter())),
         soft(API.members()),
         /* 今天的紀錄：我的模式只看自己，家庭模式看家庭（下面再濾成統計算進去的那幾個人） */
-        soft(API.transactions(Object.assign({ from: todayKey(), to: todayKey(), groupId: GROUP },
-          fam ? {} : { userId: m.user.id })))
+        soft(API.transactions(Object.assign({ from: todayKey(), to: todayKey() }, targetFilter(),
+          fam || activeActivity() ? {} : { userId: m.user.id })))
       ]).then(function (r) {
         var d = r[0], b = r[1], gs = r[2].__err ? [] : (r[2].groups || []).filter(function (g) { return !g.personal; }),
             ads = r[3].__err ? [] : (r[3].advices || []), fm = r[4], tx = r[5];
@@ -539,15 +538,15 @@
           return !fam || ids.indexOf(t.user) >= 0;
         });
         greet(m.user, fm,
-              fam && !d.__err ? '家庭這個月' : '',
-              fam && !d.__err ? d.members.length + ' 位家人的收支' : '',
+              fam && !d.__err ? '家庭這個月' : activeActivity() ? activeActivity().name : '',
+              fam && !d.__err ? d.members.length + ' 位家人的收支' : activeActivity() ? '活動這個月的收支' : '',
               scopeSeg(m));
 
         var sv = d.__err ? null : d.savings, lv = sv ? sv.level : '';
         var used = sv ? Math.min(100, Math.round(sv.ratio * 100)) : 0;
-        var budgets = b.__err ? [] : (fam ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; }));
+        var budgets = b.__err ? [] : (fam || activeActivity() ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; }));
         var warn = ads.filter(function (a) { return a.level === 'warn'; }).length;
-        var go = fam ? '#/stats' : '#/entry';
+        var go = '#/entry';
         var chev = '<svg class="wal__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
           'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 
@@ -579,7 +578,7 @@
                 ? '<span title="收入還沒入帳，先照預計的算；入帳之後自動改用實際的">含預計收入 <b>' + num(d.expectedIncome.pending) + '</b></span>' : '') +
               '<span>每月想存 <b>' + num(sv.goal) + '</b></span></div>' +
             /* 一點收入都沒有、也估不出來：上限是負的。指路去設定，不要只顯示一個嚇人的數字 */
-            (!fam && !Number(d.income) && !Number(d.pocketMoney) && !(d.expectedIncome && Number(d.expectedIncome.pending) > 0)
+            (!fam && !activeActivity() && !Number(d.income) && !Number(d.pocketMoney) && !(d.expectedIncome && Number(d.expectedIncome.pending) > 0)
               ? '<a class="wal__hint" href="#/profile/income">還沒有收入進來？設定「收入怎麼算」，月底才發薪也不會變負數 ›</a>' : '') +
             '<div class="wal__foot">' +
               '<div class="wal__f"><span>結餘</span><b>' + amt(d.net) + '</b></div>' +
@@ -596,7 +595,7 @@
         /* 3. 預算：一個分類一張小卡 */
         h += '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
           (budgets.length ? '<span class="sec__n">' + budgets.length + ' 項</span>' : '') +
-          '<a class="sec__link" href="#/profile/budget">調整預算 ›</a></div>';
+          (fam || activeActivity() ? '' : '<a class="sec__link" href="#/profile/budget">調整預算 ›</a>') + '</div>';
         h += b.__err ? errState(b.__err) : budgets.length
           ? '<div class="bgrid">' + budgets.map(function (x) {
               var p = Math.round(x.pct * 100);
@@ -609,7 +608,7 @@
                 '<div class="bcard__v">' + num(x.used) + '<small> / ' + num(x.limit) + '</small></div>' +
               '</div>';
             }).join('') + '</div>'
-          : '<a class="card bnone" href="#/profile">' + emptyState('還沒有設定預算', '到「個人資料 › 每月預算」替常花的分類設個上限 ›') + '</a>';
+          : fam || activeActivity() ? '<div class="card">' + emptyState('還沒有設定預算', '') + '</div>' : '<a class="card bnone" href="#/profile">' + emptyState('還沒有設定預算', '到「個人資料 › 每月預算」替常花的分類設個上限 ›') + '</a>';
 
         if (fam && !d.__err) {
           h += '<div class="sec"><h2 class="sec__t">每個人的這個月</h2></div>' +
@@ -646,7 +645,7 @@
   }
 
   /* 今天的紀錄。上面一條是今天花了多少、收了多少，下面是一筆一筆。
-     ⚠️ 只放今天：完整的明細在「收支明細」，這裡不做篩選、不做刪除。 */
+     ⚠️ 只放今天：完整的明細在「個人帳本」，這裡不做篩選、不做刪除。 */
   function todayCard(rows, fam) {
     var MAX = 6, spent = 0, got = 0;
     rows.forEach(function (t) {
@@ -660,7 +659,7 @@
 
     if (!rows.length) {
       /* ⚠️ 選了某一個活動的時候，「今天還沒有記帳」會讓人以為真的沒記——其實是被活動篩掉了 */
-      var one = GROUP !== 'all' && GROUP !== PERSONAL_GROUP;
+      var one = !!activeActivity();
       return h + '<div class="card tdy tdy--empty">' +
         (one
           ? emptyState('這個活動今天還沒有紀錄', '可從右上角切換其他活動查看紀錄。')
@@ -824,7 +823,7 @@
     var g = TXGROUPS.filter(function (x) { return x.id === t.group; })[0];
     return !!t.snapshot || !!(g && g.settledAt);
   }
-  function txCan(t) { return isMine(t) && !txLocked(t); }
+  function txCan(t) { return !isFamily() && isMine(t) && !txLocked(t); }
 
   function txRow(t, hit) {
     TXSEEN[t.id] = t;
@@ -859,7 +858,7 @@
         (PICK.on ? '' : can
           ? '<button class="txr__ed" data-edit="' + esc(t.id) + '">修改</button>' +
             '<button class="del" data-del="' + esc(t.id) + '">刪除</button>'
-          : (isMine(t) ? '<span class="txr__lock" title="合併前的歷史或已結算紀錄不能修改，請到收支明細修改副本">' + (t.snapshot ? '合併前紀錄' : '已結算') + '</span>' : '')) +
+          : (isMine(t) ? '<span class="txr__lock" title="合併前的歷史或已結算紀錄不能修改，請到個人帳本修改副本">' + (t.snapshot ? '合併前紀錄' : '已結算') + '</span>' : '')) +
       '</td></tr>';
   }
 
@@ -894,7 +893,7 @@
      ============================================================ */
   var FOLD = {};                       // id → 展開中嗎
 
-  /* extra：放在「記一筆」這類主要按鈕左邊的次要按鈕（例如收支明細的「選取多筆」）。
+  /* extra：放在「記一筆」這類主要按鈕左邊的次要按鈕（例如個人帳本的「選取多筆」）。
      跟 tools 分開，是因為手機上 tools 會整行掉到下一列，extra 要留在標題這一列。 */
   function foldHead(id, title, label, kicker, help, tools, extra) {
     var on = !!FOLD[id];
@@ -978,13 +977,13 @@
   }
 
   function vEntry(activityId) {
-    ENTRY_ACTIVITY = activityId || null;
-    setGroup(ENTRY_ACTIVITY || PERSONAL_GROUP);
+    if (activityId && !isFamily()) setGroup(activityId);
+    ENTRY_ACTIVITY = isFamily() ? null : (activityId || (activeActivity() && GROUP) || null);
     if (ENTRY_ACTIVITY) F.activityId = 'all';
     paintGroups();
     if (!ARCHIVE.current) ARCHIVE.current = taipeiMonth();
     if (!ARCHIVE.month) ARCHIVE.month = ARCHIVE.current;
-    head(ENTRY_ACTIVITY ? '活動明細' : '收支明細', '');
+    head(modeName() + '帳本', activeActivity() ? activeActivity().name : isFamily() ? '明細依照原本的照看權限顯示' : '');
     /* 只有從總覽的「本月收入／支出」進來才帶著本月的篩選；從別的地方進來一律清掉，
        不然上次點過之後，每次開明細都只剩這個月 */
     if (!FLT_KEEP) { F.from = ''; F.to = ''; }
@@ -1355,7 +1354,7 @@
   }
   function fetchTxPage(append, sequence) {
     var box = document.getElementById('txList'); if (!box) return Promise.resolve();
-    var f = Object.assign({}, F, { groupId: GROUP, page: ARCHIVE.page });
+    var f = Object.assign({}, F, targetFilter(), { page: ARCHIVE.page });
     if (!ENTRY_ACTIVITY) { var range = monthRange(ARCHIVE.month); f.from = range[0]; f.to = range[1]; }
     return Promise.all([API.transactions(f), soft(API.groups({ includeArchived: true }))]).then(function (r) {
       if (sequence !== ARCHIVE.sequence) return;
@@ -1370,7 +1369,7 @@
     var sequence = ++ARCHIVE.sequence;
     if (ENTRY_ACTIVITY) return fetchTxPage(false, sequence);
     var box = document.getElementById('archiveList'); if (!box) return;
-    return API.transactionArchive({ groupId: PERSONAL_GROUP, kind: F.kind, source: F.source, q: F.q, activityId: F.activityId }).then(function (d) {
+    return API.transactionArchive(Object.assign({}, targetFilter(), { kind: F.kind, source: F.source, q: F.q, activityId: F.activityId })).then(function (d) {
       if (sequence !== ARCHIVE.sequence) return;
       ARCHIVE.data = d; ARCHIVE.current = d.currentMonth;
       var months = []; d.years.forEach(function (y) { y.months.forEach(function (m) { months.push(m.month); }); });
@@ -1458,7 +1457,7 @@
 
   function openTxEdit(id) {
     var t = TXSEEN[id];
-    if (!t || txEdOn) return;
+    if (!t || txEdOn || isFamily()) return;
     txEdOn = true; txEdRow = t;
     /* 可以換去的活動：沒結算、沒封存的；原本那本一定要在選項裡 */
     var gs = TXGROUPS.filter(function (g) { return g.id === t.group || (!g.settledAt && !g.archived); });
@@ -1482,7 +1481,7 @@
             fld('分類', '<select id="txeCat">' + txEdCats(t.kind, t.cat) + '</select>') +
             (gs.length > 1
               ? fld('活動', '<select id="txeGroup">' + gs.map(function (g) {
-                  return '<option value="' + esc(g.id) + '"' + (g.id === t.group ? ' selected' : '') + '>' + esc(g.personal ? '收支明細' : g.name) + '</option>';
+                  return '<option value="' + esc(g.id) + '"' + (g.id === t.group ? ' selected' : '') + '>' + esc(g.personal ? '個人帳本' : g.name) + '</option>';
                 }).join('') + '</select>', true)
               : '') +
             fld('店家', '<input type="text" id="txeMer" maxlength="100" value="' + esc(t.merchant || '') + '">', true) +
@@ -1549,18 +1548,18 @@
      算不出來的時候「按年」直接關掉，不給一份對不上的數字。
      ============================================================ */
   function vStats() {
-    head('統計', '');
+    head(modeName() + '財務狀況', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
     API.me().then(function (m) {
       var sc = scopeOf(m);
-      return API.summary({ scope: sc, groupId: GROUP }).then(function (d) { render(m, sc, d); });
+      return API.summary(targetFilter()).then(function (d) { render(m, sc, d); });
     }).catch(function (e) { $view.innerHTML = '<div class="page">' + errState(e) + '</div>'; });
 
     function render(m, sc, d) {
       if (STAT.period === 'year' && !d.yearly) STAT.period = 'month';
       var month = STAT.period === 'month';
-      head('統計', sc === 'family' ? '家庭的收支' : '', scopeSeg(m));
+      head(modeName() + '財務狀況', activeActivity() ? activeActivity().name : '', scopeSeg(m));
 
       var rows = month
         ? (d.monthly || []).map(function (r) { return { k: r.m, label: r.m.slice(5) + ' 月', income: r.income, expense: r.expense }; })
@@ -1624,18 +1623,18 @@
   var ADVOPEN = null;    // 展開中的那一則
 
   function vAdvice() {
-    head('財務建議', '');
+    head(modeName() + '財務建議', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
     API.me().then(function (m) {
       var sc = scopeOf(m);
-      head('財務建議', sc === 'family' ? '家庭的建議，以及你照顧的家人的個人建議' : '', scopeSeg(m));
-      return API.advices({ scope: sc }).then(function (d) {
+      head(modeName() + '財務建議', activeActivity() ? activeActivity().name : '', scopeSeg(m));
+      return API.advices(targetFilter()).then(function (d) {
         ADV = d.advices || [];
         $view.innerHTML =
           '<div class="page">' +
             '<div id="advHint"></div>' +
             '<p class="slow" id="advSlow" hidden>模型正在寫建議。主機閒置一陣子後第一次要多等一下，最久大約半分鐘。</p>' +
-            '<div class="sec"><h2 class="sec__t">' + (sc === 'family' ? '家庭的建議' : '給你的建議') + '</h2>' +
+            '<div class="sec"><h2 class="sec__t">' + (modeName() + '的建議') + '</h2>' +
               '<span class="sec__n" id="advN">' + ADV.length + ' 則</span>' +
               '<button class="btn btn--sm btn--go" id="advGen" data-gen-scope="' + sc + '">產生這個月的建議</button>' +
               '<div class="sec__tools"><label class="fsel fsel--q">' +
@@ -1644,7 +1643,7 @@
             '<div class="card card--flush adl" id="advList"></div>' +
           '</div>';
         paintAdvices();
-        if (sc === 'family') return;
+        if (sc === 'family' || activeActivity()) return;
         /* 沒填理財習慣的話提一次——這是它真正派得上用場的地方 */
         return API.financeProfile().then(function (p) {
           var f = p.finance || {};
@@ -1782,8 +1781,10 @@
         '<div class="fam0__ic" aria-hidden="true">＋</div>' +
         '<h3 class="fam0__t">建立我的家庭</h3>' +
         '<p class="fam0__s">建立的人會是家長，之後可以邀請家人加入。</p>' +
-        '<form class="fam0__f" id="famNewF">' +
+        '<form class="family-create" id="famNewF">' +
           '<input type="text" id="famName" maxlength="20" placeholder="例如 林家" aria-label="家庭名稱" required>' +
+          '<label class="fld"><span>長期共同存款目標（選填）</span><input type="number" id="famGoalAmount" min="0" max="999999999999.99" step="0.01" value="0"></label>' +
+          '<label class="fld"><span>目標內容（選填，300 字）</span><textarea id="famGoalNote" rows="2" maxlength="300" placeholder="例如 全家旅行基金"></textarea></label>' +
           '<button class="btn btn--go" type="submit">建立</button>' +
         '</form>' +
       '</div></section>' +
@@ -1816,14 +1817,28 @@
         '</div>' +
         '<div class="famsum__a">' +
           '<button class="btn btn--sm btn--go" data-famgo="home">看家庭總覽</button>' +
-          '<button class="btn btn--sm" data-famgo="stats">家庭統計</button>' +
+          '<button class="btn btn--sm" data-famgo="entry">家庭帳本</button>' +
         '</div></div>';
     }).catch(function (e) { box.innerHTML = errState(e); });
   }
 
+  function familyGoalCard(g, parent) {
+    var progress = Math.max(0, Math.min(100, Math.round(Number(g.ratio || 0) * 100)));
+    return '<section class="card family-goal"><div class="card__h"><h2 class="card__t">家庭長期目標</h2><span class="card__s">共同存款</span></div>' +
+      '<p class="family-goal__note">' + esc(g.note || '尚未填寫目標內容') + '</p>' +
+      '<div class="family-goal__numbers"><span>累計收支結餘 <b>' + amt(g.accumulated || 0) + '</b></span><span>目標 <b>' + amt(g.amount || 0) + '</b></span></div>' +
+      '<div class="wal__bar" role="progressbar" aria-label="家庭目標累計進度" aria-valuenow="' + progress + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + progress + '%"></i></div>' +
+      '<p class="card__s">' + (Number(g.amount) > 0 ? progress + '% · 尚差 ' + money(g.remaining || 0) + '。' : '設定金額後顯示達成進度。') +
+      '自 ' + esc(g.since || todayKey()) + ' 家庭建立日起，累計目前家人的個人帳本收支結餘；不含預計收入、子女收入與尚未結束的活動。</p>' +
+      (parent ? '<details class="family-goal__edit"><summary>修改家庭目標</summary><form id="familyGoalForm" class="family-create">' +
+        '<label class="fld"><span>目標金額</span><input id="familyGoalAmount" type="number" min="0" max="999999999999.99" step="0.01" required value="' + Number(g.amount || 0) + '"></label>' +
+        '<label class="fld"><span>目標內容（300 字）</span><textarea id="familyGoalNote" maxlength="300" rows="2">' + esc(g.note || '') + '</textarea></label>' +
+        '<button class="btn btn--go" type="submit">儲存目標</button></form></details>' : '') + '</section>';
+  }
+
   function renderFamily(d, inv) {
     var parent = d.myRole === 'parent';
-    head('家庭活動', d.family.name + '　·　' + d.members.length + ' 位');
+    head('家庭', d.family.name + '　·　' + d.members.length + ' 位');
 
     function names(list, key) {
       return list.map(function (g) { return esc(g[key]); }).join('、');
@@ -1832,7 +1847,7 @@
     var tools = '<button class="btn btn--sm btn--ghost" data-help="perms">誰可以做什麼</button>';
     /* 子女沒有邀請的功能，標題列就不放「邀請家人」 */
     /* 最上面先看家庭這個月（家長才有：子女看不到別人的帳）；成員、邀請在下面 */
-    var h = '<div class="page">' + (parent ? '<div id="famSum">' + skeleton(1) + '</div>' : '') + (parent
+    var h = '<div class="page">' + familyGoalCard(d.family.goal || {}, parent) + (parent ? '<div id="famSum">' + skeleton(1) + '</div>' : '') + (parent
       ? foldHead('finv', '成員', '邀請家人', d.members.length + ' 人', null, tools)
       : '<div class="sec"><h2 class="sec__t">成員</h2>' +
         '<span class="sec__n">' + d.members.length + ' 人</span><div class="sec__tools">' + tools + '</div></div>');
@@ -2164,7 +2179,7 @@
           : '') +
       '</div>';
 
-      h += '<div class="sec"><h2 class="sec__t">收支明細</h2><span class="sec__n">' + tx.total + ' 筆</span></div>';
+      h += '<div class="sec"><h2 class="sec__t">個人帳本</h2><span class="sec__n">' + tx.total + ' 筆</span></div>';
       h += '<div id="mtx">' + txTable(tx.transactions, hit,
         '<div class="card">' + emptyState('還沒有紀錄', '這個月還沒記過帳。') + '</div>') + '</div></div>';
 
@@ -2209,7 +2224,7 @@
 
       /* 活動不分常設、活動：一份清單，有結束日的那幾本自己帶「到 10/31」的標籤。
          ⚠️ 自己的基底活動（註冊時開的「〈名字〉的活動」）是所有紀錄的家，不是要管理的活動，不放進這份清單；
-            收支明細與合併後的本人紀錄，從上面的活動切換器查看。 */
+            個人帳本與合併後的本人紀錄，從上面的活動切換器查看。 */
       var mine = live.filter(function (g) { return !g.personal; });
       var open = mine.filter(function (g) { return !g.settled; });
       var done = mine.filter(function (g) { return g.settled; });
@@ -2422,14 +2437,14 @@
         '<button class="btn btn--sm" data-gview="' + esc(g.id) + '">查看活動的 ' + g.count + ' 筆紀錄 →</button>' +
         '<span class="lg__sp"></span>' +
         (!g.personal && !g.settled
-          ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">複製到收支明細並退出</button>' : '') +
+          ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">複製到個人帳本並退出</button>' : '') +
         (g.canEdit
           ? '<button class="gx" data-garch="' + esc(g.id) +
             '" title="收起這個活動。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
-        /* 結算過的活動才能移除：活動不見、紀錄留在各自的收支明細裡 */
+        /* 結算過的活動才能移除：活動不見、紀錄留在各自的個人帳本裡 */
         (g.canEdit && g.settled
           ? '<button class="gx gx--warn" data-gremove="' + esc(g.id) + '|' + esc(g.name) +
-            '" title="活動移除、不能復原；裡面的紀錄會留在各自的收支明細">移除</button>' : '') +
+            '" title="活動移除、不能復原；裡面的紀錄會留在各自的個人帳本">移除</button>' : '') +
       '</div>' +
     '</div>';
   }
@@ -2742,13 +2757,13 @@
       t: '這個月還能花多少',
       b: '收入扣掉你想存的，剩下的就是能放心花的錢。' },
     { sel: '.dtile[data-nav="entry"], .tabbar__i[data-tab="entry"]', hash: '#/',
-      t: '收支明細',
+      t: '個人帳本',
       b: '記過的每一筆都在這裡，可以改、可以刪，也能一次選好幾筆刪掉。' },
     { sel: '.dtile[data-nav="advice"], .tabbar__i[data-tab="advice"]', hash: '#/',
       t: '財務建議',
       b: '按一下就幫你看這個月的花費；每個數字都附算式，可以自己驗算。' },
     { sel: '.dtile[data-nav="members"]', hash: '#/',
-      t: '家庭活動',
+      t: '家庭',
       b: '家庭這個月花了多少、成員和邀請都在這裡；照看孩子的時候，看得到他記了什麼。' },
     { sel: '#gswBtn, .dtile[data-nav="groups"]', hash: '#/',
       t: '活動',
@@ -3178,7 +3193,7 @@
   var AUDIT_TW = {
     suspend_user: '停權帳號', unsuspend_user: '解除停權',
     grant_guardianship: '建立監管關係', end_guardianship: '解除監管',
-    change_role: '變更角色', create_family: '建立家庭', view_ward: '查看被監管者',
+    change_role: '變更角色', create_family: '建立家庭', update_family_goal: '修改家庭目標', view_ward: '查看被監管者',
     invite_member: '邀請家人', join_family: '加入家庭',
     remove_member: '移出家庭', leave_family: '退出家庭', remove_group: '移除活動',
     dissolve_family: '解散家庭', change_password: '改密碼', reset_password: '重設密碼',
@@ -3189,6 +3204,7 @@
   /* 第一層標題。有「我｜家庭」切換的頁面，標題上方的小字跟著顯示「我的／家庭」；
      act 是這一頁右上角的動作，可以不給。 */
   function head(t, sub, act) {
+    if (canFamily(ME) && !/data-scope=/.test(act || '')) act = scopeSeg(ME) + (act || '');
     $title.textContent = t;
     $sub.textContent = sub || '';
     $sub.hidden = !sub;
@@ -3199,12 +3215,17 @@
     if (a) { a.innerHTML = act || ''; a.hidden = !act; }
     /* 有「我／家庭」切換的頁面，小字直接說現在看的是誰 */
     var k = document.getElementById('pkick');
-    var fam = /data-scope=/.test(act || '') && SCOPE === 'family';
-    if (k) k.textContent = /data-scope=/.test(act || '') ? (fam ? '家庭' : '我的') : '';
+    var fam = isFamily();
+    if (k) k.textContent = /data-scope=/.test(act || '') ? modeName() : '';
     /* 家庭模式只整理資訊、不記帳：右上角和手機的「記一筆」一起收起來 */
     /* 家庭狀態還在，每一頁（家庭、主題、個人資料、活動…）都不放「記一筆」：
        記帳永遠記在自己身上，家庭模式下出現它，對象就錯了 */
-    document.body.classList.toggle('in-family', SCOPE === 'family' && (!ME || canFamily(ME)));
+    document.body.classList.toggle('in-family', fam);
+    document.body.dataset.target = modeName();
+    [['entry', '帳本'], ['stats', '財務狀況'], ['advice', '財務建議']].forEach(function (x) {
+      var label = document.querySelector('.tabbar [data-tab="' + x[0] + '"] span');
+      if (label) label.textContent = modeName() + x[1];
+    });
   }
 
   function animate() {
@@ -3954,7 +3975,7 @@
         ? '<ul class="alist">' + list.map(function (a) {
             return '<li class="ai' + (a.enabled ? '' : ' off') + '">' +
               '<span class="ai__p">' + esc(a.percent) + '<i>%</i></span>' +
-              '<span class="ai__s">' + esc(a.groupId === PERSONAL_GROUP ? '收支明細' : a.groupName) + '</span>' +
+              '<span class="ai__s">' + esc(a.groupId === PERSONAL_GROUP ? '個人帳本' : a.groupName) + '</span>' +
               '<button class="sw' + (a.enabled ? ' on' : '') + '" role="switch" aria-checked="' + !!a.enabled + '" ' +
                 'data-atoggle="' + esc(a.id) + '|' + (a.enabled ? '0' : '1') + '" ' +
                 'aria-label="' + (a.enabled ? '關掉' : '打開') + '這個提醒"><i></i></button>' +
@@ -3968,7 +3989,7 @@
         '<input type="number" id="anPct" min="1" max="200" value="80" required aria-label="百分比">' +
         '<span class="anew__t">%，</span>' +
         '<select id="anGroup" aria-label="哪一個活動">' + goals.map(function (g) {
-          return '<option value="' + (g.groupId || '') + '">' + esc(g.groupId === PERSONAL_GROUP ? '收支明細' : g.groupName) + '</option>';
+          return '<option value="' + (g.groupId || '') + '">' + esc(g.groupId === PERSONAL_GROUP ? '個人帳本' : g.groupName) + '</option>';
         }).join('') + '</select>' +
         '<button class="btn btn--sm btn--go" type="submit">加入</button>' +
       '</form>';
@@ -4030,7 +4051,7 @@
     return (latin ? latin[0] : a.charAt(0)).toUpperCase();
   }
 
-  /* 活動切換器：只列可使用的活動；失效選擇回到本人的收支明細。 */
+  /* 活動切換器：只列可使用的活動；失效選擇回到本人的個人帳本。 */
   function paintGroups(required) {
     var box = document.getElementById('gsw');
     if (!box) return Promise.resolve();
@@ -4039,8 +4060,9 @@
       var personal = all.filter(function (g) { return g.personal; })[0];
       PERSONAL_GROUP = personal ? personal.id : null;
       var gs = all.filter(function (g) { return !g.personal && !g.settled && !g.archived; });
-      box.hidden = false;
-      if (!all.some(function (g) { return g.id === GROUP && !g.settled && !g.archived; })) setGroup(PERSONAL_GROUP || (gs[0] && gs[0].id));
+      box.hidden = isFamily();
+      if (!all.some(function (g) { return g.id === GROUP && !g.settled && !g.archived; })) setGroup(PERSONAL_GROUP);
+      CURRENT_ACTIVITY = gs.filter(function (g) { return g.id === GROUP; })[0] || null;
       if (!gs.length) {
         box.innerHTML = '<span class="gsw-empty">目前尚未建立活動</span><a class="gsw-create" href="#/groups">建立活動</a>';
         return;
@@ -4073,7 +4095,7 @@
                 g.count + ' 筆' + (g.goal ? '　目標 ' + money(g.goal) : '') +
               '</i></span></button>';
           }).join('') +
-          '<a class="gsw__more" href="#/groups">管理活動 →</a>' +
+          '<a class="gsw__more" href="#/" data-personal-return>回到個人帳本 →</a>' +
         '</div>';
       pushForDrawer();
     }).catch(function (err) { box.hidden = true; if (required) throw err; });
@@ -4128,6 +4150,8 @@
          ME 在登出時會清掉，所以這裡不會拿上一個人的身分來判斷。 */
       (ME && ME.user ? Promise.resolve(ME) : API.me()).then(function (m) {
         ME = m;
+        if (page === 'entry' && parts[1] && scopeOf(m) !== 'family') setGroup(parts[1]);
+        if (scopeOf(m) === 'family' && page === 'groups') { location.hash = '#/'; return; }
         var admin = !!m.user.isPlatformAdmin;
         if (admin && page !== 'admin') { location.hash = '#/admin'; return; }
         if (!admin && page === 'admin') { location.hash = '#/'; return; }
@@ -4151,7 +4175,7 @@
       });
 
       function render() {
-        /* 勾選模式只屬於收支明細。離開就收掉，不然成員頁的明細也會長出勾選框 */
+        /* 勾選模式只屬於個人帳本。離開就收掉，不然成員頁的明細也會長出勾選框 */
         if (page !== 'entry') { PICK.on = false; PICK.ids = []; }
         (ROUTES[page] || vHome)(parts[1], parts[2]);
         /* 總覽就是儀表板；其他頁面左上角出現「總覽」可以回去 */
@@ -4280,8 +4304,10 @@
     var scp = t.closest('[data-scope]');
     if (scp) {
       SCOPE = scp.dataset.scope === 'family' ? 'family' : 'me';
+      setGroup(PERSONAL_GROUP); CURRENT_ACTIVITY = null; ENTRY_ACTIVITY = null; F.userId = 'all'; F.activityId = 'all';
       try { sessionStorage.setItem('fambudget.scope', SCOPE); } catch (err) {}
-      paint();
+      if (['', 'entry', 'stats', 'advice'].indexOf((location.hash || '#/').replace(/^#\/?/, '').split('/')[0]) < 0 || /^#\/entry\//.test(location.hash)) location.hash = '#/';
+      else paint();
       return;
     }
 
@@ -4290,7 +4316,8 @@
     if (fgo) {
       SCOPE = 'family';
       try { sessionStorage.setItem('fambudget.scope', SCOPE); } catch (err) {}
-      location.hash = fgo.dataset.famgo === 'stats' ? '#/stats' : '#/';
+      setGroup(PERSONAL_GROUP); CURRENT_ACTIVITY = null;
+      location.hash = fgo.dataset.famgo === 'entry' ? '#/entry' : '#/';
       return;
     }
 
@@ -4384,7 +4411,7 @@
       danger({
         title: '解散「' + dName + '」',
         detail: '每個人都會離開這個家庭：監管關係、零用金結束，家人之間的活動互相移出，還沒用的邀請與邀請碼作廢。<br>' +
-                '<b>紀錄一筆都不會刪</b>，每一筆都還在記的人自己的收支明細裡。這個動作<b>不能復原</b>。',
+                '<b>紀錄一筆都不會刪</b>，每一筆都還在記的人自己的個人帳本裡。這個動作<b>不能復原</b>。',
         level: 'full',
         ok: '解散家庭',
         onOk: function () {
@@ -4654,11 +4681,12 @@
       }
       return;
     }
+    if (t.closest('[data-personal-return]')) { e.preventDefault(); returnPersonal(); return; }
     var gpick = t.closest('[data-group]');
     if (gpick) {
       setGroup(gpick.dataset.group);
       // 先把面板往上收完，再重畫——不然一換活動面板就瞬間消失
-      slideClose(document.getElementById('gswPanel'), function () { location.hash = '#/entry/' + encodeURIComponent(gpick.dataset.group); if (ENTRY_ACTIVITY === gpick.dataset.group) paint(); });
+      slideClose(document.getElementById('gswPanel'), function () { F.userId = 'all'; F.activityId = 'all'; if (location.hash === '#/' || !location.hash) paint(); else location.hash = '#/'; });
       return;
     }
     if (!t.closest('#gsw')) {
@@ -4687,8 +4715,8 @@
     if (gset) {
       var gid = gset.dataset.gsettle;
       danger({
-        title: '複製到收支明細並退出',
-        detail: '只把<b>你自己記的明細</b>複製到收支明細，原活動會保留合併前的紀錄，並退出這個活動。' +
+        title: '複製到個人帳本並退出',
+        detail: '只把<b>你自己記的明細</b>複製到個人帳本，原活動會保留合併前的紀錄，並退出這個活動。' +
                 '<br>其他成員仍可繼續使用；如果你是開帳者，會移交管理權。最後一位成員退出時，才會關閉活動。',
         level: 'password',
         ok: '確定合併',
@@ -4697,7 +4725,7 @@
             setGroup(r.personalGroupId);
             LG.open = null;
             paintGroups(); vGroups();
-            toast('已複製明細到收支明細，原活動紀錄保留，並已退出', 'ok');
+            toast('已複製明細到個人帳本，原活動紀錄保留，並已退出', 'ok');
           }).catch(function (err) { toast(err.message || '合併失敗', 'err'); });
         }
       });
@@ -4835,7 +4863,7 @@
       danger({
         title: '移除「' + rm[1] + '」',
         detail: '這個活動會從活動清單和切換器消失，<b>不能復原</b>。' +
-                '<br>裡面的紀錄<b>不會刪掉</b>：每一筆都還在記帳的人自己的收支明細裡，統計數字也不會變。' +
+                '<br>裡面的紀錄<b>不會刪掉</b>：每一筆都還在記帳的人自己的個人帳本裡，統計數字也不會變。' +
                 '<br>只是之後不能再單獨看這個活動；只靠這個活動看得到別人紀錄的家人，就看不到了。',
         level: 'full',
         ok: '確定移除',
@@ -4843,7 +4871,7 @@
           API.removeGroup(rm[0]).then(function () {
             if (GROUP === rm[0]) setGroup('all');
             paintGroups(); vGroups();
-            toast('已移除「' + rm[1] + '」，紀錄都還在收支明細裡', 'ok');
+            toast('已移除「' + rm[1] + '」，紀錄都還在個人帳本裡', 'ok');
           }).catch(function (err) { toast(err.message || '移除失敗', 'err'); });
         }
       });
@@ -4855,7 +4883,7 @@
       danger({
         title: '把這個人移出活動',
         detail: '他之後<b>看不到別人記在這個活動的紀錄</b>，也不能再往這個活動記。' +
-                '<br>他自己記過的那些<b>不會刪掉</b>，還在他自己的收支明細裡。',
+                '<br>他自己記過的那些<b>不會刪掉</b>，還在他自己的個人帳本裡。',
         level: 'full',
         ok: '確定移出',
         onOk: function () {
@@ -4913,7 +4941,7 @@
     var ag = t.closest('#advGen');
     if (ag) {
       var stopAdv = waitBtn(ag, '產生中', 'advSlow');
-      API.generateAdvices({ scope: ag.dataset.genScope }).then(function (r) {
+      API.generateAdvices(targetFilter()).then(function (r) {
         stopAdv();
         if (r.fallback) {
           /* AI 叫不動（503）：用同一批數字先整理的，不會存起來，所以直接畫，不重新讀 */
@@ -5311,10 +5339,18 @@
       return;
     }
 
+    if (f.id === 'familyGoalForm') {
+      e.preventDefault(); busy(f, true, '儲存中…');
+      API.updateFamilyGoal({ goalAmount: Number(document.getElementById('familyGoalAmount').value), goalNote: document.getElementById('familyGoalNote').value }).then(function () {
+        busy(f, false); vMembers(); toast('家庭目標已儲存', 'ok');
+      }).catch(function (err) { busy(f, false); toast(err.message || '儲存失敗', 'err'); });
+      return;
+    }
+
     if (f.id === 'famNewF') {
       e.preventDefault();
       busy(f, true, '建立中…');
-      API.createFamily({ name: document.getElementById('famName').value }).then(function (r) {
+      API.createFamily({ name: document.getElementById('famName').value, goalAmount: Number(document.getElementById('famGoalAmount').value), goalNote: document.getElementById('famGoalNote').value }).then(function (r) {
         busy(f, false);
         afterFamilyChange('「' + r.family.name + '」建好了，現在可以邀請家人');
       }).catch(function (err) { busy(f, false); toast(err.message || '建立失敗', 'err'); });

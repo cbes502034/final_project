@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 class GenerateIn(BaseModel):
     """me：寫給自己的；family：全家（只有家長）。"""
     scope: str = Field(default="me", pattern="^(me|family)$")
+    groupId: str | None = None
 
 
 class AdviceItem(BaseModel):

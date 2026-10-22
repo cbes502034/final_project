@@ -7,7 +7,7 @@ from app.toolkit import crud, errors
 
 
 def filters(db, me, userId=None, groupId=None, from_=None, to=None, categoryId=None,
-            kind=None, source=None, q=None, activityId=None):
+            kind=None, source=None, q=None, activityId=None, scope=None):
     users, groups = visible_scope(me, db)
     where = {"and": [{"or": [{"user_id__in": users}, {"group_id__in": groups}]}]}
     if userId and userId != "all":
@@ -24,6 +24,18 @@ def filters(db, me, userId=None, groupId=None, from_=None, to=None, categoryId=N
         where["group_id"] = gid
     else:
         where["is_snapshot"] = False
+    if scope == "family":
+        from app.services.financial_context import resolve, personal_ids
+        context = resolve(db, me, "family")
+        # 家庭合計包含所有人，個別明細仍沿用監管權限。
+        where.pop("group_id", None)
+        where["group_id__in"] = personal_ids(db, context["people"].intersection(users))
+        where["is_snapshot"] = False
+    elif scope == "me" and not (groupId and groupId != "all"):
+        from app.services.financial_context import personal_ids
+        where["group_id__in"] = personal_ids(db, {me.id})
+    elif scope not in (None, "me"):
+        raise errors.unprocessable("scope 只能是 me 或 family")
     try:
         if from_:
             where["occurred_on__gte"] = date.fromisoformat(from_)

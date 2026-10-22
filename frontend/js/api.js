@@ -79,7 +79,8 @@
    POST   /api/advices/generate   產生這個月的建議
    DELETE /api/advices/{aid}       刪一則建議
 
-   家庭（22 支）
+   家庭（23 支）
+   PATCH  /api/family                              修改家庭長期目標
    GET    /api/family                              家庭、成員、監管關係
    POST   /api/family                              建立家庭（建立的人是家長）
    DELETE /api/family                              解散家庭（唯一的家長）
@@ -207,7 +208,7 @@
            重新整理之後就消失——被停權的人重新整理一下就能登入。 */
         ['newGroups', 'activityInvites', 'groupPatch', 'joined', 'left', 'archived', 'settled', 'removed', 'txPatch', 'txGone', 'resets',
          'goalPatch', 'allowancePatch', 'newAlerts', 'alertPatch', 'alertGone',
-         'suspended', 'audit', 'newFamilies', 'memberships', 'invites', 'codes', 'endedGuardians',
+         'suspended', 'audit', 'newFamilies', 'familyGoals', 'memberships', 'invites', 'codes', 'endedGuardians',
          'passwords', 'advices', 'customCategories', 'newGuardians', 'dissolved'].forEach(function (k) {
           if (saved[k]) base[k] = saved[k];
         });
@@ -259,6 +260,7 @@
         suspended: state.suspended || {},
         audit: state.audit || [],
         newFamilies: state.newFamilies || [],
+        familyGoals: state.familyGoals || {},
         memberships: state.memberships || {},
         invites: state.invites || [],
         codes: state.codes || [],
@@ -384,7 +386,7 @@
     var months = [3, 2, 1].map(function (b) { return shiftMonth(global.DATA.meta.period, -b); });
     var seen = {}, earned = 0;
     s.transactions.forEach(function (t) {
-      if (t.snapshot || t.user !== uid || (t.kind !== 'income' && t.kind !== 'expense')) return;
+      if (t.snapshot || !(groupOf(t.group) || {}).personalOwner || t.user !== uid || (t.kind !== 'income' && t.kind !== 'expense')) return;
       var ym = String(t.date).slice(0, 7);
       if (months.indexOf(ym) < 0) return;
       seen[ym] = true;
@@ -691,6 +693,31 @@
       })
       .filter(function (g) { return (s.removed || []).indexOf(g.id) < 0; })   // 移除的連「已封存」都不列
       .filter(function (g) { return withArchived || !g.archived; });
+  }
+
+  function financialContext(f) {
+    f = f || {};
+    if (f.scope && ['me', 'family'].indexOf(f.scope) < 0) throw oops('scope 只能是 me 或 family', 422);
+    var s = load(), me = memberOf(s.me), family = f.scope === 'family';
+    if (family && (!me.familyId || me.role !== 'parent')) throw oops('只有家庭中的家長可以切換家庭模式', 403);
+    var g = !family && f.groupId && f.groupId !== 'all' ? groupOf(f.groupId) : null;
+    if (!family && f.groupId && f.groupId !== 'all' && (!g || visibleGroups(s.me).indexOf(g.id) < 0)) throw oops('你不在這個活動裡', 403);
+    var activity = g && !g.personalOwner;
+    var users = family ? global.DATA.members.filter(function (u) { return u.familyId === me.familyId; }).map(function (u) { return u.id; }) : [s.me];
+    if (activity) users = memberIdsOf(g.id).concat(s.transactions.filter(function (t) { return t.group === g.id; }).map(function (t) { return t.user; })).filter(function (u, i, a) { return a.indexOf(u) === i; });
+    return { users: users, group: activity ? g.id : null, activity: !!activity,
+      earners: family ? users.filter(function (u) { return memberOf(u).role === 'parent'; }) : users,
+      includes: function (t) { return activity ? t.group === g.id : !t.snapshot && !!(groupOf(t.group) || {}).personalOwner; } };
+  }
+
+  function mockFamilyGoal(fam) {
+    var s = load(), p = (s.familyGoals || {})[fam.id] || {}, since = fam.createdAt || fam.created || todayStr();
+    var people = global.DATA.members.filter(function (u) { return u.familyId === fam.id; });
+    var ids = people.map(function (u) { return u.id; }), parents = people.filter(function (u) { return u.role === 'parent'; }).map(function (u) { return u.id; });
+    var rows = s.transactions.filter(function (t) { return !t.snapshot && (groupOf(t.group) || {}).personalOwner && ids.indexOf(t.user) >= 0 && t.date >= since && t.date <= todayStr(); });
+    var income = sum(rows.filter(function (t) { return parents.indexOf(t.user) >= 0; }), 'income'), expense = sum(rows, 'expense'), net = income - expense;
+    var amount = Number(p.amount === undefined ? fam.goalAmount || 0 : p.amount);
+    return { amount: amount, note: p.note === undefined ? fam.goalNote || '' : p.note, since: since, income: income, expense: expense, accumulated: net, remaining: Math.max(0, amount - net), ratio: amount ? Math.max(0, net) / amount : 0 };
   }
 
   function txActivity(t) {
@@ -1842,12 +1869,12 @@
       f = f || {};
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
-        var users = f.scope === 'family' ? visibleUsers(s.me) : [s.me];
+        var context = financialContext(f), users = context.users;
         /* ⚠️ 統計只走 A（這些人記的），不走 B。
            B 會把共用帳本裡「別人的錢」算進這個人的總額——
            家用帳本裡配偶花的錢，不該出現在我的支出裡。 */
         var tx = s.transactions.filter(function (t) {
-          if (f.groupId && f.groupId !== 'all' ? t.group !== f.groupId : t.snapshot) return false;
+          if (!context.includes(t)) return false;
           return users.indexOf(t.user) >= 0 && t.date.indexOf(D.meta.period) === 0;
         });
         // 成員表上的 income / expense 是本月至今的合計（示範明細已含在內）；
@@ -1860,7 +1887,7 @@
            支出則要算：那筆錢確實離開了這個家。
 
            他們自己的收入另外回一個 wardIncome，畫面上分開顯示。 */
-        var wards = f.scope === 'family' ? wardsOf(s.me) : [];
+        var wards = users.filter(function (u) { return context.earners.indexOf(u) < 0; });
         var earners = users.filter(function (u) { return wards.indexOf(u) < 0; });
 
         /* ⚠️ 一律從明細算，不要用 members[] 上的彙總欄位。
@@ -1885,12 +1912,12 @@
         /* 選了某一本帳 → 用那本帳自己的目標；沒選 → 用整體目標。
            這就是「每個月的存錢目標可以有好幾個設定」的意思。 */
         var goal = users.reduce(function (n, u) {
-          if (f.groupId && f.groupId !== 'all' && (groupOf(f.groupId) || {}).personalOwner !== u) return n + goalOf(u, f.groupId);
+          if (context.activity) return n + goalOf(u, f.groupId);
           var m = memberOf(u);
           return n + (m && m.savingsGoal ? m.savingsGoal : 0);
         }, 0);
         /* 預計收入還沒入帳的部分也算進上限（選了帳本就不估：預計收入是整個人的） */
-        var oneBook = f.groupId && f.groupId !== 'all' && (groupOf(f.groupId) || {}).personalOwner !== s.me;
+        var oneBook = context.activity;
         var pending = 0, exps = [];
         if (!oneBook) earners.forEach(function (u) {
           var e = expectedOf(s, u);
@@ -1912,8 +1939,7 @@
         var oneGroup = f.groupId && f.groupId !== 'all';
         function rowFor(prefix) {
           var list = s.transactions.filter(function (t) {
-            if (oneGroup && t.group !== f.groupId) return false;
-            if (!oneGroup && t.snapshot) return false;
+            if (!context.includes(t)) return false;
             return users.indexOf(t.user) >= 0 && t.date.indexOf(prefix) === 0;
           });
           return {
@@ -1994,7 +2020,7 @@
            ⚠️ 這一段是有來由的：前端曾經送 user=U3，而契約寫的是 userId。
            mock 當時默默忽略不認得的參數，所以「篩選沒生效」在 mock 下
            看起來完全正常——直到接上真後端才會發現。寧可現在就吵。 */
-        var OK = ['userId', 'groupId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page', 'activityId'];
+        var OK = ['userId', 'groupId', 'from', 'to', 'categoryId', 'kind', 'source', 'q', 'page', 'activityId', 'scope'];
         Object.keys(f).forEach(function (k) {
           if (OK.indexOf(k) < 0) {
             throw new Error('不認得的篩選參數「' + k + '」，契約上只有：' + OK.join('、'));
@@ -2002,6 +2028,8 @@
         });
 
         var vis = visibleUsers(s.me);
+        var family = f.scope === 'family' ? financialContext(f) : null;
+        if (f.scope && ['me', 'family'].indexOf(f.scope) < 0) throw oops('scope 只能是 me 或 family', 422);
         var vgs = visibleGroups(s.me);
         var askable = coMembers(s.me).concat(vis).concat(s.transactions.filter(function (t) {
           return vgs.indexOf(t.group) >= 0;
@@ -2026,6 +2054,8 @@
 
         var rows = s.transactions.filter(function (t) {
           if (!canSeeRow(t, vis, vgs)) return false;
+          if (family && (!family.includes(t) || family.users.indexOf(t.user) < 0 || vis.indexOf(t.user) < 0)) return false;
+          if (f.scope === 'me' && (!f.groupId || f.groupId === 'all') && (groupOf(t.group) || {}).personalOwner !== s.me) return false;
           if (f.groupId && f.groupId !== 'all' ? t.group !== f.groupId : t.snapshot) return false;
           if (f.userId && f.userId !== 'all' && t.user !== f.userId) return false;
           /* ⚠️ from／to／categoryId 早就在契約裡、也在上面的白名單裡，
@@ -2551,12 +2581,12 @@
       f = f || {};
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
-        var vis = visibleUsers(s.me);
+        var context = financialContext(f), vis = f.scope ? context.users : visibleUsers(s.me);
         var one = f.groupId && f.groupId !== 'all';
         function used(uid, cat) {
           return sum(s.transactions.filter(function (t) {
             return t.user === uid && t.cat === cat && t.date.indexOf(D.meta.period) === 0 &&
-              (one ? t.group === f.groupId : !t.snapshot);
+              context.includes(t);
           }), 'expense');
         }
         return {
@@ -2599,17 +2629,17 @@
       f = f || {};
       var s = load(), D = global.DATA;
       return sleep(LATENCY).then(function () {
-        var vis = visibleUsers(s.me);
+        var context = financialContext(f);
         /* scope: 'me'     只有寫給我本人的
                   'family' 家庭的建議 ＋ 我監管的人的個人建議（家長才有）
            ⚠️ 子女不會拿到家庭的建議——那幾則是寫給家長看的，裡面會點名。 */
-        var fam = f.scope === 'family' && vis.length > 1;
+        var fam = f.scope === 'family';
         var gone = s.deletedAdvices || [];
         var rows = D.advices.concat(s.advices || []).filter(function (a) {
           if (gone.indexOf(a.id) >= 0) return false;            // 刪掉的不再出現
-          if (a.scope === 'family') return fam;
-          if (a.user === s.me) return !fam;
-          return fam && vis.indexOf(a.user) >= 0;
+          if ((a.groupId || null) !== context.group) return false;
+          if (a.scope === 'family') return fam && (!a.familyId || a.familyId === memberOf(s.me).familyId);
+          return !fam && a.user === s.me;
         });
         return {
           advices: rows.map(function (a) {
@@ -2630,18 +2660,19 @@
       var s = load(), D = global.DATA;
       var scope = p.scope === 'family' ? 'family' : 'me';
       var me = memberOf(s.me) || {};
-      if (scope === 'family' && !(isParentOf(s, me.familyId) && visibleUsers(s.me).length > 1)) {
+      if (scope === 'family' && !(isParentOf(s, me.familyId))) {
         return Promise.reject(oops('家庭的建議只有家長、而且照看著家人時才能產生', 403));
       }
-      return Promise.all([mock.summary({ scope: scope }), mock.budgets({})]).then(function (r) {
+      return Promise.all([mock.summary(p), mock.budgets(p)]).then(function (r) {
         return sleep(700).then(function () {
           var sm = r[0], bd = r[1].budgets || [];
           var period = D.meta.period, who = scope === 'family' ? null : s.me;
           var built = buildAdvices(sm, bd, scope, s.me, period);
-          var out = built.advices, head = built.head;
+          var out = built.advices, head = built.head, context = financialContext(p);
+          out.forEach(function (a) { a.groupId = context.group; a.familyId = me.familyId; });
           // 同一個月、同一個範圍再產生一次：蓋掉舊的，不要疊出兩份
           s.advices = (s.advices || []).filter(function (a) {
-            return !(a.period === period && a.scope === head.scope && (a.user || null) === who);
+            return !(a.period === period && a.scope === head.scope && (a.user || null) === who && (a.groupId || null) === context.group);
           }).concat(out);
           save();
           return {
@@ -2665,7 +2696,7 @@
         return {
           me: s.me,
           myRole: me.role || null,
-          family: fam ? { id: fam.id, name: fam.name, createdBy: fam.createdBy } : null,
+          family: fam ? { id: fam.id, name: fam.name, createdBy: fam.createdBy, goal: mockFamilyGoal(fam) } : null,
           visible: vis,
           queryable: queryableUsers(s.me),
           /* 只列**同一個家庭**的人；還沒有家庭就只有自己。
@@ -2712,8 +2743,10 @@
         if (me.familyId) throw oops('你已經在一個家庭裡了', 409);
         var name = String(p.name || '').replace(/\s+/g, ' ').trim().slice(0, 20);
         if (!name) throw oops('幫你的家庭取個名字，例如「林家」');
+        var goalAmount = Number(p.goalAmount || 0);
+        if (!isFinite(goalAmount) || goalAmount < 0 || goalAmount > 999999999999.99 || String(p.goalNote || '').length > 300) throw oops('目標金額或內容不正確', 422);
         var f = { id: 'F' + (allFamilies().length + 1) + '-' + Date.now().toString(36),
-                  name: name, createdBy: s.me, createdAt: todayStr() };
+                  name: name, createdBy: s.me, createdAt: todayStr(), goalAmount: goalAmount, goalNote: String(p.goalNote || '').trim() };
         s.newFamilies = (s.newFamilies || []).concat([f]);
         setMembership(s, s.me, f.id, 'parent');
         pushAudit(s, 'create_family', null, '建立「' + name + '」');
@@ -2724,6 +2757,17 @@
 
     /* 產生邀請碼。⚠️ 身分由家長決定，拿到碼的人不能自己選。
        同一個身分再產生一次，舊的那組就作廢——「重新產生」就是這個意思。 */
+    updateFamilyGoal: function (p) {
+      var s = load(), me = memberOf(s.me), fam = familyOf(s.me);
+      return sleep(LATENCY).then(function () {
+        if (!fam || me.role !== 'parent') throw oops('只有家長可以修改家庭目標', 403);
+        var amount = Number(p.goalAmount);
+        if (!isFinite(amount) || amount < 0 || amount > 999999999999.99 || String(p.goalNote || '').length > 300) throw oops('目標金額或內容不正確', 422);
+        s.familyGoals = s.familyGoals || {}; s.familyGoals[fam.id] = { amount: amount, note: String(p.goalNote || '').trim() }; save();
+        return { family: { id: fam.id, name: fam.name, goal: mockFamilyGoal(fam) } };
+      });
+    },
+
     createInviteCode: function (p) {
       var s = load(); p = p || {};
       return sleep(240).then(function () {
@@ -3378,6 +3422,7 @@
     setSavingsGoal:    function (u, g, gid) { return req('/api/savings-goal', { method: 'PUT', body: { userId: u, goal: g, groupId: gid || null } }); },
     advices:           function (f)     { return req('/api/advices' + qs(f)); },
     members:           function ()      { return req('/api/family'); },
+    updateFamilyGoal: function (p) { return req('/api/family', { method: 'PATCH', body: p }); },
     createFamily:      function (p)     { return req('/api/family', { method: 'POST', body: p }); },
     createInviteCode:  function (p)     { return req('/api/family/invite', { method: 'POST', body: p }); },
     joinFamily:        function (p)     { return req('/api/family/join', { method: 'POST', body: p }); },
@@ -3498,6 +3543,7 @@
 
     members:            ['GET /api/family', '家庭'],
     createFamily:       ['POST /api/family', '家庭'],
+    updateFamilyGoal:   ['PATCH /api/family', '家庭'],
     dissolveFamily:     ['DELETE /api/family', '家庭'],
     createInviteCode:   ['POST /api/family/invite', '家庭'],
     joinFamily:         ['POST /api/family/join', '家庭'],
@@ -3651,7 +3697,7 @@
      ============================================================ */
   var LOOKUP = { cats: null, people: null, me: null };
   /* 家庭、分類、名字改了，對照表要重拿 */
-  var LOOKUP_STALE = ['createCategory', 'createFamily', 'joinFamily', 'acceptInvite', 'removeMember',
+  var LOOKUP_STALE = ['createCategory', 'createFamily', 'updateFamilyGoal', 'joinFamily', 'acceptInvite', 'removeMember',
     'leaveFamily', 'dissolveFamily', 'changeMemberRole', 'updateProfile', 'joinActivity', 'respondActivityInvite', 'login', 'logout', 'register'];
 
   function lookups() {
@@ -3757,7 +3803,7 @@
     },
     generateAdvices: function (args) {
       var scope = (args[0] || {}).scope === 'family' ? 'family' : 'me';
-      return Promise.all([global.API.summary({ scope: scope }), global.API.budgets({}), global.API.me()]).then(function (r) {
+      return Promise.all([global.API.summary(args[0] || {}), global.API.budgets(args[0] || {}), global.API.me()]).then(function (r) {
         var built = buildAdvices(r[0], r[1].budgets || [], scope, r[2].user.id, r[0].period || global.DATA.meta.period);
         return { fallback: true, generatedAt: built.head.generatedAt,
           advices: built.advices.map(function (a) { return Object.assign(a, { userName: a.user ? r[2].user.name : null }); }),

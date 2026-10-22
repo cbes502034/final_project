@@ -39,7 +39,7 @@ OWNER = "數字"
 
 @router.get("/budgets", summary="預算與已花")
 @block_admin
-def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get_db)):
+def list_budgets(me: User, groupId: str | None = None, scope: str | None = None, db: Session = Depends(get_db)):
     """預算與已花
 
     GET /api/budgets
@@ -102,9 +102,11 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
         5. 每一筆預算配上 used、over、pct，照 pct 由大到小排，回傳
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import datetime, timedelta, timezone
 
             from fastapi import APIRouter, Depends, Query
@@ -117,26 +119,17 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 這個月的起訖（台灣時間）
             this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
             start, end = period.month_range(this_month)
 
             # 2. 我看得到的人的每月分類預算
-            users, groups = visible_scope(me, db)
-            budgets = crud.find(Budget, {"user_id__in": users, "period_type": "month", "category_id__isnull": False},
-                                order_by="id", db=db)
-
-            # 3. 只算某一本帳：要是我加入的
-            group_id = None
-            if groupId and groupId != "all":
-                group_id = int(groupId) if groupId.isdigit() else 0
-                if group_id not in groups:
-                    raise errors.forbidden("你不在這本帳裡")
-
-            # 4. 已花多少：這個月、這個人、這個分類的支出，從明細現算
+            from app.services.financial_context import resolve, personal_ids
+            context = resolve(db, me, scope, groupId)
+            users = context["people"] if scope is not None else visible_scope(me, db)[0]
+            budgets = crud.find(Budget, {"user_id__in": users, "period_type": "month", "category_id__isnull": False}, order_by="id", db=db)
+            group_id = context["group"].id if context["group"] else None
             spent = {}
             if budgets:
                 where = {"user_id__in": {b.user_id for b in budgets}, "kind": "expense",
@@ -145,6 +138,7 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
                     where["group_id"] = group_id
                 else:
                     where["is_snapshot"] = False
+                    where["group_id__in"] = personal_ids(db, users)
                 for t in crud.find(Transaction, where, fields=("user_id", "category_id", "amount"), db=db):
                     key = (t["user_id"], t["category_id"])
                     spent[key] = money.add(spent.get(key), t["amount"])
@@ -178,35 +172,19 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
-    from datetime import datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
 
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
 
     # 1. 這個月的起訖（台灣時間）
     this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
     start, end = period.month_range(this_month)
 
     # 2. 我看得到的人的每月分類預算
-    users, groups = visible_scope(me, db)
-    budgets = crud.find(Budget, {"user_id__in": users, "period_type": "month", "category_id__isnull": False},
-                        order_by="id", db=db)
-
-    # 3. 只算某一本帳：要是我加入的
-    group_id = None
-    if groupId and groupId != "all":
-        group_id = int(groupId) if groupId.isdigit() else 0
-        if group_id not in groups:
-            raise errors.forbidden("你不在這本帳裡")
-
-    # 4. 已花多少：這個月、這個人、這個分類的支出，從明細現算
+    from app.services.financial_context import resolve, personal_ids
+    context = resolve(db, me, scope, groupId)
+    users = context["people"] if scope is not None else visible_scope(me, db)[0]
+    budgets = crud.find(Budget, {"user_id__in": users, "period_type": "month", "category_id__isnull": False}, order_by="id", db=db)
+    group_id = context["group"].id if context["group"] else None
     spent = {}
     if budgets:
         where = {"user_id__in": {b.user_id for b in budgets}, "kind": "expense",
@@ -215,6 +193,7 @@ def list_budgets(me: User, groupId: str | None = None, db: Session = Depends(get
             where["group_id"] = group_id
         else:
             where["is_snapshot"] = False
+            where["group_id__in"] = personal_ids(db, users)
         for t in crud.find(Transaction, where, fields=("user_id", "category_id", "amount"), db=db):
             key = (t["user_id"], t["category_id"])
             spent[key] = money.add(spent.get(key), t["amount"])
@@ -297,9 +276,11 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
         3. limit 是 0：刪掉那一列，回 deleted: true
         4. 不是 0：upsert（有就改、沒有就新增），db.commit()，回傳設定
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import datetime, timedelta, timezone
 
             from fastapi import APIRouter, Depends, Query
@@ -312,16 +293,14 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 只能設在支出分類（系統的或我們家的）
             category_id = int(body.cat) if body.cat.isdigit() else 0
             category = crud.get(Category, where={
                 "id": category_id,
                 "kind": "expense",
                 "or": [{"family_id__isnull": True}, {"family_id": me.family_id}],
-            }, db=db)
+                }, db=db)
             if category is None:
                 raise errors.bad_request("預算只能設在支出分類")
 
@@ -358,17 +337,8 @@ def set_budget(body: BudgetIn, me: User, db: Session = Depends(get_db)):
     """
     # raise not_ready("PUT /api/budgets", OWNER)
 
-    from datetime import datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
 
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
 
     # 1. 只能設在支出分類（系統的或我們家的）
     category_id = int(body.cat) if body.cat.isdigit() else 0
@@ -459,9 +429,11 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
         3. 這個月（台灣時間）的那一列：upsert 成新的目標，db.commit()
         4. 回傳：整體的帶 name 與 savingsGoal，帳本的帶 groupId 與 groupName
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import datetime, timedelta, timezone
 
             from fastapi import APIRouter, Depends, Query
@@ -474,10 +446,8 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 只有本人能設（userId 不帶 = 自己）
             try:
                 roles.require_set_goal(str(me.id), body.userId or str(me.id))
             except PermissionError as exc:
@@ -524,17 +494,8 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
     """
     # raise not_ready("PUT /api/savings-goal", OWNER)
 
-    from datetime import datetime, timedelta, timezone
 
-    from fastapi import APIRouter, Depends, Query
-    from sqlalchemy.orm import Session
     
-    from app.guards import block_admin, visible_scope
-    from app.models import Budget, Category, Group, GroupMember, SavingsGoal, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.stats import BudgetIn, SavingsGoalIn
-    from app.toolkit import crud, errors, money, period, roles
-    from app.toolkit.db import get_db
     
     # 1. 只有本人能設（userId 不帶 = 自己）
     try:
@@ -617,9 +578,11 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
         3. 第一列放整體，後面一本一列，回傳
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import datetime, timedelta, timezone
 
             from fastapi import APIRouter, Depends, Query
@@ -632,10 +595,8 @@ def list_savings_goals(me: User, db: Session = Depends(get_db)):
             from app.toolkit import crud, errors, money, period, roles
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 我的每一筆目標由舊到新：後面的蓋掉前面的，每本帳留下最新的（整體的鍵是 None）
             latest = {}
             for row in crud.find(SavingsGoal, {"user_id": me.id}, order_by="id", db=db):
                 latest[row.group_id] = row.goal_amount

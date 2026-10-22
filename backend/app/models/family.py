@@ -17,8 +17,9 @@ tests/test_backend_core.py 會逐欄比對 data.js 與這裡，漏改一處就�
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models._types import BigID, utcnow
@@ -38,6 +39,8 @@ class Family(Base):
     created_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     # 預設 'TWD'
     currency: Mapped[str] = mapped_column(Text, nullable=False, default="TWD")
+    goal_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    goal_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
 
 

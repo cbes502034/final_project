@@ -3980,3 +3980,20 @@ body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #
   #view .activity-invite-panel .invp__f input, #cg input { font-size: 16px; }
   .gsw-empty { display: inline-block; max-width: 120px; white-space: normal; }
 }
+
+
+/* 三種財務對象沿用同一套版面。家庭不提供活動或記帳入口。 */
+body.in-family #gsw, body.in-family .tabbar [data-tab="stats"] { display: none !important; }
+.family-create { display: grid; gap: 16px; margin-top: 18px; }
+.family-create .btn { justify-self: start; }
+.family-goal { margin-bottom: 24px; }
+.family-goal__note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.family-goal__numbers { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.family-goal__numbers b { margin-left: 8px; }
+.family-goal__edit { margin-top: 16px; }
+.family-goal__edit summary { cursor: pointer; color: var(--accent); }
+@media (max-width: 760px) {
+  body.in-family .tabbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tabbar__i span:last-child { white-space: nowrap; font-size: 11px; }
+  .family-goal__numbers { flex-direction: column; }
+}

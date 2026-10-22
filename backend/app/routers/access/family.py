@@ -29,7 +29,8 @@ from app.models import (
     Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
     Transaction, User,
 )
-from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+from app.services.financial_context import family_goal
+from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
 from app.toolkit import crud, errors, family, images, money, password_reset, period, security
 from app.toolkit.config import settings
 from app.toolkit.db import get_db
@@ -116,8 +117,8 @@ def get_family(me: User, db: Session = Depends(get_db)):
         6. 全部組起來：visible、queryable 自己排第一個，其他照 id 排
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -130,16 +131,14 @@ def get_family(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 我看得到誰（全部紀錄）、查得到誰（再加上共用帳本的人）
             users, groups = visible_scope(me, db)
             sharing = crud.find(GroupMember, {"group_id__in": groups}, fields="user_id", db=db)
             queryable = users.union(sharing)
@@ -199,7 +198,7 @@ def get_family(me: User, db: Session = Depends(get_db)):
             return {
                 "me": str(me.id),
                 "myRole": me.family_role,
-                "family": {"id": str(fam.id), "name": fam.name, "createdBy": str(fam.created_by)} if fam else None,
+                "family": {"id": str(fam.id), "name": fam.name, "createdBy": str(fam.created_by), "goal": family_goal(db, fam)} if fam else None,
                 "visible": [str(me.id)] + [str(u) for u in sorted(users) if u != me.id],
                 "queryable": [str(me.id)] + [str(u) for u in sorted(queryable) if u != me.id],
                 "members": members,
@@ -281,7 +280,7 @@ def get_family(me: User, db: Session = Depends(get_db)):
     return {
         "me": str(me.id),
         "myRole": me.family_role,
-        "family": {"id": str(fam.id), "name": fam.name, "createdBy": str(fam.created_by)} if fam else None,
+        "family": {"id": str(fam.id), "name": fam.name, "createdBy": str(fam.created_by), "goal": family_goal(db, fam)} if fam else None,
         "visible": [str(me.id)] + [str(u) for u in sorted(users) if u != me.id],
         "queryable": [str(me.id)] + [str(u) for u in sorted(queryable) if u != me.id],
         "members": members,
@@ -348,8 +347,8 @@ def create_family(body: FamilyIn, me: User, db: Session = Depends(get_db)):
         2. 新增家庭 → 拿掉我以前的 removed 列 → 新增我這一列（家長）→ 寫稽核
         3. db.commit()，回傳 {family, role}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -362,23 +361,21 @@ def create_family(body: FamilyIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 整理名稱
             try:
                 name = family.clean_family_name(body.name)
             except ValueError as exc:
                 raise errors.unprocessable(str(exc)) from None
 
             # 2. 新增家庭，建立的人是家長
-            fam = crud.save(Family, {"name": name, "created_by": me.id}, db=db)
+            fam = crud.save(Family, {"name": name, "created_by": me.id, "goal_amount": body.goalAmount, "goal_note": body.goalNote.strip()}, db=db)
             crud.remove(FamilyMember, {"user_id": me.id, "status": "removed"}, db=db)
             crud.save(FamilyMember, {"family_id": fam.id, "user_id": me.id, "role": "parent"}, db=db)
             crud.save(AuditLog, {"actor_id": me.id, "action": "create_family", "target_type": "family",
@@ -411,7 +408,7 @@ def create_family(body: FamilyIn, me: User, db: Session = Depends(get_db)):
         raise errors.unprocessable(str(exc)) from None
 
     # 2. 新增家庭，建立的人是家長
-    fam = crud.save(Family, {"name": name, "created_by": me.id}, db=db)
+    fam = crud.save(Family, {"name": name, "created_by": me.id, "goal_amount": body.goalAmount, "goal_note": body.goalNote.strip()}, db=db)
     crud.remove(FamilyMember, {"user_id": me.id, "status": "removed"}, db=db)
     crud.save(FamilyMember, {"family_id": fam.id, "user_id": me.id, "role": "parent"}, db=db)
     crud.save(AuditLog, {"actor_id": me.id, "action": "create_family", "target_type": "family",
@@ -491,8 +488,8 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
         5. 邀請、邀請碼作廢；寫稽核
         6. db.commit()，回傳 {dissolved, family, released}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -505,16 +502,14 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 只有唯一的家長能解散
             rows = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"}, db=db)
             people = [r.user_id for r in rows]
             other_parents = len([r for r in rows if r.role == "parent" and r.user_id != me.id])
@@ -657,8 +652,8 @@ def create_invite_code(body: InviteCodeIn, me: User, db: Session = Depends(get_d
            （「給女兒」「給外婆」各一組），作廢舊的會把別人手上還沒用的碼弄失效。
            不要的那一組由家長自己在畫面上刪掉（DELETE /api/family/invites/{id}）。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -671,17 +666,14 @@ def create_invite_code(body: InviteCodeIn, me: User, db: Session = Depends(get_d
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 產生新碼：資料庫只存雜湊
-            #    ⚠️ 不要作廢同身分的舊碼——別人手上那組可能還沒用
             code = family.new_code()
             expires = family.expires_at(days=settings.invite_ttl_days)
             row = crud.save(FamilyInvite, {
@@ -799,8 +791,8 @@ def join_family(body: JoinIn, me: User, db: Session = Depends(get_db)):
         4. 拿掉我以前的 removed 列 → 新增我這一列（身分照碼上的）→ 碼改成 accepted → 寫稽核
         5. db.commit()，回傳 {family, role}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -813,16 +805,14 @@ def join_family(body: JoinIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 整理使用者打的碼，用雜湊去找
             code = family.normalize_code(body.code)
             if len(code) != 8:
                 raise errors.bad_request("邀請碼是 8 個字，例如 K7QM-3XWP")
@@ -972,8 +962,8 @@ def lookup_user(me: User, email: str | None = None, db: Session = Depends(get_db
         4. 查他的家庭、我們家有沒有邀請過他，交給 lookup_status
         5. 只回 id、名字、頭像與 status
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -986,14 +976,13 @@ def lookup_user(me: User, email: str | None = None, db: Session = Depends(get_db
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
             now = datetime.now(timezone.utc)
 
@@ -1158,8 +1147,8 @@ def list_invites(me: User, db: Session = Depends(get_db)):
         4. 組成三份清單回傳（codes 的 code 一律 null）
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -1172,14 +1161,13 @@ def list_invites(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
             live = {"status": "pending", "expires_at__gt": datetime.now(timezone.utc)}
 
@@ -1325,8 +1313,8 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
         3. 新增邀請、寫稽核，db.commit()
         4. 回 {"id", "status": "pending"}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -1339,14 +1327,13 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
             now = datetime.now(timezone.utc)
 
@@ -1478,8 +1465,8 @@ def accept_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
         3. 拿掉我以前的 removed 列 → 加入 → 邀請改成 accepted → 寫稽核
         4. db.commit()，回傳 {family, role}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -1492,16 +1479,14 @@ def accept_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 只有被邀請的本人找得到這個邀請
             number = int(invite_id) if invite_id.isdigit() else 0
             invite = crud.get(FamilyInvite, where={"id": number, "invitee_id": me.id}, db=db)
             if invite is None:
@@ -1635,8 +1620,8 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
         ⚠️ 不要在 where 裡加 `code_hash__isnull`：加了就只找得到其中一種，
            另一種永遠回 404。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -1649,16 +1634,14 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 還沒回覆的那一列（帳號邀請與邀請碼都在這張表）
             number = int(invite_id) if invite_id.isdigit() else 0
             invite = crud.get(FamilyInvite, where={"id": number, "status": "pending"}, db=db)
             if invite is None:
@@ -1781,8 +1764,8 @@ def change_member_role(user_id: str, body: RolePatchIn, me: User, db: Session = 
         3. 設為家長：結束他被照看的關係、零用金歸零；改成子女：結束他照看別人的關係、零用金歸零
         4. 改角色、寫稽核，db.commit()，回 changed: true
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -1795,16 +1778,14 @@ def change_member_role(user_id: str, body: RolePatchIn, me: User, db: Session = 
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 對象要在同一個家庭
             uid = int(user_id) if user_id.isdigit() else 0
             target = crud.get(FamilyMember, where={"family_id": me.family_id, "user_id": uid, "status": "active"}, db=db)
             if target is None:
@@ -1969,8 +1950,8 @@ def remove_member(user_id: str, me: User, db: Session = Depends(get_db)):
         4. 寫稽核（退出記 leave_family、移出記 remove_member），db.commit()
         5. 退出回 {left, family}；移出回 {id, removed, endedGuardianships}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -1983,16 +1964,14 @@ def remove_member(user_id: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 這一家有誰、誰是家長
             rows = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"}, db=db)
             role_of = {r.user_id: r.role for r in rows}
             fam = crud.get(Family, me.family_id, db=db)
@@ -2167,8 +2146,8 @@ def list_guardianships(me: User, db: Session = Depends(get_db)):
         3. 一筆一筆轉成前端要的樣子（mine = 監管人是我），回傳
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -2181,16 +2160,14 @@ def list_guardianships(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 這一家的人
             ids = crud.find(FamilyMember, {"family_id": me.family_id, "status": "active"}, fields="user_id", db=db)
 
             # 2. 兩邊都是這一家的人、還沒結束的監管關係
@@ -2307,8 +2284,8 @@ def create_guardianship(body: GuardianshipIn, me: User, db: Session = Depends(ge
         3. 新增監管關係、寫稽核，db.commit()
         4. 回傳新的那一列（mine: true）
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -2321,16 +2298,14 @@ def create_guardianship(body: GuardianshipIn, me: User, db: Session = Depends(ge
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 監管人一定是自己
             if body.guardianId and body.guardianId != str(me.id):
                 raise errors.forbidden("只能設定「我」照看誰，不能替別的家長設定")
 
@@ -2469,8 +2444,8 @@ def end_guardianship(gid: str, me: User, db: Session = Depends(get_db)):
         3. 設 ended_at、零用金歸零、寫稽核，db.commit()
         4. 回 {"id", "ended": true}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -2483,16 +2458,14 @@ def end_guardianship(gid: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 找還有效的那一列
             number = int(gid) if gid.isdigit() else 0
             row = crud.get(Guardianship, where={"id": number, "ended_at__isnull": True}, db=db)
             if row is None:
@@ -2616,8 +2589,8 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
         4. 一個人一列回傳
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -2630,16 +2603,14 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 我照看的人
             wards = crud.find(Guardianship, {"guardian_id": me.id, "ended_at__isnull": True},
                               fields="ward_id", order_by="id", db=db)
             if not wards:
@@ -2763,8 +2734,8 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
         2. upsert 我給他的零用金，db.commit()
         3. 回 {wardId, wardName, amount}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -2777,16 +2748,14 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 只有監管他的人能設
             ward_id = int(body.wardId) if body.wardId.isdigit() else 0
             if not crud.exists(Guardianship, {"guardian_id": me.id, "ward_id": ward_id, "ended_at__isnull": True}, db=db):
                 raise errors.forbidden("你沒有監管這個人")
@@ -2875,8 +2844,8 @@ def list_audit(me: User, db: Session = Depends(get_db)):
         3. 一筆一筆轉成 {id, at, actor, actorName, action, target, note}，回傳
         ⚠️ 只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
             from datetime import datetime, timedelta, timezone
 
@@ -2889,16 +2858,14 @@ def list_audit(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
-            from app.routers._stub import not_ready, stub
-            from app.schemas.family import AllowanceIn, FamilyIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 最新的 200 筆
             logs = crud.find(AuditLog, order_by="-id", limit=200, db=db)
 
             # 2. 做事的人的名字（平台管理員沒有家庭，前端對不到，要後端帶）
@@ -2954,3 +2921,74 @@ def list_audit(me: User, db: Session = Depends(get_db)):
             "note": (log.meta_json or {}).get("note", ""),
         })
     return {"logs": out}
+
+
+@router.patch("/family", summary="修改家庭長期目標")
+@parent_required
+def update_family_goal(body: FamilyGoalPatchIn, me: User, db: Session = Depends(get_db)):
+    """修改家庭長期目標
+
+    PATCH /api/family
+
+    【這支做什麼】
+        家長修改長期共同存款目標與文字，不改每月存款設定。
+    【前端怎麼打】
+        API.updateFamilyGoal({goalAmount, goalNote})，家庭頁儲存目標。
+    【誰能打】
+        已加入家庭的家長；子女與平台管理員回 403。
+    【請求主體】
+        goalAmount：非負數，最多小數兩位；goalNote：最多 300 字。
+    【成功回應】
+        family：id、name、goal（amount、note、since、accumulated、remaining、ratio）。
+    【錯誤回應】
+        403 非家長；422 金額、字數或多餘欄位不合法。
+    【會用到的資料表】
+        families、family_members、groups、transactions、audit_logs。
+    【每一步用的工具與資料庫方法】
+        crud.get/save、family_goal，與家庭權限守衛。
+    【寫法步驟】
+        更新兩個目標欄位，記錄稽核並回傳累計進度。
+    【完整寫法】
+        第一步：共用 import
+
+            from datetime import datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, HTTPException, Query
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import admin_required, block_admin, family_required, parent_required, protect, visible_scope
+            from app.models import (
+                Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
+                Transaction, User,
+            )
+            from app.services.financial_context import family_goal
+            from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
+            from app.toolkit import crud, errors, family, images, money, password_reset, period, security
+            from app.toolkit.config import settings
+            from app.toolkit.db import get_db
+
+        第二步：套用以下函式內容
+
+            fam = crud.get(Family, me.family_id, db=db)
+            if fam is None:
+                raise errors.not_found("找不到家庭")
+            fam.goal_amount = body.goalAmount
+            fam.goal_note = body.goalNote.strip()
+            crud.save(AuditLog, {"actor_id": me.id, "action": "update_family_goal", "target_type": "family",
+                                 "target_id": fam.id, "meta_json": {"note": "修改家庭長期目標"}}, db=db)
+            db.commit()
+            return {"family": {"id": str(fam.id), "name": fam.name, "goal": family_goal(db, fam)}}
+
+    【做完怎麼確認】
+        家長可改、子女不可改；修改目標不重設累計起點。
+    """
+    fam = crud.get(Family, me.family_id, db=db)
+    if fam is None:
+        raise errors.not_found("找不到家庭")
+    fam.goal_amount = body.goalAmount
+    fam.goal_note = body.goalNote.strip()
+    crud.save(AuditLog, {"actor_id": me.id, "action": "update_family_goal", "target_type": "family",
+                         "target_id": fam.id, "meta_json": {"note": "修改家庭長期目標"}}, db=db)
+    db.commit()
+    return {"family": {"id": str(fam.id), "name": fam.name, "goal": family_goal(db, fam)}}

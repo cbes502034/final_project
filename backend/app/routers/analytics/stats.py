@@ -54,7 +54,7 @@ def get_summary(
 
     【這支做什麼】
         總覽與統計頁的所有數字：這個月的收入、支出、各分類、近 6 個月、近 3 年、存款目標燈號、每個人的這個月。
-        scope=me 只算自己；scope=family 算「我看得到全部紀錄的人」（自己＋照看的人＋同家庭的其他家長）。
+        scope=me 算個人帳本；指定活動則算全活動；scope=family 算家庭所有成員的個人帳本。
         ⚠️ 所有數字都從 transactions 加總，整個系統只有 services/analytics.py 加總錢——
            這支負責「決定算誰、算哪本帳」，加總交給 analytics.summary()（第三步）。
         ⚠️ 家庭模式：照看的孩子的收入不算進家庭收入（那多半是零用金，會重複算），支出要算；
@@ -76,7 +76,7 @@ def get_summary(
 
     【查詢參數】
         參數     型別  說明
-        scope    字串  me（預設）／family。其他值回 422。子女打 family 也只會算到自己（他看不到別人）
+        scope    字串  me（預設）／family。其他值回 422。家庭只限家長，子女回 403。
         groupId  字串  只算那一本帳；all 等於沒帶。要是我加入的帳本，不然 403
         · 期間一律是「台灣的這個月」。前端不送 period。
 
@@ -162,9 +162,11 @@ def get_summary(
         c. 合計 income（只加 earners）、expense（全部），byCat 由大到小
         ⚠️ 金額全程 Decimal（money 模組），不要轉 float 再加。
 
-    【完整寫法】照下面三步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import datetime, timedelta, timezone
 
             from fastapi import APIRouter, Depends, Query
@@ -179,31 +181,18 @@ def get_summary(
             from app.toolkit.config import settings
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 期間：台灣的這個月
             this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
 
-            # 2. 要算誰：me 只有自己；family 是我看得到全部紀錄的人。照看的孩子收入不算進家庭收入
-            scope = scope or "me"
-            if scope not in ("me", "family"):
-                raise errors.unprocessable("scope 只能是 me 或 family")
-            users, groups = visible_scope(me, db)
-            wards = set(crud.find(Guardianship, {"guardian_id": me.id, "ended_at__isnull": True}, fields="ward_id", db=db))
-            people = users if scope == "family" else {me.id}
-            kids = [u for u in people if u in wards]
-            earners = [u for u in people if u not in wards]
-
-            # 3. 只算某一本帳：要是我加入的
-            group_id = None
-            if groupId and groupId != "all":
-                group_id = int(groupId) if groupId.isdigit() else 0
-                if group_id not in groups:
-                    raise errors.forbidden("你不在這本帳裡")
-
-            # 4. 加總（整個系統只有 analytics 加總錢）
-            nums = analytics.summary(db, people, earners, this_month, group_id)
+            # 2. 對象：個人、活動或全家庭；家庭子女收入另外列出。
+            from app.services.financial_context import resolve
+            context = resolve(db, me, scope, groupId)
+            scope = context["scope"]
+            people, earners = context["people"], context["earners"]
+            kids = people - set(earners)
+            group_id = context["group"].id if context["group"] else None
+            nums = analytics.summary(db, people, earners, this_month, group_id, context["personal_only"])
             per_user = nums["perUser"]
 
             # 5. 存款目標：選了帳本用那本帳的，沒選用整體的；每個人最新的一筆
@@ -215,11 +204,11 @@ def get_summary(
                 goals[row.user_id] = row.goal_amount
             # 零用金：被照看的人沒記到的那部分，照家長的設定補進可支配上限（只在算自己的時候；
             #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
-            pocket = analytics.pocket_money(db, list(people), this_month)
-            mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
+            pocket = analytics.pocket_money(db, list(people), this_month, personal_only=True) if context["personal_only"] else {}
+            mine_extra = pocket.get(me.id, money.ZERO) if scope != "family" and people == {me.id} else money.ZERO
             # 預計收入：月底才領薪水、日薪、打工的人，還沒入帳前先照預計的算——收入用 max(已入帳, 預計)，入帳後不會重複算。
             #           選了帳本就不估：預計收入是整個人的，不屬於哪一本帳
-            expected = analytics.expected_income(db, list(people), this_month) if group_id is None or personal else {}
+            expected = analytics.expected_income(db, list(people), this_month, personal_only=True) if context["personal_only"] else {}
             pending = {u: analytics.pending_income(expected.get(u), per_user[u]["income"] + pocket.get(u, money.ZERO))
                        for u in people}
             mine_pending = money.add(*[pending[u] for u in earners])
@@ -281,61 +270,6 @@ def get_summary(
                 "members": members,
             }
 
-        第三步：打開 app/services/analytics.py，把 summary() 整個換成這段（GET /api/summary 與 POST /api/advices/generate 都用它；函式裡那三行 import 不用搬到檔案最上面）
-
-            def summary(db: Any, users: list[int], earners: list[int], period: str, group_id: int | None = None) -> dict[str, Any]:
-                '''GET /api/summary 的數字。users 是這次要算的人，earners 是收入要算進去的人（不含子女）。'''
-                from datetime import date
-
-                from app.models import Transaction
-                from app.toolkit import crud, period as periods
-
-                users, earners = set(users), set(earners)
-                year = int(period[:4])
-                months = periods.recent_months(period, 6)
-                years = [str(year - 2), str(year - 1), str(year)]
-
-                # a. 一次查出這三年、這些人記的收支（transfer 不算；選了帳本只算那本）
-                where = {"user_id__in": users, "kind__in": ["income", "expense"],
-                         "occurred_on__between": (date(year - 2, 1, 1), date(year, 12, 31))}
-                if group_id is not None:
-                    where["group_id"] = group_id
-                else:
-                    where["is_snapshot"] = False
-                rows = crud.find(Transaction, where, fields=("user_id", "category_id", "kind", "amount", "occurred_on"), db=db)
-
-                # b. 一筆一筆分到桶子裡
-                per_user = {u: {"income": money.ZERO, "expense": money.ZERO} for u in users}
-                monthly = {m: {"income": money.ZERO, "expense": money.ZERO} for m in months}
-                yearly = {y: {"income": money.ZERO, "expense": money.ZERO} for y in years}
-                by_cat = {}
-                count = 0
-                for r in rows:
-                    ym = r["occurred_on"].isoformat()[:7]
-                    kind, amount = r["kind"], r["amount"]
-                    if ym == period:
-                        count += 1
-                        per_user[r["user_id"]][kind] += amount
-                        if kind == "expense":
-                            by_cat[r["category_id"]] = by_cat.get(r["category_id"], money.ZERO) + amount
-                    if kind == "income" and r["user_id"] not in earners:
-                        continue                      # 子女的收入不算進家庭收入（多半是零用金，會重複算）
-                    if ym in monthly:
-                        monthly[ym][kind] += amount
-                    yearly[ym[:4]][kind] += amount
-
-                # c. 合計：收入只加 earners，支出加全部
-                return {
-                    "income": money.add(*[per_user[u]["income"] for u in users if u in earners]),
-                    "expense": money.add(*[per_user[u]["expense"] for u in users]),
-                    "count": count,
-                    "byCat": [{"cat": str(c), "amount": a}
-                              for c, a in sorted(by_cat.items(), key=lambda kv: kv[1], reverse=True)],
-                    "monthly": [{"m": m, **monthly[m]} for m in months],
-                    "yearly": [{"y": y, "partial": periods.is_incomplete_year(y), **yearly[y]} for y in years],
-                    "perUser": per_user,
-                }
-
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
         2. 瀏覽器打開 http://localhost:8000/docs，找到 GET /api/summary
@@ -356,25 +290,14 @@ def get_summary(
     # 1. 期間：台灣的這個月
     this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
 
-    # 2. 要算誰：me 只有自己；family 是我看得到全部紀錄的人。照看的孩子收入不算進家庭收入
-    scope = scope or "me"
-    if scope not in ("me", "family"):
-        raise errors.unprocessable("scope 只能是 me 或 family")
-    users, groups = visible_scope(me, db)
-    wards = set(crud.find(Guardianship, {"guardian_id": me.id, "ended_at__isnull": True}, fields="ward_id", db=db))
-    people = users if scope == "family" else {me.id}
-    kids = [u for u in people if u in wards]
-    earners = [u for u in people if u not in wards]
-
-    # 3. 只算某一本帳：要是我加入的
-    group_id = None
-    if groupId and groupId != "all":
-        group_id = int(groupId) if groupId.isdigit() else 0
-        if group_id not in groups:
-            raise errors.forbidden("你不在這本帳裡")
-
-    # 4. 加總（整個系統只有 analytics 加總錢）
-    nums = analytics.summary(db, people, earners, this_month, group_id)
+    # 2. 對象：個人、活動或全家庭；家庭子女收入另外列出。
+    from app.services.financial_context import resolve
+    context = resolve(db, me, scope, groupId)
+    scope = context["scope"]
+    people, earners = context["people"], context["earners"]
+    kids = people - set(earners)
+    group_id = context["group"].id if context["group"] else None
+    nums = analytics.summary(db, people, earners, this_month, group_id, context["personal_only"])
     per_user = nums["perUser"]
 
     # 5. 存款目標：選了帳本用那本帳的，沒選用整體的；每個人最新的一筆
@@ -386,11 +309,11 @@ def get_summary(
         goals[row.user_id] = row.goal_amount
     # 零用金：被照看的人沒記到的那部分，照家長的設定補進可支配上限（只在算自己的時候；
     #         全家模式裡那筆錢本來就是家長的收入，再加一次就重複了）
-    pocket = analytics.pocket_money(db, list(people), this_month)
-    mine_extra = pocket.get(me.id, money.ZERO) if people == {me.id} else money.ZERO
+    pocket = analytics.pocket_money(db, list(people), this_month, personal_only=True) if context["personal_only"] else {}
+    mine_extra = pocket.get(me.id, money.ZERO) if scope != "family" and people == {me.id} else money.ZERO
     # 預計收入：月底才領薪水、日薪、打工的人，還沒入帳前先照預計的算——收入用 max(已入帳, 預計)，入帳後不會重複算。
     #           選了帳本就不估：預計收入是整個人的，不屬於哪一本帳
-    expected = analytics.expected_income(db, list(people), this_month) if group_id is None or personal else {}
+    expected = analytics.expected_income(db, list(people), this_month, personal_only=True) if context["personal_only"] else {}
     pending = {u: analytics.pending_income(expected.get(u), per_user[u]["income"] + pocket.get(u, money.ZERO))
                for u in people}
     mine_pending = money.add(*[pending[u] for u in earners])

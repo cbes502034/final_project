@@ -297,6 +297,7 @@ MEMBERS: list[Member] = [
         routes=[
             ("GET", "/api/family"),
             ("POST", "/api/family"),
+            ("PATCH", "/api/family"),
             ("DELETE", "/api/family"),
             ("POST", "/api/family/invite"),
             ("POST", "/api/family/join"),

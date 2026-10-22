@@ -51,7 +51,7 @@ def test_get_family_看得到的人才有存款目標(api):
     r = api.get("/api/family", headers=login(dad))
     assert r.status_code == 200, r.text
     b = r.json()
-    assert (b["me"], b["myRole"], b["family"]) == (str(dad.id), "parent",
+    assert (b["me"], b["myRole"], {k: v for k, v in b["family"].items() if k != "goal"}) == (str(dad.id), "parent",
                                                     {"id": str(fam.id), "name": "王家", "createdBy": str(dad.id)})
     assert b["visible"] == [str(dad.id), str(mom.id), str(kid.id)]
     assert b["queryable"] == [str(dad.id), str(mom.id), str(kid.id), str(aunt.id)]

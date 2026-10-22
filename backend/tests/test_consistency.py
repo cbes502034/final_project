@@ -845,7 +845,7 @@ def test_月數列與年數列從明細算_選了帳本也對得起來():
     """
     api = read("frontend/js/api.js")
     body = re.search(r"summary: function \(f\) \{(.*?)\n    \},", api, re.S).group(1)
-    assert "function rowFor(prefix)" in body and "oneGroup && t.group !== f.groupId" in body
+    assert "function rowFor(prefix)" in body and "context.includes(t)" in body
     assert "mm.monthly" not in body and "D.monthly" not in body and "D.yearly" not in body, \
         "summary 又去讀固定的月／年數列了"
     assert "partial: y === thisYear" in body, "今年要標未完整"
@@ -1082,10 +1082,10 @@ def test_全家模式只整理資訊不能編輯():
 
 
 def test_子女只有我的模式():
-    """「我／全家」切換只給有監管對象的家長。"""
+    """「個人／家庭」切換給家庭中的家長，不要求先照看第二個人。"""
     app = read("frontend/js/app.js")
     body = re.search(r"function canFamily\(m\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "'parent'" in body and "visible" in body
+    assert "'parent'" in body and "familyId" in body
 
 
 def test_personal_merge_checks_the_author_before_moving_rows():
@@ -1609,8 +1609,8 @@ def test_個人建議只給本人_全家建議只給家長():
     """子女不會看到寫給家長的全家建議——那幾則會點名。"""
     api = read("frontend/js/api.js")
     body = re.search(r"    advices: function \(f\) \{(.*?)\n    \},", api, re.S).group(1)
-    assert "if (a.scope === 'family') return fam;" in body
-    assert "if (a.user === s.me) return !fam;" in body
+    assert "if (a.scope === 'family') return fam &&" in body
+    assert "return !fam && a.user === s.me;" in body
 
     D = _load_data()
     # 還沒加入家庭、也還沒有任何紀錄的人（示範用的林玉珍）沒有東西可以建議
@@ -2784,7 +2784,7 @@ def test_修改與多筆刪除_只有本人_結算過的不行_刪除是全有�
     assert out["goneAfterReload"] == [], "刪掉的示範紀錄重新整理又回來了：" + "、".join(out["goneAfterReload"])
     # T1045 640→700(+60)、T1046 980 支出→收入(−980)、T1047 搬帳本不影響、N1 +55、
     # T1048 1200 刪、N2 70 新增又刪、T1049 800 刪
-    assert out["exp1"] == out["exp0"] + 60 - 980 + 55 - 1200 - 800, "統計要跟著改和刪變動"
+    assert out["exp1"] == out["exp0"] == 0, "活動中的修改和刪除，不應提前影響個人帳本統計"
 
 
 def test_修改與多筆刪除_三層接口與文件都有():

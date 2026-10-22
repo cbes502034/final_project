@@ -40,7 +40,7 @@ def savings_status(income: Any, expense: Any, goal: Any) -> dict[str, Any]:
     }
 
 
-def expected_income(db: Any, users: list[int], period: str) -> dict[int, dict[str, Any]]:
+def expected_income(db: Any, users: list[int], period: str, personal_only: bool = False) -> dict[int, dict[str, Any]]:
     """每個人這個月的「預計收入」：{user_id: {"amount": Decimal, "basis": 怎麼來的, "months": 用了幾個月}}。不估的人不在裡面。
 
     為什麼要有：月底才領薪水、日薪、打工、接案的人，月初還沒有收入，「收入 − 每月想存」一開始就是負的，
@@ -70,8 +70,12 @@ def expected_income(db: Any, users: list[int], period: str) -> dict[int, dict[st
     if auto:
         months = periods.recent_months(periods.shift_month(period, -1), 3)        # 上個月往前 3 個月
         start, end = periods.month_range(months[0])[0], periods.month_range(months[-1])[1]
-        for t in crud.find(Transaction, {"is_snapshot": False, "user_id__in": auto, "kind__in": ["income", "expense"],
-                                         "occurred_on__between": (start, end)},
+        where = {"is_snapshot": False, "user_id__in": auto, "kind__in": ["income", "expense"],
+                 "occurred_on__between": (start, end)}
+        if personal_only:
+            from app.services.financial_context import personal_ids
+            where["group_id__in"] = personal_ids(db, auto)
+        for t in crud.find(Transaction, where,
                            fields=("user_id", "kind", "amount", "occurred_on"), db=db):
             seen.setdefault(t["user_id"], set()).add(t["occurred_on"].isoformat()[:7])
             if t["kind"] == "income":
@@ -106,7 +110,7 @@ def pending_income(expected: dict[str, Any] | None, counted: Any) -> Decimal:
     return max(money.ZERO, money.to_decimal(expected["amount"]) - money.to_decimal(counted or 0))
 
 
-def summary(db: Any, users: list[int], earners: list[int], period: str, group_id: int | None = None) -> dict[str, Any]:
+def summary(db: Any, users: list[int], earners: list[int], period: str, group_id: int | None = None, personal_only: bool = False) -> dict[str, Any]:
     '''GET /api/summary 的數字。users 是這次要算的人，earners 是收入要算進去的人（不含子女）。'''
     from datetime import date
 
@@ -125,6 +129,9 @@ def summary(db: Any, users: list[int], earners: list[int], period: str, group_id
         where["group_id"] = group_id
     else:
         where["is_snapshot"] = False
+        if personal_only:
+            from app.services.financial_context import personal_ids
+            where["group_id__in"] = personal_ids(db, users)
     rows = crud.find(Transaction, where, fields=("user_id", "category_id", "kind", "amount", "occurred_on"), db=db)
 
     # b. 一筆一筆分到桶子裡
@@ -160,7 +167,7 @@ def summary(db: Any, users: list[int], earners: list[int], period: str, group_id
     }
 
 
-def pocket_money(db: Any, users: list[int], period: str) -> dict[int, Any]:
+def pocket_money(db: Any, users: list[int], period: str, personal_only: bool = False) -> dict[int, Any]:
     """被照看的人這個月「還沒記到的零用金」：{user_id: 金額}。可支配上限要把它加進收入。
 
     孩子多半沒有薪水，家長在「零用金」設了 3,000，孩子卻不一定會自己記一筆「收入：零用金」。
@@ -190,8 +197,12 @@ def pocket_money(db: Any, users: list[int], period: str) -> dict[int, Any]:
     start, end = periods.month_range(period)
     recorded: dict[int, Any] = {}
     if cat_ids:
-        for t in crud.find(Transaction, {"is_snapshot": False, "user_id__in": list(setting), "kind": "income", "category_id__in": cat_ids,
-                                         "occurred_on__between": (start, end)}, fields=("user_id", "amount"), db=db):
+        where = {"is_snapshot": False, "user_id__in": list(setting), "kind": "income", "category_id__in": cat_ids,
+                 "occurred_on__between": (start, end)}
+        if personal_only:
+            from app.services.financial_context import personal_ids
+            where["group_id__in"] = personal_ids(db, users)
+        for t in crud.find(Transaction, where, fields=("user_id", "amount"), db=db):
             recorded[t["user_id"]] = recorded.get(t["user_id"], money.ZERO) + t["amount"]
     out = {}
     for u, amount in setting.items():

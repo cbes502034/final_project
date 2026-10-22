@@ -38,6 +38,7 @@ class Advice(Base):
     family_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("families.id"), nullable=True)
     # FK → users，NULL = 家庭層級建議
     user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    group_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("groups.id"), nullable=True)
     # 'month' / 'year'
     period_type: Mapped[str] = mapped_column(Text, nullable=False, default="month")
     period_key: Mapped[str] = mapped_column(Text, nullable=False)

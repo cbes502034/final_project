@@ -325,6 +325,8 @@ window.DATA = {
       cols: [['id', 'BIGSERIAL', 'PK'], ['name', 'TEXT', '例如「林家」'],
              ['created_by', 'BIGINT', 'FK → users，開這個家的人。⚠️ 僅供稽核，不給任何額外權限'],
              ['currency', 'TEXT', "預設 'TWD'"],
+             ['goal_amount', 'NUMERIC(14,2)', '長期共同存款目標，預設 0'],
+             ['goal_note', 'TEXT', '家庭目標內容，最多 300 字'],
              ['created_at', 'TIMESTAMPTZ', '']] },
 
     { t: 'family_members', label: '家庭成員與角色', note: '一個人同時只屬於一個家庭',
@@ -405,6 +407,7 @@ window.DATA = {
     { t: 'advices', label: 'LLM 財務建議', note: '使用者按「產生建議」時寫一列，附依據。同一個月、同一個範圍再產生會蓋掉舊的',
       cols: [['id', 'BIGSERIAL', 'PK'], ['family_id', 'BIGINT', 'FK → families'],
              ['user_id', 'BIGINT', 'FK → users，NULL = 家庭層級建議'],
+             ['group_id', 'BIGINT', 'FK → groups，NULL = 個人或家庭，活動建議分開保存'],
              ['period_type', 'TEXT', "'month' / 'year'"],
              ['period_key', 'TEXT', ''],
              ['level', 'TEXT', "'ok' / 'info' / 'warn'"],

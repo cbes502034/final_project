@@ -46,6 +46,7 @@ def list_transactions(
     userId: str | None = None,
     groupId: str | None = None,
     activityId: str | None = None,
+    scope: str | None = None,
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
     categoryId: str | None = None,
@@ -149,9 +150,11 @@ def list_transactions(
         8. 一筆一筆轉成前端要的樣子，回傳 transactions 與 total
         ⚠️ 這支只讀不寫，不用 db.commit()。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import date, datetime, timezone
 
             from fastapi import APIRouter, Depends, Query, Request
@@ -166,14 +169,13 @@ def list_transactions(
 
         第二步：套用以下函式內容
 
-            # 1. 不認得的查詢參數直接擋（默默忽略的話，篩選沒生效也看不出來）
-            allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page", "activityId"}
+            allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page", "activityId", "scope"}
             unknown = sorted(set(request.query_params) - allowed)
             if unknown:
                 raise errors.unprocessable("不認得的篩選參數：" + "、".join(unknown))
 
             from app.services.transaction_query import filters, annotate
-            where = filters(db, me, userId, groupId, from_, to, categoryId, kind, source, q, activityId)
+            where = filters(db, me, userId, groupId, from_, to, categoryId, kind, source, q, activityId, scope)
 
             # 6. 查一頁：新的在前，一頁 200 筆
             result = crud.find(Transaction, where, order_by=("-occurred_on", "-id"), page=page, size=200, db=db)
@@ -228,13 +230,13 @@ def list_transactions(
 
 
     # 1. 不認得的查詢參數直接擋（默默忽略的話，篩選沒生效也看不出來）
-    allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page", "activityId"}
+    allowed = {"userId", "groupId", "from", "to", "categoryId", "kind", "source", "q", "page", "activityId", "scope"}
     unknown = sorted(set(request.query_params) - allowed)
     if unknown:
         raise errors.unprocessable("不認得的篩選參數：" + "、".join(unknown))
 
     from app.services.transaction_query import filters, annotate
-    where = filters(db, me, userId, groupId, from_, to, categoryId, kind, source, q, activityId)
+    where = filters(db, me, userId, groupId, from_, to, categoryId, kind, source, q, activityId, scope)
 
     # 6. 查一頁：新的在前，一頁 200 筆
     result = crud.find(Transaction, where, order_by=("-occurred_on", "-id"), page=page, size=200, db=db)
@@ -367,9 +369,11 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
         ⚠️ 第 4、5 步的 crud.save 都帶 db=db：這樣它們不會各自存檔，要到第 6 步才一起寫進去。
            中間任何一步出錯，這一筆和通知都不會留下，不會出現「帳記了、通知沒發」的半套狀態。
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import date, datetime, timezone
 
             from fastapi import APIRouter, Depends, Query, Request
@@ -382,10 +386,8 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 檢查日期格式
             try:
                 occurred_on = date.fromisoformat(body.date)
             except ValueError:
@@ -477,17 +479,8 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
         6. 前端改成連你的後端（frontend/index.html 的 api-base），到記帳頁用「單筆手動」記一筆，收支明細要出現這一筆
         7. 自動檢查：在 backend/ 底下跑 pytest tests/routes -k "create_transaction and 你的"，要全部通過
     """
-    from datetime import date, datetime, timezone
 
-    from fastapi import APIRouter, Depends, Query, Request
-    from sqlalchemy.orm import Session
 
-    from app.guards import block_admin, current_user, own, visible_scope
-    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.transaction import TransactionIn, TransactionPatchIn
-    from app.toolkit import crud, errors, ledger, money, notify
-    from app.toolkit.db import get_db
 
     # 1. 檢查日期格式
     try:
@@ -665,9 +658,11 @@ def update_transaction(
         6. source 是 nlp：把改過的值合併進 nlp_parses.user_corrected
         7. db.commit()，回傳改完的那一筆
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import date, datetime, timezone
 
             from fastapi import APIRouter, Depends, Query, Request
@@ -680,10 +675,8 @@ def update_transaction(
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 整理要改的欄位：只拿有送來的，空的、格式不對的回 400
             try:
                 patch = ledger.clean_patch(body.model_dump(exclude_unset=True))
             except ValueError as exc:
@@ -789,17 +782,8 @@ def update_transaction(
     """
 
 
-    from datetime import date, datetime, timezone
 
-    from fastapi import APIRouter, Depends, Query, Request
-    from sqlalchemy.orm import Session
 
-    from app.guards import block_admin, current_user, own, visible_scope
-    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.transaction import TransactionIn, TransactionPatchIn
-    from app.toolkit import crud, errors, ledger, money, notify
-    from app.toolkit.db import get_db
 
 
     # 1. 整理要改的欄位：只拿有送來的，空的、格式不對的回 400
@@ -950,9 +934,11 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
         2. 刪掉指向這一筆的通知；解析紀錄的連結改成 NULL
         3. 刪這一筆，db.commit()，回傳 {"deleted": id}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import date, datetime, timezone
 
             from fastapi import APIRouter, Depends, Query, Request
@@ -965,10 +951,8 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 結算過的帳本裡的紀錄不能刪
             group = crud.get(Group, row.group_id, db=db)
             try:
                 ledger.require_editable(row.user_id, row.user_id, group.settled_at, row.is_snapshot)
@@ -1000,17 +984,8 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
-    from datetime import date, datetime, timezone
 
-    from fastapi import APIRouter, Depends, Query, Request
-    from sqlalchemy.orm import Session
 
-    from app.guards import block_admin, current_user, own, visible_scope
-    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.transaction import TransactionIn, TransactionPatchIn
-    from app.toolkit import crud, errors, ledger, money, notify
-    from app.toolkit.db import get_db
 
 
     # 1. 結算過的帳本裡的紀錄不能刪
@@ -1103,9 +1078,11 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
         4. 全部通過：刪通知、拿掉解析連結、刪明細，db.commit()
         5. 回傳 {"deleted": [...]}
 
-    【完整寫法】照下面兩步改，改完這支就做好了
-        第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
+    【完整寫法】
+        第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import date, datetime, timezone
 
             from fastapi import APIRouter, Depends, Query, Request
@@ -1118,10 +1095,8 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
-        第二步：刪掉上面的 @stub，再把 raise not_ready(...) 那一行換成下面這段。
-        裝飾器、函式名稱、參數和這段說明字串都不用動。
+        第二步：套用以下函式內容
 
-            # 1. 整理要刪的 id：去空白、去重複；空的或太多回 400
             try:
                 wanted = ledger.clean_ids(ids or "")
             except ValueError as exc:
@@ -1169,17 +1144,8 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
     """
 
 
-    from datetime import date, datetime, timezone
 
-    from fastapi import APIRouter, Depends, Query, Request
-    from sqlalchemy.orm import Session
 
-    from app.guards import block_admin, current_user, own, visible_scope
-    from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
-    from app.routers._stub import not_ready, stub
-    from app.schemas.transaction import TransactionIn, TransactionPatchIn
-    from app.toolkit import crud, errors, ledger, money, notify
-    from app.toolkit.db import get_db
 
 
 
@@ -1221,6 +1187,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
 @block_admin
 def transaction_archive(me: User, groupId: str | None = None, kind: str | None = None,
                         source: str | None = None, q: str | None = None, activityId: str | None = None,
+                        scope: str | None = None,
                         db: Session = Depends(get_db)):
     """收支明細的年月包裹
 
@@ -1247,6 +1214,8 @@ def transaction_archive(me: User, groupId: str | None = None, kind: str | None =
     【完整寫法】
         第一步：共用 import
 
+            # 這個檔案裡每一支做完之後會用到的 import 都已經放好了。
+            # 還沒做的那幾支看起來「沒用到」是正常的，不要刪。
             from datetime import date, datetime, timezone
 
             from fastapi import APIRouter, Depends, Query, Request
@@ -1264,7 +1233,7 @@ def transaction_archive(me: User, groupId: str | None = None, kind: str | None =
             from datetime import timedelta
             from sqlalchemy import select, extract, func
             from app.services.transaction_query import filters
-            where = filters(db, me, groupId=groupId, kind=kind, source=source, q=q, activityId=activityId)
+            where = filters(db, me, groupId=groupId, kind=kind, source=source, q=q, activityId=activityId, scope=scope)
             year, month = extract("year", Transaction.occurred_on), extract("month", Transaction.occurred_on)
             rows = db.execute(select(year.label("year"), month.label("month"), func.count().label("count"))
                               .where(crud.build_where(Transaction, where)).group_by(year, month).order_by(year.desc(), month.desc())).all()
@@ -1288,7 +1257,7 @@ def transaction_archive(me: User, groupId: str | None = None, kind: str | None =
     from datetime import timedelta
     from sqlalchemy import select, extract, func
     from app.services.transaction_query import filters
-    where = filters(db, me, groupId=groupId, kind=kind, source=source, q=q, activityId=activityId)
+    where = filters(db, me, groupId=groupId, kind=kind, source=source, q=q, activityId=activityId, scope=scope)
     year, month = extract("year", Transaction.occurred_on), extract("month", Transaction.occurred_on)
     rows = db.execute(select(year.label("year"), month.label("month"), func.count().label("count"))
                       .where(crud.build_where(Transaction, where)).group_by(year, month).order_by(year.desc(), month.desc())).all()
