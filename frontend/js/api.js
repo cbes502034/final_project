@@ -1573,20 +1573,22 @@
     },
 
     /* 每位成員只合併自己的明細；其餘成員繼續使用。 */
-    settleGroup: function (gid) {
+    settleGroup: function (gid, merge) {
       var s = load();
       return sleep(320).then(function () {
         var g = groupOf(gid);
         if (!g) throw oops('找不到這本帳', 404);
         if (memberIdsOf(gid).indexOf(s.me) < 0) throw oops('你不在這本帳裡', 403);
         if (g.personalOwner) throw oops('個人大帳本不能合併或退出', 400);
-        var personal = ensurePersonal(s.me), copies = [];
+        var personal = merge === false ? null : ensurePersonal(s.me), copies = [];
         s.txPatch = s.txPatch || {};
         s.transactions.forEach(function (t) {
           if (t.group !== gid || t.user !== s.me || t.snapshot) return;
-          var copied = Object.assign(clone(t), { id: 'Ncopy' + t.id, group: personal.id,
-            copiedFrom: t.id, originGroup: gid, snapshot: false });
-          copies.push(copied);
+          if (personal) {
+            var copied = Object.assign(clone(t), { id: 'Ncopy' + t.id, group: personal.id,
+              copiedFrom: t.id, originGroup: gid, snapshot: false });
+            copies.push(copied);
+          }
           t.snapshot = true;
           s.txPatch[t.id] = Object.assign({}, s.txPatch[t.id] || {}, { snapshot: true });
         });
@@ -1602,9 +1604,10 @@
           s.groupPatch[gid] = Object.assign({}, s.groupPatch[gid] || {}, { settledAt: null },
             g.owner === s.me ? { owner: remaining[0] } : {});
         }
-        pushAudit(s, 'merge_group', gid, '合併本人明細到個人大帳本');
+        pushAudit(s, personal ? 'merge_group' : 'leave_group', gid,
+          personal ? '合併本人明細到個人大帳本並退出' : '退出活動，不複製明細');
         save();
-        return { id: gid, personalGroupId: personal.id, copied: copies.length,
+        return { id: gid, personalGroupId: personal ? personal.id : null, copied: copies.length,
           closed: !remaining.length, settledAt: remaining.length ? null : at };
       });
     },
@@ -3404,7 +3407,7 @@
     respondActivityInvite: function (id, action) { return req('/api/group-invites/' + encodeURIComponent(id), { method: 'POST', body: { action: action } }); },
     groups:            function (f)     { return req('/api/groups' + qs(f)); },
     createGroup:       function (p)     { return req('/api/groups', { method: 'POST', body: p }); },
-    settleGroup:       function (g)     { return req('/api/groups/' + g + '/settle', { method: 'POST' }); },
+    settleGroup:       function (g, merge) { return req('/api/groups/' + g + '/settle' + (merge === false ? '?merge=false' : ''), { method: 'POST' }); },
     setGroupNotify:    function (g, on) { return req('/api/groups/' + g + '/notify', { method: 'PATCH', body: { notify: !!on } }); },
     updateGroup:       function (g, p)  { return req('/api/groups/' + encodeURIComponent(g), { method: 'PATCH', body: p }); },
     archiveGroup:      function (g)     { return req('/api/groups/' + encodeURIComponent(g), { method: 'DELETE' }); },

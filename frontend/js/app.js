@@ -810,7 +810,7 @@
         (PICK.on ? '' : can
           ? '<button class="txr__ed" data-edit="' + esc(t.id) + '">修改</button>' +
             '<button class="del" data-del="' + esc(t.id) + '">刪除</button>'
-          : (isMine(t) ? '<span class="txr__lock" title="合併前的歷史或已結算紀錄不能修改，請到個人帳本修改副本">' + (t.snapshot ? '合併前紀錄' : '已結算') + '</span>' : '')) +
+          : (isMine(t) ? '<span class="txr__lock" title="退出前的活動歷史或已結算紀錄不能修改">' + (t.snapshot ? '退出前紀錄' : '已結算') + '</span>' : '')) +
       '</td></tr>';
   }
 
@@ -2231,7 +2231,7 @@
 
      跟財務建議同一個做法——一個活動平常只佔一行：
        顏色 · 名稱 · 狀態 · 成員 · 筆數
-     點開才出現成員、月目標、通知、結算／封存。
+     點開才出現成員、月目標、通知與退出。
 
      ⚠️ 原本一個活動就是一張 150px 高的卡：月目標輸入框、三顆按鈕、
      通知勾選全部攤開，三本帳就佔掉一整個螢幕，而且那些東西
@@ -2389,10 +2389,7 @@
         '<button class="btn btn--sm" data-gview="' + esc(g.id) + '">查看活動的 ' + g.count + ' 筆紀錄 →</button>' +
         '<span class="lg__sp"></span>' +
         (!g.personal && !g.settled
-          ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">複製到個人帳本並退出</button>' : '') +
-        (g.canEdit
-          ? '<button class="gx" data-garch="' + esc(g.id) +
-            '" title="收起這個活動。紀錄不會被刪掉，之後可以復原">封存</button>' : '') +
+          ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">退出</button>' : '') +
         /* 結算過的活動才能移除：活動不見、紀錄留在各自的個人帳本裡 */
         (g.canEdit && g.settled
           ? '<button class="gx gx--warn" data-gremove="' + esc(g.id) + '|' + esc(g.name) +
@@ -2473,8 +2470,8 @@
          '<p>右上角切換活動之後，數字都只看那一本。</p>'
     },
     archive: {
-      t: '封存',
-      b: '<p>把用不到的活動收起來。<b>紀錄一筆都不會刪</b>，隨時可以復原。</p>'
+      t: '舊封存活動',
+      b: '<p>這裡保留以前封存的活動。<b>紀錄一筆都不會刪</b>，可以復原後繼續使用；現在的活動請從「退出」選擇是否合併明細。</p>'
     },
     alerts: {
       t: '花到幾成提醒我',
@@ -2575,6 +2572,8 @@
      ============================================================ */
   var dangerOn = false;
   var dangerFn = null;
+  var dangerAlt = null;
+  var dangerBusy = false;
   var dangerOk = '';
   var REASON_MIN = 4;           // 跟後端 toolkit/roles.py 的 SUSPEND_REASON_MIN 一樣
   var dangerCode = '';
@@ -2592,6 +2591,7 @@
     if (dangerOn) return;
     dangerOn = true;
     dangerFn = opt.onOk;
+    dangerAlt = opt.secondary || null;
     dangerOk = opt.ok || '確定刪除';
     dangerCode = opt.level === 'full' ? randomCode() : '';
 
@@ -2622,6 +2622,7 @@
         '</div>' +
         '<div class="hp__d">' +
           '<button class="btn" id="dgNo">取消</button>' +
+          (dangerAlt ? '<button class="btn" id="dgAlt">' + esc(dangerAlt.label) + '</button>' : '') +
           '<button class="btn btn--danger" id="dgYes">' + esc(opt.ok || '確定刪除') + '</button>' +
         '</div>' +
       '</div></div>');
@@ -2634,10 +2635,12 @@
   }
 
   function dangerClose() {
+    if (dangerBusy) return;
     var w = document.getElementById('dg');
     if (!w) return;
     dangerOn = false;
     dangerFn = null;
+    dangerAlt = null;
     w.classList.remove('on');
     document.body.classList.remove('hp-on');
     setTimeout(function () { w.remove(); }, 200);
@@ -2652,7 +2655,9 @@
     if (c) { c.style.animation = 'nudge .3s'; setTimeout(function () { c.style.animation = ''; }, 320); }
   }
 
-  function dangerGo() {
+  function dangerGo(alternate) {
+    if (dangerBusy) return;
+    var fn = alternate && dangerAlt ? dangerAlt.onOk : dangerFn;
     /* 照畫面上的順序檢查：先理由、再密碼，錯在哪一格就跳到哪一格 */
     var reasonEl = document.getElementById('dgReason');
     var reason = reasonEl ? reasonEl.value.trim() : null;
@@ -2672,16 +2677,21 @@
       if (typed !== dangerCode) { dangerErr('那段代碼跟上面不一樣'); return; }
     }
 
-    var btn = document.getElementById('dgYes');
+    var btn = document.getElementById(alternate ? 'dgAlt' : 'dgYes');
+    var buttons = document.querySelectorAll('#dgYes, #dgAlt');
+    dangerBusy = true;
+    buttons.forEach(function (b) { b.disabled = true; });
     if (btn) { btn.disabled = true; btn.textContent = '確認中…'; }
 
     API.verifyPassword(pw).then(function () {
-      var fn = dangerFn;
+      dangerBusy = false;
       dangerClose();
       /* 密碼也交給動作本身：救不回來的（刪除帳號）後端會自己再核對一次，不只靠這裡 */
       if (fn) fn(reason, pw);
     }).catch(function (err) {
-      if (btn) { btn.disabled = false; btn.textContent = dangerOk; }
+      dangerBusy = false;
+      buttons.forEach(function (b) { b.disabled = false; });
+      if (btn) btn.textContent = alternate && dangerAlt ? dangerAlt.label : dangerOk;
       dangerErr(err.message || '密碼不正確');
       if (pwEl) { pwEl.value = ''; pwEl.focus(); }
     });
@@ -4164,6 +4174,7 @@
     /* 確認視窗開著的時候，底下什麼都不能點 */
     if (dangerOn) {
       if (t.closest('#dgYes')) dangerGo();
+      else if (t.closest('#dgAlt')) dangerGo(true);
       else if (t.closest('#dgX') || t.closest('#dgNo') || !t.closest('.hp__c')) dangerClose();
       e.preventDefault();
       e.stopPropagation();
@@ -4601,11 +4612,21 @@
     if (gset) {
       var gid = gset.dataset.gsettle;
       danger({
-        title: '複製到個人帳本並退出',
-        detail: '只把<b>你自己記的明細</b>複製到個人帳本，原活動會保留合併前的紀錄，並退出這個活動。' +
-                '<br>其他成員仍可繼續使用；如果你是開帳者，會移交管理權。最後一位成員退出時，才會關閉活動。',
+        title: '退出',
+        detail: '<b>退出：</b>只退出這個活動，不將明細複製到個人帳本。' +
+                '<br><b>合併並退出：</b>只把你自己記的明細複製到個人帳本，再退出這個活動。' +
+                '<br>兩種方式都會保留原活動的明細，其他成員仍可繼續查看與使用。' +
+                '如果你是活動建立者，會移交管理權；最後一位成員退出時，才會關閉活動。',
         level: 'password',
-        ok: '確定合併',
+        ok: '合併並退出',
+        secondary: { label: '退出', onOk: function () {
+          API.settleGroup(gid, false).then(function () {
+            if (GROUP === gid) setGroup('all');
+            LG.open = null;
+            paintGroups(); vGroups();
+            toast('已退出活動，原活動明細保留，未複製到個人帳本', 'ok');
+          }).catch(function (err) { toast(err.message || '退出失敗', 'err'); });
+        } },
         onOk: function () {
           API.settleGroup(gid).then(function (r) {
             setGroup(r.personalGroupId);
@@ -4710,31 +4731,6 @@
       location.hash = '#/entry/' + encodeURIComponent(gview.dataset.gview);
       return;
     }
-    var garch = t.closest('[data-garch]');
-    if (garch) {
-      /* 兩段式：第一下先問，第二下才真的做。
-         ⚠️ 封存會讓該活動從切換器和統計裡消失，看起來跟刪除一樣——
-         使用者按下去之前必須知道會發生什麼。 */
-      if (garch.dataset.sure !== '1') {
-        garch.dataset.sure = '1';
-        garch.textContent = '確定封存？';
-        garch.classList.add('gx--sure');
-        setTimeout(function () {
-          if (!garch.isConnected) return;
-          garch.dataset.sure = '0';
-          garch.textContent = '封存';
-          garch.classList.remove('gx--sure');
-        }, 4000);
-        return;
-      }
-      API.archiveGroup(garch.dataset.garch).then(function () {
-        if (GROUP === garch.dataset.garch) setGroup('all');
-        paintGroups(); vGroups();
-        toast('已封存。紀錄一筆都沒刪，在下面「已封存」可以復原', 'ok');
-      }).catch(function (err) { toast(err.message || '封存失敗', 'err'); });
-      return;
-    }
-
     var grest = t.closest('[data-grestore]');
     if (grest) {
       API.updateGroup(grest.dataset.grestore, { archived: false }).then(function (g) {

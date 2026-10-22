@@ -1124,19 +1124,21 @@ def remove_group_member(user_id: str, group=Depends(in_group("gid", owner=True))
     # raise not_ready("DELETE /api/groups/{gid}/members/{user_id}", OWNER)
 
 
-@router.post("/groups/{gid}/settle", summary="把自己的明細合併到個人大帳本")
-def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user),
+@router.post("/groups/{gid}/settle", summary="退出活動，可選擇合併本人明細")
+def settle_group(merge: bool = True, group=Depends(in_group("gid")), me: User = Depends(current_user),
                  db: Session = Depends(get_db)):
-    """把自己的明細合併到個人大帳本
+    """退出活動，可選擇合併本人明細
 
     POST /api/groups/{gid}/settle
 
     【這支做什麼】
-        每位成員都能操作，只複製本人明細到個人大帳本並退出；原紀錄保留在原帳本作為唯讀歷史。
+        每位成員都能操作。預設複製本人明細到個人大帳本並退出；merge=false 僅退出、不建立副本。
+        兩種方式都將原紀錄保留在原活動作為唯讀歷史。
         其他成員繼續使用原帳本，建立者退出時移交管理權。最後一位退出才關閉。
 
     【前端怎麼打】
-        API.settleGroup(gid)，帳本頁的「合併到我的帳本」。
+        API.settleGroup(gid) 合併並退出；API.settleGroup(gid, false) 僅退出。
+        活動管理「退出」視窗選擇對應操作。
 
     【誰能打】
         登入、未停權且仍在帳本中的成員；一般及活動帳本都適用。
@@ -1144,9 +1146,13 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
     【路徑參數】
         gid：要合併的帳本 id。
 
+    【查詢參數】
+        merge：布林值，預設 true；false 表示僅退出，不建立個人帳本或複製明細。
+
     【成功回應】
         {"id": "1", "personalGroupId": "2", "copied": 2, "closed": false, "settledAt": null}
         settledAt 僅在最後一位成員退出、帳本關閉時有時間。
+        僅退出時 personalGroupId=null、copied=0。
 
     【錯誤回應】
         400 個人大帳本不能合併或退出；403 你不在這本帳裡；404 找不到這本帳。
@@ -1181,7 +1187,7 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
         第二步：呼叫共用的合併服務，成功後一次提交
 
             from app.services.personal_ledger import merge_personal
-            result = merge_personal(db, group, me)
+            result = merge_personal(db, group, me, copy_entries=merge)
             db.commit()
             return result
 
@@ -1189,7 +1195,7 @@ def settle_group(group=Depends(in_group("gid")), me: User = Depends(current_user
         成員合併後可在個人大帳本找到副本，原帳本仍保留他的合併前紀錄，其他成員繼續使用。
     """
     from app.services.personal_ledger import merge_personal
-    result = merge_personal(db, group, me)
+    result = merge_personal(db, group, me, copy_entries=merge)
     db.commit()
     return result
 

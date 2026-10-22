@@ -21,7 +21,7 @@ def ensure_personal(db, user):
     return personal
 
 
-def merge_personal(db, group, me):
+def merge_personal(db, group, me, *, copy_entries=True):
     # 先鎖原帳本，再重新檢查成員資格，避免重複提交或兩位成員同時退出。
     group = db.execute(select(Group).where(Group.id == group.id).with_for_update()
                        .execution_options(populate_existing=True)).scalar_one()
@@ -32,14 +32,18 @@ def merge_personal(db, group, me):
     if group.personal_owner_id is not None:
         raise errors.bad_request("個人大帳本不能合併或退出")
 
-    personal = ensure_personal(db, me)
+    personal = ensure_personal(db, me) if copy_entries else None
     originals = crud.find(Transaction, {
         "group_id": group.id, "user_id": me.id, "is_snapshot": False,
     }, order_by="id", db=db)
     copies = []
     for original in originals:
-        copied = copy_to_personal(db, original, personal.id)
-        copies.append({"originalId": str(original.id), "copyId": str(copied.id)})
+        if copy_entries:
+            copied = copy_to_personal(db, original, personal.id)
+            copies.append({"originalId": str(original.id), "copyId": str(copied.id)})
+        else:
+            # 離開後保留當時的活動歷史，不建立個人副本。
+            crud.save(Transaction, {"id": original.id, "is_snapshot": True}, db=db)
     crud.remove(GroupMember, {"group_id": group.id, "user_id": me.id}, db=db)
     remaining = crud.find(GroupMember, {"group_id": group.id},
                           order_by=("joined_at", "user_id"), db=db)
@@ -53,11 +57,11 @@ def merge_personal(db, group, me):
     else:
         crud.save(Group, {"id": group.id, "settled_at": now, "removed_at": now}, db=db)
     crud.save(AuditLog, {
-        "actor_id": me.id, "action": "merge_group", "target_type": "group", "target_id": group.id,
-        "meta_json": {"personalGroupId": str(personal.id), "copied": len(copies),
+        "actor_id": me.id, "action": "merge_group" if copy_entries else "leave_group", "target_type": "group", "target_id": group.id,
+        "meta_json": {"personalGroupId": str(personal.id) if personal else None, "copied": len(copies),
                       "copies": copies, "closed": not remaining},
     }, db=db)
-    return {"id": str(group.id), "personalGroupId": str(personal.id), "copied": len(copies),
+    return {"id": str(group.id), "personalGroupId": str(personal.id) if personal else None, "copied": len(copies),
             "closed": not remaining, "settledAt": now.isoformat() if not remaining else None}
 
 

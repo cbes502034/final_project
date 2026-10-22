@@ -17,7 +17,7 @@ async function checkUI() {
     { id: 'closed', name: '已結算', settled: true }];
   const ui = Object.assign(harness.context, { HEADER: harness.header, API: { groups: async () => ({ groups: books }) },
     GROUP: 'all', isFamily: () => false, esc: String, tint: String, money: String, pushForDrawer() {},
-    setGroup(id) { ui.GROUP = id; }, LG: { fam: { members: [] } } });
+    setGroup(id) { ui.GROUP = id; }, LG: { fam: { members: [] } }, activityInvitePanel: () => '' });
   ui.TXGROUPS = [];
   vm.runInContext(extract('paintGroups') + '\n' + extract('ledgerBody') + '\n' + extract('txLocked'), ui);
   assert.equal(ui.txLocked({ snapshot: true, group: 'shared' }), true);
@@ -36,6 +36,9 @@ async function checkUI() {
   const html = ui.ledgerBody({ id: 'shared', members: [], count: 2, canEdit: false });
   assert.ok(html.includes('data-gsettle="shared"')); // Non-owners can merge.
   assert.ok(html.includes('data-gview="shared"'));
+  assert.ok(html.includes('>退出</button>'));
+  const ownerHTML = ui.ledgerBody({ id: 'shared', members: [], count: 2, canEdit: true });
+  assert.ok(!ownerHTML.includes('data-garch='));
   assert.ok(!ui.ledgerBody({ id: 'personal', personal: true, members: [], count: 0 }).includes('data-gsettle='));
 }
 async function checkMock() {
@@ -58,6 +61,24 @@ async function checkMock() {
     return c;
   }
   let c = open();
+  // Leaving alone must not create copies, including after a reload.
+  const initial = storage['fambudget.state.v2'];
+  const left = await c.API.settleGroup('G1', false);
+  assert.equal(left.copied, 0);
+  assert.equal(left.personalGroupId, null);
+  let leaveSaved = JSON.parse(storage['fambudget.state.v2']);
+  assert.equal((leaveSaved.extra || []).length, 0);
+  assert.equal(leaveSaved.txPatch.T1.snapshot, true);
+  assert.equal(leaveSaved.groupPatch.G1.owner, 'U2');
+  leaveSaved.me = 'U2'; storage['fambudget.state.v2'] = JSON.stringify(leaveSaved);
+  c = open();
+  assert.equal((await c.API.transactions({ groupId: 'G1' })).transactions.length, 2);
+  const leaveLast = await c.API.settleGroup('G1', false);
+  assert.equal(leaveLast.closed, true);
+  assert.equal(leaveLast.copied, 0);
+  assert.ok(!(await c.API.groups()).groups.some(g => g.id === 'G1'));
+  storage['fambudget.state.v2'] = initial;
+  c = open();
   assert.equal((await c.API.summary({ scope: 'me' })).expense, 0);
   assert.equal((await c.API.summary({ scope: 'me', groupId: 'G1' })).expense, 30);
   const merged = await c.API.settleGroup('G1');

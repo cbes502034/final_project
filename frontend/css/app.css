@@ -2019,6 +2019,16 @@ input[type="password"], input[type="search"], select, textarea {
   padding: 8px 12px; background: var(--down-wash); border-left: 3px solid var(--down);
 }
 .dg .hp__d { justify-content: flex-end; gap: 10px; }
+.dg .hp__c:has(#dgAlt) { display: flex; flex-direction: column; overflow: hidden; }
+.dg .hp__c:has(#dgAlt) .hp__b { min-height: 0; overflow-y: auto; }
+.dg .hp__c:has(#dgAlt) .hp__h,
+.dg .hp__d:has(#dgAlt) { flex-shrink: 0; }
+.dg .hp__d:has(#dgAlt) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dg .hp__d:has(#dgAlt) .btn { min-width: 0; padding-inline: 8px; }
+@media (max-width: 380px) {
+  .dg .hp__d:has(#dgAlt) { padding-inline: 12px; }
+  .dg .hp__d:has(#dgAlt) .btn { padding-inline: 4px; }
+}
 .btn--danger {
   background: var(--down); border-color: var(--down); color: var(--card);
 }

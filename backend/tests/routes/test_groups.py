@@ -252,6 +252,53 @@ SETTLE = ("POST", "/api/groups/{gid}/settle")
 
 
 @pytest.mark.route(*SETTLE)
+@pytest.mark.parametrize("owner_leaves", [True, False])
+@pytest.mark.parametrize("last_merges", [True, False])
+def test_leave_without_copy_preserves_history_and_remaining_members(api, owner_leaves, last_merges):
+    owner, member, stranger = user("o@x.tw", "開立者"), user("m@x.tw", "朋友"), user("s@x.tw", "路人")
+    leaving, staying = (owner, member) if owner_leaves else (member, owner)
+    g = ledger_of(owner, member)
+    cat = categories()["餐飲"]
+    own, theirs = spend(leaving, g, cat, 15), spend(staying, g, cat, 20)
+    url = f"/api/groups/{g.id}/settle?merge=false"
+    assert api.post(url).status_code == 401
+    assert api.post(url, headers=login(stranger)).status_code == 403
+    assert api.post(f"/api/groups/{g.id}/settle?merge=invalid", headers=login(leaving)).status_code == 422
+    r = api.post(url, headers=login(leaving))
+    assert r.status_code == 200, r.text
+    assert r.json() == {"id": str(g.id), "personalGroupId": None, "copied": 0,
+                        "closed": False, "settledAt": None}
+    assert crud.count(Transaction) == 2
+    assert not crud.exists(Group, {"personal_owner_id": leaving.id})
+    assert not crud.exists(Transaction, {"copied_from_id": own.id})
+    assert crud.get(Transaction, own.id).is_snapshot
+    assert crud.get(Transaction, own.id).group_id == g.id
+    assert crud.get(Group, g.id).created_by == staying.id
+    assert not crud.get(Group, g.id).removed_at
+    assert not crud.exists(GroupMember, {"group_id": g.id, "user_id": leaving.id})
+    log = crud.get(AuditLog, where={"action": "leave_group", "actor_id": leaving.id})
+    assert log.meta_json["copied"] == 0 and log.meta_json["personalGroupId"] is None
+    assert api.post(url, headers=login(leaving)).status_code == 403
+    rows = api.get(f"/api/transactions?groupId={g.id}", headers=login(staying)).json()["transactions"]
+    assert {t["id"] for t in rows} == {str(own.id), str(theirs.id)}
+    assert api.patch(f"/api/groups/{g.id}", headers=login(staying), json={"name": "繼續使用"}).status_code == 200
+    added = api.post("/api/transactions", headers=login(staying), json={
+        "date": now().date().isoformat(), "amount": 30, "kind": "expense", "cat": str(cat.id), "groupId": str(g.id)})
+    assert added.status_code == 201, added.text
+    last = api.post(f"/api/groups/{g.id}/settle?merge={'true' if last_merges else 'false'}", headers=login(staying))
+    assert last.status_code == 200 and last.json()["closed"]
+    assert last.json()["copied"] == (2 if last_merges else 0)
+    assert crud.count(Transaction) == (5 if last_merges else 3)
+    assert crud.count(Transaction, {"group_id": g.id}) == 3
+    assert crud.get(Group, g.id).settled_at and crud.get(Group, g.id).removed_at
+    assert not crud.exists(GroupMember, {"group_id": g.id})
+    assert not any(item["id"] == str(g.id) for item in api.get("/api/groups", headers=login(staying)).json()["groups"])
+    assert api.post(url, headers=login(staying)).status_code == 404
+    if last_merges:
+        assert api.post(f"/api/groups/{last.json()['personalGroupId']}/settle?merge=false", headers=login(staying)).status_code == 400
+
+
+@pytest.mark.route(*SETTLE)
 def test_settle_group_copies_the_callers_rows_and_keeps_shared_history(api):
     me, mom, stranger = user("d@x.tw", "爸爸"), user("m@x.tw", "媽媽"), user("s@x.tw", "路人")
     cats = categories()
