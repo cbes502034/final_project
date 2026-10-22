@@ -10,14 +10,14 @@ function extract(name) {
   return app.slice(start, app.indexOf('\n  }', start) + '\n  }'.length);
 }
 async function checkUI() {
-  const box = {};
+  const harness = require('./page_header.js').createHarness(repo);
+  const box = harness.nodes.gsw;
   const books = [{ id: 'other', name: '旅遊', count: 2 },
     { id: 'personal', name: '自己的帳本', count: 1, personal: true },
     { id: 'closed', name: '已結算', settled: true }];
-  const ui = { document: { getElementById: () => box }, API: { groups: async () => ({ groups: books }) },
+  const ui = Object.assign(harness.context, { HEADER: harness.header, API: { groups: async () => ({ groups: books }) },
     GROUP: 'all', isFamily: () => false, esc: String, tint: String, money: String, pushForDrawer() {},
-    setGroup(id) { ui.GROUP = id; }, LG: { fam: { members: [] } } };
-  vm.createContext(ui);
+    setGroup(id) { ui.GROUP = id; }, LG: { fam: { members: [] } } });
   ui.TXGROUPS = [];
   vm.runInContext(extract('paintGroups') + '\n' + extract('ledgerBody') + '\n' + extract('txLocked'), ui);
   assert.equal(ui.txLocked({ snapshot: true, group: 'shared' }), true);

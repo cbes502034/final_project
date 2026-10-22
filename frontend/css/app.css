@@ -1517,24 +1517,6 @@ input[type="password"], input[type="search"], select, textarea {
 /* 未讀數字改成掛在圖示右上 */
 .bell__n { top: 11px; right: 11px; }
 
-/* 搜尋抽屜 */
-#searchDrawer {
-  position: absolute; top: 100%; left: 0; right: 0;
-  display: flex; align-items: center; gap: 10px;
-  padding: 18px 28px; background: var(--card);
-  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line-2);
-  box-shadow: 0 14px 28px color-mix(in srgb, var(--shade) 9%, transparent);
-  animation: drawer .26s var(--out) both;
-  min-width: 0;
-}
-#searchDrawer .search__ic { width: 18px; height: 18px; color: var(--ink-dim); flex: 0 0 18px; }
-#searchDrawer input {
-  flex: 1 1 auto; border: 0; background: transparent; font-size: 16px;
-  color: var(--ink); padding: 0;
-}
-#searchDrawer input:focus { outline: none; box-shadow: none !important; }
-#searchDrawer input::placeholder { color: var(--ink-dim); }
-
 /* 頂欄的標題不要被擠掉 */
 
 
@@ -2504,131 +2486,7 @@ body.is-admin .bell__wrap { display: none; }
    標題在左，右邊是「我｜全家」、帳本、搜尋、通知，全部同一行。
    ⚠️ 原本工具在另一條獨立的頂列上，兩個橫幅疊在一起，中間空一大塊。
    ============================================================ */
-.phead {
-  max-width: var(--page-w); margin: 0 auto;
-  padding: 26px var(--page-x) 6px;
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap;
-}
-/* margin-right: auto ＝ 讓標題那一塊吃掉中間的空白，右邊的工具才會貼到底。
-   ⚠️ 不能只靠 .phead 的 space-between：總覽多了頭貼之後變成三格，
-      space-between 會把標題推到正中間，跟頭貼中間裂出一條縫。 */
-.phead__m { min-width: 0; margin-right: auto; }
-/* 總覽的問候區：頭貼 ＋「嗨，名字」＋ 哪個家庭的誰。
-   頭貼不參與伸縮（flex: 0 0 auto），名字再長也不會把它壓扁。 */
-.phead__av { flex: 0 0 auto; display: block; align-self: center; }
-.phead__av[hidden] { display: none; }
-/* 這一顆要看得出是「你」，所以用主色實心，不是清單裡那種淡的。
-   有上傳頭貼的話 .ava--img 會蓋掉背景，只留下圓角與外框。 */
-.phead__av .ava {
-  width: 52px; height: 52px; font-size: 20px;
-  background: var(--accent); border-color: var(--accent);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 24%, transparent);
-}
-@media (max-width: 560px) {
-  .phead__av .ava { width: 44px; height: 44px; font-size: 17px; }
-}
-.phead__k { font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--accent); margin-bottom: 6px; }
-.phead__k:empty { display: none; }
-.phead__t {
-  font-family: var(--serif); font-size: var(--h1); font-weight: 700;
-  line-height: 1.2; letter-spacing: .01em; color: var(--ink);
-}
-.phead__s { margin-top: 8px; font-size: 14px; color: var(--ink-faint); }
-.phead__r { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.phead__a { display: flex; align-items: center; gap: 10px; }
-.phead__tools { display: flex; align-items: center; gap: 8px; }
-body.is-out .phead { display: none; }
-
-/* ---------- 三個工具：同一個高度、同一種外框 ---------- */
-.phead__tools .gsw,
-.phead__tools .bell__wrap { position: relative; flex: 0 0 auto; border: 0; }
-.phead__tools .gsw[hidden], .phead__tools .bell__wrap[hidden] { display: none; }
-
-.phead__tools .gsw__b {
-  display: inline-flex; align-items: center; gap: 8px;
-  width: auto; height: var(--ctl); padding: 0 12px;
-  background: var(--card); border: 1px solid var(--line-2); color: var(--ink);
-  font-size: 13.5px; font-weight: 600; box-shadow: none;
-}
-.phead__tools .gsw__b:hover { background: var(--card); border-color: var(--accent-line); color: var(--ink); }
-.phead__tools .gsw__b.open { border-color: var(--accent); background: var(--card); color: var(--ink); }
-.phead__tools .gsw__ic, .phead__tools .ic__d { display: none; }
-.phead__tools .gsw__b .gsw__d { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; }
-.phead__tools .gsw__n { display: inline; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
-.phead__tools .gsw__cv { display: block; width: 14px; height: 14px; opacity: .55; transition: transform .2s var(--ease); }
-.phead__tools .gsw__b.open .gsw__cv { transform: rotate(180deg); }
-
-.phead__tools #searchBtn,
-.phead__tools .bell {
-  position: relative; display: grid; place-items: center;
-  width: var(--ctl); height: var(--ctl); padding: 0; align-self: center;
-  background: var(--card); border: 1px solid var(--line-2); color: var(--ink-soft); box-shadow: none;
-}
-.phead__tools #searchBtn svg, .phead__tools .bell svg { width: 18px; height: 18px; }
-.phead__tools #searchBtn:hover, .phead__tools .bell:hover { border-color: var(--accent-line); color: var(--ink); background: var(--card); }
-.phead__tools .bell.open, .phead__tools #searchBtn.open { border-color: var(--accent); color: var(--accent); }
-.phead__tools .bell__n {
-  position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px;
-  display: grid; place-items: center; font-size: 10.5px; font-weight: 700; line-height: 1;
-  background: var(--badge); color: var(--badge-ink); border: 2px solid var(--paper);
-}
-.phead__tools .bell__n[hidden] { display: none; }
-
-/* 電腦版：搜尋是一直都在的輸入框，不需要那顆圖示 */
-.phead__tools #searchBtn { display: none; }
-.phead__tools #searchDrawer {
-  position: relative; display: flex; align-items: center; align-self: center;
-  width: 230px; min-width: 0; max-width: none; height: var(--ctl); margin: 0; padding: 0 12px 0 34px;
-  background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239DA2A9' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px 50% / 15px 15px;
-  border: 1px solid var(--line-2); box-shadow: none; animation: none;
-}
-.phead__tools #searchDrawer:focus-within { border-color: var(--accent); }
-.phead__tools #searchDrawer input {
-  width: 100%; height: 100%; padding: 0; border: 0; background: transparent;
-  font-size: 13.5px; color: var(--ink);
-}
-.phead__tools #searchDrawer input:focus { outline: none; }
-
-/* ---------- 下拉面板：從按鈕正下方浮出來，不推動任何內容 ---------- */
-/* 對齊按鈕右緣往左展開，所以不會蓋到同一行右邊的按鈕；
-   項目太多就在面板裡自己捲（max-height ＋ overflow），頁面不會被撐長。 */
-.phead__tools .gsw__p,
-.phead__tools .bell__panel {
-  position: absolute; top: calc(100% + 8px); right: 0; left: auto; z-index: 65;
-  display: block; width: 320px; max-height: min(64vh, 460px); overflow-y: auto; overscroll-behavior: contain;
-  margin: 0; padding: 6px 0;
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-panel);
-  box-shadow: var(--shadow-pop); animation: popIn .18s var(--out) both;
-}
-.phead__tools .gsw__p[hidden], .phead__tools .bell__panel[hidden] { display: none; }
-.phead__tools .bell__panel { width: 380px; padding: 0; }
-
-.phead__tools .gsw__i {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-  padding: 10px 16px; margin: 0; border: 0; background: transparent; text-align: left; box-shadow: none;
-}
-.phead__tools .gsw__i:hover { background: var(--card-2); padding-left: 16px; }
-.phead__tools .gsw__i.on { background: var(--accent-wash); }
-.phead__tools .gsw__i .gsw__d { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; }
-.phead__tools .gsw__m { display: flex; flex-direction: column; min-width: 0; line-height: 1.4; }
-.phead__tools .gsw__m b { font-size: 14px; font-weight: 600; color: var(--ink); }
-.phead__tools .gsw__m i { font-style: normal; font-size: 12px; color: var(--ink-faint); }
-.phead__tools .gsw__more {
-  display: block; margin-top: 4px; padding: 10px 16px; border-top: 1px solid var(--line);
-  font-size: 13px; font-weight: 700; color: var(--accent);
-}
-
-.phead__tools .bell__h {
-  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--line);
-}
-.phead__tools .bell__t { margin-right: auto; font-family: var(--sans); font-size: 14px; font-weight: 700; }
-.phead__tools .bell__list { max-height: none; overflow: visible; }
-.phead__tools .bell__i { padding: 12px 16px; }
-.phead__tools .bell__i:hover { padding-left: 16px; background: var(--card-2); }
-.phead__tools .bell__empty { padding: 28px 16px; }
-
-/* 面板開著時不要把內容壓暗、也不要擋住操作 */
+/* 頁面橫幅已抽到 css/page-header.css。 */
 body.dw-on #view { opacity: 1; pointer-events: auto; }
 
 /* ============================================================
@@ -2873,8 +2731,6 @@ body.is-out .foot { display: none; }
 #view .btn--go { box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 22%, transparent); }
 #view .btn--ghost { border-color: transparent; color: var(--ink-faint); }
 #view .btn--ghost:hover { color: var(--down); background: var(--down-wash); border-color: transparent; }
-.phead__a .btn { height: 40px; padding: 0 18px; font-weight: 700; }
-.phead__a .btn--go { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 25%, transparent); }
 
 #view .fld { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 #view .fld > span { font-size: var(--lbl); font-weight: 600; letter-spacing: .04em; color: var(--ink-faint); }
@@ -3070,30 +2926,9 @@ body.is-out .foot { display: none; }
   :root { --page-x: 16px; --pad: 16px; --h1: 25px; --h2: 17.5px; }
   .main { margin-left: 0; padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom, 0px)); }
 
-  /* 標題一行，工具另起一行排滿；下拉面板用整行的寬度 */
-  .phead { padding-top: 18px; align-items: flex-start; }
-  .phead__r { width: 100%; justify-content: space-between; }
-  .phead__tools { margin-left: auto; }
   .toasts { bottom: calc(var(--tabs-h) + 16px); }
 }
 
-@media (max-width: 760px) {
-  /* 工具攤平到同一排；搜尋打開時自己佔下一整行，把內容往下推一行——
-     ⚠️ 不要做成浮層：浮在內容上會蓋住底下的標題和篩選。 */
-  .phead__r { flex-wrap: wrap; }
-  .phead__tools { display: contents; }
-  .phead__tools .gsw { margin-left: auto; }
-  .phead__tools #searchBtn { display: grid; }
-  .phead__tools #searchDrawer {
-    order: 9; flex: 1 0 100%; position: static;
-    width: 100%; max-width: none; height: 44px; box-shadow: none;
-  }
-  .phead__tools #searchDrawer[hidden] { display: none; }
-  .phead__tools .gsw__n { max-width: 96px; }
-  /* 手機上下拉面板用整排的寬度，不然右邊對齊按鈕會超出螢幕 */
-  .phead__tools .gsw, .phead__tools .bell__wrap { position: static; }
-  .phead__tools .gsw__p, .phead__tools .bell__panel { left: 0; right: 0; width: auto; }
-}
 
 @keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
@@ -3275,10 +3110,7 @@ body.is-out .foot { display: none; }
 #view .fold__p,
 #view .lg__b,
 #view .adl .ad__b,
-.mbar__p,
-.phead__tools .gsw__p,
-.phead__tools .bell__panel,
-.phead__tools #searchDrawer { animation: none; }
+.mbar__p { animation: none; }
 
 /* 家庭成員：移出、退出 */
 #view .mt__x {
@@ -3423,8 +3255,6 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 .appbar .bell__empty { padding: 28px 16px; color: var(--ink-soft); }
 #who { display: inline-flex; align-items: center; gap: 8px; width: auto; }
 
-.phead { padding-top: 22px; }
-.phead__t { font-family: var(--display); }
 
 /* ---------- 首頁上半部：左邊疊卡，右邊常用功能 ---------- */
 #view .dash {
@@ -3625,14 +3455,12 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 .seg__b { border-radius: var(--r-card); }
 #view .btn, .btn, #view .fold__b, #view .fsel select, #view .fsel input, #view .fld input, #view .fld select,
 #view .money, #view .anew input, #view .anew select, #view .fam0__f input, #view .invp__f input,
-#view .lg__add, #view .mt__x, #view .lg__f .goal__i, #view .code,
-.phead__tools .gsw__b, .phead__tools #searchBtn, .phead__tools #searchDrawer { border-radius: var(--r-input); }
+#view .lg__add, #view .mt__x, #view .lg__f .goal__i, #view .code { border-radius: var(--r-input); }
 .pill, #view .sec__n, #view .mt__me, #view .lg__who .chip, .sw { border-radius: var(--r-pill); }
 .sw i { border-radius: var(--r-pill); }
 #view .mbar, #view .mbar i, #view .goal__track, #view .goal__track i { border-radius: var(--r-bar); }
 #view .kpi__ic, #view .goal__ic, #view .fam0__ic, #view .invc__mark, #view .invp__n { border-radius: var(--r-sm); }
 #view .sec__t::before { border-radius: var(--r-pill); }
-.phead__tools .gsw__p { border-radius: var(--r-panel); }
 .dot, .gsw__d, .lg__dot { border-radius: var(--r-dot); }
 
 /* ---------- 手機底部分頁 ---------- */
@@ -3640,14 +3468,7 @@ body.is-home .appbar__add, body.in-family .appbar__add, body.is-admin .appbar__a
 
 /* 一頁只放一個「記一筆」：收支明細自己的標題列就有，右上角那顆收起來 */
 body[data-page="entry"] .appbar__add { display: none; }
-/* 頁首的「搜尋店家或備註」與「全部帳本」是篩選明細用的，不是每一頁的裝飾：
-   搜尋只在總覽（打了會跳去明細）與收支明細出現；
-   帳本切換只在真的會跟著它變的三頁出現——總覽、收支明細、統計。
-   其他頁（財務建議、帳本、家庭、成員紀錄、個人資料、主題、平台管理…）一律收起來。
-   ⚠️ 用「只有這幾頁才顯示」而不是「這幾頁不顯示」：以後新增的頁面預設就乾淨，不會再多一個裝飾品。 */
-body:not([data-page="home"]):not([data-page="entry"]) #searchBtn,
-body:not([data-page="home"]):not([data-page="entry"]) #searchDrawer,
-body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #gsw { display: none !important; }
+/* 模式橫幅的工具在所有一般頁面保持相同，見 page-header.css。 */
 
 /* ---------- RWD ---------- */
 @media (max-width: 1080px) {
@@ -3656,7 +3477,6 @@ body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #
 @media (max-width: 900px) {
   .appbar__in { height: 58px; }
   .appbar__add { display: none; }
-  .phead { padding-top: 16px; }
   #view .dash { grid-template-columns: minmax(0, 1fr); }
   #view .dtile--add { display: none; }   /* 這兩種情況沒有分頁列 */
   /* 底部分頁列已經有明細、統計、建議，常用功能就不再放一次；左上角的「← 總覽」也是分頁列的第一格 */
@@ -3994,6 +3814,6 @@ body.in-family #gsw, body.in-family .tabbar [data-tab="stats"] { display: none !
 .family-goal__edit summary { cursor: pointer; color: var(--accent); }
 @media (max-width: 760px) {
   body.in-family .tabbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .tabbar__i span:last-child { white-space: nowrap; font-size: 11px; }
+  .tabbar__i > span:last-child { min-height: 24px; max-width: 100%; white-space: normal; font-size: 11px; line-height: 12px; text-align: center; }
   .family-goal__numbers { flex-direction: column; }
 }

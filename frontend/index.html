@@ -31,8 +31,9 @@
   })();
 </script>
 <link rel="stylesheet" href="css/tokens.css?v=188">
-<link rel="stylesheet" href="css/app.css?v=196">
+<link rel="stylesheet" href="css/app.css?v=197">
 <link rel="stylesheet" href="css/themes.css?v=188">
+<link rel="stylesheet" href="css/page-header.css?v=197">
 </head>
 <body>
 
@@ -64,28 +65,31 @@
   </header>
 
   <main class="main">
-    <!-- 第一層標題：頁面。右邊是這一頁的切換與工具（我｜家庭、帳本、搜尋） -->
+    <!-- 模式共用橫幅：標題區與工具區固定，不隨頁面內容改變位置。 -->
     <div class="phead" id="phead">
-      <!-- 總覽才有的頭貼。其他頁面 head() 會把它收起來 -->
-      <span class="phead__av" id="pav" hidden></span>
-      <div class="phead__m">
-        <div class="phead__k" id="pkick"></div>
-        <h1 class="phead__t" id="ptitle">總覽</h1>
-        <p class="phead__s" id="psub" hidden></p>
+      <div class="phead__identity">
+        <span class="phead__av" id="pav" hidden></span>
+        <div class="phead__m">
+          <div class="phead__k" id="pkick"></div>
+          <h1 class="phead__t" id="ptitle">總覽</h1>
+          <p class="phead__s" id="psub"></p>
+        </div>
       </div>
       <div class="phead__r">
-        <div class="phead__a" id="pact" hidden></div>
+        <div class="phead__scope" id="headerScope"></div>
         <div class="phead__tools">
           <div class="gsw" id="gsw" hidden></div>
-          <button class="ic" id="searchBtn" title="搜尋" aria-label="搜尋">
+          <button class="ic" id="searchBtn" title="搜尋" aria-label="搜尋" aria-expanded="false" aria-controls="searchDrawer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
           </button>
-          <div class="search" id="searchDrawer" hidden>
-            <input id="search" type="search" placeholder="搜尋活動、店家或備註" autocomplete="off">
+          <div class="search" id="searchDrawer" role="search" aria-label="搜尋帳本明細" hidden>
+            <input id="search" type="search" placeholder="搜尋帳本明細" aria-label="搜尋帳本明細" autocomplete="off">
+            <button type="button" id="searchClose" aria-label="收起搜尋"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
           </div>
         </div>
       </div>
     </div>
+    <div class="phead-actions" id="pact" hidden></div>
 
     <div id="view"></div>
 
@@ -105,9 +109,10 @@
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="js/stars.js?v=188"></script>
-<script src="js/data.js?v=196"></script>
-<script src="js/api.js?v=196"></script>
+<script src="js/data.js?v=197"></script>
+<script src="js/api.js?v=197"></script>
 <script src="js/notify.js?v=188"></script>
-<script src="js/app.js?v=196"></script>
+<script src="js/page-header.js?v=197"></script>
+<script src="js/app.js?v=197"></script>
 </body>
 </html>

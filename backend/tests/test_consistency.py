@@ -1738,18 +1738,19 @@ def test_下拉面板浮在按鈕下面_不搬進版面():
     assert "acctm" not in bar, "帳號選單已經拆掉了，頂列不要再長回來"
 
 
-    css = read("frontend/css/app.css")
-    for sel in (r"\.phead__tools \.gsw__p,\s*\.phead__tools \.bell__panel", r"\.appbar \.bell__panel"):
+    css = read("frontend/css/app.css") + read("frontend/css/page-header.css")
+    for sel in (r"\.phead__tools \.gsw__p", r"\.appbar \.bell__panel"):
         rule = re.search(sel + r" \{([^}]*)\}", css)
         assert rule, "找不到 " + sel
         assert "position: absolute" in rule.group(1), "下拉面板應該用定位浮起來，不佔版面：" + sel
         assert "overflow-y: auto" in rule.group(1), "項目多的時候面板要自己捲，不能把頁面撐長：" + sel
 
 
-def test_電腦版的搜尋框不會被點掉():
-    """點外面收起搜尋框只能在手機上。電腦版曾經點一下任何地方搜尋框就消失，旁邊的按鈕跟著位移。"""
-    app = read("frontend/js/app.js")
-    assert "if (narrowBar.matches && !t.closest('#searchDrawer') && !t.closest('#searchBtn'))" in app
+def test_所有一般頁面載入同一個模式橫幅():
+    """搜尋展開、鍵盤與模式狀態由 test_page_header.py 跑實際元件驗證。"""
+    html = read("frontend/index.html")
+    assert 'css/page-header.css?' in html and 'js/page-header.js?' in html
+    assert html.index('js/page-header.js?') < html.index('js/app.js?')
 
 
 # ===========================================================================
@@ -2373,9 +2374,8 @@ def test_總覽的標題是招呼語_不是總覽兩個字():
     app = read("frontend/js/app.js")
     assert "head('總覽'" not in app, "總覽的標題不要再寫死「總覽」"
 
-    greet = app[app.index("function greet(user, fm, title, sub, act)"):app.index("function famLine(")]
-    assert "ava(user)" in greet, "招呼語旁邊要有頭貼"
-    assert greet.index("head(") < greet.index("getElementById('pav')"),         "要先 head() 再放頭貼——head() 會把頭貼那一格清掉，順序反了頭貼永遠是空的"
+    # 頭像與工具列由共用橫幅繪製，不再由首頁另畫一套。
+    assert "FBPageHeader.create" in app
 
     fam = app[app.index("function famLine(user, fm)"):app.index("function vHome()")]
     assert "fm.family.name" in fam and "ROLE_TW" in fam, "第二行要講「哪個家庭的什麼身分」"
@@ -3143,10 +3143,9 @@ def test_一個畫面不放兩個同樣的入口():
     assert "document.body.dataset.page = page || 'home';" in app
     assert "dtile--tabbar" in app and "#view .dtile--tabbar { display: none; }" in css
     assert ".appbar__home { display: none !important; }" in css
-    # 頁首的搜尋與帳本切換只在用得到的頁面出現（使用者：「有些功能本身不會需要用到帳本，不要一直掛在上面當裝飾品」）
-    assert 'body:not([data-page="home"]):not([data-page="entry"]) #searchBtn' in css
-    assert ('body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #gsw '
-            '{ display: none !important; }') in css
+    # 2026-10-22：同一模式下每頁保留相同工具；搜尋目前對象的帳本。
+    assert 'body:not([data-page="home"]):not([data-page="entry"]) #searchBtn' not in css
+    assert 'body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #gsw' not in css
     assert "wal__go" not in app and "wal__go" not in css
     # 帳本頁只有一顆「開一本帳」，常設或活動在表單裡選（使用者：「一個統一的按鈕就好」）
     assert "foldBlock('gnew', '進行中', '建立活動'" in app and "data-gnew-temp" not in app

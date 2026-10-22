@@ -7,6 +7,7 @@
   'use strict';
 
   var API = global.API;
+  var HEADER = global.FBPageHeader.create({ escape: esc, tint: tint, avatar: ava, money: money });
   var $view = document.getElementById('view');
   var DATA_CATS = {};   // 分類 id → 名稱，確認訊息要用
 
@@ -35,46 +36,7 @@
     });
   }
 
-  /* 活動清單與通知是**從按鈕往下浮出來的下拉面板**。
-
-     ⚠️ 以前把它們搬進版面（頂列和內容之間），佔真實空間把內容往下推。
-     改版之後頁首多了標題那一段，搬進去的面板就插在標題底下，整頁往下跳——
-     使用者看到的就是「一點就跑版」。現在面板留在按鈕旁邊，用定位浮起來，
-     內容一格都不動；項目多的話面板自己捲動，不會把頁面撐長。 */
-  /* 寬螢幕的搜尋是頂欄上一直都在的輸入框，窄螢幕才是「按圖示展開」的抽屜。
-     ⚠️ 以前兩邊都靠 CSS 硬蓋：寬螢幕用 display:flex !important 蓋掉 [hidden]，
-     結果那個輸入框看得見、打得了字，hidden 屬性卻是 true——
-     螢幕閱讀器會直接跳過它，等於對讀螢幕的人來說搜尋不存在。
-     改成讓 hidden 一直說實話：寬螢幕拿掉它，窄螢幕才交給按鈕控制。 */
-  var narrowBar = window.matchMedia('(max-width: 760px)');
-
-  function syncSearchMode() {
-    var sd = document.getElementById('searchDrawer');
-    var sb = document.getElementById('searchBtn');
-    if (!sd) return;
-    if (narrowBar.matches) {
-      sd.hidden = true;                       // 收起來，等使用者按圖示
-      if (sb) sb.classList.remove('open');
-      document.body.classList.remove('dw-on');
-    } else {
-      sd.hidden = false;                      // 一直都在
-    }
-  }
-  syncSearchMode();
-  /* ⚠️ 只靠 matchMedia 的 change 不夠可靠（換裝置模擬、某些瀏覽器不一定送），
-     所以 resize 也補一道。但只在**模式真的變了**的時候才動——
-     否則使用者一邊打字一邊轉螢幕，搜尋框會被關掉。 */
-  var wasNarrow = narrowBar.matches;
-  narrowBar.addEventListener('change', function () {
-    wasNarrow = narrowBar.matches;
-    syncSearchMode();
-  });
-  window.addEventListener('resize', function () {
-    if (narrowBar.matches === wasNarrow) return;
-    wasNarrow = narrowBar.matches;
-    syncSearchMode();
-  });
-
+  /* 橫幅的尺寸、工具與搜尋展開行為由 page-header.js 共用管理。 */
   /* ⚠️ 只有這兩個是抽屜。#searchDrawer 在文字模式是頂欄上的行內搜尋框，
      把它搬進版面的話，頂欄的搜尋就不見了。 */
   var DRAWERS = ['#gswPanel', '#bellPanel'];
@@ -401,9 +363,7 @@
     }).join('') + '</div>';
   }
 
-  function scopeSeg(m) {
-    return canFamily(m) ? seg('scope', [['me', '個人'], ['family', '家庭']], SCOPE) : '';
-  }
+
 
   /* ============================================================
      01 總覽：這個月現在怎樣
@@ -493,14 +453,7 @@
      ⚠️ fm 拿不到（那一支還沒做、或斷線，off: true）時不要寫「還沒有加入家庭」——
         他可能是有家庭的，只是我們問不到。那種情況退回顯示日期。 */
   function greet(user, fm, title, sub, act) {
-    /* ⚠️ 一定要先 head() 再放頭貼：head() 會把頭貼那一格清掉（換頁時要收起來），
-       順序反過來的話剛放好的頭貼馬上被它清掉，標題旁邊永遠是空的。 */
     head(title || (greeting() + '，' + callName(user.name)), sub || famLine(user, fm), act);
-    var av = document.getElementById('pav');
-    if (av) {
-      av.innerHTML = ava(user);
-      av.hidden = false;
-    }
   }
 
   function famLine(user, fm) {
@@ -539,8 +492,7 @@
         });
         greet(m.user, fm,
               fam && !d.__err ? '家庭這個月' : activeActivity() ? activeActivity().name : '',
-              fam && !d.__err ? d.members.length + ' 位家人的收支' : activeActivity() ? '活動這個月的收支' : '',
-              scopeSeg(m));
+              fam && !d.__err ? d.members.length + ' 位家人的收支' : activeActivity() ? '活動這個月的收支' : '');
 
         var sv = d.__err ? null : d.savings, lv = sv ? sv.level : '';
         var used = sv ? Math.min(100, Math.round(sv.ratio * 100)) : 0;
@@ -1559,7 +1511,7 @@
     function render(m, sc, d) {
       if (STAT.period === 'year' && !d.yearly) STAT.period = 'month';
       var month = STAT.period === 'month';
-      head(modeName() + '財務狀況', activeActivity() ? activeActivity().name : '', scopeSeg(m));
+      head(modeName() + '財務狀況', activeActivity() ? activeActivity().name : '');
 
       var rows = month
         ? (d.monthly || []).map(function (r) { return { k: r.m, label: r.m.slice(5) + ' 月', income: r.income, expense: r.expense }; })
@@ -1627,7 +1579,7 @@
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
     API.me().then(function (m) {
       var sc = scopeOf(m);
-      head(modeName() + '財務建議', activeActivity() ? activeActivity().name : '', scopeSeg(m));
+      head(modeName() + '財務建議', activeActivity() ? activeActivity().name : '');
       return API.advices(targetFilter()).then(function (d) {
         ADV = d.advices || [];
         $view.innerHTML =
@@ -3201,22 +3153,14 @@
   };
 
   /* ---------- 共用 ---------- */
-  /* 第一層標題。有「我｜家庭」切換的頁面，標題上方的小字跟著顯示「我的／家庭」；
-     act 是這一頁右上角的動作，可以不給。 */
+  /* 各頁只傳入標題；橫幅依目前對象套用同一個元件。 */
   function head(t, sub, act) {
-    if (canFamily(ME) && !/data-scope=/.test(act || '')) act = scopeSeg(ME) + (act || '');
-    $title.textContent = t;
-    $sub.textContent = sub || '';
-    $sub.hidden = !sub;
-    /* 頭貼只有總覽要，其他頁面一律收起來——不收的話換頁之後它會留在標題旁邊 */
-    var av = document.getElementById('pav');
-    if (av) { av.innerHTML = ''; av.hidden = true; }
-    var a = document.getElementById('pact');
-    if (a) { a.innerHTML = act || ''; a.hidden = !act; }
-    /* 有「我／家庭」切換的頁面，小字直接說現在看的是誰 */
-    var k = document.getElementById('pkick');
+    var page = (location.hash || '#/').replace(/^#\/?/, '').split('/')[0];
+    var user = ME && ME.user;
+    var enabled = !!user && !user.isPlatformAdmin && ['login', 'register', 'forgot', 'reset', 'verify', 'setup', 'admin'].indexOf(page) < 0;
+    HEADER.render({ title: t, subtitle: sub, actions: act, user: user,
+      enabled: enabled, canFamily: canFamily(ME), scope: scopeOf(ME), mode: modeName() });
     var fam = isFamily();
-    if (k) k.textContent = /data-scope=/.test(act || '') ? modeName() : '';
     /* 家庭模式只整理資訊、不記帳：右上角和手機的「記一筆」一起收起來 */
     /* 家庭狀態還在，每一頁（家庭、主題、個人資料、活動…）都不放「記一筆」：
        記帳永遠記在自己身上，家庭模式下出現它，對象就錯了 */
@@ -3224,7 +3168,7 @@
     document.body.dataset.target = modeName();
     [['entry', '帳本'], ['stats', '財務狀況'], ['advice', '財務建議']].forEach(function (x) {
       var label = document.querySelector('.tabbar [data-tab="' + x[0] + '"] span');
-      if (label) label.textContent = modeName() + x[1];
+      if (label) label.innerHTML = esc(modeName()) + '<wbr>' + esc(x[1]);
     });
   }
 
@@ -4063,40 +4007,7 @@
       box.hidden = isFamily();
       if (!all.some(function (g) { return g.id === GROUP && !g.settled && !g.archived; })) setGroup(PERSONAL_GROUP);
       CURRENT_ACTIVITY = gs.filter(function (g) { return g.id === GROUP; })[0] || null;
-      if (!gs.length) {
-        box.innerHTML = '<span class="gsw-empty">目前尚未建立活動</span><a class="gsw-create" href="#/groups">建立活動</a>';
-        return;
-      }
-      var cur = gs.filter(function (g) { return g.id === GROUP; })[0] || { name: '選擇活動', color: 'book-indigo' };
-
-      /* 兩種長相都畫出來，由 body 上的 class 決定顯示哪一種：
-           方案一（bar-text）文字 ＋ 抽屜
-           方案二（bar-icon）圖示 ＋ 一般下拉
-         挑定之後把另一邊刪掉就好。 */
-      box.innerHTML =
-        '<button class="ic gsw__b" id="gswBtn" title="活動：' + esc(cur.name) + '" ' +
-          'aria-label="切換活動，目前是' + esc(cur.name) + '">' +
-          '<svg class="gsw__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">' +
-            '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>' +
-            '<path d="M10 4h8.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H10"/></svg>' +
-          '<span class="ic__d" style="background:' + tint(cur.color) + '"></span>' +
-          '<span class="gsw__d" style="background:' + tint(cur.color) + '"></span>' +
-          '<span class="gsw__n">' + esc(cur.name) + '</span>' +
-          '<svg class="gsw__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-            'stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>' +
-        '</button>' +
-        '<div class="gsw__p" id="gswPanel" hidden>' +
-          gs.map(function (g) {
-            return '<button class="gsw__i' + (g.id === GROUP ? ' on' : '') +
-              '" data-group="' + esc(g.id) + '">' +
-              '<span class="gsw__d" style="background:' + tint(g.color) + '"></span>' +
-              '<span class="gsw__m"><b>' + esc(g.name) + '</b><i>' +
-                (g.settled ? '已結算・不能再記　' : '') +
-                g.count + ' 筆' + (g.goal ? '　目標 ' + money(g.goal) : '') +
-              '</i></span></button>';
-          }).join('') +
-          '<a class="gsw__more" href="#/" data-personal-return>回到個人帳本 →</a>' +
-        '</div>';
+      HEADER.setActivities(gs, GROUP);
       pushForDrawer();
     }).catch(function (err) { box.hidden = true; if (required) throw err; });
   }
@@ -4530,32 +4441,6 @@
       return;
     }
 
-    /* ---- 搜尋抽屜 ---- */
-    if (t.closest('#searchBtn') && !narrowBar.matches) return;   // 寬螢幕沒有這顆
-    if (t.closest('#searchBtn')) {
-      var sd = document.getElementById('searchDrawer');
-      var sb = document.getElementById('searchBtn');
-      if (sd) {
-        if (sd.hidden) {
-          sb.classList.add('open');
-          slideOpen(sd);
-          document.getElementById('search').focus();
-        } else {
-          sb.classList.remove('open');
-          slideClose(sd);
-        }
-      }
-      return;
-    }
-    /* ⚠️ 點外面收起搜尋框**只在手機**。電腦版的搜尋框一直都在，
-       之前這裡沒分，點頁面任何地方就把電腦版的搜尋框藏掉，旁邊的按鈕跟著位移。 */
-    if (narrowBar.matches && !t.closest('#searchDrawer') && !t.closest('#searchBtn')) {
-      var sd2 = document.getElementById('searchDrawer');
-      if (sd2 && !sd2.hidden) {
-        document.getElementById('searchBtn').classList.remove('open');
-        slideClose(sd2);
-      }
-    }
 
     /* 活動的存錢目標：選填，按了才出現輸入框 */
     var gop = t.closest('[data-gopen]');
@@ -4677,6 +4562,7 @@
       if (gp) {
         var gOpen = gp.hidden;
         document.getElementById('gswBtn').classList.toggle('open', gOpen);
+        document.getElementById('gswBtn').setAttribute('aria-expanded', String(gOpen));
         if (gOpen) slideOpen(gp); else slideClose(gp);
       }
       return;
@@ -4693,7 +4579,7 @@
       var gp2 = document.getElementById('gswPanel');
       if (gp2 && !gp2.hidden) {
         var gb = document.getElementById('gswBtn');
-        if (gb) gb.classList.remove('open');
+        if (gb) { gb.classList.remove('open'); gb.setAttribute('aria-expanded', 'false'); }
         slideClose(gp2);
       }
     }
@@ -5650,14 +5536,17 @@
   });
 
   var timer = 0;
+  $search.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') { event.preventDefault(); clearTimeout(timer); searchLedger(); }
+  });
+  function searchLedger() {
+    F.q = $search.value.trim();
+    var page = (location.hash || '').replace(/^#\/?/, '').split('/')[0];
+    if (page === 'entry') loadTx(); else location.hash = '#/entry';
+  }
   $search.addEventListener('input', function () {
     clearTimeout(timer);
-    var v = $search.value.trim();
-    timer = setTimeout(function () {
-      F.q = v;
-      var page = (location.hash || '').replace(/^#\/?/, '').split('/')[0];
-      if (page === 'entry') loadTx(); else location.hash = '#/entry';
-    }, 260);
+    timer = setTimeout(searchLedger, 260);
   });
 
   document.addEventListener('keydown', function (e) {
