@@ -1559,7 +1559,7 @@ def test_帳本頁進來只看得到帳本():
     assert "foldRestore()" in body, "重畫之後沒有 foldRestore()"
 
     lb = re.search(r"function ledgerBody\(g\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "data-gdel" in lb and "activity-invite" in lb, "成員管理與朋友邀請應該在活動展開的內容裡"
+    assert "data-gdel" in lb and "activityInvitePanel(g)" in lb, "成員管理與朋友邀請應該在活動展開的內容裡"
 
     plain = re.findall(r'<h2 class="sec__t">([^<\']+)', body)
     assert set(plain) <= set(), "帳本頁多了攤開的區塊：%s" % plain

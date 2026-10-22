@@ -40,7 +40,7 @@ def test_asset_versions_follow_contents_and_build_keeps_source_unchanged(tmp_pat
         asset.write('\n// new API release\n')
     build(source, output)
     assert api_url(output) != old_url
-    assert '?v=194' in (source / 'index.html').read_text(encoding='utf-8')
+    assert (source / 'index.html').read_bytes() == original
 
 
 def test_deployment_points_to_content_versioned_output():

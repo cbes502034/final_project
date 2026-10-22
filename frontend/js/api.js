@@ -36,7 +36,8 @@
    GET    /api/admin/security-events           安全事件
    POST   /api/client-errors                   回報畫面上出的錯
 
-   記帳（25 支）
+   記帳（26 支）
+   GET    /api/groups/{gid}/invites/lookup       用完整 email 找活動朋友
    GET    /api/transactions                     收支明細
    POST   /api/transactions                     手動新增一筆
    PATCH  /api/transactions/{tx_id}             修改一筆
@@ -2094,11 +2095,25 @@
         st.activityInvites = (st.activityInvites || []).concat([row]); save(); return clone(row);
       });
     },
+    lookupActivityUser: function (gid, email) {
+      var st = load();
+      return sleep(260).then(function () {
+        var g = groupOf(gid);
+        if (!g || g.owner !== st.me || g.personalOwner || g.settledAt || g.archived) throw oops('你不能邀請加入這個活動', 403);
+        var mail = String(email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) throw oops('請輸入完整的 email', 400);
+        var u = global.DATA.members.filter(function (x) { return String(x.email || '').toLowerCase() === mail; })[0];
+        if (!u) throw oops('找不到這個帳號', 404);
+        var pending = (st.activityInvites || []).some(function (r) { return r.groupId === gid && r.invitee === u.id && r.status === 'pending' && Date.parse(r.expiresAt) > Date.now(); });
+        return { user: { id: u.id, name: u.name, avatar: u.avatar, avatarUrl: u.avatarUrl || null },
+          status: u.isPlatformAdmin || u.suspendedAt ? 'unavailable' : memberIdsOf(gid).indexOf(u.id) >= 0 ? 'member' : pending ? 'invited' : 'available' };
+      });
+    },
     activityInvites: function () {
       var st = load();
       return sleep(120).then(function () { return { invites: (st.activityInvites || []).filter(function (r) {
         var g = groupOf(r.groupId); return g && !g.archived && !g.settledAt && r.status === 'pending' && Date.parse(r.expiresAt) > Date.now() && (r.invitee === st.me || g.owner === st.me);
-      }).map(function (r) { return Object.assign(clone(r), { code: null, groupName: groupOf(r.groupId).name, incoming: r.invitee === st.me, kind: r.code ? 'code' : 'account' }); }) }; });
+      }).map(function (r) { var from = memberOf(r.inviter) || {}, to = memberOf(r.invitee) || {}; return Object.assign(clone(r), { code: null, groupName: groupOf(r.groupId).name, inviterName: from.name, inviteeName: to.name, inviteeEmail: to.email, incoming: r.invitee === st.me, kind: r.code ? 'code' : 'account' }); }) }; });
     },
     joinActivity: function (code) {
       var st = load(), row = (st.activityInvites || []).filter(function (r) { return r.code && normCode(r.code) === normCode(code); })[0];
@@ -3339,6 +3354,7 @@
     readNotifications: function (u)     { return req('/api/notifications', { method: 'PATCH', body: { readUntil: u } }); },
     transactionArchive: function (f) { return req('/api/transactions/archive' + qs(f)); },
     inviteActivity: function (g, p) { return req('/api/groups/' + encodeURIComponent(g) + '/invites', { method: 'POST', body: p || {} }); },
+    lookupActivityUser: function (g, email) { return req('/api/groups/' + encodeURIComponent(g) + '/invites/lookup' + qs({ email: email })); },
     activityInvites: function () { return req('/api/group-invites'); },
     joinActivity: function (code) { return req('/api/group-invites/join', { method: 'POST', body: { code: code } }); },
     respondActivityInvite: function (id, action) { return req('/api/group-invites/' + encodeURIComponent(id), { method: 'POST', body: { action: action } }); },
@@ -3411,6 +3427,7 @@
   var FN = {
     transactionArchive: ['GET /api/transactions/archive', '記帳'],
     inviteActivity: ['POST /api/groups/{gid}/invites', '記帳'],
+    lookupActivityUser: ['GET /api/groups/{gid}/invites/lookup', '記帳'],
     activityInvites: ['GET /api/group-invites', '記帳'],
     joinActivity: ['POST /api/group-invites/join', '記帳'],
     respondActivityInvite: ['POST /api/group-invites/{invite_id}', '記帳'],
@@ -3508,6 +3525,7 @@
   /* 畫面一定會讀的欄位。少了任何一個，畫面會在很後面的地方壞掉（讀不到 undefined 的 map），
      看不出是哪一支回錯——所以在這裡先檢查，直接指出是哪一支。 */
   var SHAPE = {
+    lookupActivityUser: ['user', 'status'], activityInvites: ['invites'],
     me: ['user'], login: ['user'], register: ['user', 'verifySent', 'message'],
     financeProfile: ['finance', 'styles', 'goals', 'habits'],
     requestPasswordReset: ['ok', 'message'], sessions: ['sessions'],

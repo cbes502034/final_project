@@ -152,7 +152,7 @@ final_project/
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
 │   │   ├── models/              23 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
-│   │   ├── routers/             84 支路由，一個領域一個資料夾。還沒做的回 501
+│   │   ├── routers/             85 支路由，一個領域一個資料夾。還沒做的回 501
 │   │   │   ├── auth/            認證（auth.py、admin.py）　← 每個資料夾裡都有 README.md
 │   │   │   ├── ledger/          記帳（transactions、nlp、categories、groups）
 │   │   │   ├── analytics/       數字（stats、budgets、alerts、advices）
@@ -186,7 +186,7 @@ final_project/
 
 # 四、API 目錄清單
 
-共 **84 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
+共 **85 條路由**（另有 `/healthz`、`/docs` 兩支系統路由）。標示說明：
 
 - **權限**：`公開` / `登入` / `本人` / `家長` / `監管者` / `建立者` / `平台管理員`
 - ⚠️ `家長` 是**家庭**治理權限；`平台` 是系統管理員，只能停權與查稽核，讀不到任何財務資料。兩者完全分開。
@@ -291,6 +291,7 @@ final_project/
 | 88 | GET | `/api/group-invites` | 記帳 | 登入 | 我的活動邀請 |
 | 89 | POST | `/api/group-invites/join` | 記帳 | 登入 | 使用邀請碼加入活動 |
 | 90 | POST | `/api/group-invites/{invite_id}` | 記帳 | 登入 | 回覆或取消活動邀請 |
+| 91 | GET | `/api/groups/{gid}/invites/lookup` | 記帳 | 登入 | 用完整 email 找活動朋友，確認後再送出邀請 |
 | 58 | GET | `/api/allowances` | 家庭 | 登入 | 我每月給每個被監管者多少零用金 |
 | 59 | PUT | `/api/allowance` | 家庭 | 監管者 | 設定零用金。body: { wardId, amount } |
 | 65 | GET | `/api/audit` | 家庭 | 平台管理員 | 稽核紀錄：誰做了什麼。⚠️ 只記動作，不記金額 |
@@ -439,7 +440,7 @@ final_project/
 
 ## 5-1　每一支路由的規格，寫在那一支的說明字串裡
 
-`backend/app/routers/` 底下（一個領域一個資料夾）的 84 支路由，每一支的說明字串都有同樣的十一個段落：
+`backend/app/routers/` 底下（一個領域一個資料夾）的 85 支路由，每一支的說明字串都有同樣的十一個段落：
 
 ```
 【這支做什麼】【前端怎麼打】【誰能打】【請求主體／查詢參數】【成功回應】【錯誤回應】

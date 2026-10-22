@@ -1733,7 +1733,7 @@
 
      ⚠️ 身分由家長決定，被邀請的人不能自己選。
      ============================================================ */
-  var INV = { role: 'child', codeRole: 'child', found: null };
+  var INV = { role: 'child', codeRole: 'child', found: null, activity: null };
 
   function roleTW(r) { return r === 'parent' ? '家長' : '子女'; }
 
@@ -2004,16 +2004,18 @@
         所以關掉這個對話框之後就真的拿不回來了——這件事要寫在上面，
         不是等使用者關掉才發現。
      --------------------------------------------------------- */
-  function codeNew() {
+  function codeNew(activity) {
+    if (document.getElementById('cg')) return;
+    INV.activity = activity || null;
     var w = el('<div class="hp" id="cg">' +
       '<div class="hp__c" role="dialog" aria-modal="true" aria-labelledby="cgT">' +
         '<div class="hp__h"><h3 id="cgT">產生邀請碼</h3>' +
           '<button class="hp__x" id="cgX" aria-label="關閉">✕</button></div>' +
         '<div class="hp__b" id="cgBody">' +
           '<label class="fld"><span>這組碼給誰用</span>' +
-            '<input type="text" id="cgLabel" maxlength="30" placeholder="例如：給女兒" autocomplete="off"></label>' +
-          '<div class="fld"><span>加入後的身分</span>' +
-            seg('cgrole', [['child', '子女'], ['parent', '家長']], INV.codeRole) + '</div>' +
+            '<input type="text" id="cgLabel" maxlength="30" placeholder="' + (activity ? '例如：給小明' : '例如：給女兒') + '" autocomplete="off"></label>' +
+          (activity ? '<div class="fld"><span>加入的活動</span><b>' + esc(activity.name) + '</b></div><div class="fld"><span>加入後的身分</span><b>活動成員</b></div>'
+            : '<div class="fld"><span>加入後的身分</span>' + seg('cgrole', [['child', '子女'], ['parent', '家長']], INV.codeRole) + '</div>') +
           '<p class="cg__note">碼在下一步顯示，<b>只會出現這一次</b>。關掉之後就拿不回來了，忘了只能重新產生一組。</p>' +
         '</div>' +
         '<div class="hp__d">' +
@@ -2030,10 +2032,12 @@
   }
 
   function codeClose() {
+    var activity = INV.activity;
     var w = document.getElementById('cg');
     if (w) w.remove();
     document.body.classList.remove('hp-on');
-    paintCodes();
+    INV.activity = null;
+    if (activity) refreshActivityInvites(true); else paintCodes();
   }
 
   /* 產生好了：同一個對話框換成「這是你的碼」，複製鈕與警語放在一起 */
@@ -2044,12 +2048,11 @@
     if (!body || !foot) return;
     if (title) title.textContent = '邀請碼產生好了';
     body.innerHTML =
-      '<p class="cg__lab">' + esc(c.label) + '　·　' + roleTW(c.role) + '　·　' + ttlText(c.expiresAt) +
+      '<p class="cg__lab">' + esc(c.label) + '　·　' + (INV.activity ? esc(INV.activity.name) + ' · 活動成員' : roleTW(c.role)) + '　·　' + ttlText(c.expiresAt) +
         '（' + shortDate(c.expiresAt) + '前有效）</p>' +
       '<div class="cg__code"><code>' + esc(c.code) + '</code>' +
         '<button class="btn btn--sm" data-copy="' + esc(c.code) + '">複製</button></div>' +
-      '<p class="cg__warn">⚠️ 關掉這個視窗之後就<b>看不到這組碼了</b>。' +
-        '系統只存它的雜湊，任何人都查不回來——現在就複製傳給對方。</p>';
+      '<p class="cg__warn">關掉這個視窗之後就<b>看不到這組碼了</b>。請現在複製傳給對方；邀請碼只能使用一次。</p>';
     foot.innerHTML = '<button class="btn btn--go" id="cgOk">我存好了</button>';
   }
 
@@ -2188,6 +2191,7 @@
      每一個活動可以各自設一個每月存款目標。
      ============================================================ */
   function vGroups() {
+    ACTIVITY_INV.sequence++;
     head('活動', '');
     $view.innerHTML = '<div class="page">' + skeleton(4) + '</div>';
 
@@ -2239,7 +2243,7 @@
         '</li>';
       }).join('') + '</ul></div>';
 
-      var h = '<div class="page">' + activityInbox(LG.invites) +
+      var h = '<div class="page"><div id="activityInbox">' + activityInbox(LG.invites) + '</div>' +
         foldBlock('gnew', '進行中', '建立活動', gnewForm, open.length + ' 個', 'books') +
         (open.length
           ? ledgerList(open)
@@ -2270,13 +2274,78 @@
      同一個活動的資訊被拆成上下兩處，要對著名字找。
      ============================================================ */
   var LG = { open: null, fam: null, byId: {} };
+  var ACTIVITY_INV = { found: {}, busy: false, sequence: 0 };
 
   function activityInbox(invites) {
     var incoming = invites.filter(function (r) { return r.incoming; });
-    return '<section class="card activity-join"><h2 class="sec__t">加入朋友的活動</h2>' +
-      '<form id="activityJoinForm"><label>邀請碼<input id="activityJoinCode" required maxlength="30" autocomplete="off" placeholder="例如 K7QM-3XWP"></label><button class="btn btn--go">加入活動</button></form>' +
-      incoming.map(function (r) { return '<div class="activity-incoming"><b>邀請你加入「' + esc(r.groupName) + '」</b><div><button class="btn btn--go btn--sm" data-activity-response="' + esc(r.id) + '|accept">接受</button><button class="btn btn--sm" data-activity-response="' + esc(r.id) + '|decline">婉拒</button></div></div>'; }).join('') + '</section>';
+    return '<div id="activityIncoming">' + activityIncomingCards(incoming) + '</div>' +
+      '<section class="card fam0 activity-join"><h2 class="fam0__t">用邀請碼加入活動</h2><p class="fam0__s">輸入朋友傳給你的 8 碼邀請碼。</p>' +
+      '<form class="fam0__f" id="activityJoinForm"><input class="codein" id="activityJoinCode" required maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="活動邀請碼" placeholder="K7QM-3XWP"><button class="btn btn--go">加入</button></form></section>';
   }
+
+  function activityIncomingCards(invites) {
+    return invites.filter(function (r) { return r.incoming; }).map(function (r) {
+      return '<div class="card invc"><div class="invc__mark" aria-hidden="true">' + esc((r.groupName || '活').charAt(0)) + '</div>' +
+        '<div class="invc__m"><div class="invc__t"><b>' + esc(r.inviterName || '朋友') + '</b> 邀請你加入「' + esc(r.groupName) + '」</div><div class="invc__s">活動成員　·　' + shortDate(r.expiresAt) + '前有效</div></div>' +
+        '<div class="invc__a"><button class="btn btn--sm btn--ghost" data-activity-response="' + esc(r.id) + '|decline">婉拒</button><button class="btn btn--sm btn--go" data-activity-response="' + esc(r.id) + '|accept">加入</button></div></div>';
+    }).join('');
+  }
+
+  function activityCodeCards(gid, invites) {
+    var codes = invites.filter(function (r) { return r.groupId === gid && !r.incoming && r.kind === 'code'; });
+    return codes.length ? '<div class="codes" role="list">' + codes.map(function (c) {
+      return '<div class="code" role="listitem" data-activity-invite="' + esc(c.id) + '"><div class="code__m"><b class="code__n">' + esc(c.label) + '</b><span class="code__d">活動成員　·　' + ttlText(c.expiresAt) + '（' + shortDate(c.expiresAt) + '）　·　只能用一次</span></div>' +
+        '<span class="code__v" aria-label="邀請碼已隱藏">••••-••••</span><button class="ic ic--sm" data-activity-response="' + esc(c.id) + '|cancel" aria-label="刪除「' + esc(c.label) + '」這組邀請碼" title="刪除這組">×</button></div>';
+    }).join('') + '</div>' : '<p class="invp__hint">產生之後傳給朋友，他在「活動」頁輸入就能加入。</p>';
+  }
+
+  function activitySentCards(gid, invites) {
+    var sent = invites.filter(function (r) { return r.groupId === gid && !r.incoming && r.kind === 'account'; });
+    return sent.length ? '<div class="card card--flush pend"><div class="card__h"><span class="card__t">等待回覆</span><span class="card__s">' + sent.length + ' 個邀請</span></div>' + sent.map(function (r) {
+      return '<div class="pend__i" data-activity-invite="' + esc(r.id) + '">' + ava({ name: r.inviteeName || r.label }, 'ava--sm') + '<div class="pend__m"><b>' + esc(r.inviteeName || r.label) + '</b><small>' + esc(r.inviteeEmail || '') + '</small></div><span class="pill pill--near">活動成員</span><button class="btn btn--sm btn--ghost" data-activity-response="' + esc(r.id) + '|cancel">取消</button></div>';
+    }).join('') + '</div>' : '';
+  }
+
+  function activityInvitePanel(g) {
+    return '<details class="activity-invite-panel"><summary>邀請朋友</summary><div class="duo duo--tight">' +
+      '<section class="duo__c"><div class="card invp"><div class="invp__h"><span class="invp__n">1</span><b>用帳號邀請</b></div>' +
+      '<form class="invp__f" data-activity-find="' + esc(g.id) + '"><input type="email" name="email" placeholder="輸入朋友的完整 email" aria-label="朋友的 email" autocomplete="off" required><button class="btn btn--sm" type="submit">找人</button></form>' +
+      '<div class="invp__r" id="activityFound-' + esc(g.id) + '"><p class="invp__hint">只接受完整的 email，找到之後再送出邀請。</p></div><div id="activitySent-' + esc(g.id) + '">' + activitySentCards(g.id, LG.invites || []) + '</div></div></section>' +
+      '<section class="duo__c"><div class="card invp"><div class="invp__h"><span class="invp__n">2</span><b>或是給他邀請碼</b><button class="btn btn--sm btn--go" data-activity-code="' + esc(g.id) + '">產生邀請碼</button></div>' +
+      '<div id="activityCodes-' + esc(g.id) + '">' + activityCodeCards(g.id, LG.invites || []) + '</div></div></section></div></details>';
+  }
+
+  function paintActivityFound(gid, email, r) {
+    var box = document.getElementById('activityFound-' + gid);
+    if (!box) return;
+    ACTIVITY_INV.found[gid] = r && r.user ? { user: r.user, email: email } : null;
+    if (!r || !r.user) { box.innerHTML = '<p class="invp__hint">' + esc(r && r.msg || '找不到這個帳號') + '</p>'; return; }
+    var status = { member: '已經在這個活動裡了', invited: '已經邀請過了，等對方回覆就好', unavailable: '這個帳號目前不能邀請' }[r.status];
+    box.innerHTML = '<div class="found">' + ava(r.user, 'ava--md') + '<div class="found__m"><b>' + esc(r.user.name) + '</b><small>' + esc(status || email) + '</small></div>' +
+      (r.status === 'available' ? '<div class="found__a"><span class="pill pill--near">活動成員</span><button class="btn btn--sm btn--go" data-activity-send="' + esc(gid) + '">送出邀請</button></div>' : '') + '</div>';
+  }
+
+  function refreshActivityInvites(force) {
+    if (!/^#\/groups\/?$/.test(location.hash) || document.hidden || ACTIVITY_INV.busy) return Promise.resolve();
+    ACTIVITY_INV.busy = true;
+    var sequence = ACTIVITY_INV.sequence;
+    return API.activityInvites().then(function (d) {
+      if (sequence !== ACTIVITY_INV.sequence || !/^#\/groups\/?$/.test(location.hash)) return;
+      var changed = JSON.stringify(LG.invites || []) !== JSON.stringify(d.invites || []);
+      LG.invites = d.invites || [];
+      if (!changed && !force) return;
+      Object.keys(LG.byId || {}).forEach(function (gid) {
+        var codes = document.getElementById('activityCodes-' + gid), sent = document.getElementById('activitySent-' + gid);
+        if (codes) codes.innerHTML = activityCodeCards(gid, LG.invites);
+        if (sent) sent.innerHTML = activitySentCards(gid, LG.invites);
+      });
+      var incoming = document.getElementById('activityIncoming');
+      if (incoming) incoming.innerHTML = activityIncomingCards(LG.invites);
+    }).catch(function (e) { if (force) toast(e.message || '邀請狀態暫時無法更新', 'err'); })
+      .then(function () { ACTIVITY_INV.busy = false; });
+  }
+  setInterval(function () { refreshActivityInvites(false); }, 5000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) refreshActivityInvites(true); });
 
   function ledgerList(list) {
     return '<div class="lgl">' + list.map(ledgerRow).join('') + '</div>';
@@ -2330,14 +2399,7 @@
         '</span>';
     }).join('');
 
-    var pending = (LG.invites || []).filter(function (r) { return r.groupId === g.id && !r.incoming; });
-    var add = editable ? '<details class="activity-invite-panel"><summary>邀請朋友</summary>' +
-      '<p>朋友不必加入家庭。可產生邀請碼，或用朋友註冊的 Email 邀請。</p>' +
-      '<button type="button" class="btn btn--sm" data-activity-code="' + esc(g.id) + '">產生邀請碼</button>' +
-      '<div id="activityCode-' + esc(g.id) + '" class="activity-code"></div>' +
-      '<form class="activity-email" data-activity-email="' + esc(g.id) + '"><label>朋友的帳號（Email）<input name="email" type="email" required placeholder="friend@example.com"></label><button class="btn btn--go btn--sm">送出邀請</button></form>' +
-      pending.map(function (r) { return '<div class="activity-pending"><span>' + esc(r.label) + ' · ' + (r.kind === 'code' ? '邀請碼' : '帳號邀請') + ' · 等待加入</span><button type="button" class="btn btn--sm" data-activity-response="' + esc(r.id) + '|cancel">取消</button></div>'; }).join('') +
-      '</details>' : '';
+    var add = editable ? activityInvitePanel(g) : '';
 
     return '<div class="lg__b">' +
       (g.note ? '<p class="lg__note">' + esc(g.note) + '</p>' : '') +
@@ -4112,17 +4174,29 @@
 
     var ac = t.closest('[data-activity-code]');
     if (ac) {
-      ac.disabled = true;
-      API.inviteActivity(ac.dataset.activityCode, { label: '朋友' }).then(function (r) {
-        var box = document.getElementById('activityCode-' + ac.dataset.activityCode);
-        if (box) box.innerHTML = '<strong>' + esc(r.code) + '</strong><button class="btn btn--sm" data-copy="' + esc(r.code) + '">複製</button><small>七日內有效，限一人使用</small>';
-      }).catch(function (err) { toast(err.message, 'err'); }).then(function () { ac.disabled = false; });
+      var activity = LG.byId[ac.dataset.activityCode];
+      if (activity) codeNew(activity);
+      return;
+    }
+    var activitySend = t.closest('[data-activity-send]');
+    if (activitySend) {
+      var sendGid = activitySend.dataset.activitySend, found = ACTIVITY_INV.found[sendGid];
+      if (!found) return;
+      activitySend.disabled = true;
+      API.inviteActivity(sendGid, { email: found.email, label: found.user.name.slice(0, 30) }).then(function () {
+        paintActivityFound(sendGid, found.email, { user: found.user, status: 'invited' });
+        refreshActivityInvites(true);
+        toast('邀請送出了，等' + found.user.name + '按「加入」', 'ok');
+      }).catch(function (err) { activitySend.disabled = false; toast(err.message || '送不出去', 'err'); });
       return;
     }
     var ai = t.closest('[data-activity-response]');
     if (ai) {
       var parts = ai.dataset.activityResponse.split('|'); ai.disabled = true;
-      API.respondActivityInvite(parts[0], parts[1]).then(function () { vGroups(); paintGroups(); toast('邀請已更新', 'ok'); })
+      API.respondActivityInvite(parts[0], parts[1]).then(function () {
+        if (parts[1] === 'accept') { vGroups(); paintGroups(); } else refreshActivityInvites(true);
+        toast(parts[1] === 'cancel' ? '已取消邀請' : parts[1] === 'decline' ? '已婉拒' : '已加入活動', 'ok');
+      })
         .catch(function (err) { ai.disabled = false; toast(err.message, 'err'); });
       return;
     }
@@ -4682,8 +4756,11 @@
       if (!name) { toast('先幫這組碼取個名字，之後才分得出哪一組是哪一組', 'err'); if (lab) lab.focus(); return; }
       var go = document.getElementById('cgGo');
       if (go) { go.disabled = true; go.textContent = '產生中…'; }
-      API.createInviteCode({ role: INV.codeRole, label: name }).then(function (c) {
-        codeDone(c);
+      var codeActivity = INV.activity, codeDialog = document.getElementById('cg');
+      var createCode = codeActivity ? API.inviteActivity(codeActivity.id, { label: name }) : API.createInviteCode({ role: INV.codeRole, label: name });
+      createCode.then(function (c) {
+        if (document.getElementById('cg') === codeDialog) codeDone(c);
+        if (codeActivity) refreshActivityInvites(true);
       }).catch(function (err) {
         if (go) { go.disabled = false; go.textContent = '產生'; }
         toast(err.message || '產生失敗', 'err');
@@ -5091,13 +5168,22 @@
 
   document.addEventListener('submit', function (e) {
     var activityForm = e.target;
-    if (activityForm.id === 'activityJoinForm' || activityForm.hasAttribute('data-activity-email')) {
+    if (activityForm.hasAttribute('data-activity-find')) {
+      e.preventDefault();
+      var findGid = activityForm.dataset.activityFind, email = activityForm.elements.email.value.trim();
+      var findSequence = ACTIVITY_INV.sequence;
+      busy(activityForm, true, '找…');
+      API.lookupActivityUser(findGid, email).then(function (r) {
+        busy(activityForm, false);
+        if (findSequence === ACTIVITY_INV.sequence) paintActivityFound(findGid, email, r);
+      }).catch(function (err) { busy(activityForm, false); if (findSequence === ACTIVITY_INV.sequence) paintActivityFound(findGid, email, { msg: err.message }); });
+      return;
+    }
+    if (activityForm.id === 'activityJoinForm') {
       e.preventDefault();
       var button = activityForm.querySelector('button'); button.disabled = true;
-      var request = activityForm.id === 'activityJoinForm'
-        ? API.joinActivity(document.getElementById('activityJoinCode').value.trim())
-        : API.inviteActivity(activityForm.dataset.activityEmail, { email: activityForm.elements.email.value.trim(), label: activityForm.elements.email.value.trim().slice(0, 30) });
-      request.then(function () { vGroups(); paintGroups(); toast(activityForm.id === 'activityJoinForm' ? '已加入活動' : '邀請已送出，朋友可在活動頁接受', 'ok'); })
+      var request = API.joinActivity(document.getElementById('activityJoinCode').value.trim());
+      request.then(function () { vGroups(); paintGroups(); toast('已加入活動', 'ok'); })
         .catch(function (err) { button.disabled = false; toast(err.message, 'err'); });
       return;
     }
@@ -5539,6 +5625,7 @@
   });
 
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.getElementById('cg')) { codeClose(); return; }
     if (e.key === 'Escape' && helpOpen) closeHelp();
     if (e.key === 'Escape' && dangerOn) dangerClose();
     if (e.key === 'Escape' && txEdOn) closeTxEdit();

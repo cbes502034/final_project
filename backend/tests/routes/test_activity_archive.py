@@ -23,10 +23,17 @@ def test_friends_join_by_code_or_account_without_changing_families(api):
     code = created.json()["code"]
     row = crud.get(ActivityInvite, int(created.json()["id"]))
     assert row.code_hash and row.code_hash != code
+    assert created.json()["label"] == "給朋友"
+    pending_codes = api.get("/api/group-invites", headers=login(owner)).json()["invites"]
+    pending = next(r for r in pending_codes if r["id"] == created.json()["id"])
+    assert pending["label"] == "給朋友" and pending["kind"] == "code"
+    assert datetime.fromisoformat(pending["expiresAt"]) == datetime.fromisoformat(created.json()["expiresAt"])
+    assert "code" not in pending and "code_hash" not in pending
     accepted = api.post("/api/group-invites/join", headers=login(friend), json={"code": code.lower()})
     assert accepted.status_code == 200, accepted.text
     assert crud.exists(GroupMember, {"group_id": activity.id, "user_id": friend.id})
     assert crud.get(FamilyMember, where={"user_id": friend.id}).family_id == other_family.id
+    assert not any(r["id"] == created.json()["id"] for r in api.get("/api/group-invites", headers=login(owner)).json()["invites"])
     visible = api.get(f"/api/transactions?groupId={activity.id}", headers=login(friend)).json()
     assert [t["id"] for t in visible["transactions"]] == [str(shared.id)]
     assert visible["transactions"][0]["userName"] == owner.display_name
@@ -40,8 +47,39 @@ def test_friends_join_by_code_or_account_without_changing_families(api):
     assert inbox[0]["incoming"] and inbox[0]["groupName"] == activity.name
     assert api.post(f"/api/group-invites/{iid}", headers=login(stranger), json={"action": "accept"}).status_code == 403
     assert api.post(f"/api/group-invites/{iid}", headers=login(second), json={"action": "accept"}).status_code == 200
+    assert not any(r["id"] == iid for r in api.get("/api/group-invites", headers=login(owner)).json()["invites"])
     assert not crud.exists(FamilyMember, {"user_id": second.id})
     assert api.post(f"/api/groups/{activity.id}/invites", headers=login(friend), json={}).status_code == 403
+
+
+@pytest.mark.route("GET", "/api/groups/{gid}/invites/lookup")
+def test_activity_lookup_confirms_person_before_inviting_without_family_restrictions(api):
+    owner, friend, member, admin = [user(f"{n}@x.tw", n, is_platform_admin=n == "admin") for n in ("owner", "friend", "member", "admin")]
+    family_of((friend, "parent"))
+    activity = ledger_of(owner, member)
+    route = f"/api/groups/{activity.id}/invites/lookup"
+    h = login(owner)
+    found = api.get(route, params={"email": " FRIEND@x.tw "}, headers=h)
+    assert found.status_code == 200, found.text
+    assert found.json()["status"] == "available" and found.json()["user"]["name"] == friend.display_name
+    assert set(found.json()["user"]) == {"id", "name", "avatar", "avatarUrl"}
+    assert api.get(route, params={"email": member.email}, headers=h).json()["status"] == "member"
+    assert api.get(route, params={"email": admin.email}, headers=h).json()["status"] == "unavailable"
+    assert api.get(route, params={"email": "friend"}, headers=h).status_code == 400
+    assert api.get(route, params={"email": "missing@x.tw"}, headers=h).status_code == 404
+    assert api.get(route, params={"email": friend.email}, headers=login(member)).status_code == 403
+    assert api.post(f"/api/groups/{activity.id}/invites", json={"email": friend.email}, headers=h).status_code == 200
+    assert api.get(route, params={"email": friend.email}, headers=h).json()["status"] == "invited"
+    assert not crud.exists(FamilyMember, {"user_id": owner.id})
+
+
+@pytest.mark.route("GET", "/api/groups/{gid}/invites/lookup")
+def test_activity_lookup_limits_account_searches(api):
+    owner = user("owner@x.tw", "建立者")
+    activity = ledger_of(owner)
+    for i in range(10):
+        assert api.get(f"/api/groups/{activity.id}/invites/lookup", params={"email": f"missing{i}@x.tw"}, headers=login(owner)).status_code == 404
+    assert api.get(f"/api/groups/{activity.id}/invites/lookup", params={"email": "again@x.tw"}, headers=login(owner)).status_code == 429
 
 
 @pytest.mark.route("POST", "/api/groups/{gid}/invites")

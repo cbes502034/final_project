@@ -1537,3 +1537,57 @@ def respond_activity_invite(invite_id: str, body: ActivityRespondIn, me: User, d
     result = respond(db, me, invite_id=int(invite_id) if invite_id.isdigit() else 0, action=body.action)
     db.commit()
     return result
+
+
+@router.get("/groups/{gid}/invites/lookup", summary="用完整 email 找活動朋友")
+@block_admin
+def lookup_activity_user(email: str, group=Depends(in_group("gid", owner=True)), me: User = Depends(current_user), db: Session = Depends(get_db)):
+    """用完整 email 找活動朋友
+
+    GET /api/groups/{gid}/invites/lookup
+
+    【這支做什麼】
+        像家庭邀請一樣先找到帳號，再確認對象、送出活動邀請。不改動家庭關係。
+    【前端怎麼打】
+        API.lookupActivityUser(gid, email)，找到後才能送出邀請。
+    【誰能打】
+        已登入的一般使用者，且為活動建立者。
+    【查詢參數】
+        email 必須是完整帳號，僅精確比對；每分鐘最多十次。
+    【成功回應】
+        user（id、name、avatar、avatarUrl）、status（available、member、invited、unavailable）。
+    【錯誤回應】
+        400 格式錯誤；403 非建立者；404 找不到；409 活動已結束；429 查詢過多。
+    【會用到的資料表】
+        users、groups、group_members、activity_invites、audit_logs。
+    【每一步用的工具與資料庫方法】
+        activity_invites.lookup 驗證狀態、查帳號、記查詢次數。
+    【寫法步驟】
+        驗證權限及完整 email；只回名字、頭像及可邀請狀態。
+    【完整寫法】
+        第一步：共用 import
+
+            from collections import Counter
+            from datetime import date, datetime, timedelta, timezone
+
+            from fastapi import APIRouter, Depends, Query
+            from sqlalchemy.orm import Session
+
+            from app import catalog
+            from app.guards import block_admin, current_user, in_group
+            from app.models import AuditLog, FamilyMember, Group, GroupMember, SavingsGoal, Transaction, User
+            from app.routers._stub import not_ready, stub
+            from app.schemas.group import ActivityInviteIn, ActivityJoinIn, ActivityRespondIn, GroupIn, GroupMemberIn, GroupPatchIn, NotifyIn
+            from app.toolkit import crud, errors, ledger
+            from app.toolkit.db import get_db
+
+        第二步：套用以下函式內容
+
+            from app.services.activity_invites import lookup
+            return lookup(db, group, me, email)
+
+    【做完怎麼確認】
+        不同家庭、沒有家庭的朋友都能找到；重複邀請、非建立者與過量查詢會被擋。
+    """
+    from app.services.activity_invites import lookup
+    return lookup(db, group, me, email)

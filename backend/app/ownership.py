@@ -186,6 +186,7 @@ MEMBERS: list[Member] = [
             ("POST", "/api/groups/{gid}/settle"),
             ("PATCH", "/api/groups/{gid}/notify"),
             ("POST", "/api/groups/{gid}/invites"),
+            ("GET", "/api/groups/{gid}/invites/lookup"),
             ("GET", "/api/group-invites"),
             ("POST", "/api/group-invites/join"),
             ("POST", "/api/group-invites/{invite_id}"),

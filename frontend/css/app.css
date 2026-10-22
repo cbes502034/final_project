@@ -3155,7 +3155,7 @@ body.is-out .foot { display: none; }
 }
 #view .fam0__f input:focus { outline: none; border-color: var(--accent); background: var(--card); }
 #view .fam0__f .btn { height: 44px; }
-#view .codein { font-family: var(--code); font-size: 18px !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; text-align: center; }
+#view .codein { font-family: var(--sans); font-size: 18px !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; text-align: center; }
 
 /* 收到的邀請 */
 #view .invc {
@@ -3226,7 +3226,7 @@ body.is-out .foot { display: none; }
 #view .code__n { font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #view .code__d { font-size: 11.5px; color: var(--ink-faint); }
 #view .code__v {
-  margin-left: auto; font-family: var(--code); font-size: 13px; letter-spacing: .1em;
+  margin-left: auto; font-family: var(--sans); font-size: 13px; letter-spacing: .1em;
   color: var(--ink-dim); white-space: nowrap;
 }
 /* 過期的還留在清單上（家長要自己刪），但整列變淡，不要跟還能用的混在一起 */
@@ -3247,7 +3247,7 @@ body.is-out .foot { display: none; }
   padding: 14px 16px; background: var(--sunk); border: 1px solid var(--line-2);
 }
 .cg__code code {
-  font-family: var(--code); font-size: 24px; font-weight: 700; letter-spacing: .14em;
+  font-family: var(--sans); font-size: 24px; font-weight: 700; letter-spacing: .14em;
   color: var(--ink); word-break: break-all;
 }
 .cg__warn {
@@ -3957,19 +3957,18 @@ body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #
 .txr__activity-mobile { display: none; }
 .gsw-empty { color: var(--ink-dim); font-size: 12px; }
 .gsw-create { margin-left: 8px; font-size: 12px; color: var(--accent); }
+/* 活動與家庭邀請共用 invp／codes／cg；字型沿用系統。 */
 .activity-join { margin-bottom: 22px; }
-.activity-join form, .activity-email { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
-.activity-join label, .activity-email label { display: grid; gap: 7px; flex: 1 1 220px; min-width: 0; font-size: 13px; }
-.activity-join input, .activity-email input { width: 100%; min-width: 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); font: inherit; }
-.activity-incoming, .activity-pending { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 15px 0; border-top: 1px solid var(--line); margin-top: 15px; }
-.activity-incoming > div { display: flex; gap: 8px; }
-.activity-invite-panel { width: 100%; margin-top: 12px; }
-.activity-invite-panel summary { cursor: pointer; color: var(--accent); font-weight: 700; }
-.activity-invite-panel p { color: var(--ink-dim); font-size: 12px; line-height: 1.7; }
-.activity-code { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.activity-code strong { font-family: var(--mono); font-size: 20px; letter-spacing: 2px; }
-.activity-code small { color: var(--ink-dim); }
-.activity-pending span { overflow-wrap: anywhere; min-width: 0; }
+.activity-invite-panel { width: 100%; margin-top: 12px; font-family: var(--sans); }
+.activity-invite-panel > summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+#view .activity-invite-panel > .duo { margin-top: 14px; }
+#view .activity-invite-panel .invp__f { flex-wrap: wrap; }
+#view .activity-invite-panel .invp__f input { flex: 1 1 160px; font-family: inherit; }
+#view .activity-invite-panel .invp__n,
+#view .activity-invite-panel .pill,
+#view .activity-invite-panel .card__t,
+#view #activityIncoming .invc__mark,
+#cg, #cg input, #cg button { font-family: var(--sans); }
 @media (max-width: 760px) {
   .txr__activity { display: none; }
   .txr__activity-mobile { display: block; color: var(--ink-dim); margin-top: 4px; font-size: 11px; font-weight: 400; overflow-wrap: anywhere; }
@@ -3978,7 +3977,6 @@ body:not([data-page="home"]):not([data-page="entry"]):not([data-page="stats"]) #
   .archive-tools { align-items: stretch; }
   .archive-tools .fsel { width: 100%; }
   .archive-tools select { max-width: 100%; }
-  .activity-join input, .activity-email input { font-size: 16px; }
-  .activity-email button, .activity-join form > button { flex: 1 1 100%; }
+  #view .activity-invite-panel .invp__f input, #cg input { font-size: 16px; }
   .gsw-empty { display: inline-block; max-width: 120px; white-space: normal; }
 }

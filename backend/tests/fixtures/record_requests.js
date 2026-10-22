@@ -79,6 +79,7 @@ async function rec(name, ...args) {
   await rec('groups', {});
   await rec('updateGroup', g.id, { note: '日常開銷，全家共用' });
   await rec('addGroupMember', g.id, kid.user.id);
+  await rec('lookupActivityUser', g.id, 'meiling@wang.tw');
   const activityCode = await rec('inviteActivity', g.id, {});
   await rec('activityInvites');
   await A.login({ email: 'meiling@wang.tw', password: 'meiling-pass-1' });

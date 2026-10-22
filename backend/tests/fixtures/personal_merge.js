@@ -123,5 +123,30 @@ function checkArchive() {
   assert.ok(ui.archiveMarkup(data).includes('id="txList"'));
   assert.ok(ui.archiveMarkup({currentMonth:'2027-01', activities:[], years:[]}).includes('empty'));
 }
-(async () => { checkArchive(); await checkUI(); await checkMock(); console.log('personal merge, archive UI and mock checks passed'); })()
+async function checkInvitationUI() {
+  const nodes = {'activityCodes-G1':{}, 'activitySent-G1':{}, activityIncoming:{}};
+  const code = {id:'code1', groupId:'G1', kind:'code', label:'給小明', expiresAt:'2030-12-31', code:'SECRET-CODE'};
+  const account = {id:'account1', groupId:'G1', kind:'account', label:'小美', inviteeEmail:'friend@x.tw'};
+  const ui = { LG:{invites:[code,account], byId:{G1:{}}}, ACTIVITY_INV:{busy:false,sequence:0},
+    location:{hash:'#/groups'}, document:{hidden:false,getElementById:id=>nodes[id]},
+    API:{activityInvites:async()=>({invites:[account]})}, esc:String, shortDate:()=>'', ttlText:()=>'', ava:()=>'', toast:()=>{} };
+  vm.createContext(ui);
+  vm.runInContext(['activityCodeCards','activitySentCards','activityIncomingCards','activityInvitePanel','refreshActivityInvites'].map(extract).join('\n'),ui);
+  const panel = ui.activityInvitePanel({id:'G1'});
+  assert.ok(panel.includes('data-activity-find="G1"') && panel.includes('找人'));
+  assert.ok(panel.includes('data-activity-code="G1"') && panel.includes('產生邀請碼'));
+  assert.ok(panel.includes('給小明') && panel.includes('等待回覆'));
+  assert.ok(!panel.includes('SECRET-CODE')); // Only the dialog may reveal a new code.
+  assert.ok(!panel.includes('activityCode-G1'));
+  await ui.refreshActivityInvites(true);
+  assert.ok(!nodes['activityCodes-G1'].innerHTML.includes('code1'));
+  assert.ok(nodes['activitySent-G1'].innerHTML.includes('account1'));
+  ui.API.activityInvites=async()=>({invites:[]});
+  await ui.refreshActivityInvites(true);
+  assert.equal(nodes['activitySent-G1'].innerHTML,'');
+  ui.document.hidden=true;
+  ui.API.activityInvites=()=>{throw Error('Hidden pages must not poll');};
+  await ui.refreshActivityInvites(true);
+}
+(async () => { checkArchive(); await checkInvitationUI(); await checkUI(); await checkMock(); console.log('personal merge, archive and invitation UI checks passed'); })()
   .catch(err => { console.error(err); process.exitCode = 1; });

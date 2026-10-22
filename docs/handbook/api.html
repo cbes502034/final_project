@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API 瀏覽</title>
-<meta name="description" content="家庭記帳系統的 84 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
+<meta name="description" content="家庭記帳系統的 85 支 API 路由，可搜尋、依負責人與方法篩選，展開看參數與請求回應範例。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
@@ -40,7 +40,7 @@
     <div class="hero__eyebrow">API REFERENCE</div>
     <h1 style="font-size:clamp(28px,3.6vw,38px)">API 瀏覽</h1>
     <p class="hero__lead">
-      我們寫的 <b>84 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
+      我們寫的 <b>85 支</b>，加上 FastAPI 自動產生的 2 支。依四個功能模組分組。點任一列展開看參數與請求／回應。
       標 <span class="tag tag--llm">★</span> 的是與模型直接相關的路由。
     </p>
     <div class="hero__meta">
@@ -95,7 +95,7 @@
 
   <footer class="foot" style="max-width:none">
     <div>家庭記帳與財務控管系統 · API 目錄</div>
-    <div class="mono">84 ROUTES · 4 MODULES</div>
+    <div class="mono">85 ROUTES · 4 MODULES</div>
   </footer>
 </div>
 
@@ -486,7 +486,8 @@
     { n: 87, o: 'm2', m: 'POST', p: '/api/groups/{gid}/invites', a: '登入', d: '建立活動邀請', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
     { n: 88, o: 'm2', m: 'GET', p: '/api/group-invites', a: '登入', d: '我的活動邀請', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
     { n: 89, o: 'm2', m: 'POST', p: '/api/group-invites/join', a: '登入', d: '使用邀請碼加入活動', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
-    { n: 90, o: 'm2', m: 'POST', p: '/api/group-invites/{invite_id}', a: '登入', d: '回覆或取消活動邀請', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' }
+    { n: 90, o: 'm2', m: 'POST', p: '/api/group-invites/{invite_id}', a: '登入', d: '回覆或取消活動邀請', q: [], res: '{}', note: '活動不改變家庭關係；收支明細以台北時間按年月整理。' },
+    { n: 91, o: 'm2', m: 'GET', p: '/api/groups/{gid}/invites/lookup', a: '登入', d: '用完整 email 找活動朋友', q: ['email（完整帳號）'], res: '{}', note: '只有活動建立者可以找人；活動邀請不影響家庭身分。' }
   ];
 
   var VERBS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];

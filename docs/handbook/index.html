@@ -68,7 +68,7 @@
         <div class="mchip"><span>線上原型</span><b><a href="https://fambudget-web.onrender.com" target="_blank" rel="noopener">fambudget-web</a></b></div>
         <div class="mchip"><span>原始碼</span><b class="mono">cbes502034/final_project</b></div>
         <div class="mchip"><span>技術棧</span><b>FastAPI · PostgreSQL · 純靜態前端</b></div>
-        <div class="mchip"><span>API</span><b>84 支路由</b></div>
+        <div class="mchip"><span>API</span><b>85 支路由</b></div>
         <div class="mchip"><span>資料表</span><b>22 張</b></div>
       </div>
     </header>
@@ -575,7 +575,7 @@
     <section class="sec" id="api">
       <div class="sec__h"><span class="sec__n">05</span><h2>API 目錄：按人員分類</h2></div>
       <p class="sec__lead">
-        共 <b>84 支路由</b>。權限標示：公開 / 登入 / 本人 / 家長 / 監管者 / 建立者 / 平台管理員。
+        共 <b>85 支路由</b>。權限標示：公開 / 登入 / 本人 / 家長 / 監管者 / 建立者 / 平台管理員。
         <span class="tag tag--llm">★</span> 代表與 LLM 直接相關。
       </p>
 
@@ -587,7 +587,7 @@
         </div>
         <div class="card" style="border-top:2px solid var(--m2)">
           <div class="mvc__k" style="color:var(--m2)">記帳</div>
-          <div class="mvc__t">記帳 · 25 支</div>
+          <div class="mvc__t">記帳 · 26 支</div>
           <p style="font-size:13px;color:var(--ink-soft)">四支 nlp 路由是<b>整個系統的核心</b>。解析與寫入刻意分兩步，模型永遠不碰資料庫。</p>
         </div>
         <div class="card" style="border-top:2px solid var(--m3)">
@@ -671,6 +671,7 @@
             <tr><td class="num">88</td><td class="tight">GET</td><td class="rt">/api/group-invites</td><td class="tight">登入</td><td>我的活動邀請</td></tr>
             <tr><td class="num">89</td><td class="tight">POST</td><td class="rt">/api/group-invites/join</td><td class="tight">登入</td><td>使用邀請碼加入活動</td></tr>
             <tr><td class="num">90</td><td class="tight">POST</td><td class="rt">/api/group-invites/{invite_id}</td><td class="tight">登入</td><td>回覆或取消活動邀請</td></tr>
+          <tr><td class="num">91</td><td class="tight">GET</td><td class="rt">/api/groups/{gid}/invites/lookup</td><td class="tight">登入</td><td>用完整 email 找活動朋友</td></tr>
           </tbody>
         </table>
       </div>
@@ -790,7 +791,7 @@
         <div class="layer">
           <div class="layer__h"><span class="layer__t">FastAPI</span><span class="layer__s">backend/app/</span></div>
           <div class="boxes" style="margin-bottom:10px">
-            <div class="box"><b>routers/</b> 84 支路由，只做接收與回傳</div>
+            <div class="box"><b>routers/</b> 85 支路由，只做接收與回傳</div>
             <div class="box"><b>guards.py</b> 路由守衛：登入 · 角色 · 本人 · 帳本成員</div>
             <div class="box"><b>schemas/</b> Pydantic 驗證</div>
             <div class="box"><b>toolkit/</b> 設定 · 資料庫 · 增刪改查 · 密碼 · JWT · 規則</div>
