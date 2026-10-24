@@ -37,6 +37,7 @@
     document.addEventListener('click', function (event) {
       var target = event.target;
       if (!target.closest) return;
+      if (target.closest('.gsw__create')) closeActivity();
       if (target.closest('#searchBtn')) {
         if (mobile) setSearchOpen(drawer.hidden, false);
       } else if (target.closest('#searchClose')) {
@@ -112,7 +113,7 @@
             '<span class="gsw__d" style="background:' + tint(activity.color) + '"></span>' +
             '<span class="gsw__m"><b>' + esc(activity.name) + '</b><i>' + activity.count + ' 筆' + (activity.goal ? '　目標 ' + money(activity.goal) : '') + '</i></span></button>';
         }).join('') : '<p class="gsw__empty">目前尚未建立活動</p><a class="gsw__i gsw__create" href="#/groups">建立活動 →</a>') +
-        '<a class="gsw__more" href="#/" data-personal-return>回到個人帳本 →</a></div>';
+        '</div>';
     }
 
     setSearchOpen(false);

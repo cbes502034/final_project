@@ -65,8 +65,12 @@ function check(repo) {
   assert.ok(nodes.gsw.innerHTML.includes('id="gswBtn"')); // Empty and populated states use the same control.
   header.setActivities([{id:'1',name:'<旅行>',count:3,color:'book-indigo',goal:1000}], '1');
   assert.ok(nodes.gsw.innerHTML.includes('&lt;旅行>'));
-  assert.ok(nodes.gsw.innerHTML.includes('回到個人帳本 →'));
+  assert.ok(!nodes.gsw.innerHTML.includes('回到活動管理'));
+  assert.ok(!nodes.gsw.innerHTML.includes('data-personal-return'));
   assert.ok(nodes.gsw.innerHTML.includes('目標 1000'));
+  nodes.gswPanel.hidden = false;
+  dispatch('click', '.gsw__create');
+  assert.equal(nodes.gswPanel.hidden, true); // Same-page links close the activity menu too.
   header.render({...state, canFamily:false});
   assert.ok(nodes.headerScope.innerHTML.includes('個人模式'));
   assert.ok(!nodes.headerScope.innerHTML.includes('data-scope='));

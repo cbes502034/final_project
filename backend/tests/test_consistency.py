@@ -1502,10 +1502,12 @@ def test_沒有側欄_原本的每個功能都嵌在儀表板上():
     missing = need - tiles
     assert not missing, "這些頁面拆掉側欄之後進不去了：%s" % sorted(missing)
     assert "quick: true" in home, "儀表板上要有「記一筆」"
-    # 換主題與登出原本在右上角的帳號選單裡。選單拆掉之後搬進常用功能——
-    # 整個網站只有這兩個地方進得去，不能跟著選單一起消失。
-    for part in ("docs/guide.html", "nav: 'theme'", "id: 'logout'"):
+    # 使用說明與換主題保留在常用功能；登出移至個人資料頁。
+    for part in ("docs/guide.html", "nav: 'theme'"):
         assert part in home, "常用功能少了 " + part
+    assert "id: 'logout'" not in home
+    profile = re.search(r"function vProfile\(at\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert 'id="logout"' in profile
 
     # 其他頁面要能回到總覽；總覽本身不需要那顆鈕
     assert 'id="homeBtn"' in html
@@ -2350,8 +2352,7 @@ def test_右上角的帳號選單已經拆掉():
 def test_常用功能不跟著_summary_一起消失():
     """GET /api/summary 還沒做的時候，總覽的內容會整塊換成錯誤卡。
 
-    功能格子要是也一起不見，使用者連**登出**都按不到——
-    帳號選單拆掉之後，那是整個網站唯一的出口。
+    數字讀取失敗時仍保留功能入口，使用者可前往個人資料登出。
     """
     app = read("frontend/js/app.js")
     home = app[app.index("function vHome()"):]
@@ -2359,7 +2360,7 @@ def test_常用功能不跟著_summary_一起消失():
 
     tiles = app[app.index("function quickTiles(o)"):app.index("function tile(t)")]
     assert "o = o || {}" in tiles, "什麼資料都沒有的時候也要畫得出來"
-    for part in ("id: 'logout'", "nav: 'theme'"):
+    for part in ("nav: 'profile'", "nav: 'theme'"):
         assert part in tiles, "常用功能少了 " + part
 
 

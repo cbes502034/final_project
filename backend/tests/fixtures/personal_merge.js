@@ -40,6 +40,35 @@ async function checkUI() {
   const ownerHTML = ui.ledgerBody({ id: 'shared', members: [], count: 2, canEdit: true });
   assert.ok(!ownerHTML.includes('data-garch='));
   assert.ok(!ui.ledgerBody({ id: 'personal', personal: true, members: [], count: 0 }).includes('data-gsettle='));
+  let activity = null, family = false, repaints = 0;
+  Object.assign(ui, { activeActivity: () => activity, isFamily: () => family,
+    modeName: () => family ? '家庭' : activity ? '活動' : '個人', TILE_IC: {},
+    PERSONAL_GROUP: 'personal', CURRENT_ACTIVITY: null, ENTRY_ACTIVITY: null,
+    F: {userId: 'someone', activityId: 'shared'}, location: {hash: '#/'}, paint: () => { repaints++; } });
+  vm.runInContext(['quickTiles', 'tile', 'returnPersonal'].map(extract).join('\n'), ui);
+  const personalTiles = ui.quickTiles({});
+  assert.ok(personalTiles.includes('data-nav="groups"'));
+  assert.ok(!personalTiles.includes('id="logout"'));
+  activity = {id: 'shared', name: '旅行'};
+  const activityTiles = ui.quickTiles({});
+  assert.ok(activityTiles.includes('data-personal-return'));
+  assert.ok(activityTiles.includes('>個人帳本</span>') && activityTiles.includes('>活動帳本</span>'));
+  assert.ok(!activityTiles.includes('id="logout"'));
+  family = true;
+  const familyTiles = ui.quickTiles({fam: true});
+  assert.ok(!familyTiles.includes('data-nav="groups"') && !familyTiles.includes('id="logout"'));
+  assert.ok(!ui.quickTiles({}).includes('data-nav="groups"')); // Failed summaries retain the family scope.
+  ui.GROUP = 'shared'; ui.CURRENT_ACTIVITY = activity; ui.ENTRY_ACTIVITY = 'shared';
+  ui.returnPersonal();
+  assert.equal(ui.GROUP, 'personal');
+  assert.equal(ui.CURRENT_ACTIVITY, null); assert.equal(ui.ENTRY_ACTIVITY, null);
+  assert.equal(ui.F.activityId, 'all'); assert.equal(ui.F.userId, 'all');
+  assert.equal(ui.location.hash, '#/');
+  assert.equal(repaints, 1); // The activity home must repaint as the personal home even though its URL stays the same.
+  ui.location.hash = '#/entry';
+  ui.returnPersonal();
+  assert.equal(ui.location.hash, '#/');
+  assert.equal(repaints, 1);
 }
 async function checkMock() {
   const storage = { 'fambudget.state.v2': JSON.stringify({ me: 'U1', auth: { loggedIn: true } }) };

@@ -399,8 +399,8 @@
   /* 常用功能：原本側欄的東西都在這裡。
      ⚠️ 家庭模式只整理資訊，沒有「記一筆」——記帳永遠是記自己的。
      ⚠️ 這一區**不能**跟著 GET /api/summary 的成敗走。數字拿不到時整頁換成
-        錯誤卡，功能格子要是也一起不見，使用者連登出都按不到——而登出是
-        整個網站唯一的出口。所以 o 裡的東西全部可以是 undefined：
+        錯誤卡，功能格子也要保留，讓使用者仍能前往個人資料等頁面。
+        所以 o 裡的東西全部可以是 undefined：
         那幾個角標（幾筆、幾本、幾則）沒有就不顯示，格子照樣在。 */
   function quickTiles(o) {
     o = o || {};
@@ -408,24 +408,24 @@
     var tiles = [
       o.fam ? null : { quick: true, label: '記一筆', icon: 'add', tone: 'add' },
       { nav: 'entry', label: name + '帳本', icon: 'entry', badge: o.count ? '本月 ' + o.count + ' 筆' : '' },
-      activity ? { nav: 'groups', label: '活動管理', icon: 'groups', badge: activeActivity().name } : null,
+      activity ? { personal: true, label: '個人帳本', icon: 'entry' } : null,
+      isFamily() ? null : { nav: 'groups', label: '活動管理', icon: 'groups', badge: activity ? activeActivity().name : '' },
       o.fam ? null : { nav: 'stats', label: name + '財務狀況', icon: 'stats' },
       { nav: 'advice', label: name + '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '', badge: o.warn ? o.warn + ' 則要注意' : '' },
       o.fam ? { nav: 'members', label: o.fm && o.fm.family ? o.fm.family.name : '家庭', icon: 'members',
         badge: o.fm && o.fm.members ? o.fm.members.length + ' 人' : '' } : null,
       o.fam ? null : { nav: 'profile', label: '個人資料', icon: 'profile' },
       activity ? null : { href: 'docs/guide.html', label: '使用說明', icon: 'guide' },
-      { nav: 'theme', label: '換主題', icon: 'theme' },
-      activity ? null : { id: 'logout', label: '登出', icon: 'out', tone: 'out' }
+      { nav: 'theme', label: '換主題', icon: 'theme' }
     ];
     return '<section class="qk"><div class="qk__h"><h2 class="qk__t">常用功能</h2></div>' +
       '<nav class="dgrid" aria-label="功能">' + tiles.filter(Boolean).map(tile).join('') + '</nav></section>';
   }
 
   function tile(t) {
-    /* id ＝ 這一格按下去要做事，不是換頁（目前只有登出，處理在下面的委派裡） */
+    /* 個人帳本捷徑先清除活動對象，再回到個人總覽。 */
     var attr = t.id ? ' id="' + t.id + '"'
-      : t.quick ? ' data-quick="entry"' : t.nav !== undefined ? ' data-nav="' + t.nav + '"' : '';
+      : t.personal ? ' data-personal-return' : t.quick ? ' data-quick="entry"' : t.nav !== undefined ? ' data-nav="' + t.nav + '"' : '';
     var tag = t.href ? 'a' : 'button';
     /* 手機的底部分頁列已經有明細、統計、建議：這三格在那個寬度收起來，不要同一個畫面兩個入口 */
     var inBar = ['stats', 'advice'].indexOf(t.nav) >= 0 ? ' dtile--tabbar' : '';
@@ -539,7 +539,7 @@
           '</div>' +
         '</section>';
 
-        /* 2. 常用功能：這一區不靠任何一支 API，永遠畫得出來（登出在裡面） */
+        /* 2. 常用功能：這一區不靠任何一支 API，永遠畫得出來 */
         h += quickTiles({ fam: fam, count: d.__err ? 0 : d.count, groups: gs.length,
                           warn: warn, fm: fm, famOff: !!fm.__err, canFam: canFamily(m) });
         h += '</div>';
@@ -591,7 +591,7 @@
         });
       });
     }).catch(function (e) {
-      /* 數字拿不到，但功能還是要能按——尤其是登出 */
+      /* 數字拿不到，功能入口仍要能使用 */
       $view.innerHTML = '<div class="page">' + errState(e) + quickTiles({}) + '</div>';
     });
   }
@@ -935,7 +935,9 @@
     paintGroups();
     if (!ARCHIVE.current) ARCHIVE.current = taipeiMonth();
     if (!ARCHIVE.month) ARCHIVE.month = ARCHIVE.current;
-    head(modeName() + '帳本', activeActivity() ? activeActivity().name : isFamily() ? '明細依照原本的照看權限顯示' : '');
+    head(modeName() + '帳本', activeActivity() ? activeActivity().name : isFamily() ? '明細依照原本的照看權限顯示' : '',
+      isFamily() ? '' : '<a class="btn btn--sm btn--ghost" href="#/">← ' +
+        (ENTRY_ACTIVITY ? '返回活動頁面' : '返回個人總覽') + '</a>');
     /* 只有從總覽的「本月收入／支出」進來才帶著本月的篩選；從別的地方進來一律清掉，
        不然上次點過之後，每次開明細都只剩這個月 */
     if (!FLT_KEEP) { F.from = ''; F.to = ''; }
@@ -3635,7 +3637,7 @@
 
   function vProfile(at) {
     if (at === 'theme') { location.replace('#/theme'); return; }
-    head('個人資料', '');
+    head('個人資料', '', '<button class="btn btn--sm btn--ghost" id="logout">登出</button>');
     $view.innerHTML = '<div class="page">' + skeleton(3) + '</div>';
     API.me().then(function (m) {
       var u = m.user;
