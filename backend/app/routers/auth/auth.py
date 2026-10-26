@@ -34,6 +34,7 @@ from app.models import (
     AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
 )
 from app.routers._stub import not_ready, stub
+from app.services import income_ledger
 from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
 from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
 from app.toolkit.config import settings
@@ -157,6 +158,7 @@ def register(body: RegisterIn, request: Request, background: BackgroundTasks, db
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -445,6 +447,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -687,6 +690,7 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -860,6 +864,7 @@ def logout(
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -969,6 +974,7 @@ def logout_all(me: User, payload: dict = Depends(current_token_payload), db: Ses
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -1043,7 +1049,7 @@ def get_me(me: User, db: Session = Depends(get_db)):
                   "avatar": "明", "avatarUrl": null, "age": 52, "birthYear": 1974, "joined": "2026-01-05",
                   "theme": "sky", "onboardedAt": "2026-01-05T01:00:00+00:00", "savingsGoal": 20000,
                   "isPlatformAdmin": false, "emailVerified": true, "incomeMode": "auto", "expectedIncome": null,
-                  "incomeType": null, "incomeNote": null},
+                  "incomeType": null, "incomeNote": null, "incomePayDay": null},
          "family": {"id": "2", "name": "王家", "period": "2026-09"},
          "visible": ["3", "4", "5"], "queryable": ["3", "4", "5", "6"],
          "guardedBy": [{"id": "4", "name": "陳美玲"}]}
@@ -1100,6 +1106,7 @@ def get_me(me: User, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -1152,6 +1159,7 @@ def get_me(me: User, db: Session = Depends(get_db)):
                     "expectedIncome": me.expected_income,
                     "incomeType": me.income_type,
                     "incomeNote": me.income_note,
+                    "incomePayDay": me.income_pay_day,
                     "emailVerified": me.email_verified_at is not None,
                 },
                 "family": {"id": str(fam.id), "name": fam.name,
@@ -1216,6 +1224,7 @@ def get_me(me: User, db: Session = Depends(get_db)):
             "expectedIncome": me.expected_income,
             "incomeType": me.income_type,
             "incomeNote": me.income_note,
+            "incomePayDay": me.income_pay_day,
             "emailVerified": me.email_verified_at is not None,
         },
         "family": {"id": str(fam.id), "name": fam.name,
@@ -1266,6 +1275,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         expectedIncome 數字或 null  每月預計收入；0 或 null = 不填。選 fixed 一定要有
         incomeType   字串或 null  收入怎麼來（catalog.INCOME_TYPES：salary_end、hourly、freelance…、other）
         incomeNote   字串或 null  選 other 時自己寫的，洗過（profile.clean_note）、最多 30 字
+        incomePayDay 整數或 null  固定收入每月幾號入帳（1~28），null = 1 號；到了那天自動記一筆（services/income_ledger.py）
         範例：{"displayName": "王大明", "birthYear": 1974}　或　{"theme": "sky"}　或　{"onboarded": true}
         · body.model_fields_set 是「有送來的欄位名字」：birthYear 送 null（要清掉）跟沒送（不要動）分得開
         · 不認得的欄位（例如 email）FastAPI 直接回 422（ProfilePatchIn 設了 extra="forbid"）
@@ -1324,6 +1334,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -1384,6 +1395,10 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
                 changes["income_type"] = body.incomeType
             if "incomeNote" in sent:
                 changes["income_note"] = profile.clean_note(body.incomeNote)[:30] or None     # 「其他」自己寫的，洗過、最多 30 字
+            if "incomePayDay" in sent:                                         # 固定收入每月幾號入帳，null = 1 號
+                if body.incomePayDay is not None and not 1 <= body.incomePayDay <= 28:
+                    raise errors.unprocessable("入帳日只能是 1～28 號")
+                changes["income_pay_day"] = body.incomePayDay
             if {"incomeMode", "expectedIncome"} & sent and changes.get("income_mode", me.income_mode) == "fixed" \
                     and not changes.get("expected_income", me.expected_income):
                 raise errors.unprocessable("選固定月薪，要填每個月大約多少")
@@ -1391,6 +1406,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
             # 6. 寫回去
             if changes:
                 crud.save(User, {"id": me.id, **changes}, db=db)
+                income_ledger.sync_settings(db, me)              # 這個月自動記的薪水還沒被改過：跟著新的金額、入帳日
                 db.commit()
 
             # 7. 回傳改完的 user（形狀同 GET /api/auth/me）
@@ -1418,6 +1434,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
                 "expectedIncome": me.expected_income,
                 "incomeType": me.income_type,
                 "incomeNote": me.income_note,
+                "incomePayDay": me.income_pay_day,
             }
 
     【做完怎麼確認】
@@ -1485,6 +1502,10 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         changes["income_type"] = body.incomeType
     if "incomeNote" in sent:
         changes["income_note"] = profile.clean_note(body.incomeNote)[:30] or None     # 「其他」自己寫的，洗過、最多 30 字
+    if "incomePayDay" in sent:                                         # 固定收入每月幾號入帳，null = 1 號
+        if body.incomePayDay is not None and not 1 <= body.incomePayDay <= 28:
+            raise errors.unprocessable("入帳日只能是 1～28 號")
+        changes["income_pay_day"] = body.incomePayDay
     if {"incomeMode", "expectedIncome"} & sent and changes.get("income_mode", me.income_mode) == "fixed" \
             and not changes.get("expected_income", me.expected_income):
         raise errors.unprocessable("選固定月薪，要填每個月大約多少")
@@ -1492,6 +1513,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
     # 6. 寫回去
     if changes:
         crud.save(User, {"id": me.id, **changes}, db=db)
+        income_ledger.sync_settings(db, me)              # 這個月自動記的薪水還沒被改過：跟著新的金額、入帳日
         db.commit()
 
     # 7. 回傳改完的 user（形狀同 GET /api/auth/me）
@@ -1519,6 +1541,7 @@ def update_me(body: ProfilePatchIn, me: User, db: Session = Depends(get_db)):
         "expectedIncome": me.expected_income,
         "incomeType": me.income_type,
         "incomeNote": me.income_note,
+        "incomePayDay": me.income_pay_day,
     }
 
 
@@ -1603,6 +1626,7 @@ def change_password(
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -1759,6 +1783,7 @@ def request_password_reset(body: PasswordResetIn, background: BackgroundTasks, d
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -1930,6 +1955,7 @@ def confirm_password_reset(
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -2066,6 +2092,7 @@ def verify_email(body: VerifyEmailIn, request: Request, db: Session = Depends(ge
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -2252,6 +2279,7 @@ def resend_verify_email(me: User, background: BackgroundTasks, db: Session = Dep
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -2390,6 +2418,7 @@ def get_finance(me: User, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -2521,6 +2550,7 @@ def set_finance(body: FinanceIn, me: User, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -2657,6 +2687,7 @@ def verify_password(body: VerifyPasswordIn, me: User, db: Session = Depends(get_
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -2785,6 +2816,7 @@ def list_sessions(me: User, payload: dict = Depends(current_token_payload), db: 
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -2928,6 +2960,7 @@ def upload_avatar(body: AvatarIn, me: User, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -3032,6 +3065,7 @@ def delete_avatar(me: User, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings
@@ -3142,6 +3176,7 @@ def delete_me(body: VerifyPasswordIn, me: User, db: Session = Depends(get_db)):
                 AuditLog, Family, FamilyMember, Group, GroupMember, Guardianship, PasswordReset, SavingsGoal, User, UserSession,
             )
             from app.routers._stub import not_ready, stub
+            from app.services import income_ledger
             from app.schemas.auth import AvatarIn, FinanceIn, LoginIn, LogoutIn, PasswordChangeIn, PasswordResetConfirmIn, PasswordResetIn, ProfilePatchIn, RefreshIn, RegisterIn, VerifyEmailIn, VerifyPasswordIn
             from app.toolkit import account, crud, email_verify, errors, images, mailer, password_reset, passwords, period, profile, roles, security, theme, tokens
             from app.toolkit.config import settings

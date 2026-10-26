@@ -74,8 +74,7 @@ window.DATA = {
      使用者可以自己改；「其他」讓他自己寫。可花上限的收入一律是 max(已入帳, 預計收入)。
      ⚠️ 只拿來決定怎麼估、建議的做法，不拿來推測或評價收入高低、身分。 */
   incomeTypes: [
-    { id: 'salary_end', name: '月薪（月底或月中發）', mode: 'fixed' },
-    { id: 'salary_start', name: '月薪（月初發）', mode: 'fixed' },
+    { id: 'salary', name: '月薪', mode: 'fixed' },
     { id: 'hourly', name: '時薪、日薪、打工', mode: 'auto' },
     { id: 'freelance', name: '接案、自由工作', mode: 'auto' },
     { id: 'commission', name: '底薪加獎金、抽佣', mode: 'auto' },
@@ -294,6 +293,8 @@ window.DATA = {
              ['expected_income', 'NUMERIC(14,2)', '每月預計收入。可花上限用 max(這個月已入帳, 預計)：月底才發薪、日薪、打工的人月初不會變負數'],
              ['income_type', 'TEXT', '收入怎麼來：incomeTypes 的 id（月薪、時薪日薪打工、接案…、other）。只決定怎麼估與建議的做法'],
              ['income_note', 'TEXT', '選「其他」時自己寫的收入方式，最多 30 字。⚠️ 進 prompt 前一樣當資料洗過（toolkit/profile.py）'],
+             ['income_pay_day', 'INT', '固定收入每月幾號入帳（1~28）。NULL = 每月 1 日'],
+             ['income_posted_period', 'TEXT', "'2026-10'：這個月的固定收入已經自動記過（或略過），刪掉也不再補"],
              ['created_at', 'TIMESTAMPTZ', ''], ['last_login_at', 'TIMESTAMPTZ', ''],
              ['last_active_at', 'TIMESTAMPTZ', '最後一次有登入狀態的請求。平台管理頁的紅綠燈看它，每 30 秒最多寫一次'],
              ['deleted_at', 'TIMESTAMPTZ', 'NULL = 正常。刪除帳號後只留墓碑：名字、email 抹掉，紀錄全部刪除（toolkit/account.py）']] },

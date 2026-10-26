@@ -173,7 +173,7 @@
 
   var ALLOWANCE_TW = { paid: '給了你這個月的零用金', adjusted: '把這個月的零用金改成', cancelled: '取消了這個月的零用金' };
 
-  var KIND_TW = { budget_alert: '階段性提醒', allowance: '零用金', family_invite: '家庭邀請',
+  var KIND_TW = { budget_alert: '階段性提醒', allowance: '零用金', income: '自動入帳', family_invite: '家庭邀請',
                   activity_invite: '活動邀請', activity_target: '目標金額' };
 
   function line(n) {
@@ -200,6 +200,10 @@
       return esc(n.payerName || '家長') + ' ' + ALLOWANCE_TW[n.action] +
         (n.action === 'cancelled' ? '' : ' <b>' + money(n.amount) + '</b>') +
         (n.action === 'adjusted' && n.prev != null ? '<br><span class="bell__n2">原本 ' + money(n.prev) + '</span>' : '');
+    }
+    if (n.type === 'income') {
+      return '這個月的固定收入 <b>' + money(n.amount) + '</b> 已經自動記進個人帳本' +
+        '<br><span class="bell__n2">實際入帳金額不一樣的話，到帳本改那一筆</span>';
     }
     if (n.type === 'family_invite') {
       return esc(n.inviterName || '家人') + ' 邀請你以' + (n.role === 'parent' ? '家長' : '子女') +
@@ -399,7 +403,7 @@
       if (n && (n.type === 'budget_alert' || n.type === 'family_invite' || n.type === 'activity_target')) {
         // 提醒點下去看自己的總覽，不是別人的紀錄；家庭邀請的「加入」也在總覽最上面
         location.hash = '#/';
-      } else if (n && n.type === 'allowance') {
+      } else if (n && (n.type === 'allowance' || n.type === 'income')) {
         location.hash = '#/entry';
       } else if (n && n.type === 'activity_invite') {
         location.hash = '#/groups';

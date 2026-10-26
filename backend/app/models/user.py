@@ -75,6 +75,10 @@ class User(Base):
     # 收入怎麼來（catalog.INCOME_TYPES 的 id）；選「其他」時自己寫的（最多 30 字）
     income_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     income_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 固定收入每月幾號入帳（1~28）。NULL = 每月 1 日。到了那天自動記一筆（services/income_ledger.py）
+    income_pay_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # '2026-10'：這個月的固定收入已經自動記過（或略過），刪掉也不再補
+    income_posted_period: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 最後一次有登入狀態的請求。平台管理頁的紅綠燈看它（守衛每 30 秒最多寫一次）

@@ -372,6 +372,7 @@
     if (u && u.expectedIncome === undefined) u.expectedIncome = null;
     if (u && u.incomeType === undefined) u.incomeType = null;
     if (u && u.incomeNote === undefined) u.incomeNote = null;
+    if (u && u.incomePayDay === undefined) u.incomePayDay = null;
     return u;
   }
 
@@ -1203,6 +1204,13 @@
           q.incomeType = p.incomeType;
         }
         if (p.incomeNote !== undefined) q.incomeNote = String(p.incomeNote || '').replace(/\s+/g, ' ').trim().slice(0, 30) || null;
+        /* 固定收入每月幾號入帳。⚠️ 示範模式只記設定：到日子自動記一筆是後端做的（services/income_ledger.py） */
+        if (p.incomePayDay !== undefined) {
+          if (p.incomePayDay !== null && (!Number.isSafeInteger(p.incomePayDay) || p.incomePayDay < 1 || p.incomePayDay > 28)) {
+            throw oops('入帳日只能是 1～28 號', 422);
+          }
+          q.incomePayDay = p.incomePayDay;
+        }
         if ((p.incomeMode !== undefined || p.expectedIncome !== undefined) &&
             ('incomeMode' in q ? q.incomeMode : m.incomeMode) === 'fixed' &&
             !('expectedIncome' in q ? q.expectedIncome : m.expectedIncome)) {

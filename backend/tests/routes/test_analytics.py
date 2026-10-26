@@ -32,7 +32,8 @@ SUM = ("GET", "/api/summary")
 
 @pytest.mark.route(*SUM)
 def test_personal_book_keeps_profile_goal_and_expected_income(api):
-    me = user("personal@x.tw", "本人", income_mode="fixed", expected_income=50000)
+    me = user("personal@x.tw", "本人", income_mode="fixed", expected_income=50000,
+              income_posted_period=this_month())     # 這支看預計收入：這個月的固定收入還沒自動入帳
     personal = ledger_of(me, name="本人的帳本", personal_owner_id=me.id)
     separate = ledger_of(me, name="尚未合併")
     cats = categories()
@@ -131,7 +132,8 @@ def test_summary_孩子的零用金算進可支配上限_自己有記就不重�
 @pytest.mark.route(*SUM)
 def test_summary_月底才發薪_先用預計收入_入帳後不重複算(api):
     """使用者實際遇到：月底才領薪水、月初就開始記帳，收入是 0，「這個月還可以花」一開始就是負的。"""
-    me = user("g@x.tw", "女朋友", income_mode="fixed", expected_income=31000)
+    me = user("g@x.tw", "女朋友", income_mode="fixed", expected_income=31000,
+              income_posted_period=this_month())     # 還沒到入帳日（自動入帳另外在 test_income_ledger.py 驗）
     cats = categories()
     g = ledger_of(me, personal_owner_id=me.id)
     spend(me, g, cats["餐飲"], 2000)
@@ -465,7 +467,8 @@ def test_generate_advices_數字先算好_不合格的丟掉_同月蓋掉舊的(
 
 @pytest.mark.route(*GEN)
 def test_generate_advices_收入方式當背景_上限含預計收入_不准推測社會階層(api, model):
-    me = user("g@x.tw", "女朋友", income_mode="fixed", expected_income=31000, income_type="salary_end")
+    me = user("g@x.tw", "女朋友", income_mode="fixed", expected_income=31000, income_type="salary",
+              income_posted_period=this_month())     # 這個月的薪水還沒進來（不讓自動入帳在發薪日之後跑這支時先記掉）
     cats = categories()
     g = ledger_of(me, personal_owner_id=me.id)
     spend(me, g, cats["餐飲"], 2000)
@@ -474,7 +477,7 @@ def test_generate_advices_收入方式當背景_上限含預計收入_不准推�
     r = api.post("/api/advices/generate", headers=login(me), json={"scope": "me"})
     assert r.status_code == 201, r.text
     prompt = model["calls"][0]
-    assert "收入方式：月薪（月底或月中發）；固定月薪" in prompt and "發薪" in prompt   # 建議照收入結構換切入點
+    assert "收入方式：月薪；固定月薪" in prompt and "發薪" in prompt                 # 建議照收入結構換切入點
     assert "社會階層" in prompt and "不要推測" in prompt                         # 護欄
     numbers = crud.find(Advice, {"period_key": this_month()})[0].basis_json["numbers"]
     assert (numbers["pendingIncome"], numbers["savings"]["allowance"], numbers["savings"]["income"]) == (31000, 26000, 31000)

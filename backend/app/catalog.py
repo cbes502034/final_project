@@ -136,8 +136,7 @@ SAVINGS_RULE_NOTE = ("可支配上限 = 本月收入 − 每月存款目標。�
 #: 「其他」讓他自己寫（users.income_note，最多 30 字，進 prompt 前一樣當資料洗過）。
 #: ⚠️ 只拿來決定「預計收入怎麼估」與建議的做法，不拿來推測或評價收入高低、身分（catalog.ADVICE_RULES）
 INCOME_TYPES = [
-    {"id": "salary_end", "name": "月薪（月底或月中發）", "mode": "fixed"},
-    {"id": "salary_start", "name": "月薪（月初發）", "mode": "fixed"},
+    {"id": "salary", "name": "月薪", "mode": "fixed"},           # 幾號發由 users.income_pay_day 決定
     {"id": "hourly", "name": "時薪、日薪、打工", "mode": "auto"},
     {"id": "freelance", "name": "接案、自由工作", "mode": "auto"},
     {"id": "commission", "name": "底薪加獎金、抽佣", "mode": "auto"},

@@ -804,7 +804,7 @@
 
   /* 這筆能不能改、能不能刪：自己的，而且活動沒結算。
      ⚠️ 只是決定要不要畫按鈕。真正的檢查在 API（403／409），按鈕藏起來不是權限控制。 */
-  var SOURCE_TW = { nlp: 'AI 解析', manual: '手動', allowance: '零用金' };
+  var SOURCE_TW = { nlp: 'AI 解析', manual: '手動', allowance: '零用金', income_auto: '自動入帳' };
   function txLocked(t) {
     var g = TXGROUPS.filter(function (x) { return x.id === t.group; })[0];
     /* 家長給的零用金：孩子那筆收入不能自己改或刪，要家長調整 */
@@ -1314,7 +1314,7 @@
     return '<div class="bar bar--inline">' +
       (F.from ? '<span class="fchip">本月<button type="button" data-fclear aria-label="清掉本月的篩選">&#10005;</button></span>' : '') +
       sel('kind', '收支', [['all', '全部'], ['expense', '支出'], ['income', '收入']]) +
-      sel('source', '來源', [['all', '全部'], ['nlp', 'AI 解析'], ['manual', '手動輸入'], ['allowance', '零用金']]) +
+      sel('source', '來源', [['all', '全部'], ['nlp', 'AI 解析'], ['manual', '手動輸入'], ['allowance', '零用金'], ['income_auto', '自動入帳']]) +
       '</div>';
   }
 
@@ -2167,11 +2167,7 @@
               '<label class="money"><i>NT$</i><input type="number" min="1" step="1" inputmode="numeric" ' +
                 'data-allow="' + esc(u.id) + '" value="' + (u.allowance > 0 ? u.allowance : '') + '" placeholder="輸入正整數" aria-label="每月零用金"></label>' +
               '<label class="allow__d"><span>每月</span><select data-allowday="' + esc(u.id) + '" aria-label="零用金發放日">' +
-                '<option value="">1 號（帳本換月時）</option>' +
-                Array.apply(null, Array(27)).map(function (_, i) {
-                  var day = i + 2;
-                  return '<option value="' + day + '"' + (u.payDay === day ? ' selected' : '') + '>' + day + ' 號</option>';
-                }).join('') +
+                  payDayOptions(u.payDay) +
               '</select><span>發</span></label>' +
               '<div class="allow__h">僅限正整數，改完離開欄位就會存好。到了發放日自動記一筆在你的帳上，也記一筆收入到' +
                 esc(callName(u.name)) + '的帳上並通知他</div>' +
@@ -3799,6 +3795,14 @@
     ['actual', '只算已入帳', '不估，記了收入才算']
   ];
   var INCOME_TW = { fixed: '固定金額', auto: '自動估', actual: '只算已入帳' };
+  /* 每月幾號（1~28）的選單：零用金發放日、固定收入入帳日共用。沒選（空字串）＝ 1 號 */
+  function payDayOptions(sel) {
+    return '<option value="">1 號（帳本換月時）</option>' + Array.apply(null, Array(27)).map(function (_, i) {
+      var day = i + 2;
+      return '<option value="' + day + '"' + (Number(sel) === day ? ' selected' : '') + '>' + day + ' 號</option>';
+    }).join('');
+  }
+
   function incomeTypes() { return global.DATA.incomeTypes || []; }
   function incomeTypeOf(id) { return incomeTypes().filter(function (t) { return t.id === id; })[0]; }
 
@@ -3825,30 +3829,37 @@
           '<label class="money"><i>NT$</i><input type="number" min="0" step="100" inputmode="numeric" id="' + p + 'Amt" ' +
             'value="' + amt + '" placeholder="' + (mode === 'fixed' ? '每個月大約多少（必填）' : '還沒紀錄時先估（選填）：日薪 × 天數') + '" ' +
             'aria-label="每個月大約多少收入"></label>') +
+        /* 固定金額才自動入帳；自動估是預估，不是真的有錢進來，不記 */
+        (mode === 'fixed'
+          ? '<label class="allow__d"><span>每月</span><select id="' + p + 'Day" aria-label="每月幾號入帳">' +
+              payDayOptions(u.incomePayDay) + '</select><span>自動記一筆收入到個人帳本</span></label>'
+          : '') +
       '</div>';
   }
 
   /* 表單上現在的值（還沒存的也算） */
   function incomeNow(p, base) {
     var q = function (sel) { return document.querySelector(sel); };
-    var amtEl = document.getElementById(p + 'Amt'), noteEl = document.getElementById(p + 'Note');
+    var amtEl = document.getElementById(p + 'Amt'), noteEl = document.getElementById(p + 'Note'), dayEl = document.getElementById(p + 'Day');
     return {
       incomeType: (q('[name="' + p + 'Type"]:checked') || {}).value || (base && base.incomeType) || null,
       incomeMode: (q('[name="' + p + 'Mode"]:checked') || {}).value || (base && base.incomeMode) || 'auto',
       expectedIncome: amtEl ? (Number(amtEl.value) || null) : (base ? base.expectedIncome : null),
-      incomeNote: noteEl ? noteEl.value.trim() : (base ? base.incomeNote : null)
+      incomeNote: noteEl ? noteEl.value.trim() : (base ? base.incomeNote : null),
+      incomePayDay: dayEl ? (Number(dayEl.value) || null) : (base ? base.incomePayDay || null : null)
     };
   }
 
   function incomeCard(u) {
     return '<div class="plan__k">收入</div>' + incomeFields('inc', u) +
-      '<div class="plan__h">收入還沒入帳前，「這個月還可以花」先照這個算；入帳之後自動改用實際的（取比較多的那個），不會重複算。</div>';
+      '<div class="plan__h">收入還沒入帳前，「這個月還可以花」先照這個算；入帳之後自動改用實際的（取比較多的那個），不會重複算。' +
+        (u.incomeMode === 'fixed' ? '選固定金額，到了入帳日自動記一筆；入帳日前自己已經記了，就不會再多記。' : '') + '</div>';
   }
 
   function incomeSave(patch, done) {
     API.updateProfile(patch).then(function (u) {
       if (ME && ME.user) {
-        ['incomeType', 'incomeMode', 'expectedIncome', 'incomeNote'].forEach(function (k) { ME.user[k] = u[k]; });
+        ['incomeType', 'incomeMode', 'expectedIncome', 'incomeNote', 'incomePayDay'].forEach(function (k) { ME.user[k] = u[k]; });
       }
       var card = document.getElementById('incCard');
       if (card) card.innerHTML = incomeCard(u);
@@ -5241,6 +5252,7 @@
       if (inc.incomeMode === 'fixed' && !inc.expectedIncome) { formErr(f, '選固定金額，要填每個月大約多少'); return; }
       busy(f, true, '儲存中…');
       API.updateProfile({ incomeType: inc.incomeType, incomeMode: inc.incomeMode, incomeNote: inc.incomeNote || null,
+                          incomePayDay: inc.incomePayDay,
                           expectedIncome: inc.incomeMode === 'actual' ? null : inc.expectedIncome }).then(function () {
         return API.me();
       }).then(function (m) { return API.setSavingsGoal(m.user.id, gv); }).then(function () {
@@ -5518,7 +5530,7 @@
           var nb = document.getElementById('incNote');
           if (nb) nb.focus();
         }
-        incomeSave({ incomeType: want.incomeType, incomeMode: want.incomeMode,
+        incomeSave({ incomeType: want.incomeType, incomeMode: want.incomeMode, incomePayDay: want.incomePayDay,
                      expectedIncome: want.incomeMode === 'actual' ? null : want.expectedIncome });
       };
       if (want.incomeMode === (saved.incomeMode || 'auto')) { commit(); return; }   // 算法沒變：數字不會變，不用問
@@ -5532,13 +5544,15 @@
       });
       return;
     }
-    if (e.target.id === 'incAmt' || e.target.id === 'incNote') {
+    if (e.target.id === 'incAmt' || e.target.id === 'incNote' || e.target.id === 'incDay') {
       var cur = incomeNow('inc', ME && ME.user);
       if (cur.expectedIncome !== null && (isNaN(cur.expectedIncome) || cur.expectedIncome < 0)) { toast('收入要是 0 以上的數字', 'err'); return; }
       if (cur.incomeMode === 'fixed' && !cur.expectedIncome) { toast('選固定金額，要填每個月大約多少', 'err'); return; }
       incomeSave({ incomeType: cur.incomeType, incomeMode: cur.incomeMode, incomeNote: cur.incomeNote || null,
+                   incomePayDay: cur.incomePayDay,
                    expectedIncome: cur.incomeMode === 'actual' ? null : cur.expectedIncome },
         e.target.id === 'incNote' ? '收入怎麼來存好了'
+          : e.target.id === 'incDay' ? '每月 ' + (cur.incomePayDay || 1) + ' 號自動記一筆收入'
           : cur.incomeMode === 'fixed' ? '每個月收入 ' + money(cur.expectedIncome) + '，首頁的數字已經重算' : '估計的收入存好了');
       return;
     }
