@@ -132,7 +132,12 @@ def summary(db: Any, users: list[int], earners: list[int], period: str, group_id
         if personal_only:
             from app.services.financial_context import personal_ids
             where["group_id__in"] = personal_ids(db, users)
-    rows = crud.find(Transaction, where, fields=("user_id", "category_id", "kind", "amount", "occurred_on"), db=db)
+    rows = crud.find(Transaction, where, fields=("id", "user_id", "category_id", "kind", "amount", "occurred_on"), db=db)
+    # 家長給孩子的零用金，兩個人都在這次要算的人裡（家庭模式）：只是家裡的錢換手，不算支出
+    from app.services.allowance_ledger import internal_transfer_ids
+    skip = internal_transfer_ids(db, users) if group_id is None else set()
+    if skip:
+        rows = [r for r in rows if r["id"] not in skip]
 
     # b. 一筆一筆分到桶子裡
     per_user = {u: {"income": money.ZERO, "expense": money.ZERO} for u in users}

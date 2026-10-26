@@ -427,11 +427,11 @@ def test_copy_preserves_history_without_doubling_family_spending_and_cannot_repe
     crud.save(GroupMember, {"group_id": shared.id, "user_id": child.id})
     again = api.post(f"/api/groups/{shared.id}/settle", headers=h)
     assert again.status_code == 200 and again.json()["copied"] == 0
-    assert crud.count(Transaction) == 2
+    assert crud.count(Transaction, {"source__ne": "allowance"}) == 2      # 零用金那一對另外算
     assert api.patch(f"/api/transactions/{original.id}", headers=h, json={"amount": 999}).status_code == 409
     assert api.delete(f"/api/transactions/{original.id}", headers=h).status_code == 409
     assert api.delete(f"/api/transactions?ids={original.id},{copied.id}", headers=h).status_code == 409
-    assert crud.count(Transaction) == 2
+    assert crud.count(Transaction, {"source__ne": "allowance"}) == 2
 
     # Personal corrections affect the copy while the shared book keeps the pre-settlement figures.
     edited = api.patch(f"/api/transactions/{copied.id}", headers=h, json={"amount": 120})

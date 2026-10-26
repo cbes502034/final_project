@@ -46,7 +46,7 @@ def filters(db, me, userId=None, groupId=None, from_=None, to=None, categoryId=N
     if categoryId:
         where["category_id"] = int(categoryId) if categoryId.isdigit() else 0
     for name, value, valid in (("kind", kind, ("income", "expense", "transfer")),
-                                ("source", source, ("manual", "nlp", "import"))):
+                                ("source", source, ("manual", "nlp", "import", "allowance"))):
         if value and value != "all":
             if value not in valid:
                 raise errors.unprocessable(name + " 只能是 " + "、".join(valid))

@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from app.models import Advice, AlertRule, Allowance, Budget, Category, Notification, SavingsGoal, SecurityEvent, User
+from app.models import Advice, AlertRule, Allowance, Budget, Category, Notification, SavingsGoal, SecurityEvent, Transaction, User
 from app.services.llm import client
 from app.toolkit import crud
 from app.toolkit.config import settings
@@ -94,21 +94,22 @@ def test_summary_家庭_孩子的收入另外算_每個人各自的燈號(api):
     r = api.get("/api/summary?scope=family", headers=login(dad))
     assert r.status_code == 200, r.text
     b = r.json()
-    assert (b["income"], b["expense"], b["wardIncome"], b["wardSpend"], b["allowance"]) == (40000, 6200, 3000, 1200, 3000)
+    # 爸爸一登入，這個月的零用金就自動發了：小華多一筆收入 3,000；爸爸那筆「給零用金」是家裡換手，家庭支出不算
+    assert (b["income"], b["expense"], b["wardIncome"], b["wardSpend"], b["allowance"]) == (40000, 6200, 6000, 1200, 3000)
     assert b["monthly"][-1] == {"m": this_month(), "income": 40000, "expense": 6200}
     by = {m["id"]: m for m in b["members"]}
     assert set(by) == {str(dad.id), str(mom.id), str(kid.id)}
     assert by[str(mom.id)]["savingsLevel"] == "over" and by[str(dad.id)]["savingsLevel"] == "safe"
-    assert by[str(kid.id)]["role"] == "child" and by[str(kid.id)]["income"] == 3000
+    assert by[str(kid.id)]["role"] == "child" and by[str(kid.id)]["income"] == 6000      # 其他收入 3,000 ＋ 自動入帳的零用金 3,000
     # 家庭模式只開放家長；子女保留個人模式。
     assert api.get("/api/summary?scope=family", headers=login(kid)).status_code == 403
     kb = api.get("/api/summary", headers=login(kid)).json()
-    assert [m["id"] for m in kb["members"]] == [str(kid.id)] and kb["income"] == 3000
+    assert [m["id"] for m in kb["members"]] == [str(kid.id)] and kb["income"] == 6000
 
 
 @pytest.mark.route(*SUM)
 def test_summary_孩子的零用金算進可支配上限_自己有記就不重複算(api):
-    """家長設了零用金、孩子沒記收入：上限要是零用金，不能是 0（不然花一塊錢就「超出計畫」）。"""
+    """家長設了零用金：自動在孩子帳上記一筆收入，上限就是零用金，不能是 0（不然花一塊錢就「超出計畫」）。"""
     dad, kid = user("d@x.tw", "爸爸"), user("k@x.tw", "小華")
     family_of((dad, "parent"), (kid, "child"))
     guard(dad, kid)
@@ -117,17 +118,14 @@ def test_summary_孩子的零用金算進可支配上限_自己有記就不重�
     spend(kid, kg, cats["餐飲"], 808)
     crud.save(Allowance, {"payer_id": dad.id, "ward_id": kid.id, "amount": 3000})
     b = api.get("/api/summary", headers=login(kid)).json()
-    assert b["pocketMoney"] == 3000
+    assert (b["income"], b["pocketMoney"]) == (3000, 0)          # 已經入帳，不用再補
     assert (b["savings"]["allowance"], b["savings"]["left"], b["savings"]["level"]) == (3000, 2192, "safe")
     fam = api.get("/api/summary?scope=family", headers=login(dad)).json()
     kid_row = next(m for m in fam["members"] if m["id"] == str(kid.id))
     assert (kid_row["allowance"], kid_row["savingsLevel"]) == (3000, "safe")
     assert fam["pocketMoney"] == 0 and fam["income"] == 0          # 全家模式不把零用金再算一次
-    # 孩子自己記了 1,000 的「零用金」收入：只補差額 2,000，上限還是 3,000
-    pocket = crud.save(Category, {"name": "零用金", "kind": "income", "color": "cat-transit"})
-    spend(kid, kg, pocket, 1000)
-    b = api.get("/api/summary", headers=login(kid)).json()
-    assert (b["income"], b["pocketMoney"], b["savings"]["allowance"]) == (1000, 2000, 3000)
+    # 同一個月打開好幾次，也只發一次
+    assert crud.count(Transaction, {"user_id": kid.id, "source": "allowance"}) == 1
 
 
 @pytest.mark.route(*SUM)

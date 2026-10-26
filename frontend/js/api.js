@@ -797,6 +797,13 @@
     return seed ? seed.amount : 0;
   }
 
+  /* 每月幾號發（1~28），沒設是 null＝每月 1 日。
+     ⚠️ 示範模式只記設定：真正「到日子自動記一對帳、通知孩子」是後端做的（services/allowance_ledger.py） */
+  function payDayOf(payer, ward) {
+    var mine = (load().allowancePatch || []).filter(function (a) { return a.payer === payer && a.ward === ward; });
+    return mine.length ? (mine[mine.length - 1].payDay || null) : null;
+  }
+
   /* 誰是我監管的人（不含我自己）。家庭總覽要靠它把收入分開算。 */
   function wardsOf(meId) {
     return global.DATA.guardianships
@@ -1766,6 +1773,7 @@
             return {
               wardId: w, wardName: m.name || w,
               amount: allowanceOf(st.me, w),
+              payDay: payDayOf(st.me, w),
               // 這個月花掉多少：從明細現算（人身上沒有彙總欄位）
               spent: st.transactions.filter(function (t) {
                 return !t.snapshot && t.user === w && t.kind === 'expense' && t.date.indexOf(global.DATA.meta.period) === 0;
@@ -1776,7 +1784,7 @@
       });
     },
 
-    setAllowance: function (wardId, amount) {
+    setAllowance: function (wardId, amount, payDay) {
       var st = load();
       return sleep(220).then(function () {
         if (wardsOf(st.me).indexOf(wardId) < 0) {
@@ -1784,12 +1792,14 @@
         }
         var v = amount;
         if (!Number.isSafeInteger(v) || v <= 0) throw oops('零用金只能輸入正整數', 422);
+        var day = payDay == null ? null : payDay;
+        if (day !== null && (!Number.isSafeInteger(day) || day < 1 || day > 28)) throw oops('發放日只能是 1～28 號', 422);
         st.allowancePatch = (st.allowancePatch || []).concat([
-          { payer: st.me, ward: wardId, amount: v }
+          { payer: st.me, ward: wardId, amount: v, payDay: day }
         ]);
         save();
         var m = memberOf(wardId) || {};
-        return { wardId: wardId, wardName: m.name, amount: v };
+        return { wardId: wardId, wardName: m.name, amount: v, payDay: day };
       });
     },
 
@@ -3264,6 +3274,11 @@
         return doRefresh().then(function () { return req(path, opt, true); });
       }
       if (!r.ok) return fail(r, path);
+      /* 改了東西（記帳、邀請、改零用金…）可能馬上產生通知：鈴鐺不用等下一輪，現在就問 */
+      var method = ((opt && opt.method) || 'GET').toUpperCase();
+      if (method !== 'GET' && path.indexOf('/api/notifications') !== 0 && global.Notify) {
+        setTimeout(function () { global.Notify.refresh(); }, 300);
+      }
       return r.status === 204 ? null : r.json();
     });
   }
@@ -3415,7 +3430,7 @@
     addGroupMember:    function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members', { method: 'POST', body: { userId: u } }); },
     removeGroupMember: function (g, u)  { return req('/api/groups/' + encodeURIComponent(g) + '/members/' + encodeURIComponent(u), { method: 'DELETE' }); },
     allowances:        function ()      { return req('/api/allowances'); },
-    setAllowance:      function (w, a)  { return req('/api/allowance', { method: 'PUT', body: { wardId: w, amount: a } }); },
+    setAllowance:      function (w, a, d) { return req('/api/allowance', { method: 'PUT', body: { wardId: w, amount: a, payDay: d == null ? null : d } }); },
     savingsGoals:      function ()      { return req('/api/savings-goals'); },
     alerts:            function ()      { return req('/api/alerts'); },
     createAlert:       function (p)     { return req('/api/alerts', { method: 'POST', body: p }); },
@@ -3615,7 +3630,7 @@
     generateAdvices: { advices: { id: 's', scope: 's', level: 's', title: 's', body: 's', basis: 'a', suggest: 'a' } },
     members: { members: { id: 's', name: 's', avatar: 's' }, guardianships: { id: 's', guardian: 's', ward: 's' } },
     guardianships: { guardianships: { id: 's', guardian: 's', ward: 's' } },
-    allowances: { allowances: { wardId: 's', wardName: 's', amount: 'n', spent: 'n' } },
+    allowances: { allowances: { wardId: 's', wardName: 's', amount: 'n', payDay: 'n?', spent: 'n' } },
     notifications: { notifications: { id: 's', type: 's', createdAt: 't', readAt: 't?' } },
     sessions: { sessions: { id: 's', device: 's', current: 'b', lastActiveAt: 't' } },
     adminUsers: { users: { id: 's', name: 's', email: 's', suspendedAt: 't?', presence: 's', lastActiveAt: 't?' } },

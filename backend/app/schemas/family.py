@@ -60,6 +60,8 @@ class GuardianshipIn(BaseModel):
 class AllowanceIn(BaseModel):
     wardId: str
     amount: int = Field(gt=0, strict=True, description="每月零用金，只接受正整數")
+    payDay: int | None = Field(default=None, ge=1, le=28, strict=True,
+                               description="每月幾號發（1~28）；不填就是每月 1 日，跟帳本換月同一天")
 
 
 class ReadOneIn(BaseModel):

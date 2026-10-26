@@ -29,6 +29,7 @@ from app.models import (
     Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
     Transaction, User,
 )
+from app.services import allowance_ledger, inbox
 from app.services.financial_context import family_goal
 from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
 from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -131,6 +132,7 @@ def get_family(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -361,6 +363,7 @@ def create_family(body: FamilyIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -502,6 +505,7 @@ def dissolve_family(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -666,6 +670,7 @@ def create_invite_code(body: InviteCodeIn, me: User, db: Session = Depends(get_d
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -805,6 +810,7 @@ def join_family(body: JoinIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -976,6 +982,7 @@ def lookup_user(me: User, email: str | None = None, db: Session = Depends(get_db
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -1161,6 +1168,7 @@ def list_invites(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -1327,6 +1335,7 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -1361,6 +1370,7 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
             crud.save(AuditLog, {"actor_id": me.id, "action": "invite_member", "target_type": "user",
                                  "target_id": user_id, "meta_json": {"note": "邀請%s成為%s" % (
                                      target.display_name, "家長" if body.role == "parent" else "子女")}}, db=db)
+            inbox.family_invite(db, invite)                    # 對方的鈴鐺會跳出來
             db.commit()
             return {"id": str(invite.id), "status": "pending"}
 
@@ -1404,6 +1414,7 @@ def send_invite(body: InviteIn, me: User, db: Session = Depends(get_db)):
     crud.save(AuditLog, {"actor_id": me.id, "action": "invite_member", "target_type": "user",
                          "target_id": user_id, "meta_json": {"note": "邀請%s成為%s" % (
                              target.display_name, "家長" if body.role == "parent" else "子女")}}, db=db)
+    inbox.family_invite(db, invite)                    # 對方的鈴鐺會跳出來
     db.commit()
     return {"id": str(invite.id), "status": "pending"}
 
@@ -1479,6 +1490,7 @@ def accept_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -1634,6 +1646,7 @@ def decline_invite(invite_id: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -1778,6 +1791,7 @@ def change_member_role(user_id: str, body: RolePatchIn, me: User, db: Session = 
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -1964,6 +1978,7 @@ def remove_member(user_id: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -2160,6 +2175,7 @@ def list_guardianships(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -2298,6 +2314,7 @@ def create_guardianship(body: GuardianshipIn, me: User, db: Session = Depends(ge
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -2458,6 +2475,7 @@ def end_guardianship(gid: str, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -2560,7 +2578,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
     【請求參數】沒有
 
     【成功回應】狀態碼 200
-        {"allowances": [{"wardId": "5", "wardName": "王小華", "amount": 3000, "spent": 1850}]}
+        {"allowances": [{"wardId": "5", "wardName": "王小華", "amount": 3000, "payDay": 5, "spent": 1850}]}
         · 沒照看任何人：{"allowances": []}
         · 沒設過零用金的是 0
 
@@ -2603,6 +2621,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -2618,10 +2637,11 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
 
             # 2. 名字、零用金設定
             names = {u.id: u.display_name for u in crud.find(User, {"id__in": wards}, db=db)}
-            amounts = {}
+            amounts, days = {}, {}
             for a in crud.find(Allowance, {"payer_id": me.id, "ward_id__in": wards, "period_key__isnull": True},
                                order_by="id", db=db):
                 amounts[a.ward_id] = a.amount
+                days[a.ward_id] = a.pay_day
 
             # 3. 這個月花了多少（從明細現算）
             start, end = period.month_range(period.current_month(datetime.now(timezone(timedelta(hours=8))).date()))
@@ -2634,7 +2654,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
             out = []
             for w in wards:
                 out.append({"wardId": str(w), "wardName": names.get(w, ""),
-                            "amount": amounts.get(w, 0), "spent": spent.get(w, 0)})
+                            "amount": amounts.get(w, 0), "payDay": days.get(w), "spent": spent.get(w, 0)})
             return {"allowances": out}
 
     【做完怎麼確認】
@@ -2657,10 +2677,11 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
 
     # 2. 名字、零用金設定
     names = {u.id: u.display_name for u in crud.find(User, {"id__in": wards}, db=db)}
-    amounts = {}
+    amounts, days = {}, {}
     for a in crud.find(Allowance, {"payer_id": me.id, "ward_id__in": wards, "period_key__isnull": True},
                        order_by="id", db=db):
         amounts[a.ward_id] = a.amount
+        days[a.ward_id] = a.pay_day
 
     # 3. 這個月花了多少（從明細現算）
     start, end = period.month_range(period.current_month(datetime.now(timezone(timedelta(hours=8))).date()))
@@ -2673,7 +2694,7 @@ def list_allowances(me: User, db: Session = Depends(get_db)):
     out = []
     for w in wards:
         out.append({"wardId": str(w), "wardName": names.get(w, ""),
-                    "amount": amounts.get(w, 0), "spent": spent.get(w, 0)})
+                    "amount": amounts.get(w, 0), "payDay": days.get(w), "spent": spent.get(w, 0)})
     return {"allowances": out}
 
 
@@ -2748,6 +2769,7 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -2761,11 +2783,13 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
                 raise errors.forbidden("你沒有監管這個人")
 
             # 2. 有就改、沒有就新增（這是設定，不是一筆支出）
-            crud.save(Allowance, {"amount": money.quantize(body.amount)},
+            crud.save(Allowance, {"amount": money.quantize(body.amount), "pay_day": body.payDay},
                       where={"payer_id": me.id, "ward_id": ward_id, "period_key": None}, upsert=True, db=db)
+            # 3. 這個月已經發了就照新金額調整原本那一對帳（不新增）；到了發放日還沒發的現在發
+            allowance_ledger.sync_setting(db, me.id, ward_id)
             db.commit()
             name = crud.get(User, ward_id, fields="display_name", db=db)
-            return {"wardId": str(ward_id), "wardName": name, "amount": body.amount}
+            return {"wardId": str(ward_id), "wardName": name, "amount": body.amount, "payDay": body.payDay}
 
     【做完怎麼確認】
         1. 在 backend/ 底下啟動：uvicorn app.main:app --reload
@@ -2787,11 +2811,13 @@ def set_allowance(body: AllowanceIn, me: User, db: Session = Depends(get_db)):
         raise errors.forbidden("你沒有監管這個人")
 
     # 2. 有就改、沒有就新增（這是設定，不是一筆支出）
-    crud.save(Allowance, {"amount": money.quantize(body.amount)},
+    crud.save(Allowance, {"amount": money.quantize(body.amount), "pay_day": body.payDay},
               where={"payer_id": me.id, "ward_id": ward_id, "period_key": None}, upsert=True, db=db)
+    # 3. 這個月已經發了就照新金額調整原本那一對帳（不新增）；到了發放日還沒發的現在發
+    allowance_ledger.sync_setting(db, me.id, ward_id)
     db.commit()
     name = crud.get(User, ward_id, fields="display_name", db=db)
-    return {"wardId": str(ward_id), "wardName": name, "amount": body.amount}
+    return {"wardId": str(ward_id), "wardName": name, "amount": body.amount, "payDay": body.payDay}
 
 
 @router.get("/audit", summary="稽核紀錄")
@@ -2858,6 +2884,7 @@ def list_audit(me: User, db: Session = Depends(get_db)):
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security
@@ -2962,6 +2989,7 @@ def update_family_goal(body: FamilyGoalPatchIn, me: User, db: Session = Depends(
                 Allowance, AuditLog, Family, FamilyInvite, FamilyMember, Group, GroupMember, Guardianship, SavingsGoal,
                 Transaction, User,
             )
+            from app.services import allowance_ledger, inbox
             from app.services.financial_context import family_goal
             from app.schemas.family import AllowanceIn, FamilyIn, FamilyGoalPatchIn, GuardianshipIn, InviteCodeIn, InviteIn, JoinIn, RolePatchIn
             from app.toolkit import crud, errors, family, images, money, password_reset, period, security

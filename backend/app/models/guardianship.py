@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, Text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Numeric, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models._types import BigID, utcnow
@@ -60,4 +60,32 @@ class Allowance(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     # '2026-09'。NULL = 預設值，套用到未指定的月份
     period_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 每月幾號發（1~28）。NULL = 每月 1 日
+    pay_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class AllowancePayment(Base):
+    """零用金發放。★ 每月實際發出去的那一次：家長一筆支出、孩子一筆收入綁成一對"""
+
+    __tablename__ = "allowance_payments"
+    __table_args__ = (UniqueConstraint("payer_id", "ward_id", "period_key", name="uq_allowance_payment_month"),)
+
+    # PK
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    # FK → users，給錢的家長
+    payer_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    # FK → users，收錢的孩子
+    ward_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    # '2026-10'。同一位家長、同一個孩子、同一個月只有一列
+    period_key: Mapped[str] = mapped_column(Text, nullable=False)
+    # 這個月實際發的金額
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    # 家長那筆支出、孩子那筆收入（transactions.id）。取消後是 NULL。
+    # ⚠️ 不設外鍵：刪一筆帳時由 services/allowance_ledger.py 一起處理這一列
+    payer_tx_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    ward_tx_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # 'paid' / 'cancelled'。家長刪掉那筆就是取消，這個月不會再補發
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="paid")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

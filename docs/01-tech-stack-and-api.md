@@ -61,7 +61,7 @@
 | **Pydantic** | v2 | 請求／回應驗證 | **強制結構化輸出的關鍵**，LLM 回傳也用它驗 |
 | **pydantic-settings** | 2.6+ | 環境變數管理 | 設定集中，不散落在各處 |
 | **SQLAlchemy** | 2.0 | ORM | 2.0 的型別標註對新手比較友善 |
-| **Alembic** | 1.14+ | 資料庫遷移 | 23 張表一定會改，沒有遷移工具會很痛苦 |
+| **Alembic** | 1.14+ | 資料庫遷移 | 24 張表一定會改，沒有遷移工具會很痛苦 |
 | **psycopg** | 3.2+ | PostgreSQL 驅動 | `[binary]` 版有預編譯輪檔，不用編譯 |
 | **PyJWT** | 2.10+ | JWT 簽發驗證 | 比 python-jose 維護更活躍 |
 | **passlib[bcrypt]** | 1.7+ | 密碼雜湊 | **絕不自己實作密碼雜湊** |
@@ -150,7 +150,7 @@ final_project/
 │   │   ├── ownership.py         分工的單一事實來源（誰負責哪支路由、哪些檔案）
 │   │   ├── catalog.py           固定清單（角色、權限表、理財選項、系統分類…），正本是 data.js
 │   │   ├── toolkit/         ★   寫好的工具：config、db、crud（增刪改查）、tokens、passwords、scope、family…
-│   │   ├── models/              23 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
+│   │   ├── models/              24 張表（SQLAlchemy），欄位跟 data.js 的 schema 逐欄對齊
 │   │   ├── schemas/             請求主體（Pydantic），欄位名字跟前端送的一樣
 │   │   ├── routers/             86 支路由，一個領域一個資料夾。還沒做的回 501
 │   │   │   ├── auth/            認證（auth.py、admin.py）　← 每個資料夾裡都有 README.md
@@ -165,7 +165,7 @@ final_project/
 │   │       ├── analytics.py     所有加總（數字）
 │   │       ├── permission.py    可見範圍（家庭）
 │   │       └── evaluation.py    模型評測指標
-│   ├── alembic/                 資料庫遷移（versions/ 一版一版往上加，現在是 23 張表）
+│   ├── alembic/                 資料庫遷移（versions/ 一版一版往上加，現在是 24 張表）
 │   ├── tests/                   pytest（routes/：每一支路由的驗收測試；fixtures/：假後端）
 │   ├── tools/                   eval_nlp.py、rules_baseline.js：評測；sync_schema.py：文件從程式產生
 │   ├── eval/                    留出集與評測結果

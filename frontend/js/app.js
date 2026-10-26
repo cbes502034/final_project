@@ -410,7 +410,7 @@
       { nav: 'entry', label: name + '帳本', icon: 'entry', badge: o.count ? '本月 ' + o.count + ' 筆' : '' },
       activity ? { personal: true, label: '個人帳本', icon: 'entry' } : null,
       isFamily() ? null : { nav: 'groups', label: '活動管理', icon: 'groups', badge: activity ? activeActivity().name : '' },
-      o.fam ? null : { nav: 'stats', label: name + '財務狀況', icon: 'stats' },
+      { nav: 'stats', label: name + '財務狀況', icon: 'stats' },
       { nav: 'advice', label: name + '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '', badge: o.warn ? o.warn + ' 則要注意' : '' },
       o.fam ? { nav: 'members', label: o.fm && o.fm.family ? o.fm.family.name : '家庭', icon: 'members',
         badge: o.fm && o.fm.members ? o.fm.members.length + ' 人' : '' } : null,
@@ -495,6 +495,27 @@
               fam && !d.__err ? d.members.length + ' 位家人的收支' : activeActivity() ? '活動這個月的收支' : '');
 
         var sv = d.__err ? null : d.savings, lv = sv ? sv.level : '';
+        /* 活動不套「收入 − 每月想存」：露營、聚餐多半沒有收入，那條公式只會亮紅燈。
+           活動看的是自建立以來的累計，跟使用者自己訂的目標金額比（規則同 services/activity_target.py）：
+           還沒有收入 → 已花多少；有收入 → 已存多少。 */
+        var act = !d.__err && !fam ? activeActivity() : null, actCard = '';
+        if (act) {
+          lv = '';
+          var cumIn = 0, cumOut = 0;
+          (d.yearly || []).forEach(function (y) { cumIn += Number(y.income) || 0; cumOut += Number(y.expense) || 0; });
+          var saved = cumIn > 0, value = saved ? cumIn - cumOut : cumOut, target = Number(act.goal) || 0;
+          var reach = target > 0 ? Math.max(0, Math.min(100, Math.round(value / target * 100))) : 0;
+          actCard = '<div class="wal__k">' + (saved ? '這個活動已存' : '這個活動已花') +
+              (target > 0 && value >= target ? '<span class="pill pill--near">到目標了</span>' : '') + '</div>' +
+            '<div class="wal__v">' + amt(value) + '</div>' +
+            (target > 0
+              ? '<div class="wal__bar" role="progressbar" aria-label="目標金額進度" aria-valuenow="' + reach + '" aria-valuemin="0" aria-valuemax="100">' +
+                  '<i style="width:' + reach + '%"></i></div>' +
+                '<div class="wal__meta"><span>目標金額 <b>' + num(target) + '</b></span><span><b>' + reach + '%</b></span>' +
+                  (value < target ? '<span>還差 <b>' + num(target - value) + '</b></span>' : '') + '</div>'
+              : '<div class="wal__meta"><span>累計收入 <b>' + num(cumIn) + '</b></span><span>累計支出 <b>' + num(cumOut) + '</b></span></div>' +
+                '<a class="wal__hint" href="#/groups">設一個目標金額，到了會通知你 ›</a>');
+        }
         var used = sv ? Math.min(100, Math.round(sv.ratio * 100)) : 0;
         var budgets = b.__err ? [] : (fam || activeActivity() ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; }));
         var warn = ads.filter(function (a) { return a.level === 'warn'; }).length;
@@ -502,7 +523,7 @@
         var chev = '<svg class="wal__cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
           'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 
-        var h = '<div class="page"><div id="homeMail"></div><div id="homeInv"></div><div class="dash">';
+        var h = '<div class="page"><div id="homeMail"></div><div id="homeInv"></div><div id="homeActInv"></div><div class="dash">';
 
         /* 1. 疊在一起的數字卡——像皮夾裡的卡片。
               後面兩張露出一截：收入、支出；最前面那張是這個月還可以花。
@@ -513,9 +534,10 @@
           '<a class="wal__strip wal__strip--1" href="' + go + '"' + (fam ? '' : ' data-flt="income"') + '>' +
             '<span>' + (fam ? '家庭收入' : '本月收入') + '</span><b>' + amt(d.income) + '</b>' + chev + '</a>' +
           '<a class="wal__strip wal__strip--2" href="' + go + '"' + (fam ? '' : ' data-flt="expense"') + '>' +
-            '<span>' + (fam ? '家庭支出' : '本月支出') + '<small>' + d.count + ' 筆</small></span>' +
+            '<span>' + (fam ? '家庭支出' : '本月支出') + '</span>' +
             '<b>' + amt(d.expense) + '</b>' + chev + '</a>' +
           '<div class="wal__card">' +
+          (act ? actCard :
             '<div class="wal__k">' + (lv === 'over' ? '這個月超出計畫' : '這個月還可以花') +
               (lv === 'over' ? '' : '<span class="pill pill--' + lv + '">' + LEVEL_TW[lv] + '</span>') + '</div>' +
             '<div class="wal__v">' + amt(lv === 'over' ? sv.shortfall : Math.max(0, sv.left)) + '</div>' +
@@ -528,14 +550,16 @@
               /* 薪水還沒入帳、先照預計收入算的部分：講出來，不然收入 0、上限卻有 26,000 看起來對不上 */
               (d.expectedIncome && Number(d.expectedIncome.pending) > 0
                 ? '<span title="收入還沒入帳，先照預計的算；入帳之後自動改用實際的">含預計收入 <b>' + num(d.expectedIncome.pending) + '</b></span>' : '') +
-              '<span>每月想存 <b>' + num(sv.goal) + '</b></span></div>' +
+              (Number(sv.goal) > 0 ? '<span>每月想存 <b>' + num(sv.goal) + '</b></span>' : '') + '</div>' +
             /* 一點收入都沒有、也估不出來：上限是負的。指路去設定，不要只顯示一個嚇人的數字 */
             (!fam && !activeActivity() && !Number(d.income) && !Number(d.pocketMoney) && !(d.expectedIncome && Number(d.expectedIncome.pending) > 0)
-              ? '<a class="wal__hint" href="#/profile/income">還沒有收入進來？設定「收入怎麼算」，月底才發薪也不會變負數 ›</a>' : '') +
+              ? '<a class="wal__hint" href="#/profile/income">還沒有收入進來？設定「收入怎麼算」，月底才發薪也不會變負數 ›</a>' : '')) +
+            /* 活動的累計已經在上面；當月結餘率對活動沒有意義 */
+            (act ? '' :
             '<div class="wal__foot">' +
               '<div class="wal__f"><span>結餘</span><b>' + amt(d.net) + '</b></div>' +
               '<div class="wal__f"><span>結餘率</span><b>' + pct(d.rate) + '</b></div>' +
-            '</div>' +
+            '</div>') +
           '</div>' +
         '</section>';
 
@@ -587,6 +611,15 @@
           else if (!m.family && !m.user.isPlatformAdmin) {
             box.innerHTML = '<a class="nudge" href="#/members"><b>還沒有加入家庭</b>' +
               '<span>建立一個，或輸入家人給你的邀請碼 →</span></a>';
+          }
+        });
+        /* 朋友用帳號邀你進活動：跟家庭邀請一樣放在最上面，不然不點進活動管理就不會知道 */
+        soft(API.activityInvites()).then(function (ai) {
+          var box = document.getElementById('homeActInv');
+          var n = ai.__err ? 0 : (ai.invites || []).filter(function (r) { return r.incoming && r.status === 'pending'; }).length;
+          if (box && n) {
+            box.innerHTML = '<a class="nudge" href="#/groups"><b>有 ' + n + ' 個活動邀請</b>' +
+              '<span>到活動管理看看要不要加入 →</span></a>';
           }
         });
       });
@@ -771,9 +804,11 @@
 
   /* 這筆能不能改、能不能刪：自己的，而且活動沒結算。
      ⚠️ 只是決定要不要畫按鈕。真正的檢查在 API（403／409），按鈕藏起來不是權限控制。 */
+  var SOURCE_TW = { nlp: 'AI 解析', manual: '手動', allowance: '零用金' };
   function txLocked(t) {
     var g = TXGROUPS.filter(function (x) { return x.id === t.group; })[0];
-    return !!t.snapshot || !!(g && g.settledAt);
+    /* 家長給的零用金：孩子那筆收入不能自己改或刪，要家長調整 */
+    return !!t.snapshot || !!(g && g.settledAt) || (t.source === 'allowance' && t.kind === 'income');
   }
   function txCan(t) { return !isFamily() && isMine(t) && !txLocked(t); }
 
@@ -802,15 +837,17 @@
       '</td>' +
       '<td class="txr__activity">' + esc(t.activityName || '自行記錄') + '</td>' +
       '<td class="txr__u">' + esc(t.userName) + '</td>' +
-      '<td class="txr__s">' + (t.source === 'nlp' ? 'AI 解析' : '手動') + '</td>' +
+      '<td class="txr__s">' + (SOURCE_TW[t.source] || '手動') + '</td>' +
       '<td class="txr__a' + (t.kind === 'income' ? ' is-in' : '') + '">' +
         (t.kind === 'income' ? '+' : '−') + money(t.amount).replace('NT$ ', '') + '</td>' +
       '<td class="txr__x">' +
         /* 勾選模式時不放單筆按鈕：一次只做一件事，不會勾到一半按到別的 */
         (PICK.on ? '' : can
           ? '<button class="txr__ed" data-edit="' + esc(t.id) + '">修改</button>' +
-            '<button class="del" data-del="' + esc(t.id) + '">刪除</button>'
-          : (isMine(t) ? '<span class="txr__lock" title="退出前的活動歷史或已結算紀錄不能修改">' + (t.snapshot ? '退出前紀錄' : '已結算') + '</span>' : '')) +
+            '<button class="del" data-del="' + esc(t.id) + '"' + (t.source === 'allowance' ? ' data-allow-pair' : '') + '>刪除</button>'
+          /* 家庭模式整頁都只能看，不用每列標；只有真的被鎖住的那幾筆才講原因 */
+          : (isMine(t) && txLocked(t) ? '<span class="txr__lock" title="這一筆不能在這裡修改">' +
+              (t.snapshot ? '退出前紀錄' : t.source === 'allowance' ? '家長給的' : '已結算') + '</span>' : '')) +
       '</td></tr>';
   }
 
@@ -1277,7 +1314,7 @@
     return '<div class="bar bar--inline">' +
       (F.from ? '<span class="fchip">本月<button type="button" data-fclear aria-label="清掉本月的篩選">&#10005;</button></span>' : '') +
       sel('kind', '收支', [['all', '全部'], ['expense', '支出'], ['income', '收入']]) +
-      sel('source', '來源', [['all', '全部'], ['nlp', 'AI 解析'], ['manual', '手動輸入']]) +
+      sel('source', '來源', [['all', '全部'], ['nlp', 'AI 解析'], ['manual', '手動輸入'], ['allowance', '零用金']]) +
       '</div>';
   }
 
@@ -2099,6 +2136,7 @@
 
         var a = (al.allowances || []).filter(function (x) { return x.wardId === id; })[0];
         u.allowance = a ? a.amount : 0;
+        u.payDay = a ? a.payDay : null;
         return API.transactions({ userId: id }).then(function (tx) {
           render(me, d, u, tx, partial);
         });
@@ -2121,14 +2159,22 @@
           '</div>' +
           '<div class="pcard__stat"><b>' + tx.total + '</b><span>筆紀錄</span></div>' +
         '</div></section>' +
-        /* 零用金只有**監管他的人**看得到——那是監管者對他的設定，不是一筆支出。
+        /* 零用金只有**監管他的人**看得到。到了發放日系統自動記一對帳：你這邊一筆支出、他那邊一筆收入，並通知他。
            ⚠️ 不能用「看得到全部紀錄」判斷：家長之間也看得到全部，但不會給對方零用金。 */
         (!mine && d.guardianships.some(function (g) { return g.guardian === d.me && g.ward === id; })
           ? '<section class="duo__c"><div class="card allow">' +
               '<div class="allow__k">每個月給' + esc(callName(u.name)) + '的零用金' + helpBtn('allowance') + '</div>' +
               '<label class="money"><i>NT$</i><input type="number" min="1" step="1" inputmode="numeric" ' +
                 'data-allow="' + esc(u.id) + '" value="' + (u.allowance > 0 ? u.allowance : '') + '" placeholder="輸入正整數" aria-label="每月零用金"></label>' +
-              '<div class="allow__h">僅限正整數，改完離開欄位就會存好</div>' +
+              '<label class="allow__d"><span>每月</span><select data-allowday="' + esc(u.id) + '" aria-label="零用金發放日">' +
+                '<option value="">1 號（帳本換月時）</option>' +
+                Array.apply(null, Array(27)).map(function (_, i) {
+                  var day = i + 2;
+                  return '<option value="' + day + '"' + (u.payDay === day ? ' selected' : '') + '>' + day + ' 號</option>';
+                }).join('') +
+              '</select><span>發</span></label>' +
+              '<div class="allow__h">僅限正整數，改完離開欄位就會存好。到了發放日自動記一筆在你的帳上，也記一筆收入到' +
+                esc(callName(u.name)) + '的帳上並通知他</div>' +
             '</div></section>'
           : '') +
       '</div>';
@@ -2172,6 +2218,9 @@
       LG.fam = fam; LG.invites = r[2].invites || [];
       LG.byId = {};
       d.groups.forEach(function (g) { LG.byId[g.id] = g; });
+      /* 頁首的活動選單在這份清單到了之後再重抓一次：剛建立的活動一定已經在裡面
+         （線上曾遇過建完活動、選單卻還是舊的，本機重現不出來；這樣排就不靠請求先後） */
+      paintGroups();
 
       var live = d.groups.filter(function (g) { return !g.archived; });
       var gone = d.groups.filter(function (g) { return g.archived; });
@@ -2375,14 +2424,15 @@
       '<dl class="lg__f">' +
         '<dt>成員</dt><dd><div class="lg__who">' + who + add + '</div>' +
           (g.canEdit ? '' : '<div class="lg__hint">只有開這個活動的人可以加減成員</div>') + '</dd>' +
-        /* 每月想存多少在「個人資料」（新用戶設定第一步）就設過了，這裡是「這個活動另外設」的選填：
-           ⚠️ 沒設的活動預設收起來，只放一顆「另外設」；按了才出現輸入框（使用者：一直擺著輸入框很多餘）。 */
-        '<dt>存錢目標</dt><dd>' + (Number(g.goal) > 0
+        /* 目標金額是一個提醒，怎麼用由使用者決定：想存錢就訂高一點，想控制花費就訂低一點當警訊。
+           活動還沒有收入時比累計支出，有收入後比累計結餘；到了會通知（services/activity_target.py）。
+           ⚠️ 沒設的活動預設收起來，只放一顆「設定」；按了才出現輸入框（使用者：一直擺著輸入框很多餘）。 */
+        '<dt>目標金額</dt><dd>' + (Number(g.goal) > 0
           ? '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(g.id) + '" ' +
-              'value="' + Number(g.goal) + '" aria-label="這個活動的每月存款目標">' +
-            '<div class="lg__hint">填 0 就是不另外設，回到「個人資料」的每月想存</div>'
-          : '<button type="button" class="lg__opt" data-gopen="' + esc(g.id) + '">＋ 另外設這個活動的存錢目標（選填）</button>' +
-            '<div class="lg__hint">沒設就照「個人資料」的每月想存</div>') + '</dd>' +
+              'value="' + Number(g.goal) + '" aria-label="這個活動的目標金額">' +
+            '<div class="lg__hint">到了會通知你；填 0 就是不設</div>'
+          : '<button type="button" class="lg__opt" data-gopen="' + esc(g.id) + '">＋ 設定目標金額（選填）</button>' +
+            '<div class="lg__hint">想存錢就訂高一點，想控制花費就訂低一點當警訊</div>') + '</dd>' +
         '<dt>通知</dt><dd>' +
           '<label class="lg__chk"><input type="checkbox" data-gnotify="' + esc(g.id) + '"' +
             (g.notify ? ' checked' : '') + '><span>這個活動有動靜就通知我</span></label></dd>' +
@@ -2507,8 +2557,9 @@
     },
     allowance: {
       t: '每月零用金',
-      b: '<p>每個月給家人多少零用金。<b>這是設定，不是一筆支出。</b></p>' +
-         '<p>不用另外記一筆「給小孩 3000」，不然他花掉時同一筆錢會被算兩次。</p>'
+      b: '<p>每個月給孩子多少、幾號給。到了那天系統<b>自動記兩筆</b>：你這邊一筆「給零用金」支出，孩子那邊一筆「零用金」收入，並通知他。</p>' +
+         '<p>不用自己再記一筆，不然會算兩次。改金額只會調整這個月那一對，不會多一筆；刪掉你那筆，孩子那筆也一起刪。</p>' +
+         '<p>家庭模式裡這是家人之間換手，不算家庭支出；孩子真的花掉時才算。</p>'
     },
     avatar: {
       t: '大頭貼',
@@ -3687,9 +3738,16 @@
           '<div class="sec"><h2 class="sec__t">刪除帳號</h2></div>' +
           '<div class="card dz">' +
             '<p class="dz__t">刪除之後，你記的每一筆帳、只有你在用的活動、預算、建議、通知都會刪掉，<b>救不回來</b>。' +
-              '名字和 email 會抹掉，之後可以用同一個 email 重新註冊。還在家庭裡的話，要先到「家庭成員」退出家庭。</p>' +
+              '名字和 email 會抹掉，之後可以用同一個 email 重新註冊。還在家庭裡的話，要先退出家庭。</p>' +
             '<button class="btn btn--sm btn--danger" id="delMe">刪除我的帳號</button>' +
           '</div>' +
+          /* 子女沒有家庭頁（不看家庭帳務），退出家庭放在這裡；家長在家庭頁退出 */
+          (m.family && u.role !== 'parent'
+            ? '<div class="sec"><h2 class="sec__t">家庭</h2></div>' +
+              '<div class="card dz"><p class="dz__t">你在「' + esc(m.family.name) + '」。退出之後家長看不到你的紀錄、零用金也會停止，' +
+                '你的紀錄<b>一筆都不會刪</b>。</p>' +
+                '<button class="btn btn--sm btn--danger" data-family-leave data-name="' + esc(m.family.name) + '">退出家庭</button></div>'
+            : '') +
         '</section>' +
 
         '<section class="duo__c">' +
@@ -3943,10 +4001,8 @@
       h += '<form class="anew" id="anewF">' +
         '<span class="anew__t">花到</span>' +
         '<input type="number" id="anPct" min="1" max="200" value="80" required aria-label="百分比">' +
-        '<span class="anew__t">%，</span>' +
-        '<select id="anGroup" aria-label="哪一個活動">' + goals.map(function (g) {
-          return '<option value="' + (g.groupId || '') + '">' + esc(g.groupId === PERSONAL_GROUP ? '個人帳本' : g.groupName) + '</option>';
-        }).join('') + '</select>' +
+        '<span class="anew__t">% 就提醒我</span>' +
+        /* 只針對這個月的可花額度。活動改用自己的「目標金額」提醒（到了就通知），不在這裡選 */
         '<button class="btn btn--sm btn--go" type="submit">加入</button>' +
       '</form>';
 
@@ -4455,13 +4511,13 @@
     }
 
 
-    /* 活動的存錢目標：選填，按了才出現輸入框 */
+    /* 活動的目標金額：選填，按了才出現輸入框 */
     var gop = t.closest('[data-gopen]');
     if (gop) {
       var gdd = gop.parentNode;
       gdd.innerHTML = '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(gop.dataset.gopen) + '" ' +
-          'placeholder="這個活動每月想存多少" aria-label="這個活動的每月存款目標">' +
-        '<div class="lg__hint">填好、離開欄位就會存；沒設就照「個人資料」的每月想存</div>';
+          'placeholder="例如 5000" aria-label="這個活動的目標金額">' +
+        '<div class="lg__hint">填好、離開欄位就會存；到了會通知你</div>';
       gdd.querySelector('input').focus();
       return;
     }
@@ -4956,7 +5012,9 @@
       var did = del.dataset.del;
       danger({
         title: '刪除這筆紀錄',
-        detail: '刪掉就<b>救不回來</b>了。輸入密碼確認這是你本人。',
+        detail: (del.hasAttribute('data-allow-pair')
+          ? '這是給孩子的零用金：他那筆收入會<b>一起刪掉</b>並通知他，這個月也不會再補發。<br>'
+          : '') + '刪掉就<b>救不回來</b>了。輸入密碼確認這是你本人。',
         level: 'password',
         onOk: function () {
           API.deleteTransaction(did).then(function () {
@@ -5308,7 +5366,7 @@
       busy(f, true, '加入中…');
       API.createAlert({
         percent: Number(document.getElementById('anPct').value),
-        groupId: document.getElementById('anGroup').value || null
+        groupId: null
       }).then(function () {
         busy(f, false);
         paintAlerts();
@@ -5382,14 +5440,19 @@
       if (cs) cs.innerHTML = txEdCats(e.target.value, txEdRow && txEdRow.kind === e.target.value ? txEdRow.cat : '');
       return;
     }
-    var al = e.target.closest ? e.target.closest('[data-allow]') : null;
+    var al = e.target.closest ? e.target.closest('[data-allow], [data-allowday]') : null;
     if (al) {
-      var ar = al.value.trim(), av = Number(ar);
+      var ward = al.dataset.allow || al.dataset.allowday;
+      var amountIn = document.querySelector('[data-allow="' + ward + '"]');
+      var dayIn = document.querySelector('[data-allowday="' + ward + '"]');
+      var ar = amountIn.value.trim(), av = Number(ar);
       if (!/^[0-9]+$/.test(ar) || !Number.isSafeInteger(av) || av <= 0) {
         toast('零用金只能輸入正整數', 'err'); return;
       }
-      API.setAllowance(al.dataset.allow, av).then(function (r) {
-        toast('每月給 ' + (r.wardName || '他') + ' ' + money(av), 'ok');
+      var day = dayIn && dayIn.value ? Number(dayIn.value) : null;
+      API.setAllowance(ward, av, day).then(function (r) {
+        toast('每月 ' + (day || 1) + ' 號給 ' + (r.wardName || '他') + ' ' + money(av), 'ok');
+        paint();                                     // 這個月的那一對帳可能剛發出去，明細重畫
       }).catch(function (err) { toast('設定失敗：' + err.message, 'err'); });
       return;
     }
@@ -5415,7 +5478,7 @@
       var gv = Number(gg.value);
       if (isNaN(gv) || gv < 0) { toast('目標要是 0 以上的數字', 'err'); return; }
       API.setSavingsGoal(null, gv, gg.dataset.ggoal).then(function (r) {
-        toast('「' + (r.groupName || '這個活動') + '」的月目標改為 ' + money(gv), 'ok');
+        toast(gv > 0 ? '「' + (r.groupName || '這個活動') + '」的目標金額改為 ' + money(gv) : '不設目標金額了', 'ok');
         paintGroups();
       }).catch(function (err) { toast('設定失敗：' + err.message, 'err'); });
       return;

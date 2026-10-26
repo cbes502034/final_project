@@ -792,7 +792,7 @@ grep -rn <span class="tk-st">"TODO(記帳)"</span> app/services/   <span class="
         <div class="note__k">地基已經做好了，第一天就能開工</div>
         <p>以前要最優先完成的兩塊——「取出登入者」和「可見範圍」——已經寫好、測好：
         <code>app/guards.py</code>（<code>current_user</code>、<code>@login_required</code>、<code>visible_scope()</code>）、
-        <code>app/toolkit/crud.py</code>（增刪改查）、<code>app/models/</code>（23 張表）。直接 import 來用。</p>
+        <code>app/toolkit/crud.py</code>（增刪改查）、<code>app/models/</code>（24 張表）。直接 import 來用。</p>
       </div>
 
       <div class="note">
@@ -807,7 +807,7 @@ grep -rn <span class="tk-st">"TODO(記帳)"</span> app/services/   <span class="
           <div class="fl__d"><code>docs/02-前後端串接契約.md</code> 同名的那一節：前端送什麼、要回什麼。請求主體的模型（<code>schemas/</code>）已經照它寫好了。</div></div></div>
         <div class="fl"><div class="fl__n">2</div><div class="fl__b">
           <div class="fl__t">資料表已經在 models/</div>
-          <div class="fl__d">23 張表跟 <code>data.js</code> 的 schema 逐欄對齊（有測試擋）。要改欄位：data.js → models → <code>alembic revision --autogenerate</code>。</div></div></div>
+          <div class="fl__d">24 張表跟 <code>data.js</code> 的 schema 逐欄對齊（有測試擋）。要改欄位：data.js → models → <code>alembic revision --autogenerate</code>。</div></div></div>
         <div class="fl"><div class="fl__n">3</div><div class="fl__b">
           <div class="fl__t">規則用 toolkit/、加總寫進 services/</div>
           <div class="fl__d">「誰可以、什麼時候不行」多半已經寫在 <code>toolkit/</code>；加總與模型在 <code>services/</code>。<b>純函式，好測試。</b></div></div></div>

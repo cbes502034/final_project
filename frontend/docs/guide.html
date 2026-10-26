@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>使用說明</title>
-<meta name="description" content="家庭記帳的使用說明：三分鐘上手、記帳、總覽、活動、提醒、家人、個人資料與主題。">
+<meta name="description" content="家庭記帳的使用說明：三種視角、記帳、帳本、總覽、活動、家庭、提醒、個人資料與主題。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&amp;display=swap">
@@ -85,7 +85,7 @@
 
   /* 目錄：一排圓形圖示，像常用功能 */
   .g-toc {
-    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 10px 0 8px; padding: 14px 10px;
+    display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; margin: 10px 0 8px; padding: 14px 10px;
     background: var(--card); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
     border-radius: var(--r-card); box-shadow: var(--shadow-card);
   }
@@ -169,12 +169,25 @@
   .g-qa .a { padding: 0 14px 12px; font-size: 13.5px; line-height: 1.7; color: var(--ink-soft); }
   .g-qa .a b { color: var(--ink); }
 
+  /* 三種視角：一張對照表 */
+  .g-modes { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+  .g-modes th {
+    padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 700; letter-spacing: .06em;
+    color: var(--ink-faint); border-bottom: 1px solid var(--line-2);
+  }
+  .g-modes td { padding: 12px; vertical-align: top; color: var(--ink-soft); border-bottom: 1px dashed var(--line); }
+  .g-modes tr:last-child td { border-bottom: 0; }
+  .g-modes td:first-child { white-space: nowrap; font-family: var(--display); font-size: 18px; font-weight: 700; color: var(--ink); }
+  .g-modes b { color: var(--ink); }
+  .g-modes .yes { font-weight: 700; color: var(--up); }
+  .g-modes .no { font-weight: 700; color: var(--down); }
+
   .g-foot { margin-top: 24px; text-align: center; font-size: 13.5px; color: var(--ink-faint); }
   .g-foot a { font-weight: 700; color: var(--accent); }
 
   @media (max-width: 960px) {
     .g-start { grid-template-columns: minmax(0, 1fr); }
-    .g-toc { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .g-toc { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .g-sec { grid-template-columns: minmax(0, 1fr); }
     .g-sec__l { border-right: 0; border-bottom: 1px solid var(--line); }
   }
@@ -190,6 +203,12 @@
     .g-sec__r { padding: 8px 16px 10px; }
     .g-pts li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
     .g-qa { columns: 1; }
+    .g-toc { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .g-modes thead { display: none; }
+    .g-modes tr { display: block; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+    .g-modes tr:last-child { border-bottom: 0; }
+    .g-modes td { display: block; padding: 3px 0; border: 0; }
+    .g-modes td[data-k]::before { content: attr(data-k) "："; font-weight: 700; color: var(--ink); }
   }
 </style>
 </head>
@@ -207,6 +226,7 @@
     <symbol id="i-family" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.3"/><path d="M3.5 20v-1.5A4.5 4.5 0 0 1 8 14h2a4.5 4.5 0 0 1 4.5 4.5V20"/><path d="M15.5 14.5h1.5a3.5 3.5 0 0 1 3.5 3.5v2"/></g></symbol>
     <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20v-1.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V20"/></g></symbol>
     <symbol id="i-qa" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17.5v.01"/></g></symbol>
+    <symbol id="i-modes" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></g></symbol>
     <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6 9 12l6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </defs>
 </svg>
@@ -264,40 +284,106 @@
 
   <!-- 目錄 -->
   <nav class="g-toc" aria-label="目錄">
-    <a href="#write"><span class="g-ic"><svg aria-hidden="true"><use href="#i-entry"/></svg></span>記帳</a>
+    <a href="#modes"><span class="g-ic"><svg aria-hidden="true"><use href="#i-modes"/></svg></span>三種視角</a>
+    <a href="#write"><span class="g-ic"><svg aria-hidden="true"><use href="#i-add"/></svg></span>記帳</a>
+    <a href="#ledger"><span class="g-ic"><svg aria-hidden="true"><use href="#i-entry"/></svg></span>帳本</a>
     <a href="#read"><span class="g-ic"><svg aria-hidden="true"><use href="#i-home"/></svg></span>總覽</a>
     <a href="#books"><span class="g-ic"><svg aria-hidden="true"><use href="#i-book"/></svg></span>活動</a>
-    <a href="#alert"><span class="g-ic"><svg aria-hidden="true"><use href="#i-bell"/></svg></span>提醒</a>
-    <a href="#family"><span class="g-ic"><svg aria-hidden="true"><use href="#i-family"/></svg></span>家人</a>
+    <a href="#family"><span class="g-ic"><svg aria-hidden="true"><use href="#i-family"/></svg></span>家庭</a>
+    <a href="#alert"><span class="g-ic"><svg aria-hidden="true"><use href="#i-bell"/></svg></span>通知</a>
     <a href="#me"><span class="g-ic"><svg aria-hidden="true"><use href="#i-user"/></svg></span>個人與主題</a>
     <a href="#qa"><span class="g-ic"><svg aria-hidden="true"><use href="#i-qa"/></svg></span>常見問題</a>
   </nav>
+
+  <!-- 三種視角 -->
+  <section class="g-sec" id="modes">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-modes"/></svg></span>
+        <div><div class="g-sec__n">01</div><h2>三種視角</h2></div>
+      </div>
+      <p class="g-sec__lead">同一套畫面，看的是誰的錢，由頁首決定。先認得這三種，其他功能都跟著它走。</p>
+      <div class="g-where"><span>頁首「個人｜家庭」</span><span>頁首「選擇活動」</span></div>
+      <div class="g-eg"><i>一句話記住</i><b>個人</b>是你的總帳本，<b>活動</b>是掛在個人底下的小帳本，<b>家庭</b>是全家總帳本合起來看。</div>
+    </div>
+    <div class="g-sec__r">
+      <table class="g-modes">
+        <thead><tr><th>視角</th><th>它是什麼</th><th>怎麼進去</th><th>能記帳嗎</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>個人</td>
+            <td data-k="它是什麼">你自己的<b>總帳本</b>。自己記的收支都在這裡，總覽的「這個月還可以花」也從這裡算</td>
+            <td data-k="怎麼進去">登入後就是；頁首按「個人」</td>
+            <td data-k="能記帳嗎"><span class="yes">可以</span></td>
+          </tr>
+          <tr>
+            <td>活動</td>
+            <td data-k="它是什麼">掛在個人底下的<b>小帳本</b>，例如露營、聚餐、旅行。每個活動有自己的總覽、帳本、財務狀況和建議，可以邀朋友一起記</td>
+            <td data-k="怎麼進去">個人視角下，頁首「選擇活動」挑一個</td>
+            <td data-k="能記帳嗎"><span class="yes">可以</span>，記在這個活動裡</td>
+          </tr>
+          <tr>
+            <td>家庭</td>
+            <td data-k="它是什麼">全家人的個人帳本<b>合起來看</b>：這個月全家收多少、花多少、誰花在哪</td>
+            <td data-k="怎麼進去">頁首按「家庭」；只有家長有這個按鈕</td>
+            <td data-k="能記帳嗎"><span class="no">不行</span>，沒有「＋ 記一筆」</td>
+          </tr>
+        </tbody>
+      </table>
+      <ul class="g-pts">
+        <li><b>名字跟著換</b><span>底部分頁和常用功能會跟著視角改名：「個人帳本」「活動帳本」「家庭帳本」。看名字就知道現在算的是誰的錢</span></li>
+        <li><b>活動的帳另外算</b><span>活動裡記的帳只算在活動，<em>不會</em>算進你的個人總覽；退出活動時選「合併並退出」，你自己記的那幾筆才會複製一份到個人帳本</span></li>
+        <li><b>回到個人</b><span>在活動總覽按常用功能的「個人帳本」，就會離開活動、回到個人總覽</span></li>
+        <li><b>家庭只能看</b><span>家庭視角整理的是每個人的個人帳本；要記帳請切回「個人」</span></li>
+        <li><b>子女</b><span>子女的頁首只寫「個人模式」，沒有家庭按鈕；全家的數字由家長看</span></li>
+      </ul>
+    </div>
+  </section>
 
   <!-- 記帳 -->
   <section class="g-sec" id="write">
     <div class="g-sec__l">
       <div class="g-sec__h">
-        <span class="g-ic"><svg aria-hidden="true"><use href="#i-entry"/></svg></span>
-        <div><div class="g-sec__n">01</div><h2>記帳</h2></div>
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-add"/></svg></span>
+        <div><div class="g-sec__n">02</div><h2>記帳</h2></div>
       </div>
       <p class="g-sec__lead">不用填表格，把今天花了什麼打成一段話。</p>
-      <div class="g-where"><span>總覽 › ＋ 記一筆</span><span>手機底部中間的 ＋</span><span>電腦右上角</span></div>
+      <div class="g-where"><span>常用功能 › 記一筆</span><span>手機底部中間的 ＋</span><span>電腦右上角</span></div>
       <div class="g-eg"><i>你打</i>早餐 55，中午吃飯 320，晚上加油 1200，打工賺了 1500</div>
     </div>
     <div class="g-sec__r">
       <ul class="g-pts">
-        <li><b>自動拆開</b><span>送出後拆成一筆一筆，金額和分類都填好</span></li>
+        <li><b>記在哪裡</b><span>記在目前的視角：個人視角記進個人帳本，選了活動就記進那個活動。家庭視角沒有記帳按鈕</span></li>
+        <li><b>兩種記法</b><span>「<em>AI 幫我拆</em>」打一段話拆成好幾筆；「<em>自己填一筆</em>」日期、金額、分類自己選</span></li>
         <li><b>確認再存</b><span>每一筆標出對應原句的哪一段；沒講金額的會標出來，<em>沒補完不會存</em></span></li>
         <li><b>猜錯就改</b><span>「在家庭買飲料」的家庭是店名，這種地方可能猜錯，直接改掉</span></li>
         <li><b>會記住你的改法</b><span>分類改過一次（例如文具改成教育），下次同樣的東西就照你的改法，那一筆下面會寫「照你之前的改法」</span></li>
         <li><b>等太久</b><span>按鈕上會顯示已經等了幾秒；超過 8 秒會說明原因（主機閒置後第一次要多等一下）</span></li>
-        <li><b>只記一筆</b><span>切到「單筆手動」，自己填金額、分類、店家</span></li>
-        <li><b>年月包裹</b><span>在儀表板開啟「個人帳本」，依序展開年份、月份後查看明細。每月 1 日 00:00（台北時間），上月明細自動打包；已打包的紀錄仍能搜尋及修改。</span></li>
-        <li><b>返回首頁</b><span>個人帳本上方的「返回個人總覽」可回到個人首頁；活動帳本的「返回活動頁面」會回到目前活動的首頁，保留活動選取</span></li>
-        <li><b>來源活動</b><span>明細會顯示來源活動，也能從來源活動選單篩選，或直接搜尋活動名稱。自行記錄的明細會標示「自行記錄」。</span></li>
-        <li><b>共用搜尋</b><span>各頁上方的搜尋都查目前對象的帳本明細，可搜尋活動名稱、店家或備註。手機點放大鏡展開，按上箭頭或 Esc 收起；開關不會推動下方內容。</span></li>
-        <li><b>記錯了</b><span>個人帳本每一列右邊按<em>修改</em>：金額、日期、分類、活動都能改；別人的只能看</span></li>
-        <li><b>一次刪很多筆</b><span>個人帳本按「選取多筆」，勾好按「刪除 N 筆」；其中一筆刪不了就<em>一筆都不刪</em></span></li>
+        <li><b>記錯了</b><span>帳本每一列右邊按<em>修改</em>或<em>刪除</em>；只能改自己記的，別人的只能看</span></li>
+        <li><b>一次刪很多筆</b><span>帳本按「選取多筆」，勾好按「刪除 N 筆」；其中一筆刪不了就<em>一筆都不刪</em></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 帳本 -->
+  <section class="g-sec" id="ledger">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-entry"/></svg></span>
+        <div><div class="g-sec__n">03</div><h2>帳本</h2></div>
+      </div>
+      <p class="g-sec__lead">每一筆都在這裡，依年份、月份收好，點開才看。</p>
+      <div class="g-where"><span>常用功能 › 個人帳本</span><span>手機底部「個人帳本」</span><span>頁首搜尋框</span></div>
+    </div>
+    <div class="g-sec__r">
+      <ul class="g-pts">
+        <li><b>年月包裹</b><span>這個月直接展開；以前的先點年份、再點月份。每月 1 日 00:00（台北時間）上個月自動收起來，收起來的<em>一樣能搜尋、修改</em></span></li>
+        <li><b>篩選</b><span>收支（支出／收入）、來源（AI 解析／手動輸入／零用金）、來源活動</span></li>
+        <li><b>來源活動</b><span>從活動合併過來的會寫活動名稱，自己直接記的寫「自行記錄」</span></li>
+        <li><b>搜尋</b><span>頁首的搜尋框查目前視角的帳本，店家、備註、活動名稱都搜得到；手機按放大鏡展開，按 Esc 收起</span></li>
+        <li><b>只看收入或支出</b><span>總覽點「本月收入」或「本月支出」，帳本就只列那一種；標籤按 ✕ 看全部</span></li>
+        <li><b>返回</b><span>帳本上方「← 返回個人總覽」；在活動裡是「返回活動頁面」，活動仍保持選取</span></li>
+        <li><b>家庭帳本</b><span>家庭視角看到的是全家的個人帳本，每一列有「記錄者」；孩子的紀錄要照看中才會出現</span></li>
       </ul>
     </div>
   </section>
@@ -307,22 +393,24 @@
     <div class="g-sec__l">
       <div class="g-sec__h">
         <span class="g-ic"><svg aria-hidden="true"><use href="#i-home"/></svg></span>
-        <div><div class="g-sec__n">02</div><h2>總覽</h2></div>
+        <div><div class="g-sec__n">04</div><h2>總覽</h2></div>
       </div>
       <p class="g-sec__lead">打開就是總覽，回答一件事：這個月還能花多少。</p>
-      <div class="g-where"><span>其他頁面左上角「‹ 總覽」</span><span>手機底部「總覽」</span></div>
+      <div class="g-where"><span>左上角的「家庭記帳」</span><span>手機底部「總覽」</span></div>
       <div class="g-formula">收入 − 每月想存 ＝ 可花上限<br>可花上限 − 已經花的 ＝ 還可以花</div>
     </div>
     <div class="g-sec__r">
       <ul class="g-pts">
         <li><b>疊在一起的卡</b><span>後面露出<em>本月收入</em>、<em>本月支出</em>，最前面是<em>這個月還可以花</em></span></li>
-        <li><b>點收入或支出</b><span>點「本月收入」只看這個月的收入明細、點「本月支出」只看支出；明細頁上的「本月」標籤按 ✕ 就看全部</span></li>
-        <li><b>進度條</b><span>看的是「離存不到錢還有多遠」：接近上限變黃，超過變紅</span></li>
-        <li><b>常用功能</b><span>所有功能都在這；圖示下的小字是現況，例如「4 個活動」「2 則要注意」</span></li>
-        <li><b>預算小卡</b><span>一個分類一張，看是哪一類把錢吃掉；右上角「調整預算 ›」直接到個人資料的每月預算</span></li>
+        <li><b>進度條</b><span>看的是「離存不到錢還有多遠」：接近上限變黃，超過變紅，標題改成「這個月超出計畫」</span></li>
+        <li><b>收入還沒進來</b><span>月底才發薪，月初的上限會是負的；到 個人資料 › 存錢計畫 設定「這個月的收入怎麼估」，就先照預計收入算</span></li>
+        <li><b>常用功能</b><span>這個視角能做的事都在這；圖示下的小字是現況，例如「本月 12 筆」「2 則要注意」</span></li>
+        <li><b>預算使用狀況</b><span>一個分類一張，看是哪一類把錢吃掉；「調整預算 ›」直接到個人資料的每月預算</span></li>
         <li><b>今天的紀錄</b><span>最下面：今天花多少、收多少，和今天記的每一筆</span></li>
-        <li><b>個人｜家庭</b><span>建立家庭後家長即可切換，不必等第二位成員加入。家庭模式整理全家個人帳本的數字，<em>只能看、不能記帳</em>；子女維持個人模式</span></li>
-        <li><b>財務建議</b><span>常用功能 › 財務建議（手機在底部的「建議」），按「<em>產生這個月的建議</em>」；每一則都附算式可以核對。家長照看著家人時可以產生家庭的</span></li>
+        <li><b>活動的總覽</b><span>活動不套上面的公式，看的是自建立以來的累計：還沒有收入時是「<em>已花</em>」多少，有收入後是「<em>已存</em>」多少；設了目標金額就顯示到了幾成、還差多少</span></li>
+        <li><b>家庭的總覽</b><span>多一張「每個人的這個月」：每位家人的收入、支出、結餘，和佔家庭支出的比例</span></li>
+        <li><b>財務狀況</b><span>底部「財務狀況」：收支對照、錢花在哪，近幾個月放在一起比</span></li>
+        <li><b>財務建議</b><span>底部「財務建議」按「<em>產生這個月的建議</em>」；每一則都附算式可以核對。個人、活動、家庭的建議分開保存</span></li>
       </ul>
     </div>
   </section>
@@ -332,23 +420,73 @@
     <div class="g-sec__l">
       <div class="g-sec__h">
         <span class="g-ic"><svg aria-hidden="true"><use href="#i-book"/></svg></span>
-        <div><div class="g-sec__n">03</div><h2>活動</h2></div>
+        <div><div class="g-sec__n">05</div><h2>活動</h2></div>
       </div>
-      <p class="g-sec__lead">把不同用途的錢分開：家用、旅遊基金、自己的零用。</p>
-      <div class="g-where"><span>選擇活動後 › 活動管理</span><span>個人模式各頁上方共用的活動選單</span></div>
-      <div class="g-eg"><i>分類和活動差在哪</i><b>分類</b>是錢花在什麼；<b>活動</b>是算在哪一份預算。同樣吃飯，聚餐算家用、出國吃的算旅遊基金。</div>
+      <p class="g-sec__lead">出去玩、聚餐、辦一件事的錢，開一個活動另外記，不會混進自己的總帳本。</p>
+      <div class="g-where"><span>常用功能 › 活動管理</span><span>頁首「選擇活動」</span></div>
+      <div class="g-eg"><i>分類和活動差在哪</i><b>分類</b>是錢花在什麼（餐飲、交通）；<b>活動</b>是這筆錢屬於哪件事（露營、同事聚餐）。平常吃飯記在個人，露營時吃的記在「露營」。</div>
     </div>
     <div class="g-sec__r">
+      <div class="g-sub">開一個活動</div>
       <ul class="g-pts">
-        <li><b>建立活動</b><span>活動頁「進行中」右邊的「＋ 建立活動」，填名字就好；<em>結束日選填</em>，旅行、婚禮這種有結束日的就填上。誰都可以開，建立者可管理成員</span></li>
-        <li><b>一份清單</b><span>活動不分種類，進行中的都在同一份清單；個人的個人帳本請從儀表板開啟，不放在上方活動選單</span></li>
-        <li><b>切換</b><span>選擇活動後留在首頁，數字與功能改為該活動；個人模式仍保持選取。活動首頁的「個人帳本」會切回個人對象並返回個人總覽。家庭模式不顯示活動選單</span></li>
-        <li><b>活動管理</b><span>個人與活動首頁的常用功能都有「活動管理」，可直接前往活動清單</span></li>
-        <li><b>各自的目標</b><span>點開該活動就能填它自己的月目標，跟整體目標各算各的</span></li>
-        <li><b>有結束日的活動</b><span>過了結束日<em>不會自動結束</em>，每位成員可自行按「退出」，在視窗選擇只退出，或將自己的明細複製到個人帳本後退出；其他成員繼續記帳</span></li>
-        <li><b>退出</b><span>只離開活動，不複製明細；原活動紀錄仍保留給其他成員查看</span></li>
-        <li><b>移除</b><span>最後一位成員退出後，原活動會自動關閉並從清單消失；選擇「合併並退出」的本人明細會保留在個人帳本</span></li>
-        <li><b>邀請朋友</b><span>展開活動的「邀請朋友」後，可輸入完整 Email「找人」，確認對象再送出邀請；或按「產生邀請碼」，在視窗中命名、產生並複製給朋友。關閉視窗後只保留待使用的狀態卡片，邀請使用或取消後卡片會自動移除。朋友不必先加入家庭。</span></li>
+        <li><b>建立</b><span>活動管理 › 「＋ 建立活動」，填名字就好；<em>結束日選填</em>，旅行這種有結束日的就填上</span></li>
+        <li><b>進入活動</b><span>頁首「選擇活動」挑一個，總覽、帳本、財務狀況、財務建議都換成這個活動的</span></li>
+        <li><b>活動的設定</b><span>在活動管理點開活動：成員、目標金額、「這個活動有動靜就通知我」（預設關）</span></li>
+        <li><b>目標金額</b><span>一個提醒，怎麼用你決定：想存錢就訂高一點當儲蓄目標，想控制花費就訂低一點當警訊。到了會在鈴鐺通知你一次；每位成員各訂各的</span></li>
+      </ul>
+      <div class="g-sub">找朋友一起記</div>
+      <ul class="g-pts">
+        <li><b>用帳號邀請</b><span>點開活動 › 邀請朋友，輸入朋友的<em>完整 Email</em> 找人，確認是他再送出</span></li>
+        <li><b>用邀請碼</b><span>按「產生邀請碼」，取個名字（例如「給小明」）後產生。<em>碼只顯示這一次</em>，只能用一次、7 天有效</span></li>
+        <li><b>收到邀請</b><span>活動管理頁最上面會出現邀請卡，按接受；拿到邀請碼的，在「用邀請碼加入活動」輸入</span></li>
+        <li><b>誰能邀請</b><span>只有建立活動的人。朋友<em>不必是家人</em>，加入活動也不會改變家庭關係</span></li>
+      </ul>
+      <div class="g-sub">結束與退出</div>
+      <ul class="g-pts">
+        <li><b>退出</b><span>點開活動 › 「退出」，輸入密碼後二選一：<em>退出</em>只離開；<em>合併並退出</em>把你自己記的幾筆複製到個人帳本再離開</span></li>
+        <li><b>原紀錄留著</b><span>兩種退出都不會刪活動裡的帳，其他成員照樣看得到、繼續記</span></li>
+        <li><b>建立者退出</b><span>管理權交給最早加入的成員</span></li>
+        <li><b>移除</b><span>最後一個人退出後，活動自動關閉並從清單消失；不用另外刪</span></li>
+        <li><b>過了結束日</b><span>不會自動結束，要每個人自己退出</span></li>
+        <li><b>移出成員</b><span>建立者可以把人移出。被移出的人看不到別人記在活動的帳，也不能再記；他自己記過的不會刪</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 家庭 -->
+  <section class="g-sec" id="family">
+    <div class="g-sec__l">
+      <div class="g-sec__h">
+        <span class="g-ic"><svg aria-hidden="true"><use href="#i-family"/></svg></span>
+        <div><div class="g-sec__n">06</div><h2>家庭</h2></div>
+      </div>
+      <p class="g-sec__lead">家人各記各的，家長切到「家庭」看全家合起來的數字。</p>
+      <div class="g-where"><span>頁首「家庭」› 常用功能的家庭名稱</span><span>還沒有家庭：總覽上方「還沒有加入家庭」</span></div>
+    </div>
+    <div class="g-sec__r">
+      <div class="g-sub">建立與加入</div>
+      <ul class="g-pts">
+        <li><b>建立</b><span>建立家庭的人就是家長，可以順便填家庭長期目標；建好馬上就能切到「家庭」</span></li>
+        <li><b>用帳號邀請</b><span>家庭頁 › 邀請家人，輸入家人的<em>完整 Email</em>，選家長或子女送出；對方總覽最上面會出現邀請卡</span></li>
+        <li><b>用邀請碼</b><span>產生 8 碼傳給家人輸入；<em>只能用一次、七天失效</em></span></li>
+      </ul>
+      <div class="g-sub">誰看得到誰</div>
+      <ul class="g-pts">
+        <li><b>家長之間</b><span>同一個家庭的家長<em>互相看得到</em>彼此的個人帳本</span></li>
+        <li><b>孩子的紀錄</b><span>家長在孩子的卡片按「<em>開始照看</em>」之後才看得到；<em>只能看、不能改、不能登入對方帳號</em></span></li>
+        <li><b>停止照看</b><span>照看的家長或另一位家長可以按「停止照看」；孩子自己不能停，但看得到是誰在照看。停止之後零用金也不再發</span></li>
+        <li><b>子女</b><span>子女看不到家庭的帳務；要離開家庭，在 個人資料 › 家庭 按「退出家庭」</span></li>
+        <li><b>活動的帳</b><span>只有活動成員看得到，不會出現在家庭的數字裡</span></li>
+      </ul>
+      <div class="g-sub">家長可以做的</div>
+      <ul class="g-pts">
+        <li><b>家庭長期目標</b><span>家庭頁最上面，「修改家庭目標」填金額和想做的事。進度從<em>家庭建立那天</em>起算，累計家人個人帳本的收支結餘；不含預計收入、子女的收入和還在活動裡的帳。家庭財務建議會參考這個目標</span></li>
+        <li><b>零用金</b><span>孩子卡片 › 看紀錄 › 「每個月給孩子的零用金」，填金額、選每月幾號發（不選就是 1 號）。到了那天<em>自動記兩筆</em>：你這邊一筆「給零用金」支出，孩子那邊一筆收入，並通知他。兩位家長可以各給各的</span></li>
+        <li><b>改零用金</b><span>這個月已經發了才改金額，會直接調整那兩筆，不會多一筆，孩子也會收到通知；刪掉你那筆，孩子那筆一起刪，這個月不再補發。孩子那筆不能自己改</span></li>
+        <li><b>設為家長</b><span>孩子的卡片上按「設為家長」。之後<em>不能把他改回子女</em>，只有他自己能調整</span></li>
+        <li><b>改成子女</b><span>家裡有兩位以上家長時，自己的卡片上可以「改成子女」；你照看家人的關係會結束</span></li>
+        <li><b>家庭自訂分類</b><span>系統的分類不夠用時，在「家庭自訂分類」加一個，全家記帳、預算、統計都用得到</span></li>
+        <li><b>移出與解散</b><span>家長可以把人移出家庭；<em>唯一的家長</em>才會看到「解散家庭」。紀錄<em>一筆都不刪</em>，留在記的人自己那裡</span></li>
       </ul>
     </div>
   </section>
@@ -358,57 +496,23 @@
     <div class="g-sec__l">
       <div class="g-sec__h">
         <span class="g-ic"><svg aria-hidden="true"><use href="#i-bell"/></svg></span>
-        <div><div class="g-sec__n">04</div><h2>提醒</h2></div>
+        <div><div class="g-sec__n">07</div><h2>通知與提醒</h2></div>
       </div>
-      <p class="g-sec__lead">不用等月底，花到你設的比例就通知。</p>
+      <p class="g-sec__lead">要你知道的事都在右上角的鈴鐺，有新的會立刻跳出來。</p>
       <div class="g-where"><span>個人資料 › 花到幾成提醒我</span><span>右上角鈴鐺</span></div>
-      <div class="g-eg"><i>通知長這樣</i>旅遊基金 已用掉可花額度的 <b>103%</b>（超過你設的 100%）</div>
+      <div class="g-eg"><i>通知長這樣</i>整體 已用掉可花額度的 <b>103%</b>（超過你設的 100%）</div>
     </div>
     <div class="g-sec__r">
       <ul class="g-pts">
         <li><b>自己設門檻</b><span>可以設好幾個，例如 60%、85%、100%</span></li>
         <li><b>算的是</b><span>可花額度的幾成，<em>不是收入的幾成</em></span></li>
-        <li><b>針對某本帳</b><span>例如「旅遊基金花到九成就叫我」</span></li>
         <li><b>不會一直吵</b><span>同一個門檻<em>一個月只響一次</em>，下個月重新開始</span></li>
         <li><b>暫停</b><span>把開關關掉就好，設定會留著</span></li>
-        <li><b>活動動靜</b><span>在活動裡打開「有動靜通知我」才會通知，預設是關的</span></li>
-        <li><b>一次記很多筆</b><span>家人一段話記了 4 筆，鈴鐺裡合成一則「記了 4 筆，共 NT$ 285」，點一下全部已讀</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- 家人 -->
-  <section class="g-sec" id="family">
-    <div class="g-sec__l">
-      <div class="g-sec__h">
-        <span class="g-ic"><svg aria-hidden="true"><use href="#i-family"/></svg></span>
-        <div><div class="g-sec__n">05</div><h2>家人與家庭</h2></div>
-      </div>
-      <p class="g-sec__lead">記帳預設只有自己看得到。加入家庭之後，照下面的規則分享。</p>
-      <div class="g-where"><span>常用功能 › 家庭成員</span><span>還沒有家庭：加入家庭</span></div>
-    </div>
-    <div class="g-sec__r">
-      <div class="g-sub">加入家庭</div>
-      <ul class="g-pts">
-        <li><b>建立</b><span>建立家庭的人就是家長</span></li>
-        <li><b>用帳號邀請</b><span>輸入家人的<em>完整 email</em>，選家長或子女送出，對方按「加入」</span></li>
-        <li><b>用邀請碼</b><span>產生 8 碼傳給家人輸入；<em>只能用一次、七天失效</em></span></li>
-      </ul>
-      <div class="g-sub">誰看得到誰</div>
-      <ul class="g-pts">
-        <li><b>家長之間</b><span>同一個家庭互相看得到</span></li>
-        <li><b>孩子的紀錄</b><span>家長在孩子的卡片上按「<em>開始照看</em>」之後才看得到；<em>只能看、不能改、不能登入對方帳號</em></span></li>
-        <li><b>停止照看</b><span>照看的家長或另一位家長可以按「停止照看」；<em>孩子自己不能停</em>，但每個人都看得到是誰在照看</span></li>
-        <li><b>存多少錢</b><span>每月存款目標<em>只有本人能設</em>；家長可以在孩子的紀錄頁給零用金</span></li>
-        <li><b>離開</b><span>任何人都能退出；家長可以移出孩子。紀錄不會刪，但彼此就看不到了</span></li>
-      </ul>
-      <div class="g-sub">家長可以做的</div>
-      <ul class="g-pts">
-        <li><b>設為家長</b><span>孩子的卡片上按「設為家長」。之後<em>不能把他改回子女</em>，只有他自己能調整</span></li>
-        <li><b>改成子女</b><span>家裡有兩位以上家長時，自己的卡片上可以「改成子女」；你照看家人的關係會結束</span></li>
-        <li><b>家庭長期目標</b><span>建立家庭時可填共同存款目標與文字，之後只在家庭頁由家長修改。累計進度從家庭建立日起計算已入帳結餘，與每月存錢計畫分開；家庭財務建議也會參考目標。</span></li>
-        <li><b>家庭自訂分類</b><span>系統的分類不夠用時，在「家庭自訂分類」加一個，家庭記帳、預算、統計都用得到</span></li>
-        <li><b>解散家庭</b><span><em>唯一的家長</em>才會看到。每個人都離開這個家、照看與零用金結束，<em>紀錄一筆都不刪</em></span></li>
+        <li><b>家人記帳</b><span>你照看的孩子記帳會通知你；一段話記了 4 筆，合成一則「記了 4 筆，共 NT$ 285」</span></li>
+        <li><b>零用金</b><span>家長發了、改了或取消零用金，孩子會收到；兩位家長各給，就是兩則</span></li>
+        <li><b>邀請</b><span>有人用帳號邀你加入家庭或活動，點通知就到可以接受的地方</span></li>
+        <li><b>目標金額</b><span>活動到了你訂的目標金額，通知一次</span></li>
+        <li><b>活動動靜</b><span>在活動打開「這個活動有動靜就通知我」才會通知，預設是關的</span></li>
       </ul>
     </div>
   </section>
@@ -418,22 +522,23 @@
     <div class="g-sec__l">
       <div class="g-sec__h">
         <span class="g-ic"><svg aria-hidden="true"><use href="#i-user"/></svg></span>
-        <div><div class="g-sec__n">06</div><h2>個人資料與主題</h2></div>
+        <div><div class="g-sec__n">08</div><h2>個人資料與主題</h2></div>
       </div>
-      <p class="g-sec__lead">名字、大頭貼、密碼、理財習慣，還有整個系統的外觀。</p>
+      <p class="g-sec__lead">名字、大頭貼、密碼、存錢計畫、理財習慣，還有整個系統的外觀。</p>
       <div class="g-where"><span>常用功能 › 個人資料</span><span>常用功能 › 換主題</span></div>
     </div>
     <div class="g-sec__r">
       <ul class="g-pts">
-        <li><b>個人化設定</b><span>建好帳號後一步一步問：<em>每月想存多少 → 理財習慣 → 主題</em>，每一步都能跳過</span></li>
+        <li><b>註冊後的設定</b><span>一步一步問：<em>每月想存多少 → 理財習慣 → 主題</em>，每一步都能跳過</span></li>
+        <li><b>存錢計畫</b><span>每月想存多少、收入怎麼來、這個月的收入怎麼估（固定金額或照最近幾個月自動估）</span></li>
+        <li><b>每月預算</b><span>替每個支出分類填上限，離開欄位就存好；填 0 就是不設</span></li>
+        <li><b>理財習慣</b><span>選理財風格、目標、固定安排，財務建議會參考</span></li>
         <li><b>大頭貼</b><span>選一張照片就好，會自動裁切縮小；沒上傳就用名字最後一個字</span></li>
         <li><b>Email</b><span>是登入帳號，目前不能改</span></li>
-        <li><b>換主題</b><span>總覽的「常用功能」有一格<em>換主題</em>，自己一頁、八套主題排成卡片，<em>按一下就換</em></span></li>
-        <li><b>主題存在帳號上</b><span>換手機登入也一樣；家人各選各的</span></li>
-        <li><b>理財習慣</b><span>選理財風格、目標、固定安排，財務建議會參考</span></li>
-        <li><b>每月預算</b><span>「每月預算」裡替每個支出分類填上限，離開欄位就存好；填 0 就是不設</span></li>
-        <li><b>登出</b><span>前往「個人資料」，按頁面上方的「登出」即可登出目前裝置；首頁常用功能不再放置登出入口</span></li>
-        <li><b>登入中的裝置</b><span>只列出其他登入中的裝置；按「<em>登出其他裝置</em>」會讓其他裝置立即登出，目前這台仍保持登入</span></li>
+        <li><b>換主題</b><span>八套主題排成卡片，<em>按一下就換</em>；存在帳號上，換手機登入也一樣，家人各選各的</span></li>
+        <li><b>登出</b><span>個人資料頁上方的「登出」</span></li>
+        <li><b>登入中的裝置</b><span>列出其他登入中的裝置；按「<em>登出其他裝置</em>」讓它們立即登出，目前這台仍保持登入</span></li>
+        <li><b>刪除帳號</b><span>你記的帳、只有你在用的活動、預算、建議都會刪掉，救不回來；還在家庭裡要先退出家庭</span></li>
       </ul>
       <div class="g-note"><b>不是投資建議</b><span>填了定期定額只是讓系統知道錢去哪，系統不提供投資、保險、稅務建議。</span></div>
     </div>
@@ -444,9 +549,33 @@
     <div class="g-sec__r" style="padding-top:22px">
       <div class="g-sec__h" style="margin-bottom:14px">
         <span class="g-ic"><svg aria-hidden="true"><use href="#i-qa"/></svg></span>
-        <div><div class="g-sec__n">07</div><h2>常見問題</h2></div>
+        <div><div class="g-sec__n">09</div><h2>常見問題</h2></div>
       </div>
       <div class="g-qa">
+        <details>
+          <summary>為什麼切到「家庭」就不能記帳？</summary>
+          <div class="a">家庭是把每個人的個人帳本<b>合起來看</b>，帳一定是某個人記的。切回「個人」記，家庭的數字會自動算進去。</div>
+        </details>
+        <details>
+          <summary>活動裡記的帳，會算進我的總覽嗎？</summary>
+          <div class="a"><b>不會。</b>活動的帳只算在活動自己的總覽。退出時選「合併並退出」，你自己記的那幾筆才會複製到個人帳本，從那時起算進個人和家庭。</div>
+        </details>
+        <details>
+          <summary>退出活動後，我記的帳去哪了？</summary>
+          <div class="a">活動裡的原紀錄<b>一直留著</b>，其他成員看得到。選「合併並退出」的話，另外複製一份到你的個人帳本，標上來源活動；選「退出」就不複製。</div>
+        </details>
+        <details>
+          <summary>合併後發現記錯了，可以改嗎？</summary>
+          <div class="a">個人帳本裡的副本可以修改或刪除；活動裡的原紀錄是退出前的歷史，<b>不會跟著改</b>。同一筆只算一次，不會重複。</div>
+        </details>
+        <details>
+          <summary>家庭長期目標的進度為什麼比我想的少？</summary>
+          <div class="a">進度從<b>家庭建立那天</b>起算，之前的收入和支出都不算；也不含預計收入、子女的收入和還在活動裡的帳。這是依帳本算的結餘，不是銀行存款。</div>
+        </details>
+        <details>
+          <summary>為什麼看不到某個家人的紀錄？</summary>
+          <div class="a">孩子要有家長按了「開始照看」才看得到；家長之間同一個家庭就互相看得到。跟你一起在活動裡的人，你只看得到他記在該活動的帳。</div>
+        </details>
         <details>
           <summary>忘記密碼怎麼辦？</summary>
           <div class="a">登入頁按<b>「忘記密碼？」</b>，輸入註冊用的 email，會收到一封重設密碼的信。連結 <b>30 分鐘內有效、只能用一次</b>；設好新密碼之後，其他裝置上的登入都會登出。沒收到的話看一下垃圾信件匣。</div>
@@ -460,44 +589,32 @@
           <div class="a">不會。過去的月份用<b>當時</b>設定的數字。</div>
         </details>
         <details>
-          <summary>為什麼看不到某個家人的紀錄？</summary>
-          <div class="a">孩子要有家長按了「開始照看」才看得到；家長之間同一個家庭就互相看得到。跟你共用活動的人，只看得到該活動裡的紀錄。</div>
-        </details>
-        <details>
-          <summary>結算之後紀錄去哪了？</summary>
-          <div class="a">按「退出」開啟視窗，再選「合併並退出」後，只有你自己記的明細會複製到「〈名字〉的帳本」，原活動保留合併前的紀錄，其他成員仍看得到，你同時退出原活動。其他人仍可繼續使用；最後一位成員退出後，原活動會關閉並從清單消失。若選「退出」，不會複製任何明細到個人帳本，原活動歷史仍留存。</div>
-        </details>
-        <details>
-          <summary>結算過的活動裡記錯了，可以改嗎？</summary>
-          <div class="a">個人帳本的副本可以修改或刪除；原活動保留合併前的歷史，不會跟著副本改變。整體收支只計算一次。</div>
-        </details>
-        <details>
           <summary>「今天」「這個月」是照什麼算的？</summary>
-          <div class="a">照<b>你手機或電腦上的日期</b>。記一筆時日期預設是今天，一段話裡的「昨天」也從今天往回算；活動過了結束日沒，也是跟今天比。</div>
+          <div class="a">照<b>你手機或電腦上的日期</b>。記一筆時日期預設是今天，一段話裡的「昨天」也從今天往回算；年月包裹則固定照台北時間每月 1 日收起上個月。</div>
         </details>
         <details>
-          <summary>結算完的活動可以刪掉嗎？</summary>
-          <div class="a">不需要另外刪除。最後一位成員退出後，原活動會自動關閉；選擇「合併並退出」才會將本人的明細複製到個人帳本。原活動的歷史紀錄保留，其他成員在活動關閉前仍能查看。</div>
+          <summary>哪些事會出現在鈴鐺？</summary>
+          <div class="a"><b>你照看的孩子</b>記帳、你打開了「這個活動有動靜就通知我」的活動有人記帳、花到你設的比例、零用金發放或調整、有人邀你加入家庭或活動、活動到了目標金額。打開系統時大約每 5 秒更新一次。</div>
         </details>
         <details>
-          <summary>有人記帳，我會被通知嗎？</summary>
-          <div class="a">兩種情況會：<b>你監管的人</b>記帳，或你在活動打開了「有動靜通知我」。同一筆只通知一次。</div>
-        </details>
-        <details>
-          <summary>把人移出活動會怎樣？</summary>
-          <div class="a">他之後看不到<b>別人</b>記在該活動的紀錄，也不能再往該活動記。他<b>自己記過的不會不見</b>，還在他自己的個人帳本裡。</div>
+          <summary>孩子收到零用金，要自己記一筆嗎？</summary>
+          <div class="a"><b>不用。</b>到了發放日系統會自動記好，自己再記會算兩次。系統沒有排程，所以是發放日當天或之後，家長或孩子第一次打開系統時記上。</div>
         </details>
         <details>
           <summary>財務建議的數字可靠嗎？</summary>
           <div class="a">每則建議都附依據的算式可以核對。<b>數字是系統算的</b>，模型只負責講成人話。</div>
         </details>
         <details>
-          <summary>我是唯一的家長，可以退出嗎？</summary>
-          <div class="a">要先邀請另一位家長，或讓其他人先離開，才能退出；也可以直接<b>解散家庭</b>（每個人離開，紀錄都不刪）。家長退出時，他產生、還沒用過的邀請碼會一起失效；家裡沒有家長時，也不能再用邀請碼加入。</div>
+          <summary>我是唯一的家長，可以退出家庭嗎？</summary>
+          <div class="a">要先邀請另一位家長，或讓其他人先離開，才能退出；也可以直接<b>解散家庭</b>（每個人離開，紀錄都不刪）。家長退出時，他產生、還沒用過的邀請碼會一起失效。</div>
         </details>
         <details>
           <summary>邀請碼過期或用過了？</summary>
-          <div class="a">請家長在「家庭成員」→「邀請家人」再產生一組，舊的會自動作廢。</div>
+          <div class="a">家庭的請家長在家庭頁「邀請家人」再產生一組；活動的請建立者在活動裡再「產生邀請碼」。</div>
+        </details>
+        <details>
+          <summary>重要的動作為什麼要再輸入一次密碼？</summary>
+          <div class="a">退出活動、移出家人、退出或解散家庭、改角色這些<b>做了就回不去</b>的動作，會先請你再輸入一次密碼（影響最大的幾個還要打一段確認碼），免得手機借給別人時被誤按。</div>
         </details>
         <details>
           <summary>系統管理員看得到我的帳嗎？</summary>
@@ -508,20 +625,16 @@
           <div class="a">暫時不能登入，會看到停權理由。<b>紀錄一筆都不會刪</b>，解除後都還在。</div>
         </details>
         <details>
-          <summary>重要的動作為什麼要再輸入一次密碼？</summary>
-          <div class="a">移出家人、退出或解散家庭、改角色、移除活動這些<b>做了就回不去</b>的動作，會先請你再輸入一次密碼（解散還要打一段確認碼），免得手機借給別人時被誤按。</div>
-        </details>
-        <details>
           <summary>畫面寫「這一塊暫時讀不到」怎麼辦？</summary>
           <div class="a">重新整理頁面，或過一會兒再回來看。<b>其他區塊、其他頁面照常能用</b>，只有那一塊會換成一張說明卡。這類問題系統會自動通知管理員，不用另外回報。</div>
         </details>
         <details>
           <summary>登入時說「密碼錯太多次了」？</summary>
-          <div class="a">同一個帳號 15 分鐘內打錯 5 次密碼，會先鎖 15 分鐘，<b>時間到就自己解開</b>。這是為了防止有人一直猜你的密碼。真的忘了，可以用登入頁的「忘記密碼」重設。</div>
+          <div class="a">同一個帳號 15 分鐘內打錯 5 次密碼，會先鎖 15 分鐘，<b>時間到就自己解開</b>。真的忘了，可以用登入頁的「忘記密碼」重設。</div>
         </details>
         <details>
           <summary>AI 解析說「今天的次數用完了」？</summary>
-          <div class="a">每個人每天可以用 AI 解析 200 次、產生建議 20 次，<b>隔天就會恢復</b>。這段時間一樣可以直接手動記一筆。</div>
+          <div class="a">每個人每天可以用 AI 解析 200 次、產生建議 20 次，<b>隔天就會恢復</b>。這段時間一樣可以「自己填一筆」。</div>
         </details>
         <details>
           <summary>手機可以用嗎？</summary>

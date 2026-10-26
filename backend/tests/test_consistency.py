@@ -1713,10 +1713,11 @@ def test_登出後的頁面用預設樣式_不沿用上一個人的主題():
 
 
 def test_帳本的存錢目標是選填_預設收起來():
-    """使用者：個人資料已經設過存錢目標，帳本裡一直擺著輸入框很多餘——改成選填，按了才出現。"""
+    """使用者：個人資料已經設過存錢目標，帳本裡一直擺著輸入框很多餘——改成選填，按了才出現。
+    2026-10-27 活動的「存錢目標」改名「目標金額」（一個提醒，到了就通知），一樣是選填、預設收起來。"""
     app = read("frontend/js/app.js")
-    assert "data-gopen=" in app and "另外設這個活動的存錢目標（選填）" in app
-    row = app[app.index("'<dt>存錢目標</dt><dd>'"):]
+    assert "data-gopen=" in app and "設定目標金額（選填）" in app
+    row = app[app.index("'<dt>目標金額</dt><dd>'"):]
     row = row[:row.index("'<dt>通知</dt>")]
     assert row.index("Number(g.goal) > 0") < row.index("data-ggoal"), "沒設目標時不能直接擺輸入框"
 

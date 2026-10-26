@@ -66,6 +66,7 @@ SYSTEM_CATEGORIES = [
     ("醫療", "expense", "cat-health", "醫"), ("其他", "expense", "cat-other", "他"),
     ("薪資", "income", "cat-daily", "薪"), ("獎金", "income", "cat-bonus", "獎"),
     ("零用金", "income", "cat-transit", "零"), ("其他收入", "income", "cat-other", "收"),
+    ("給零用金", "expense", "cat-transit", "零"),
 ]
 
 CATEGORY_ICONS = {name: icon for name, _kind, _color, icon in SYSTEM_CATEGORIES}

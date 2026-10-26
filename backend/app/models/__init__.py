@@ -11,14 +11,14 @@ from app.models.budget import Budget, SavingsGoal  # noqa: F401
 from app.models.category import Category  # noqa: F401
 from app.models.family import Family, FamilyMember, FamilyInvite  # noqa: F401
 from app.models.group import ActivityInvite, Group, GroupMember  # noqa: F401
-from app.models.guardianship import Guardianship, Allowance  # noqa: F401
+from app.models.guardianship import Guardianship, Allowance, AllowancePayment  # noqa: F401
 from app.models.monitor import ErrorLog, SecurityEvent  # noqa: F401
 from app.models.nlp import NlpParse  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
 from app.models.transaction import Account, Transaction  # noqa: F401
 from app.models.user import User, UserSession, PasswordReset  # noqa: F401
 
-__all__ = ["ActivityInvite", "User", "UserSession", "PasswordReset", "Family", "FamilyMember", "FamilyInvite", "Guardianship", "Allowance", "Notification", "AuditLog", "Category", "Account", "Transaction", "NlpParse", "Group", "GroupMember", "Budget", "SavingsGoal", "AlertRule", "Advice", "SecurityEvent", "ErrorLog"]
+__all__ = ["ActivityInvite", "User", "UserSession", "PasswordReset", "Family", "FamilyMember", "FamilyInvite", "Guardianship", "Allowance", "AllowancePayment", "Notification", "AuditLog", "Category", "Account", "Transaction", "NlpParse", "Group", "GroupMember", "Budget", "SavingsGoal", "AlertRule", "Advice", "SecurityEvent", "ErrorLog"]
 
 #: 表名 → 模型類別。crud 與測試用
-TABLES = {"activity_invites": ActivityInvite, "users": User, "sessions": UserSession, "password_resets": PasswordReset, "families": Family, "family_members": FamilyMember, "family_invites": FamilyInvite, "guardianships": Guardianship, "allowances": Allowance, "notifications": Notification, "audit_logs": AuditLog, "categories": Category, "accounts": Account, "transactions": Transaction, "nlp_parses": NlpParse, "groups": Group, "group_members": GroupMember, "budgets": Budget, "savings_goals": SavingsGoal, "alert_rules": AlertRule, "advices": Advice, "security_events": SecurityEvent, "error_logs": ErrorLog}
+TABLES = {"activity_invites": ActivityInvite, "users": User, "sessions": UserSession, "password_resets": PasswordReset, "families": Family, "family_members": FamilyMember, "family_invites": FamilyInvite, "guardianships": Guardianship, "allowances": Allowance, "allowance_payments": AllowancePayment, "notifications": Notification, "audit_logs": AuditLog, "categories": Category, "accounts": Account, "transactions": Transaction, "nlp_parses": NlpParse, "groups": Group, "group_members": GroupMember, "budgets": Budget, "savings_goals": SavingsGoal, "alert_rules": AlertRule, "advices": Advice, "security_events": SecurityEvent, "error_logs": ErrorLog}

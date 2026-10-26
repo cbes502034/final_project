@@ -212,7 +212,8 @@ window.DATA = {
     { id: 'I01', name: '薪資', kind: 'income', color: 'cat-daily', icon: '薪' },
     { id: 'I02', name: '獎金', kind: 'income', color: 'cat-bonus', icon: '獎' },
     { id: 'I03', name: '零用金', kind: 'income', color: 'cat-transit', icon: '零' },
-    { id: 'I04', name: '其他收入', kind: 'income', color: 'cat-other', icon: '收' }
+    { id: 'I04', name: '其他收入', kind: 'income', color: 'cat-other', icon: '收' },
+    { id: 'C09', name: '給零用金', kind: 'expense', color: 'cat-transit', icon: '零' }
   ],
 
   /* ---------- 交易明細（核心表） ---------- */
@@ -469,7 +470,19 @@ window.DATA = {
              ['ward_id', 'BIGINT', 'FK → users，收錢的人'],
              ['amount', 'NUMERIC(14,2)', '每月金額'],
              ['period_key', 'TEXT', "'2026-09'。NULL = 預設值，套用到未指定的月份"],
+             ['pay_day', 'INT', '每月幾號發（1~28）。NULL = 每月 1 日'],
              ['created_at', 'TIMESTAMPTZ', '']] },
+
+    { t: 'allowance_payments', label: '零用金發放', note: '★ 每月實際發出去的那一次：家長一筆支出、孩子一筆收入綁成一對',
+      cols: [['id', 'BIGSERIAL', 'PK'],
+             ['payer_id', 'BIGINT', 'FK → users，給錢的家長'],
+             ['ward_id', 'BIGINT', 'FK → users，收錢的孩子'],
+             ['period_key', 'TEXT', "'2026-10'。同一位家長、同一個孩子、同一個月只有一列"],
+             ['amount', 'NUMERIC(14,2)', '這個月實際發的金額'],
+             ['payer_tx_id', 'BIGINT', '家長那筆支出（transactions.id）。取消後是 NULL'],
+             ['ward_tx_id', 'BIGINT', '孩子那筆收入（transactions.id）。取消後是 NULL'],
+             ['status', 'TEXT', "'paid' / 'cancelled'。家長刪掉那筆就是取消，這個月不會再補發"],
+             ['created_at', 'TIMESTAMPTZ', ''], ['updated_at', 'TIMESTAMPTZ', '']] },
 
     { t: 'audit_logs', label: '稽核紀錄', note: '誰看了誰的資料、誰改了權限',
       cols: [['id', 'BIGSERIAL', 'PK'], ['actor_id', 'BIGINT', 'FK → users'],
@@ -499,6 +512,7 @@ window.DATA = {
     ['sessions', 'users', 'N:1', ''],
     ['password_resets', 'users', 'N:1', ''],
     ['allowances', 'users', 'N:1', '給錢的人與收錢的人'],
+    ['allowance_payments', 'users', 'N:1', '給錢的家長與收錢的孩子'],
     ['notifications', 'users', 'N:1', '收件人'],
     ['notifications', 'transactions', 'N:1', '記帳類通知指到那一筆'],
     ['groups', 'families', 'N:1', ''],

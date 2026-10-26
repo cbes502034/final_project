@@ -121,7 +121,7 @@ def test_dissolve_family_收掉關係_紀錄不刪(api):
     assert int(crud.get(Allowance, where={"ward_id": kid.id}).amount) == 0
     assert [m.user_id for m in crud.find(GroupMember, {"group_id": g.id})] == [dad.id]
     assert set(crud.find(FamilyInvite, fields="status")) == {"cancelled"}
-    assert crud.count(Transaction) == 1
+    assert crud.count(Transaction) == 3                         # 小華那筆 ＋ 這個月自動發的零用金（爸爸一筆、小華一筆）
     assert crud.exists(AuditLog, {"action": "dissolve_family"})
 
 
@@ -509,8 +509,8 @@ def test_list_allowances(api):
     r = api.get("/api/allowances", headers=login(dad))
     assert r.status_code == 200, r.text
     assert r.json() == {"allowances": [
-        {"wardId": str(kid.id), "wardName": "小華", "amount": 3000, "spent": 150},
-        {"wardId": str(kid2.id), "wardName": "小安", "amount": 0, "spent": 0},
+        {"wardId": str(kid.id), "wardName": "小華", "amount": 3000, "payDay": None, "spent": 150},
+        {"wardId": str(kid2.id), "wardName": "小安", "amount": 0, "payDay": None, "spent": 0},
     ]}
     assert api.get("/api/allowances", headers=login(kid)).json() == {"allowances": []}
 
@@ -523,7 +523,7 @@ def test_set_allowance(api):
     h = login(dad)
     assert api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": 1}).status_code == 200
     r = api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": 3000})
-    assert r.status_code == 200 and r.json() == {"wardId": str(kid.id), "wardName": "小華", "amount": 3000}
+    assert r.status_code == 200 and r.json() == {"wardId": str(kid.id), "wardName": "小華", "amount": 3000, "payDay": None}
     api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": 3500})
     rows = crud.find(Allowance)
     assert len(rows) == 1 and int(rows[0].amount) == 3500 and rows[0].period_key is None
@@ -532,7 +532,13 @@ def test_set_allowance(api):
         rejected = api.put("/api/allowance", headers=h, json={"wardId": str(kid.id), "amount": invalid})
         assert rejected.status_code == 422, (invalid, rejected.text)
         assert int(crud.get(Allowance, rows[0].id).amount) == 3500
-    assert crud.count(Transaction) == 0                                    # 零用金是設定，不是一筆支出
+    # 設定本身不是一筆帳；這個月的發放日（沒設就是 1 日）已經過了，所以第一次設定就發一對，
+    # 之後改金額只調整那一對，不會多出新的
+    pays = crud.find(Transaction, {"source": "allowance"}, order_by="id")
+    assert [(t.user_id, t.kind, int(t.amount)) for t in pays] == [(dad.id, "expense", 3500), (kid.id, "income", 3500)]
+    assert crud.count(Transaction) == 2
+    notes = crud.find(Notification, {"recipient_id": kid.id, "type": "allowance"}, order_by="id")
+    assert [n.payload_json["action"] for n in notes] == ["paid", "adjusted", "adjusted"]
 
 
 @pytest.mark.route(*AUDIT)

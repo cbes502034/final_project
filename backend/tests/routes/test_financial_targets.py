@@ -23,10 +23,11 @@ def test_live_activity_pocket_income_does_not_reduce_personal_allowance(api):
     activity = ledger_of(kid, dad)
     spend(kid, activity, category, 1000)
     before = api.get('/api/summary', headers=login(kid)).json()
-    assert (before['income'], before['pocketMoney'], before['savings']['allowance']) == (0, 3000, 3000)
+    # 零用金已經自動入帳 3,000；活動裡那 1,000 還沒合併，不算進個人
+    assert (before['income'], before['pocketMoney'], before['savings']['allowance']) == (3000, 0, 3000)
     assert api.post('/api/groups/' + str(activity.id) + '/settle', headers=login(kid)).status_code == 200
     after = api.get('/api/summary', headers=login(kid)).json()
-    assert (after['income'], after['pocketMoney'], after['savings']['allowance']) == (1000, 2000, 3000)
+    assert (after['income'], after['pocketMoney'], after['savings']['allowance']) == (4000, 0, 4000)
 
 
 @pytest.mark.route('GET', '/api/summary')

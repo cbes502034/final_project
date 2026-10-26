@@ -47,8 +47,12 @@ def family_goal(db, fam):
     members = crud.find(FamilyMember, {"family_id": fam.id, "status": "active"}, db=db)
     people, earners = {m.user_id for m in members}, {m.user_id for m in members if m.role == "parent"}
     income, expense = money.ZERO, money.ZERO
+    from app.services.allowance_ledger import internal_transfer_ids
+    skip = internal_transfer_ids(db, people)                  # 家長給孩子的零用金是家裡換手，不算支出
     for t in crud.find(Transaction, {"group_id__in": personal_ids(db, people), "user_id__in": people,
                                     "is_snapshot": False, "occurred_on__between": (start, today)}, db=db):
+        if t.id in skip:
+            continue
         if t.kind == "income" and t.user_id in earners:
             income += t.amount
         elif t.kind == "expense":

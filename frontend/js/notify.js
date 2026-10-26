@@ -11,13 +11,13 @@
    只能把 token 放網址上 —— 而網址會進瀏覽器歷史、伺服器日誌、
    Referer 標頭。為了 SSE 破壞「token 絕不放查詢參數」的規則不划算。
 
-   輪詢 20 秒對「子女記了一筆帳」這種通知完全夠用，而且斷線重連
-   是免費的（下一次輪詢自然就接上了）。
+   輪詢 5 秒就接近即時，而且斷線重連是免費的（下一次輪詢自然就接上了）；
+   使用者自己做完會產生通知的動作（記帳、邀請、改零用金），api.js 會立刻再問一次。
    ============================================================ */
 (function (global) {
   'use strict';
 
-  var POLL_MS = 20000;          // 20 秒問一次
+  var POLL_MS = 5000;           // 5 秒問一次
   var MUTE_KEY = 'fambudget.notify.mute';
   var SEEN_KEY = 'fambudget.notify.seen';
 
@@ -171,9 +171,15 @@
     return Math.floor(s / 86400) + ' 天前';
   }
 
+  var ALLOWANCE_TW = { paid: '給了你這個月的零用金', adjusted: '把這個月的零用金改成', cancelled: '取消了這個月的零用金' };
+
+  var KIND_TW = { budget_alert: '階段性提醒', allowance: '零用金', family_invite: '家庭邀請',
+                  activity_invite: '活動邀請', activity_target: '目標金額' };
+
   function line(n) {
-    /* 三種通知：監管對象記帳（ward_transaction）、有開通知的帳本有人記帳（group_transaction）、
-       支出跨過門檻（budget_alert）。前兩種畫面上長一樣。
+    /* 記帳類：監管對象記帳（ward_transaction）、有開通知的帳本有人記帳（group_transaction），畫面上長一樣。
+       其他：支出跨過門檻（budget_alert）、零用金（allowance）、家庭邀請（family_invite）、
+       活動邀請（activity_invite）、活動到達目標金額（activity_target）。
        ⚠️ 型別要用 type 判斷，不要靠「有沒有 actorName」猜——
        之後多一種通知，猜的那套就會壞。 */
     if (n.type === 'budget_alert') {
@@ -190,6 +196,23 @@
         '（超過你設的 ' + esc(n.percent) + '%）' +
         (n.spent != null ? '<br><span class="bell__n2">' + money2 + '</span>' : '');
     }
+    if (n.type === 'allowance') {
+      return esc(n.payerName || '家長') + ' ' + ALLOWANCE_TW[n.action] +
+        (n.action === 'cancelled' ? '' : ' <b>' + money(n.amount) + '</b>') +
+        (n.action === 'adjusted' && n.prev != null ? '<br><span class="bell__n2">原本 ' + money(n.prev) + '</span>' : '');
+    }
+    if (n.type === 'family_invite') {
+      return esc(n.inviterName || '家人') + ' 邀請你以' + (n.role === 'parent' ? '家長' : '子女') +
+        '身分加入「' + esc(n.familyName) + '」<br><span class="bell__n2">到總覽最上面按加入</span>';
+    }
+    if (n.type === 'activity_invite') {
+      return esc(n.inviterName || '朋友') + ' 邀請你加入活動「' + esc(n.groupName) + '」' +
+        '<br><span class="bell__n2">到活動管理按接受</span>';
+    }
+    if (n.type === 'activity_target') {
+      return '「' + esc(n.groupName) + '」' + (n.metric === 'saved' ? '已存到 ' : '已花到 ') +
+        '<b>' + money(n.value) + '</b>，到了你設的目標金額 ' + money(n.goal);
+    }
     var who = esc(n.actorName || '家人');
     var what = esc(n.catName || '一筆');
     var where = n.merchant ? '（' + esc(n.merchant) + '）' : '';
@@ -201,12 +224,13 @@
      規則：記帳類（不是預算提醒）、同一個人、同一種、彼此相隔 60 秒內、在清單裡相鄰。
      ⚠️ 只合併顯示，後端照樣一筆一則——之後要改合併規則，不用動資料。 */
   var GROUP_MS = 60000;
+  var TX_TYPES = ['ward_transaction', 'group_transaction'];
   function grouped(items) {
     var out = [];
     items.forEach(function (n) {
       var last = out[out.length - 1];
       var prev = last && last.items[last.items.length - 1];
-      if (prev && n.type !== 'budget_alert' && prev.type === n.type &&
+      if (prev && TX_TYPES.indexOf(n.type) >= 0 && prev.type === n.type &&
           String(prev.actorId) === String(n.actorId) &&
           Math.abs(new Date(prev.createdAt) - new Date(n.createdAt)) <= GROUP_MS) {
         last.items.push(n);
@@ -297,7 +321,7 @@
           '<span class="bell__m">' +
             '<span class="bell__l">' + groupLine(g) + '</span>' +
             '<span class="bell__s">' + ago(n.createdAt) + '　·　' +
-              (n.type === 'budget_alert' ? '階段性提醒' : '唯讀檢視') + '</span>' +
+              (KIND_TW[n.type] || '唯讀檢視') + '</span>' +
           '</span></button>' +
           '<button class="bell__del" data-ndel="' + esc(ids) + '" aria-label="刪除這則通知" title="刪除">&#10005;</button></div>';
       }).join('') + '</div>';
@@ -372,9 +396,13 @@
       render();
       /* 跳到那個人的記帳表單，並把這一筆標起來（合併的那一則只跳到他的紀錄）。
          只跳到家庭總覽的話，使用者還要自己在一堆紀錄裡找是哪一筆。 */
-      if (n && n.type === 'budget_alert') {
-        // 提醒點下去看自己的總覽，不是別人的紀錄
+      if (n && (n.type === 'budget_alert' || n.type === 'family_invite' || n.type === 'activity_target')) {
+        // 提醒點下去看自己的總覽，不是別人的紀錄；家庭邀請的「加入」也在總覽最上面
         location.hash = '#/';
+      } else if (n && n.type === 'allowance') {
+        location.hash = '#/entry';
+      } else if (n && n.type === 'activity_invite') {
+        location.hash = '#/groups';
       } else if (n && n.actorId) {
         location.hash = '#/member/' + n.actorId + (item.dataset.tx ? '/' + item.dataset.tx : '');
       }

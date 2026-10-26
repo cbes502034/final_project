@@ -65,6 +65,9 @@ def create(db, group, me, email=None, label="朋友"):
         "code_hash": family.hash_code(code) if code else None, "label": label,
         "expires_at": family.expires_at(),
     }, db=db)
+    if invitee:                                              # 用帳號邀請：對方的鈴鐺會跳出來
+        from app.services import inbox
+        inbox.activity_invite(db, row, group)
     return {"id": str(row.id), "groupId": str(group.id), "code": code,
             "label": row.label, "expiresAt": iso_time(row.expires_at), "status": row.status}
 

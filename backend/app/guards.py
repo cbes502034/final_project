@@ -68,6 +68,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -122,6 +123,15 @@ def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_
     fm = crud.get(m.FamilyMember, where={"user_id": user.id, "status": "active"}, db=db)
     user.family_id = fm.family_id if fm else None
     user.family_role = fm.role if fm else None
+    # 系統沒有排程器：到了發放日的零用金、到達的活動目標金額，在有人打開系統時補上。
+    # ⚠️ 這兩件事出錯只記下來，不能讓使用者原本要做的事跟著失敗
+    from app.services import activity_target, allowance_ledger
+    for job in (allowance_ledger.settle_due, activity_target.check):
+        try:
+            job(db, user)
+        except Exception:                                   # noqa: BLE001
+            db.rollback()
+            logging.getLogger(__name__).exception("%s 失敗（user %s）", job.__qualname__, user.id)
     return user
 
 

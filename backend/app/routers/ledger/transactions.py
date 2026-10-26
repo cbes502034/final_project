@@ -30,6 +30,7 @@ from app.guards import block_admin, current_user, own, visible_scope
 from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
 from app.routers._stub import not_ready, stub
 from app.schemas.transaction import TransactionIn, TransactionPatchIn
+from app.services import allowance_ledger
 from app.toolkit import crud, errors, ledger, money, notify
 from app.toolkit.db import get_db
 
@@ -164,6 +165,7 @@ def list_transactions(
             from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import TransactionIn, TransactionPatchIn
+            from app.services import allowance_ledger
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
@@ -383,6 +385,7 @@ def create_transaction(body: TransactionIn, me: User, db: Session = Depends(get_
             from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import TransactionIn, TransactionPatchIn
+            from app.services import allowance_ledger
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
@@ -672,6 +675,7 @@ def update_transaction(
             from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import TransactionIn, TransactionPatchIn
+            from app.services import allowance_ledger
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
@@ -686,6 +690,7 @@ def update_transaction(
             group = crud.get(Group, row.group_id, db=db)
             try:
                 ledger.require_editable(me.id, row.user_id, group.settled_at, row.is_snapshot)
+                allowance_ledger.check_edit(row, patch)              # 零用金：孩子那筆不能動，家長那筆只改金額、日期、備註
             except ValueError as exc:
                 raise errors.conflict(str(exc)) from None
 
@@ -739,7 +744,9 @@ def update_transaction(
             if "note" in patch:
                 changes["note"] = patch["note"] or None
             changes["updated_at"] = datetime.now(timezone.utc)
+            prev_amount = row.amount
             crud.save(Transaction, {"id": row.id, **changes}, db=db)
+            allowance_ledger.after_update(db, row, prev_amount)       # 家長改了零用金：孩子那筆跟著改、通知孩子
 
             # 6. 段落記帳的那筆：改過的值記進 nlp_parses.user_corrected（模型抓錯的標註）
             parse = crud.get(NlpParse, where={"transaction_id": row.id}, db=db) if row.source == "nlp" else None
@@ -796,6 +803,7 @@ def update_transaction(
     group = crud.get(Group, row.group_id, db=db)
     try:
         ledger.require_editable(me.id, row.user_id, group.settled_at, row.is_snapshot)
+        allowance_ledger.check_edit(row, patch)              # 零用金：孩子那筆不能動，家長那筆只改金額、日期、備註
     except ValueError as exc:
         raise errors.conflict(str(exc)) from None
 
@@ -849,7 +857,9 @@ def update_transaction(
     if "note" in patch:
         changes["note"] = patch["note"] or None
     changes["updated_at"] = datetime.now(timezone.utc)
+    prev_amount = row.amount
     crud.save(Transaction, {"id": row.id, **changes}, db=db)
+    allowance_ledger.after_update(db, row, prev_amount)       # 家長改了零用金：孩子那筆跟著改、通知孩子
 
     # 6. 段落記帳的那筆：改過的值記進 nlp_parses.user_corrected（模型抓錯的標註）
     parse = crud.get(NlpParse, where={"transaction_id": row.id}, db=db) if row.source == "nlp" else None
@@ -948,6 +958,7 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
             from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import TransactionIn, TransactionPatchIn
+            from app.services import allowance_ledger
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
@@ -956,11 +967,13 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
             group = crud.get(Group, row.group_id, db=db)
             try:
                 ledger.require_editable(row.user_id, row.user_id, group.settled_at, row.is_snapshot)
+                allowance_ledger.check_edit(row)
             except ValueError as exc:
                 raise errors.conflict(str(exc)) from None
 
             # 2. 先處理指向這一筆的資料（外鍵）：通知刪掉；解析紀錄留著當評測資料，只拿掉連結
             tx_id = row.id
+            allowance_ledger.before_delete(db, [row])                  # 家長刪了零用金：孩子那筆一起刪、通知孩子
             crud.remove(Notification, {"transaction_id": tx_id}, db=db)
             crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id": tx_id}, db=db)
 
@@ -992,11 +1005,13 @@ def delete_transaction(row=Depends(own(Transaction, "tx_id")), db: Session = Dep
     group = crud.get(Group, row.group_id, db=db)
     try:
         ledger.require_editable(row.user_id, row.user_id, group.settled_at, row.is_snapshot)
+        allowance_ledger.check_edit(row)
     except ValueError as exc:
         raise errors.conflict(str(exc)) from None
 
     # 2. 先處理指向這一筆的資料（外鍵）：通知刪掉；解析紀錄留著當評測資料，只拿掉連結
     tx_id = row.id
+    allowance_ledger.before_delete(db, [row])                  # 家長刪了零用金：孩子那筆一起刪、通知孩子
     crud.remove(Notification, {"transaction_id": tx_id}, db=db)
     crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id": tx_id}, db=db)
 
@@ -1092,6 +1107,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
             from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import TransactionIn, TransactionPatchIn
+            from app.services import allowance_ledger
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
@@ -1115,6 +1131,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
                     raise errors.not_found("找不到這筆紀錄：" + raw)
                 try:
                     ledger.require_editable(me.id, t.user_id, t.group_id in settled, t.is_snapshot)
+                    allowance_ledger.check_edit(t)
                 except PermissionError as exc:
                     raise errors.forbidden(str(exc) + "。這次一筆都沒有刪") from None
                 except ValueError as exc:
@@ -1122,6 +1139,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
 
             # 4. 全部通過，才在同一個交易裡刪
             tx_ids = list(rows)
+            allowance_ledger.before_delete(db, rows.values())
             crud.remove(Notification, {"transaction_id__in": tx_ids}, db=db)
             crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id__in": tx_ids}, db=db)
             crud.remove(Transaction, {"id__in": tx_ids, "user_id": me.id}, db=db)
@@ -1168,6 +1186,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
             raise errors.not_found("找不到這筆紀錄：" + raw)
         try:
             ledger.require_editable(me.id, t.user_id, t.group_id in settled, t.is_snapshot)
+            allowance_ledger.check_edit(t)
         except PermissionError as exc:
             raise errors.forbidden(str(exc) + "。這次一筆都沒有刪") from None
         except ValueError as exc:
@@ -1175,6 +1194,7 @@ def delete_transactions(me: User, ids: str | None = None, db: Session = Depends(
 
     # 4. 全部通過，才在同一個交易裡刪
     tx_ids = list(rows)
+    allowance_ledger.before_delete(db, rows.values())
     crud.remove(Notification, {"transaction_id__in": tx_ids}, db=db)
     crud.save(NlpParse, {"transaction_id": None}, where={"transaction_id__in": tx_ids}, db=db)
     crud.remove(Transaction, {"id__in": tx_ids, "user_id": me.id}, db=db)
@@ -1225,6 +1245,7 @@ def transaction_archive(me: User, groupId: str | None = None, kind: str | None =
             from app.models import Category, Group, GroupMember, Guardianship, NlpParse, Notification, Transaction, User
             from app.routers._stub import not_ready, stub
             from app.schemas.transaction import TransactionIn, TransactionPatchIn
+            from app.services import allowance_ledger
             from app.toolkit import crud, errors, ledger, money, notify
             from app.toolkit.db import get_db
 
