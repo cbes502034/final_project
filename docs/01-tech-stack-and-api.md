@@ -279,8 +279,8 @@ final_project/
 | 57 | PATCH | `/api/notifications` | 家庭 | 本人 | 整批標記已讀 |
 | 84 | DELETE | `/api/notifications?ids=` | 家庭 | 本人 | 刪通知（可以一次好幾則）。只刪自己收到的，沒帶 ids 回 400 |
 | 25 | GET | `/api/groups` | 記帳 | 登入 | 我加入的群組（帳本） |
-| 26 | POST | `/api/groups` | 記帳 | 登入 | 建立一個群組，建立者自動加入 |
-| 27 | PATCH | `/api/groups/{gid}` | 記帳 | 建立者 | 改名稱、顏色、備註，或復原封存（`archived: false`） |
+| 26 | POST | `/api/groups` | 記帳 | 登入 | 建立一個群組，建立者自動加入。可帶開始日（預設今天）；開始日在以後＝預先規劃，到了才放進活動選單 |
+| 27 | PATCH | `/api/groups/{gid}` | 記帳 | 建立者 | 改活動名稱、說明、開始日、結束日、顏色，或復原封存（`archived: false`）。活動的設定只有建立者能改 |
 | 28 | DELETE | `/api/groups/{gid}` | 記帳 | 建立者 | 封存這本帳；`?permanent=true` 移除已結算的活動帳本（紀錄保留） |
 | 29 | POST | `/api/groups/{gid}/members` | 記帳 | 建立者 | 把家人加進這本帳 |
 | 30 | DELETE | `/api/groups/{gid}/members/{user_id}` | 記帳 | 建立者 | 把某個人移出這本帳 |
@@ -366,7 +366,7 @@ final_project/
 | 33 | GET | `/api/summary` | 數字 | 登入 | 摘要。`scope=me\|family`、`period=2026-09`、`groupId`。統計頁唯一的來源。可花上限的收入用 max(已入帳, 預計收入)，`expectedIncome` |
 | 35 | GET | `/api/budgets` | 數字 | 登入 | 預算與使用率 |
 | 36 | PUT | `/api/budgets` | 數字 | 本人 | 設定自己的分類預算。body: { cat, limit, period }，`limit: 0` = 拿掉 |
-| 38 | PUT | `/api/savings-goal` | 數字 | 本人 | **設定每月存款目標**（註冊後的個人化設定也走這支）。⚠️ 只有本人能設，監管者不能代設 |
+| 38 | PUT | `/api/savings-goal` | 數字 | 本人 | **設定每月存款目標**（註冊後的個人化設定也走這支）。⚠️ 只有本人能設，監管者不能代設；帶活動的 `groupId` 是整個活動共用的目標金額，只有建立者能設 |
 | 39 | GET | `/api/savings-goals` | 數字 | 登入 | 我的每月存款目標：不分群組的整體目標 ＋ 每個群組各自的 |
 | 40 | GET | `/api/alerts` | 數字 | 登入 | 我設定的階段性提醒門檻 |
 | 41 | POST | `/api/alerts` | 數字 | 本人 | 新增一個門檻（百分比 1~200） |
