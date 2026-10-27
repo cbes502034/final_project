@@ -48,11 +48,18 @@ SHOTS = [
     ("admin", "admin", "#/admin", 1280, 800, "", 3),
     ("admin_mobile", "admin", "#/admin", 390, 844, "", 3),
     ("parse", "parent", "#/entry", 1280, 800, "PARSE", 8),
+    ("danger", "parent", "#/", 1280, 800, "DANGER", 3),
+    ("kid_bell", "kid", "#/", 1280, 800, "BELL", 3),
+    ("allowance", "parent", "#/member/{kid}", 1280, 800, "", 3),
 ]
 DEFAULT_SKIP = {"parse"}
 
 #: 總覽下方的面板捲到畫面中間
 PANEL_JS = "document.querySelector('.hpanel') && document.querySelector('.hpanel').scrollIntoView({block: 'center'})"
+#: 按今天紀錄第一筆的「刪除」：拍輸入密碼的對話框（只拍，不刪）
+DANGER_JS = "(document.querySelector('.hpanel [data-del]') || {click() {}}).click()"
+#: 打開鈴鐺
+BELL_JS = "(document.getElementById('bell') || {click() {}}).click()"
 
 #: 段落記帳：按「記一筆」、選段落記帳、貼一段話、按解析
 PARSE_JS = r"""
@@ -118,6 +125,8 @@ async def cdp(ws_url, shots, people, front, api):
             # 權杖、導覽看過（記在帳號上：fambudget.tour.<id>）、要看哪一個活動（沒有就是個人）
             await js("localStorage.setItem('fambudget.auth', %s); localStorage.setItem(%s, 'done'); localStorage.setItem('fambudget.group', %s)"
                      % (json.dumps(json.dumps(tok)), json.dumps(TOUR_KEY + "." + uid), json.dumps(groups.get(activity, "") if activity else "")))
+            if "{kid}" in hash_:
+                hash_ = hash_.replace("{kid}", people["kid"][1])
             await send("Page.navigate", url=front + "/?r=%d%s" % (time.time() * 1000, hash_))
             await asyncio.sleep(wait + 1.5)          # 資料到了、淡入動畫也跑完
             if action == "PARSE":
@@ -127,6 +136,9 @@ async def cdp(ws_url, shots, people, front, api):
             elif action == "PANEL":
                 await js(PANEL_JS)
                 await asyncio.sleep(1)
+            elif action in ("DANGER", "BELL"):
+                await js(DANGER_JS if action == "DANGER" else BELL_JS)
+                await asyncio.sleep(1.5)
             shot = await send("Page.captureScreenshot", format="png")
             path = os.path.join(OUT, name + ".png")
             with open(path, "wb") as f:

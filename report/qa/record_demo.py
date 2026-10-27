@@ -62,12 +62,7 @@ CAPTION_JS = r"""
       'font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif', 'padding:14px 28px 16px',
       'display:flex', 'flex-wrap:wrap', 'gap:4px 18px', 'align-items:baseline'].join(';'));
     document.documentElement.appendChild(el);
-    var tag = document.createElement('div'); tag.id = 'qa-tag';
-    tag.setAttribute('style', 'position:fixed;top:10px;right:12px;z-index:2147483647;pointer-events:none;' +
-      'background:rgba(11,15,20,.85);color:#2BFFE0;font:12px Consolas,monospace;padding:4px 10px;border:1px solid #0ABAB5');
-    document.documentElement.appendChild(tag);
   }
-  document.getElementById('qa-tag').textContent = where;
   var small = innerWidth < 600;
   el.style.padding = small ? '10px 14px 12px' : '14px 28px 16px';
   el.innerHTML = '<span style="font:700 ' + (small ? 12 : 15) + 'px Consolas,monospace;color:#0ABAB5;white-space:nowrap">' + step + ' / ' + total + '</span>' +
@@ -152,6 +147,7 @@ class CDP:
         self.ws, self.seq, self.wait, self.frames = ws, 0, {}, []
         self.recording = False
         self.ff = []          # [(開始, 結束, 合成後最多幾秒)]：等載入、等模型的片段，合成時快轉
+        self.errors = []      # 頁面上的 JavaScript 錯誤：卡住的時候印出來
 
     async def reader(self):
         async for raw in self.ws:
@@ -163,6 +159,9 @@ class CDP:
                 self.seq += 1
                 await self.ws.send(json.dumps({"id": self.seq, "method": "Page.screencastFrameAck",
                                                "params": {"sessionId": p["sessionId"]}}))
+            elif msg.get("method") == "Runtime.exceptionThrown":
+                d = msg["params"]["exceptionDetails"]
+                self.errors.append((d.get("exception") or {}).get("description") or d.get("text"))
             elif "id" in msg and msg["id"] in self.wait:
                 self.wait.pop(msg["id"]).set_result(msg)
 
@@ -281,8 +280,8 @@ async def run(ws_url, args, accounts, workdir):
                 with open(os.path.join(HERE, "record_fail.png"), "wb") as f:
                     f.write(base64.b64decode(shot["data"]))
                 toasts = await c.js("[...document.querySelectorAll('.toast')].map(x => x.textContent).join(' ／ ')")
-                raise RuntimeError("等不到畫面：%s（第 %d 步「%s」）畫面提示：%s；截圖 report/qa/record_fail.png"
-                                   % (expr, step[0], shown.get("title", ""), toasts))
+                raise RuntimeError("等不到畫面：%s（第 %d 步「%s」）畫面提示：%s；頁面錯誤：%s；截圖 report/qa/record_fail.png"
+                                   % (expr, step[0], shown.get("title", ""), toasts, c.errors[-3:]))
             return False
 
         async def go(url, ready=None, keep=1.0, timeout=60):
@@ -360,7 +359,8 @@ async def run(ws_url, args, accounts, workdir):
         # ---------------------------------------------------------------- 片頭（不算步驟）
         await go(card_url("open", card_html("FAMBUDGET · FULL WALKTHROUGH · " + today.isoformat(), "家庭記帳<br>從一個空帳號開始",
                                             ["註冊 → 個人化設定 → 記帳 → 活動 → 家庭與零用金 → 統計與建議 → 手機版",
-                                             ("全程在部署好的網站上操作（右上角標 LIVE）" if not local else "本機試跑（右上角標 LOCAL）"),
+                                             ("全程在部署好的網站上操作" if not local else
+                                              "在本機錄：跟線上同一份程式；本機沒有接模型，AI 那兩步用規則備援"),
                                              "每一步下方的字幕說明正在做什麼；需要密碼的動作只拍到對話框"])), keep=0.5)
         if not trial:
             await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
@@ -465,7 +465,8 @@ async def run(ws_url, args, accounts, workdir):
         # ---------------------------------------------------------------- 4. 段落記帳與總覽下方面板
         await cap("段落記帳", "一句話記好幾筆：直接打一段平常講話的句子")
         await para("早餐蛋餅 45，捷運 30，午餐便當 95，晚上全聯買牙膏 89")
-        await cap("解析結果", "AI 把一段話拆成四筆、分好類；要人確認才會存")
+        await cap("解析結果", "本機沒有接模型：先用規則把一段話拆成四筆、分好類；一樣要人確認才存" if local
+                  else "AI 把一段話拆成四筆、分好類；要人確認才會存")
         await wait(6)
         await click("#paraSave")
         await busy("!document.getElementById('paraSave')", keep=1.2)
@@ -593,7 +594,11 @@ async def run(ws_url, args, accounts, workdir):
         await cap("子女收到邀請", "換成子女的帳號：總覽最上面就是家庭邀請，按「加入」就進這個家庭")
         await wait(4)
         await click("[data-inv-accept]")
-        await busy("!document.querySelector('[data-inv-accept]')", keep=1.5)
+        # 偶爾（本機 SQLite）加入成功了畫面卻沒重畫：等 12 秒還沒變就重新整理，不讓整支影片卡住
+        t0 = time.time()
+        if not await until("!document.querySelector('[data-inv-accept]')", 12, need=False):
+            await page("#/", "document.querySelector('.wal__card') && !document.querySelector('[data-inv-accept]')")
+        c.ff.append((t0, time.time(), 1.5))
         await wait(1.5)
         await page("#/groups", "document.querySelector('[data-activity-response$=\"|accept\"]')")
         await wait(1)
@@ -642,7 +647,8 @@ async def run(ws_url, args, accounts, workdir):
         await cap("統計", "收支對照、錢花在哪：數字跟總覽、明細同一個來源")
         await wait(5)
         await page("#/advice", "document.getElementById('advGen')")
-        await cap("財務建議", "數字由資料庫先算好，模型只寫句子；每個數字都附算式")
+        await cap("財務建議", "數字由資料庫先算好；本機沒接模型，就用同一批數字整理成建議，每個數字都附算式" if local
+                  else "數字由資料庫先算好，模型只寫句子；每個數字都附算式")
         await wait(1.5)
         await click("#advGen")
         await wait(2)
@@ -680,8 +686,7 @@ async def run(ws_url, args, accounts, workdir):
             await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
         shown.clear()
         await go(card_url("end", card_html("END", "謝謝觀看", [
-            "個人、活動、家庭三種視角，同一套記帳",
-            "github.com/cbes502034/final_project　｜　fambudget-web.onrender.com"])), keep=0.5)
+            "個人、活動、家庭三種視角，同一套記帳"])), keep=0.5)
         await wait(5)
         c.recording = False
         if not trial:
@@ -790,7 +795,7 @@ def main() -> int:
             print("試跑完成，每一步的截圖在", os.path.join(HERE, "trial"))
             return 0
         print("frames:", len(frames), "seconds:", round(frames[-1][0] - frames[0][0], 1) if frames else 0)
-        out = os.path.join(HERE, "家庭記帳_完整流程.mp4" if args.target == "live" else "家庭記帳_完整流程_本機.mp4")
+        out = os.path.join(HERE, "家庭記帳_完整流程.mp4")
         encode(frames, out, workdir, ff)
         print(out)
     finally:

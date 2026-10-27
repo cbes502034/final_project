@@ -1,7 +1,7 @@
 # report/：期末報告簡報
 
 成品：**`家庭記帳_期末報告.pptx`**（每一頁都有講者備註；封面與結尾有網站的 QR code）；
-**`qa/家庭記帳_完整流程.mp4`**（在部署好的網站上從空帳號開始走一遍的影片）。
+**`qa/家庭記帳_完整流程.mp4`**（在本機從空帳號開始走一遍的影片，約 6 分鐘；線上站也能錄，見下面）。
 
 簡報上的數字都不是手打的，是從程式與結果檔算出來的。模型評測跑完、測試重跑之後，照下面重新產生，數字就會更新。
 
@@ -9,7 +9,8 @@
 
 ```bash
 python report/collect.py                 # 數字 → report/data/facts.json（會跑 pytest --collect-only）
-cd report && npm install && node build_deck.js
+cd report && npm install && node build_deck.js          # 重點版（18 頁）：開場 3、四個領域各 3、結語 3
+node build_deck.js --full                                  # 完整版：每個畫面、評測細節、每一輪測試都有 → 家庭記帳_期末報告_完整版.pptx
 ```
 
 模型的成績：在 `backend/` 底下跑 `python tools/eval_nlp.py --label <名稱>`，結果會存到 `backend/eval/results/`；

@@ -23,3 +23,7 @@ backend/eval/results/*.partial.jsonl
 # 本機開發工具的設定、測試的工作檔（結果在 PDF 裡）
 .claude/
 report/qa/out/
+
+# 錄影腳本試跑的截圖與失敗截圖
+report/qa/trial/
+report/qa/record_fail.png
