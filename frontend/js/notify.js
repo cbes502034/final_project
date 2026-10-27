@@ -174,12 +174,12 @@
   var ALLOWANCE_TW = { paid: '給了你這個月的零用金', adjusted: '把這個月的零用金改成', cancelled: '取消了這個月的零用金' };
 
   var KIND_TW = { budget_alert: '階段性提醒', allowance: '零用金', income: '自動入帳', family_invite: '家庭邀請',
-                  activity_invite: '活動邀請', activity_target: '目標金額' };
+                  activity_invite: '活動邀請', activity_target: '目標金額', activity_start: '活動開始' };
 
   function line(n) {
     /* 記帳類：監管對象記帳（ward_transaction）、有開通知的帳本有人記帳（group_transaction），畫面上長一樣。
        其他：支出跨過門檻（budget_alert）、零用金（allowance）、家庭邀請（family_invite）、
-       活動邀請（activity_invite）、活動到達目標金額（activity_target）。
+       活動邀請（activity_invite）、活動到達目標金額（activity_target）、預先規劃的活動到了開始日（activity_start）。
        ⚠️ 型別要用 type 判斷，不要靠「有沒有 actorName」猜——
        之後多一種通知，猜的那套就會壞。 */
     if (n.type === 'budget_alert') {
@@ -212,6 +212,11 @@
     if (n.type === 'activity_invite') {
       return esc(n.inviterName || '朋友') + ' 邀請你加入活動「' + esc(n.groupName) + '」' +
         '<br><span class="bell__n2">到活動管理按接受</span>';
+    }
+    if (n.type === 'activity_start') {
+      var sd = String(n.startsOn || '').split('-');
+      return '「' + esc(n.groupName) + '」' + (sd.length === 3 ? Number(sd[1]) + '/' + Number(sd[2]) + ' ' : '') + '開始了' +
+        '<br><span class="bell__n2">已經放進活動選單，可以開始記帳</span>';
     }
     if (n.type === 'activity_target') {
       return '「' + esc(n.groupName) + '」' + (n.metric === 'saved' ? '已存到 ' : '已花到 ') +
@@ -405,7 +410,7 @@
         location.hash = '#/';
       } else if (n && (n.type === 'allowance' || n.type === 'income')) {
         location.hash = '#/entry';
-      } else if (n && n.type === 'activity_invite') {
+      } else if (n && (n.type === 'activity_invite' || n.type === 'activity_start')) {
         location.hash = '#/groups';
       } else if (n && n.actorId) {
         location.hash = '#/member/' + n.actorId + (item.dataset.tx ? '/' + item.dataset.tx : '');

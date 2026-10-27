@@ -16,7 +16,7 @@ async function checkUI() {
     { id: 'personal', name: '自己的帳本', count: 1, personal: true },
     { id: 'closed', name: '已結算', settled: true }];
   const ui = Object.assign(harness.context, { HEADER: harness.header, API: { groups: async () => ({ groups: books }) },
-    GROUP: 'all', global: {}, isFamily: () => false, esc: String, tint: String, money: String, pushForDrawer() {},
+    GROUP: 'all', global: {}, todayKey: () => '2026-10-27', isFamily: () => false, esc: String, tint: String, money: String, pushForDrawer() {},
     setGroup(id) { ui.GROUP = id; }, LG: { fam: { members: [] } }, activityInvitePanel: () => '' });
   ui.TXGROUPS = [];
   vm.runInContext(['paintGroups', 'ledgerBody', 'actPeriod', 'txLocked'].map(extract).join('\n'), ui);

@@ -439,6 +439,7 @@ window.DATA = {
              ['created_at', 'TIMESTAMPTZ', ''],
              ['archived_at', 'TIMESTAMPTZ', 'NULL = 使用中。封存不刪除，舊紀錄要留著'],
              ['kind', 'TEXT', "'standing' 常設 / 'temp' 臨時（有結束日、會結算）"],
+             ['starts_on', 'DATE', '開始日（預設建立當天）。比今天晚＝預先規劃，到了才放進活動選單；舊的是 NULL＝建立當天'],
              ['ends_on', 'DATE', '臨時帳本的結束日。常設為 NULL'],
              ['settled_at', 'TIMESTAMPTZ', 'NULL = 還沒結算。結算後這本帳唯讀'],
              ['removed_at', 'TIMESTAMPTZ', 'NULL = 還在。只有結算過的才能移除；移除不能復原，紀錄一筆都不刪']] },
@@ -455,7 +456,8 @@ window.DATA = {
       cols: [['group_id', 'BIGINT', 'PK, FK → groups'],
              ['user_id', 'BIGINT', 'PK, FK → users'],
              ['joined_at', 'TIMESTAMPTZ', ''],
-             ['notify', 'BOOLEAN', '這本帳有動靜要不要通知我。預設 false']] },
+             ['notify', 'BOOLEAN', '這本帳有動靜要不要通知我。預設 false'],
+             ['start_notified_on', 'DATE', '預先規劃的活動這個開始日通知過我了沒；防同時好幾個請求重複通知']] },
 
     { t: 'alert_rules', label: '階段性提醒門檻', note: '★ 使用者自己設幾個百分比，跨過就通知',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],

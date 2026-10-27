@@ -1,13 +1,13 @@
-"""零用金自動記帳、邀請進鈴鐺、活動目標金額到達通知。
+"""零用金自動記帳、邀請進鈴鐺、活動目標金額到達通知、預先規劃的活動到了開始日的通知。
 
 零用金的規則寫在 app/services/allowance_ledger.py 的開頭；這裡一條一條驗。
 """
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
 from app.models import Allowance, AllowancePayment, Notification, SavingsGoal, Transaction
-from app.services import allowance_ledger
+from app.services import activity_dates, allowance_ledger
 from app.toolkit import crud
 from tests.routes.conftest import categories, family_of, guard, ledger_of, login, spend, user
 
@@ -139,3 +139,20 @@ def test_活動目標金額_到了通知一次_改了目標再到再通知(api):
     crud.save(SavingsGoal, {"user_id": me.id, "group_id": g.id, "goal_amount": 1100, "created_by": me.id})
     api.get("/api/notifications", headers=login(me))
     assert len(_notes(me, "activity_target")) == 2
+
+
+@pytest.mark.route("GET", "/api/notifications")
+def test_預先規劃的活動_到了開始日通知每位成員一次(api):
+    me, friend = user("a@x.tw", "阿明"), user("f@x.tw", "小美")
+    on = activity_dates.today()
+    three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
+    ledger_of(me, friend, name="露營", starts_on=on, created_at=three_days_ago)      # 三天前排好、今天開始
+    ledger_of(me, name="下個月", starts_on=on + timedelta(days=5))                    # 還沒到
+    ledger_of(me, name="今天開", starts_on=on)                                       # 建立當天就開始，本來就在選單裡
+    listed = api.get("/api/notifications", headers=login(me)).json()["notifications"]
+    assert [(n["groupName"], n["startsOn"]) for n in listed if n["type"] == "activity_start"] == \
+        [("露營", on.isoformat())]
+    api.get("/api/notifications", headers=login(me))
+    assert len(_notes(me, "activity_start")) == 1                        # 同一個開始日只通知一次
+    api.get("/api/notifications", headers=login(friend))
+    assert [n["groupName"] for n in _notes(friend, "activity_start")] == ["露營"]

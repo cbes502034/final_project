@@ -50,6 +50,8 @@ class Group(Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # 'standing' 常設 / 'temp' 臨時（有結束日、會結算）
     kind: Mapped[str] = mapped_column(Text, nullable=False, default="standing")
+    # 開始日（使用者選，預設建立當天）。比今天晚＝預先規劃，到了才放進活動選單。舊的活動是 NULL＝建立當天
+    starts_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     # 臨時帳本的結束日。常設為 NULL
     ends_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     # NULL = 還沒結算。結算後這本帳唯讀
@@ -70,6 +72,9 @@ class GroupMember(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     # 這本帳有動靜要不要通知我。預設 false
     notify: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # 預先規劃的活動「這個開始日」通知過我了沒（services/activity_dates.notify_started）。
+    # 用帶條件的 UPDATE 搶這一格：同時進來好幾個請求，只有一個寫得進去，通知就不會重複
+    start_notified_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class ActivityInvite(Base):

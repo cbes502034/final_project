@@ -1,10 +1,18 @@
 """分類與帳本（記帳）。怎麼跑、兩種對象的差別：看 conftest.py 的檔頭。"""
 
+from datetime import timedelta
+
 import pytest
 
 from app.models import AuditLog, Category, Group, GroupMember, Transaction
+from app.services import activity_dates
 from app.toolkit import crud
 from tests.routes.conftest import categories, family_of, goal, ledger_of, login, now, spend, user
+
+
+def day(n):
+    """台灣的今天往後 n 天（負的往前），YYYY-MM-DD。"""
+    return (activity_dates.today() + timedelta(days=n)).isoformat()
 
 
 # ===========================================================================
@@ -108,11 +116,12 @@ NEW = ("POST", "/api/groups")
 def test_create_group_建立者自動加入(api):
     me = user("d@x.tw", "爸爸")
     r = api.post("/api/groups", headers=login(me), json={"name": " 旅遊 基金 ", "kind": "temp",
-                                                          "endsOn": "2026-10-05", "color": "book-violet"})
+                                                          "endsOn": day(30), "color": "book-violet"})
     assert r.status_code == 201, r.text
     body = r.json()
+    assert (body["startsOn"], body["planned"]) == (day(0), False)                     # 開始日沒帶＝今天
     assert (body["name"], body["kind"], body["endsOn"], body["color"], body["members"], body["canEdit"]) == \
-        ("旅遊 基金", "temp", "2026-10-05", "book-violet", [str(me.id)], True)
+        ("旅遊 基金", "temp", day(30), "book-violet", [str(me.id)], True)
     assert crud.exists(GroupMember, {"group_id": int(body["id"]), "user_id": me.id})
     r = api.post("/api/groups", headers=login(me), json={"name": "家用"})
     assert r.status_code == 201 and r.json()["color"] == "book-indigo" and r.json()["endsOn"] is None
@@ -134,6 +143,29 @@ def test_create_group_重名只比自己家_格式檢查(api):
     assert api.post("/api/groups", headers=h, json={"name": "   "}).status_code == 422
     assert api.post("/api/groups", headers=h, json={"name": "d", "kind": "weird"}).status_code == 422
     assert crud.count(Group) == 3
+
+
+@pytest.mark.route(*NEW)
+def test_create_group_開始日_預先規劃_期間規則(api):
+    me = user("d@x.tw", "爸爸")
+    h = login(me)
+
+    def post(name, **kw):
+        return api.post("/api/groups", headers=h, json={"name": name, **kw})
+
+    r = post("早就開始", startsOn=day(-10), kind="temp", endsOn=day(5))              # 開始日可以比今天早
+    assert r.status_code == 201 and (r.json()["startsOn"], r.json()["planned"]) == (day(-10), False)
+    r = post("下個月", startsOn=day(5), kind="temp", endsOn=day(9))                  # 都在以後＝預先規劃
+    assert r.status_code == 201 and r.json()["planned"] is True
+    assert post("沒結束日", startsOn=day(3)).json()["planned"] is True
+    assert post("今天結束", startsOn=day(-3), kind="temp", endsOn=day(0)).status_code == 201
+    assert post("過去的", startsOn=day(-10), kind="temp", endsOn=day(-1)).status_code == 400   # 整段都在今天以前
+    assert post("倒過來", startsOn=day(5), kind="temp", endsOn=day(3)).status_code == 400       # 結束日要在開始日之後
+    assert post("同一天", startsOn=day(3), kind="temp", endsOn=day(3)).status_code == 400
+    assert post("格式", startsOn="11/1").status_code == 422
+    listed = {g["name"]: g for g in api.get("/api/groups", headers=h).json()["groups"]}
+    assert (listed["下個月"]["planned"], listed["早就開始"]["planned"], listed["早就開始"]["startsOn"]) == \
+        (True, False, day(-10))
 
 
 # ===========================================================================
@@ -165,13 +197,20 @@ def test_update_group_改名換色復原(api):
     assert api.patch(url, headers=h, json={"owner": "3"}).status_code == 422
     assert api.patch(url, headers=h, json={"note": "說" * 101}).status_code == 422   # 說明放在活動首頁，一句話就好
     assert api.patch(url, headers=h, json={"note": ""}).json()["note"] == ""          # 空字串＝清掉
-    r = api.patch(url, headers=h, json={"endsOn": "2026-12-31"})                      # 建立後也能補結束日
-    assert (r.json()["endsOn"], r.json()["kind"]) == ("2026-12-31", "temp")
+    r = api.patch(url, headers=h, json={"endsOn": day(30)})                           # 建立後也能補結束日
+    assert (r.json()["endsOn"], r.json()["kind"]) == (day(30), "temp")
     r = api.patch(url, headers=h, json={"endsOn": None})                              # 清掉＝一直記下去
     assert (r.json()["endsOn"], r.json()["kind"]) == (None, "standing")
+    r = api.patch(url, headers=h, json={"startsOn": day(3)})                          # 改成以後才開始＝預先規劃
+    assert (r.json()["startsOn"], r.json()["planned"]) == (day(3), True)
+    assert api.patch(url, headers=h, json={"endsOn": day(2)}).status_code == 400      # 結束日要在開始日之後
+    assert api.patch(url, headers=h, json={"endsOn": day(-1)}).status_code == 400     # 結束日不能比今天早
+    r = api.patch(url, headers=h, json={"startsOn": None})                            # 空的＝今天
+    assert (r.json()["startsOn"], r.json()["planned"]) == (day(0), False)
     assert api.patch(url, headers=h, json={"endsOn": "12/31"}).status_code == 422
     mine = ledger_of(me, name="個人", personal_owner_id=me.id)
-    assert api.patch("/api/groups/%d" % mine.id, headers=h, json={"endsOn": "2026-12-31"}).status_code == 400
+    assert api.patch("/api/groups/%d" % mine.id, headers=h, json={"endsOn": day(30)}).status_code == 400
+    assert api.patch("/api/groups/%d" % mine.id, headers=h, json={"startsOn": day(1)}).status_code == 400
     assert api.patch(url, headers=h, json={}).status_code == 400
     assert api.patch(url, headers=login(mom), json={"name": "x"}).status_code == 403
     assert api.patch(url, headers=login(mom), json={"endsOn": None}).status_code == 403  # 設定只有建立者能改

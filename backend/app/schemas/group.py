@@ -19,6 +19,7 @@ class GroupIn(BaseModel):
     color: str | None = None
     kind: str = Field(default="standing", pattern="^(standing|temp)$")
     endsOn: str | None = Field(default=None, description="活動帳本（temp）必填，YYYY-MM-DD")
+    startsOn: str | None = Field(default=None, description="開始日 YYYY-MM-DD；不帶＝今天，比今天晚＝預先規劃")
     note: str = Field(default="", max_length=100, description="這個活動在做什麼，放在活動首頁最上面")
 
 
@@ -28,6 +29,7 @@ class GroupPatchIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=20)
     color: str | None = None
     note: str | None = Field(default=None, max_length=100)
+    startsOn: str | None = Field(default=None, description="開始日 YYYY-MM-DD；null 或空字串＝今天")
     endsOn: str | None = Field(default=None, description="結束日 YYYY-MM-DD；null 或空字串＝不設結束日")
     archived: bool | None = Field(default=None, description="只收 false：復原封存")
 

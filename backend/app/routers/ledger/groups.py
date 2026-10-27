@@ -73,6 +73,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
          "groups": [
            {"id": "5", "name": "家用", "icon": "用", "color": "book-indigo", "owner": "3",
             "note": "日常開銷", "created": "2026-09-01", "kind": "standing", "endsOn": null,
+            "startsOn": "2026-09-01", "planned": false,
             "settledAt": null, "archived": false, "settled": false, "overdue": false,
             "members": ["3", "4"], "memberNames": ["王大明", "陳美玲"],
             "count": 7, "goal": 0, "canEdit": true, "notify": false}
@@ -81,6 +82,8 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
         icon     名稱最後一個字
         kind     standing（一般）／temp（活動帳本，有 endsOn 結束日）
         overdue  活動帳本、還沒結算、而且 endsOn 已經過了（台灣的今天）
+        startsOn 開始日；舊的活動沒有設過＝建立那天（services/activity_dates.start_of）
+        planned  預先規劃：開始日還沒到。前端先不放進活動選單，到了才放上去（同時通知成員）
         count    這本帳的筆數。我在這本帳裡，這本帳的每一筆我都看得到（可見範圍的 B 路），所以就是全部筆數——跟點進去看到的一樣
         goal     這個活動的目標金額：建立者訂的（savings_goals 最新的一列），全員看到同一個，沒設過是 0
         canEdit  我是不是建立的人（改名、加人、封存只有建立的人能做；合併每位成員都能做）
@@ -134,6 +137,8 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
 
         第二步：套用以下函式內容
 
+            from app.services import activity_dates
+
             # 1. 我加入的帳本（移除的一律不列；沒帶 includeArchived 也不列封存的）
             mine = crud.find(GroupMember, {"user_id": me.id}, db=db)
             where = {"id__in": [m.group_id for m in mine], "removed_at__isnull": True, "settled_at__isnull": True}
@@ -170,6 +175,8 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
                     "created": g.created_at.date().isoformat(),
                     "kind": g.kind,
                     "endsOn": g.ends_on.isoformat() if g.ends_on else None,
+                    "startsOn": activity_dates.start_of(g).isoformat(),
+                    "planned": activity_dates.planned(g, today),
                     "settledAt": g.settled_at.isoformat() if g.settled_at else None,
                     "archived": g.archived_at is not None,
                     "settled": g.settled_at is not None,
@@ -198,6 +205,8 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
            （u4f60 是標籤「你的」的跳脫碼。pytest 會把中文標籤轉成跳脫碼，
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
+
+    from app.services import activity_dates
 
     # 1. 我加入的帳本（移除的一律不列；沒帶 includeArchived 也不列封存的）
     mine = crud.find(GroupMember, {"user_id": me.id}, db=db)
@@ -235,6 +244,8 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
             "created": g.created_at.date().isoformat(),
             "kind": g.kind,
             "endsOn": g.ends_on.isoformat() if g.ends_on else None,
+            "startsOn": activity_dates.start_of(g).isoformat(),
+            "planned": activity_dates.planned(g, today),
             "settledAt": g.settled_at.isoformat() if g.settled_at else None,
             "archived": g.archived_at is not None,
             "settled": g.settled_at is not None,
@@ -264,7 +275,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         建立的人自動加進這本帳（不加的話，他自己也看不到剛開的帳本）。
 
     【前端怎麼打】
-        frontend/js/api.js 的 API.createGroup({ name, color, note, kind, endsOn })
+        frontend/js/api.js 的 API.createGroup({ name, color, note, kind, startsOn, endsOn })
         帳本頁「開一本帳」送出時呼叫。前端檢查回應裡一定要有 id。
 
     【誰能打】
@@ -280,6 +291,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         name    字串  是         1～20 字（FastAPI 先擋）；整理空白後不能是空的
         color   字串  否         顏色代號，只收 app/catalog.py 的 GROUP_COLORS；沒帶用第一個（book-indigo）
         kind    字串  否         standing（預設）／temp（活動帳本）。其他值 FastAPI 自動回 422
+        startsOn 字串 否        開始日 YYYY-MM-DD；不帶＝今天。可以比今天早；比今天晚＝預先規劃
         endsOn  字串  temp 必填  活動帳本的結束日 YYYY-MM-DD；standing 帶了也不理
         note    字串  否         這本帳是做什麼的
         範例：{"name": "旅遊基金", "color": "book-violet", "kind": "temp", "endsOn": "2026-10-05", "note": ""}
@@ -287,7 +299,8 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
 
     【成功回應】狀態碼 201
         {"id": "6", "name": "旅遊基金", "icon": "金", "color": "book-violet", "owner": "3", "note": "",
-         "created": "2026-09-17", "kind": "temp", "endsOn": "2026-10-05", "settledAt": null,
+         "created": "2026-09-17", "kind": "temp", "endsOn": "2026-10-05", "startsOn": "2026-09-17",
+         "planned": false, "settledAt": null,
          "archived": false, "settled": false, "members": ["3"], "canEdit": true, "notify": false}
 
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
@@ -297,6 +310,9 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         422     名稱整理完是空的                      帳本要有名字
         422     顏色不在清單裡                        沒有這個顏色
         422     endsOn 格式不對                       結束日要是 YYYY-MM-DD
+        422     startsOn 格式不對                     開始日要是 YYYY-MM-DD
+        400     結束日比今天早                        結束日已經過了，整段期間都在今天以前，請重新設定日期
+        400     結束日沒有在開始日之後                結束日要在開始日之後
         ⚠️ 重名只比「自己家的人開的帳本」：比了別人家的，等於告訴使用者別的家庭有哪些帳本。
 
     【會用到的資料表】
@@ -316,7 +332,8 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
                 db.commit()                      兩列一起寫進去
 
     【寫法步驟】
-        1. 整理名稱（422）、檢查顏色（422）；temp 要有 endsOn（400）而且格式對（422）
+        1. 整理名稱（422）、檢查顏色（422）；temp 要有 endsOn（400）而且格式對（422）；
+           開始日沒帶是今天，期間照 services/activity_dates.check 檢查（400）
         2. 我們家的人開的帳本裡有同名的 → 409
         3. 新增帳本（family_id 記我現在的家庭）＋ 把自己加進去，db.commit()
         4. 回傳剛建好的帳本
@@ -356,6 +373,10 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
                     ends_on = date.fromisoformat(body.endsOn)
                 except ValueError:
                     raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
+            # 開始日：沒帶就是今天；比今天晚＝預先規劃，到了才放進活動選單（規則在 services/activity_dates.py）
+            from app.services import activity_dates
+            starts_on = activity_dates.parse(body.startsOn, "開始日") or activity_dates.today()
+            activity_dates.check(starts_on, ends_on)
 
             # 2. 同一個家庭裡不能重名（含封存的）；沒有家庭就只跟自己開的比
             if me.family_id:
@@ -374,6 +395,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
                 "created_by": me.id,
                 "kind": body.kind,
                 "ends_on": ends_on,
+                "starts_on": starts_on,
             }, db=db)
             crud.save(GroupMember, {"group_id": group.id, "user_id": me.id}, db=db)
             db.commit()
@@ -389,6 +411,8 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
                 "created": group.created_at.date().isoformat(),
                 "kind": group.kind,
                 "endsOn": ends_on.isoformat() if ends_on else None,
+                "startsOn": starts_on.isoformat(),
+                "planned": activity_dates.planned(group),
                 "settledAt": None,
                 "archived": False,
                 "settled": False,
@@ -443,6 +467,10 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
             ends_on = date.fromisoformat(body.endsOn)
         except ValueError:
             raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
+    # 開始日：沒帶就是今天；比今天晚＝預先規劃，到了才放進活動選單（規則在 services/activity_dates.py）
+    from app.services import activity_dates
+    starts_on = activity_dates.parse(body.startsOn, "開始日") or activity_dates.today()
+    activity_dates.check(starts_on, ends_on)
 
     # 2. 同一個家庭裡不能重名（含封存的）；沒有家庭就只跟自己開的比
     if me.family_id:
@@ -461,6 +489,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         "created_by": me.id,
         "kind": body.kind,
         "ends_on": ends_on,
+        "starts_on": starts_on,
     }, db=db)
     crud.save(GroupMember, {"group_id": group.id, "user_id": me.id}, db=db)
     db.commit()
@@ -476,6 +505,8 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         "created": group.created_at.date().isoformat(),
         "kind": group.kind,
         "endsOn": ends_on.isoformat() if ends_on else None,
+        "startsOn": starts_on.isoformat(),
+        "planned": activity_dates.planned(group),
         "settledAt": None,
         "archived": False,
         "settled": False,
@@ -486,7 +517,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
     # raise not_ready("POST /api/groups", OWNER)
 
 
-@router.patch("/groups/{gid}", summary="改活動名稱、說明、結束日、顏色")
+@router.patch("/groups/{gid}", summary="改活動名稱、說明、期間、顏色")
 # @stub
 def update_group(
     body: GroupPatchIn,
@@ -494,19 +525,19 @@ def update_group(
     me: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    """改活動名稱、說明、結束日、顏色
+    """改活動名稱、說明、期間、顏色
 
     PATCH /api/groups/{gid}
 
     【這支做什麼】
-        建立的人改活動的名稱、說明、結束日、顏色；或是帶 {"archived": false} 把封存的帳本復原。
+        建立的人改活動的名稱、說明、開始日、結束日、顏色；或是帶 {"archived": false} 把封存的帳本復原。
         ⚠️ 活動的設定只有建立者能改（成員各改各的會亂）；目標金額也一樣，走 PUT /api/savings-goal。
         ⚠️ 封存在使用者眼裡跟刪掉一模一樣，所以「復原」一定要做得出來。
            復原不用還原任何資料：封存從頭到尾沒動過任何一筆紀錄，只是讓它重新出現在清單上。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.updateGroup(gid, patch)
-        活動管理改名稱／說明／結束日／顏色、首頁就地寫說明，以及「已封存」那一區的「復原」。回應是改完的帳本。
+        活動管理改名稱／說明／開始日／結束日／顏色、首頁就地寫說明，以及「已封存」那一區的「復原」。回應是改完的帳本。
 
     【誰能打】
         登入、沒被停權，而且這本帳是自己開的。參數 group=Depends(in_group("gid", owner=True)) 已經擋好了：
@@ -521,6 +552,7 @@ def update_group(
         name      字串         1～20 字；同一個家庭裡不能跟別本重名
         color     字串         只收 catalog.GROUP_COLORS 裡的代號
         note      字串         說明；空字串 = 清掉
+        startsOn  字串／null   開始日 YYYY-MM-DD；null 或空字串 = 今天。比今天晚＝預先規劃
         endsOn    字串／null   結束日 YYYY-MM-DD；null 或空字串 = 不設結束日（一直記下去）
         archived  true／false  只收 false（復原封存）；封存本身走 DELETE
         範例：{"name": "家用開銷"}　或　{"archived": false}
@@ -534,13 +566,15 @@ def update_group(
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                      detail
         400     什麼都沒送                    沒有要改的欄位
-        400     個人大帳本送了 endsOn         個人大帳本沒有結束日
+        400     個人大帳本送了開始日或結束日  個人大帳本沒有開始日和結束日
+        400     結束日比今天早                結束日已經過了，整段期間都在今天以前，請重新設定日期
+        400     結束日沒有在開始日之後        結束日要在開始日之後
         403     不是建立的人                  只有建立這本帳的人可以做這件事（守衛回）
         404     找不到、已經移除              找不到這本帳（守衛回）
         409     新名稱跟家裡另一本重複        家裡已經有一本叫「家用」的帳了
         422     名稱整理完是空的              帳本要有名字
         422     顏色不在清單裡                沒有這個顏色
-        422     結束日格式不對                結束日要是 YYYY-MM-DD
+        422     日期格式不對                  開始日／結束日要是 YYYY-MM-DD
         422     archived 送 true              封存請用 DELETE；這裡的 archived 只收 false（復原）
         422     不認得的欄位、名稱超過 20 字  （FastAPI 自動回）
 
@@ -560,7 +594,8 @@ def update_group(
         1. 有送 name：整理空白（422）；跟原本不一樣才檢查重名（409）
         2. 有送 color：要在清單裡（422）
         3. 有送 note：去頭尾空白，空的存 NULL
-        4. 有送 endsOn：有日期就存成有期限的活動（kind=temp）；空的＝不設結束日（kind=standing）
+        4. 有送 startsOn 或 endsOn：開始日空的＝今天；結束日有日期就是有期限的活動（kind=temp），
+           空的＝不設結束日（kind=standing）；改完的期間照 services/activity_dates.check 檢查（400）
         5. 有送 archived：只收 false，把 archived_at 設回 NULL（復原）
         6. 什麼都沒改到 → 400；有的話 crud.save、db.commit()，回傳改完的帳本
 
@@ -583,6 +618,7 @@ def update_group(
 
         第二步：套用以下函式內容
 
+            from app.services import activity_dates
             if group.personal_owner_id is not None and body.archived:
                 raise errors.bad_request("個人大帳本不能封存")
 
@@ -615,18 +651,18 @@ def update_group(
             if "note" in sent:
                 changes["note"] = (body.note or "").strip() or None
 
-            # 4. 結束日：有日期＝有期限的活動（temp），清空＝一直記下去（standing）
-            if "endsOn" in sent:
+            # 4. 期間：開始日空的＝今天；結束日有日期＝有期限的活動（temp），清空＝一直記下去（standing）
+            #    規則在 services/activity_dates.py：結束日不能早於今天、要在開始日之後；開始日比今天晚＝預先規劃
+            if "startsOn" in sent or "endsOn" in sent:
                 if group.personal_owner_id is not None:
-                    raise errors.bad_request("個人大帳本沒有結束日")
-                if body.endsOn:
-                    try:
-                        changes["ends_on"] = date.fromisoformat(body.endsOn)
-                    except ValueError:
-                        raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
-                    changes["kind"] = "temp"
-                else:
-                    changes["ends_on"], changes["kind"] = None, "standing"
+                    raise errors.bad_request("個人大帳本沒有開始日和結束日")
+                starts_on, ends_on = activity_dates.start_of(group), group.ends_on
+                if "startsOn" in sent:
+                    starts_on = changes["starts_on"] = activity_dates.parse(body.startsOn, "開始日") or activity_dates.today()
+                if "endsOn" in sent:
+                    ends_on = changes["ends_on"] = activity_dates.parse(body.endsOn, "結束日")
+                    changes["kind"] = "temp" if ends_on else "standing"
+                activity_dates.check(starts_on, ends_on)
 
             # 5. 復原封存：只收 false
             if "archived" in sent:
@@ -648,6 +684,8 @@ def update_group(
                 "created": group.created_at.date().isoformat(),
                 "kind": group.kind,
                 "endsOn": group.ends_on.isoformat() if group.ends_on else None,
+                "startsOn": activity_dates.start_of(group).isoformat(),
+                "planned": activity_dates.planned(group),
                 "settledAt": group.settled_at.isoformat() if group.settled_at else None,
                 "archived": group.archived_at is not None,
                 "settled": group.settled_at is not None,
@@ -670,6 +708,7 @@ def update_group(
             -k 直接打中文比不到任何測試，會印出 0 selected）
     """
 
+    from app.services import activity_dates
     if group.personal_owner_id is not None and body.archived:
         raise errors.bad_request("個人大帳本不能封存")
 
@@ -702,18 +741,18 @@ def update_group(
     if "note" in sent:
         changes["note"] = (body.note or "").strip() or None
 
-    # 4. 結束日：有日期＝有期限的活動（temp），清空＝一直記下去（standing）
-    if "endsOn" in sent:
+    # 4. 期間：開始日空的＝今天；結束日有日期＝有期限的活動（temp），清空＝一直記下去（standing）
+    #    規則在 services/activity_dates.py：結束日不能早於今天、要在開始日之後；開始日比今天晚＝預先規劃
+    if "startsOn" in sent or "endsOn" in sent:
         if group.personal_owner_id is not None:
-            raise errors.bad_request("個人大帳本沒有結束日")
-        if body.endsOn:
-            try:
-                changes["ends_on"] = date.fromisoformat(body.endsOn)
-            except ValueError:
-                raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
-            changes["kind"] = "temp"
-        else:
-            changes["ends_on"], changes["kind"] = None, "standing"
+            raise errors.bad_request("個人大帳本沒有開始日和結束日")
+        starts_on, ends_on = activity_dates.start_of(group), group.ends_on
+        if "startsOn" in sent:
+            starts_on = changes["starts_on"] = activity_dates.parse(body.startsOn, "開始日") or activity_dates.today()
+        if "endsOn" in sent:
+            ends_on = changes["ends_on"] = activity_dates.parse(body.endsOn, "結束日")
+            changes["kind"] = "temp" if ends_on else "standing"
+        activity_dates.check(starts_on, ends_on)
 
     # 5. 復原封存：只收 false
     if "archived" in sent:
@@ -735,6 +774,8 @@ def update_group(
         "created": group.created_at.date().isoformat(),
         "kind": group.kind,
         "endsOn": group.ends_on.isoformat() if group.ends_on else None,
+        "startsOn": activity_dates.start_of(group).isoformat(),
+        "planned": activity_dates.planned(group),
         "settledAt": group.settled_at.isoformat() if group.settled_at else None,
         "archived": group.archived_at is not None,
         "settled": group.settled_at is not None,

@@ -665,19 +665,38 @@
 
   /* 「10/12 開始 · 還有 7 天結束」。結束日選填：沒填就講進行了幾天 */
   function actPeriod(g) {
-    if (!g.created) return '';
+    var from = g.startsOn || g.created;
+    if (!from) return '';
     var day = 864e5, today = new Date(todayKey() + 'T12:00:00');
     var md = function (iso) {
       var d = new Date(iso + 'T12:00:00');
       return (d.getFullYear() !== today.getFullYear() ? d.getFullYear() + '/' : '') + (d.getMonth() + 1) + '/' + d.getDate();
     };
-    var start = md(g.created) + ' 開始';
+    var start = md(from) + ' 開始';
+    /* 預先規劃：還沒開始 */
+    var until = Math.round((new Date(from + 'T12:00:00') - today) / day);
+    if (until > 0) return start + '（還有 ' + until + ' 天）' + (g.endsOn ? ' · ' + md(g.endsOn) + ' 結束' : '');
     if (g.endsOn) {
       var left = Math.round((new Date(g.endsOn + 'T12:00:00') - today) / day);
       return start + ' · ' + (left > 0 ? '還有 ' + left + ' 天結束（' + md(g.endsOn) + '）'
         : left === 0 ? '今天結束' : md(g.endsOn) + ' 已經結束');
     }
-    return start + ' · 已經 ' + (Math.round((today - new Date(g.created + 'T12:00:00')) / day) + 1) + ' 天';
+    return start + ' · 已經 ' + (1 - until) + ' 天';
+  }
+
+  /* '2026-11-08' → '11/8' */
+  function monthDay(iso) {
+    var p = String(iso || '').split('-');
+    return p.length === 3 ? Number(p[1]) + '/' + Number(p[2]) : '';
+  }
+
+  /* 活動期間的規則，跟後端 services/activity_dates.py 一樣：
+     開始日可以比今天早或晚（晚＝預先規劃）；結束日不能比今天早、而且要在開始日之後。 */
+  function activityRangeError(start, end) {
+    if (!end) return '';
+    if (end < todayKey()) return '結束日已經過了，整段期間都在今天以前，請重新設定日期';
+    if (start && end <= start) return '結束日要在開始日之後';
+    return '';
   }
 
   /* 今天的紀錄。上面一條是今天花了多少、收了多少，下面是一筆一筆。
@@ -2280,8 +2299,12 @@
          ⚠️ 自己的基底活動（註冊時開的「〈名字〉的活動」）是所有紀錄的家，不是要管理的活動，不放進這份清單；
             個人帳本與合併後的本人紀錄，從上面的活動切換器查看。 */
       var mine = live.filter(function (g) { return !g.personal; });
-      var open = mine.filter(function (g) { return !g.settled; });
+      var open = mine.filter(function (g) { return !g.settled && !g.planned; });
       var done = mine.filter(function (g) { return g.settled; });
+      /* 預先規劃：開始日還沒到，不算進行中、也不放進活動選單；到了那天自動移到進行中。
+         有的時候預設展開——是使用者特地排好的，要看得到 */
+      var plan = mine.filter(function (g) { return !g.settled && g.planned; });
+      if (plan.length && FOLD.gplan === undefined) FOLD.gplan = true;
 
       /* 開一本新的：整頁只有一顆「建立活動」（跟「記一筆」同一個做法）。
          結束日選填：不填就一直記下去，填了到期會提醒。 */
@@ -2292,6 +2315,9 @@
           /* 說明就是這個活動的目的，用使用者自己的話寫；會放在活動首頁最上面 */
           '<label class="fld fld--wide"><span>說明（選填）</span>' +
             '<input type="text" id="gnNote" maxlength="100" placeholder="例如 11 月沖繩四天三夜，住宿先刷爸爸的卡"></label>' +
+          /* 開始日預設今天，可以選以前或以後；訂在以後＝預先規劃，到了那天才放進活動選單（並通知成員） */
+          '<label class="fld"><span>開始日</span>' +
+            '<input type="date" id="gnStart" value="' + todayKey() + '" required></label>' +
           '<label class="fld"><span>結束日（選填）</span>' +
             '<input type="date" id="gnEnd"></label>' +
           '<label class="fld"><span>顏色</span>' +
@@ -2319,7 +2345,9 @@
         foldBlock('gnew', '進行中', '建立活動', gnewForm, open.length + ' 個', 'books') +
         (open.length
           ? ledgerList(open)
+          : plan.length ? ''
           : '<div class="card">' + emptyState('還沒有活動', '按右上角的「建立活動」，旅遊、搬家、家用都可以。') + '</div>') +
+        (plan.length ? foldBlock('gplan', '預先規劃', '看看', ledgerList(plan), plan.length + ' 個') : '') +
         (done.length ? foldBlock('gdone', '已結算', '看看', ledgerList(done), String(done.length) + ' 個') : '') +
         (gone.length ? foldBlock('garch', '已封存', '看看', archHTML, String(gone.length) + ' 個', 'archive') : '');
 
@@ -2432,6 +2460,7 @@
         '<span class="gsw__d lg__dot" style="background:' + tint(g.color) + '"></span>' +
         '<span class="lg__t">' + esc(g.name) + '</span>' +
         '<span class="lg__tags">' +
+          (g.planned ? '<span class="tag tag--soft">' + esc(monthDay(g.startsOn)) + ' 開始</span>' : '') +
           (g.kind === 'temp' && g.endsOn && !g.settled
             ? '<span class="tag tag--MEDIUM">到 ' + esc(g.endsOn.slice(5).replace('-', '/')) + '</span>' : '') +
           (g.overdue ? '<span class="tag tag--down">已到期</span>' : '') +
@@ -2486,7 +2515,10 @@
             /* 說明＝這個活動在做什麼，會放在活動首頁最上面 */
             '<dt>說明</dt><dd><input class="lg__in" type="text" maxlength="100" data-gnote="' + esc(g.id) + '" ' +
               'value="' + esc(g.note || '') + '" placeholder="寫一句這個活動在做什麼（選填）" aria-label="活動說明"></dd>' +
-            '<dt>結束日</dt><dd><input class="lg__in lg__in--s" type="date" data-gend="' + esc(g.id) + '" ' +
+            '<dt>開始日</dt><dd><input class="lg__in lg__in--s" type="date" required data-gstart="' + esc(g.id) + '" ' +
+              'value="' + esc(g.startsOn || '') + '" aria-label="開始日">' +
+              '<div class="lg__hint">訂在以後就是預先規劃：到了那天才放進活動選單，並通知成員</div></dd>' +
+            '<dt>結束日</dt><dd><input class="lg__in lg__in--s" type="date" min="' + todayKey() + '" data-gend="' + esc(g.id) + '" ' +
               'value="' + esc(g.endsOn || '') + '" aria-label="結束日">' +
               '<div class="lg__hint">清空就是不設結束日，一直記下去</div></dd>' +
             '<dt>顏色</dt><dd><select class="lg__in lg__in--s" data-gcolor="' + esc(g.id) + '" aria-label="顏色">' +
@@ -2512,7 +2544,8 @@
             (g.notify ? ' checked' : '') + '><span>這個活動有動靜就通知我</span></label></dd>' +
       '</dl>' +
       '<div class="lg__acts">' +
-        '<button class="btn btn--sm" data-gview="' + esc(g.id) + '">查看活動的 ' + g.count + ' 筆紀錄 →</button>' +
+        /* 預先規劃的還沒開始、不在活動選單裡，沒有紀錄可看 */
+        (g.planned ? '' : '<button class="btn btn--sm" data-gview="' + esc(g.id) + '">查看活動的 ' + g.count + ' 筆紀錄 →</button>') +
         '<span class="lg__sp"></span>' +
         (!g.personal && !g.settled
           ? '<button class="gx gx--go" data-gsettle="' + esc(g.id) + '">退出</button>' : '') +
@@ -4160,9 +4193,10 @@
       var all = d.groups || [];
       var personal = all.filter(function (g) { return g.personal; })[0];
       PERSONAL_GROUP = personal ? personal.id : null;
-      var gs = all.filter(function (g) { return !g.personal && !g.settled && !g.archived; });
+      /* 預先規劃（開始日還沒到）的不放進活動選單；到了那天後端標成進行中，這裡自然就出現 */
+      var gs = all.filter(function (g) { return !g.personal && !g.settled && !g.archived && !g.planned; });
       box.hidden = isFamily();
-      if (!all.some(function (g) { return g.id === GROUP && !g.settled && !g.archived; })) setGroup(PERSONAL_GROUP);
+      if (!all.some(function (g) { return g.id === GROUP && !g.settled && !g.archived && !g.planned; })) setGroup(PERSONAL_GROUP);
       CURRENT_ACTIVITY = gs.filter(function (g) { return g.id === GROUP; })[0] || null;
       HEADER.setActivities(gs, GROUP);
       pushForDrawer();
@@ -5418,12 +5452,16 @@
 
     if (f.id === 'gnewF') {
       e.preventDefault();
-      busy(f, true, '建立中…');
+      var starts = (document.getElementById('gnStart') || {}).value || todayKey();
       var ends = (document.getElementById('gnEnd') || {}).value || null;
+      var bad = activityRangeError(starts, ends);
+      if (bad) { toast(bad, 'err'); return; }
+      busy(f, true, '建立中…');
       API.createGroup({
         name: document.getElementById('gnName').value,
         color: document.getElementById('gnColor').value,
         kind: ends ? 'temp' : 'standing',
+        startsOn: starts,
         endsOn: ends,
         note: ((document.getElementById('gnNote') || {}).value || '').trim()
       }).then(function (g) {
@@ -5431,8 +5469,10 @@
         /* 開完就收起來。開活動是一次性動作，不像記帳會連記好幾筆——
            建好之後該看到的是「我現在有哪幾本」，不是一張空白表單。 */
         FOLD.gnew = false;
+        if (g.planned) FOLD.gplan = true;
         paintGroups(); vGroups();
-        toast('「' + g.name + '」開好了', 'ok');
+        toast(g.planned ? '「' + g.name + '」排好了，' + monthDay(g.startsOn) + ' 開始才會放進活動選單'
+                        : '「' + g.name + '」開好了', 'ok');
       }).catch(function (err) {
         busy(f, false);
         toast(err.message || '建立失敗', 'err');
@@ -5574,28 +5614,36 @@
       return;
     }
 
-    /* 活動的設定：名稱、說明、結束日、顏色。只有建立者有輸入框（後端也只收建立者），改完離開欄位就存 */
-    var gn = e.target.closest ? e.target.closest('[data-gname],[data-gnote],[data-gend],[data-gcolor]') : null;
+    /* 活動的設定：名稱、說明、開始日、結束日、顏色。只有建立者有輸入框（後端也只收建立者），改完離開欄位就存 */
+    var gn = e.target.closest ? e.target.closest('[data-gname],[data-gnote],[data-gstart],[data-gend],[data-gcolor]') : null;
     if (gn) {
-      var gd = gn.dataset, gid = gd.gname || gd.gnote || gd.gend || gd.gcolor;
-      var nv = gn.value.trim(), patch, said;
+      var gd = gn.dataset, gid = gd.gname || gd.gnote || gd.gstart || gd.gend || gd.gcolor;
+      var nv = gn.value.trim(), patch, said, was = LG.byId[gid] || {};
       if (gd.gname) {
         if (!nv) { gn.value = gn.defaultValue; toast('活動要有名稱', 'err'); return; }
         patch = { name: nv }; said = '活動名稱改成「' + nv + '」';
       } else if (gd.gnote) {
         patch = { note: nv }; said = nv ? '說明存好了' : '說明清掉了';
-      } else if (gd.gend) {
-        patch = { endsOn: nv || null };
-        said = nv ? '結束日改成 ' + nv.slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/') : '不設結束日了，一直記下去';
+      } else if (gd.gstart || gd.gend) {
+        /* 期間：開始日空的＝今天；先照規則擋一次，不合的直接退回原本的日期 */
+        var st = gd.gstart ? (nv || todayKey()) : was.startsOn, en = gd.gend ? (nv || null) : was.endsOn;
+        var bad = activityRangeError(st, en);
+        if (bad) { gn.value = gn.defaultValue; toast(bad, 'err'); return; }
+        patch = gd.gstart ? { startsOn: st } : { endsOn: en };
+        said = gd.gstart ? '開始日改成 ' + monthDay(st) + (st > todayKey() ? '，到了那天才放進活動選單' : '')
+             : en ? '結束日改成 ' + monthDay(en) : '不設結束日了，一直記下去';
       } else {
         patch = { color: nv }; said = '顏色換好了';
       }
       API.updateGroup(gid, patch).then(function (g) {
         toast(said, 'ok');
+        if (gn.tagName === 'INPUT') { if (gd.gstart && g.startsOn) gn.value = g.startsOn; gn.defaultValue = gn.value; }
         var keep = {};
-        ['name', 'note', 'color', 'endsOn', 'kind'].forEach(function (k) { if (k in g) keep[k] = g[k]; });
+        ['name', 'note', 'color', 'startsOn', 'endsOn', 'kind', 'planned'].forEach(function (k) { if (k in g) keep[k] = g[k]; });
         if (CURRENT_ACTIVITY && CURRENT_ACTIVITY.id === gid) Object.assign(CURRENT_ACTIVITY, keep);
         if (location.hash === '#/' || !location.hash) { vHome(); return; }
+        /* 進行中 ↔ 預先規劃 換了區塊：整頁重畫（展開的那一本照樣展開） */
+        if ('planned' in keep && !!keep.planned !== !!was.planned) { vGroups(); return; }
         /* 活動管理：只換那一列的標題（名稱、顏色點、到期日），下面的輸入框不重畫，游標才不會跳掉 */
         var lg = LG.byId[gid], row = document.querySelector('.lg[data-lgid="' + gid + '"]');
         if (lg && row) {

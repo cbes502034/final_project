@@ -321,6 +321,13 @@
     return global.fbToday();
   }
 
+  /* 活動期間：結束日不能比今天早、要在開始日之後（同後端 services/activity_dates.check） */
+  function rangeCheck(start, end) {
+    if (!end) return;
+    if (end < todayStr()) throw oops('結束日已經過了，整段期間都在今天以前，請重新設定日期', 400);
+    if (end <= start) throw oops('結束日要在開始日之後', 400);
+  }
+
   function notifyOf(gid, uid) {
     var rows = (global.DATA.groupMembers || []).concat(
       (state && state.joined) || []);
@@ -1564,6 +1571,8 @@
               var overdue = g.kind === 'temp' && !g.settledAt && g.endsOn &&
                 g.endsOn < todayStr();
               return Object.assign(clone(g), {
+                startsOn: g.startsOn || g.created,
+                planned: !!(g.startsOn && g.startsOn > todayStr()),   // 預先規劃：到了開始日才放進活動選單
                 personal: g.personalOwner === s.me,
                 kind: g.kind || 'standing',
                 settled: !!g.settledAt,
@@ -1653,6 +1662,9 @@
         }, 0) + 1;
         var kind = p.kind === 'temp' ? 'temp' : 'standing';
         if (kind === 'temp' && !p.endsOn) throw new Error('活動帳本要有結束日');
+        /* 開始日沒帶＝今天；期間規則同後端 services/activity_dates.py */
+        var startsOn = p.startsOn || todayStr();
+        rangeCheck(startsOn, kind === 'temp' ? p.endsOn : null);
 
         var g = {
           id: 'G' + n, name: name,
@@ -1660,6 +1672,7 @@
           owner: s.me,
           kind: kind,
           endsOn: kind === 'temp' ? p.endsOn : null,
+          startsOn: startsOn,
           settledAt: null,
           created: todayStr(),
           note: String(p.note || '')
@@ -1689,9 +1702,13 @@
         if (p.color !== undefined) q.color = p.color;
         if (p.note !== undefined) q.note = String(p.note);
         /* 結束日：有日期＝有期限的活動，清空＝一直記下去（同後端 PATCH /api/groups/{gid}） */
-        if (p.endsOn !== undefined) {
-          if (g.personalOwner) throw oops('個人大帳本沒有結束日', 400);
-          q.endsOn = p.endsOn || null; q.kind = p.endsOn ? 'temp' : 'standing';
+        if (p.startsOn !== undefined || p.endsOn !== undefined) {
+          if (g.personalOwner) throw oops('個人大帳本沒有開始日和結束日', 400);
+          var st = p.startsOn !== undefined ? (p.startsOn || todayStr()) : (g.startsOn || g.created);
+          var en = p.endsOn !== undefined ? (p.endsOn || null) : g.endsOn;
+          rangeCheck(st, en);
+          if (p.startsOn !== undefined) q.startsOn = st;
+          if (p.endsOn !== undefined) { q.endsOn = en; q.kind = en ? 'temp' : 'standing'; }
         }
         /* 復原：把 id 從封存清單拿掉。
            ⚠️ 封存從頭到尾都沒有動過任何一筆記帳，所以復原不需要還原資料，
