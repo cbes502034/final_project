@@ -2287,7 +2287,7 @@
          結束日選填：不填就一直記下去，填了到期會提醒。 */
       var gnewForm =
         '<form class="card gnew" id="gnewF">' +
-          '<label class="fld fld--wide"><span>名字</span>' +
+          '<label class="fld fld--wide"><span>活動名稱</span>' +
             '<input type="text" id="gnName" placeholder="例如 家用、沖繩旅遊" required></label>' +
           /* 說明就是這個活動的目的，用使用者自己的話寫；會放在活動首頁最上面 */
           '<label class="fld fld--wide"><span>說明（選填）</span>' +
