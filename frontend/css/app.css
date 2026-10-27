@@ -3722,6 +3722,11 @@ body[data-page="entry"] .appbar__add { display: none; }
   text-decoration: none;
 }
 #view .wal__hint:hover { text-decoration: underline; }
+/* 還沒設定收入：不是超支，用中性的灰，不要紅 */
+.pill--unset { background: var(--sunk); color: var(--ink-soft); }
+#view .wal--unset .wal__v { color: var(--ink-faint); }
+#view .wal__why { margin: 0 0 14px; font-size: 13px; line-height: 1.7; color: var(--ink-soft); }
+#view .wal__set { align-self: flex-start; }
 .inc__note {
   width: 100%; margin-top: 8px; padding: 9px 12px;
   background: var(--sunk); border: 1px solid var(--line-2); border-radius: var(--r-input);
@@ -3774,6 +3779,7 @@ body[data-page="entry"] .appbar__add { display: none; }
 #view .famsum__g { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 #view .famsum__g span { display: block; font-size: 12px; color: var(--ink-dim); margin-bottom: 4px; }
 #view .famsum__g b { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+#view .famsum__g b.famsum__none { color: var(--ink-faint); font-size: 15px; }
 #view .famsum__a { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 480px) { #view .famsum__g { grid-template-columns: 1fr 1fr; } }
 

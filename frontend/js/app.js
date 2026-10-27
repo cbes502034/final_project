@@ -516,6 +516,11 @@
               : '<div class="wal__meta"><span>累計收入 <b>' + num(cumIn) + '</b></span><span>累計支出 <b>' + num(cumOut) + '</b></span></div>' +
                 '<a class="wal__hint" href="#/groups">設一個目標金額，到了會通知你 ›</a>');
         }
+        /* 收入、零用金、預計收入全都是 0：不是超支，是「還沒設定」。
+           上限 0 元會讓第一筆支出就變成「超出計畫」、結餘變負的——改成提醒他去設定（使用者 2026-10-27） */
+        var unset = !!sv && !act && !Number(d.income) && !Number(d.pocketMoney) &&
+          !(d.expectedIncome && Number(d.expectedIncome.pending) > 0);
+        if (unset) lv = 'unset';
         var used = sv ? Math.min(100, Math.round(sv.ratio * 100)) : 0;
         var budgets = b.__err ? [] : (fam || activeActivity() ? b.budgets : b.budgets.filter(function (x) { return x.user === m.user.id; }));
         var warn = ads.filter(function (a) { return a.level === 'warn'; }).length;
@@ -537,8 +542,13 @@
             '<span>' + (fam ? '家庭支出' : '本月支出') + '</span>' +
             '<b>' + amt(d.expense) + '</b>' + chev + '</a>' +
           '<div class="wal__card">' +
-          (act ? actCard :
-            '<div class="wal__k">' + (lv === 'over' ? '這個月超出計畫' : '這個月還可以花') +
+          (act ? actCard : unset
+            ? '<div class="wal__k">這個月還可以花<span class="pill pill--unset">尚未設定</span></div>' +
+              '<div class="wal__v">—</div>' +
+              '<p class="wal__why">' + (fam ? '家人都還沒有收入進來，也沒設定每月收入，' : '還沒有收入進來，也沒設定每月收入，') +
+                '算不出這個月能花多少。設定後月底才發薪也能先照預計的算。</p>' +
+              '<a class="btn btn--go btn--sm wal__set" href="#/profile/income">' + (fam ? '設定我的收入' : '設定收入') + '</a>'
+            : '<div class="wal__k">' + (lv === 'over' ? '這個月超出計畫' : '這個月還可以花') +
               (lv === 'over' ? '' : '<span class="pill pill--' + lv + '">' + LEVEL_TW[lv] + '</span>') + '</div>' +
             '<div class="wal__v">' + amt(lv === 'over' ? sv.shortfall : Math.max(0, sv.left)) + '</div>' +
             '<div class="wal__bar" role="progressbar" aria-valuenow="' + used + '" aria-valuemin="0" aria-valuemax="100">' +
@@ -550,12 +560,10 @@
               /* 薪水還沒入帳、先照預計收入算的部分：講出來，不然收入 0、上限卻有 26,000 看起來對不上 */
               (d.expectedIncome && Number(d.expectedIncome.pending) > 0
                 ? '<span title="收入還沒入帳，先照預計的算；入帳之後自動改用實際的">含預計收入 <b>' + num(d.expectedIncome.pending) + '</b></span>' : '') +
-              (Number(sv.goal) > 0 ? '<span>每月想存 <b>' + num(sv.goal) + '</b></span>' : '') + '</div>' +
-            /* 一點收入都沒有、也估不出來：上限是負的。指路去設定，不要只顯示一個嚇人的數字 */
-            (!fam && !activeActivity() && !Number(d.income) && !Number(d.pocketMoney) && !(d.expectedIncome && Number(d.expectedIncome.pending) > 0)
-              ? '<a class="wal__hint" href="#/profile/income">還沒有收入進來？設定「收入怎麼算」，月底才發薪也不會變負數 ›</a>' : '')) +
-            /* 活動的累計已經在上面；當月結餘率對活動沒有意義 */
-            (act ? '' :
+              (Number(sv.goal) > 0 ? '<span>每月想存 <b>' + num(sv.goal) + '</b></span>' : '') + '</div>') +
+            /* 活動的累計已經在上面；當月結餘率對活動沒有意義。
+               還沒設定收入時結餘一定是 −支出、結餘率 0%：跟上面那條「本月支出」重複又嚇人，不放 */
+            (act || unset ? '' :
             '<div class="wal__foot">' +
               '<div class="wal__f"><span>結餘</span><b>' + amt(d.net) + '</b></div>' +
               '<div class="wal__f"><span>結餘率</span><b>' + pct(d.rate) + '</b></div>' +
@@ -1800,11 +1808,15 @@
     API.summary({ scope: 'family' }).then(function (d) {
       var sv = d.savings || {};
       var left = sv.level === 'over' ? -Number(sv.shortfall || 0) : Number(sv.left || 0);
+      /* 跟首頁同一條：家人都還沒有收入、也沒設定 → 不是超支，是還沒設定 */
+      var unset = !Number(d.income) && !Number(d.pocketMoney) && !(d.expectedIncome && Number(d.expectedIncome.pending) > 0);
       box.innerHTML = '<div class="card famsum">' +
         '<div class="famsum__g">' +
           '<div><span>家庭收入</span><b>' + amt(d.income) + '</b></div>' +
           '<div><span>家庭支出</span><b>' + amt(d.expense) + '</b></div>' +
-          '<div><span>' + (sv.level === 'over' ? '這個月超出計畫' : '這個月還可以花') + '</span><b>' + amt(Math.abs(left)) + '</b></div>' +
+          (unset
+            ? '<div><span>這個月還可以花</span><b class="famsum__none">尚未設定</b></div>'
+            : '<div><span>' + (sv.level === 'over' ? '這個月超出計畫' : '這個月還可以花') + '</span><b>' + amt(Math.abs(left)) + '</b></div>') +
         '</div>' +
         '<div class="famsum__a">' +
           '<button class="btn btn--sm btn--go" data-famgo="home">看家庭總覽</button>' +
