@@ -225,7 +225,8 @@ async def run(ws_url, args, accounts, workdir):
         reader = asyncio.ensure_future(c.reader())
         await c.send("Page.enable")
         await c.send("Runtime.enable")
-        await c.send("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=1, mobile=False)
+        dsf = 2 if args.snaps else 1
+        await c.send("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=dsf, mobile=False)
         # 步驟數＝這支腳本裡呼叫 cap() 的次數（以前寫死，加步驟忘了改就會出現 26 / 24）
         total = io.open(__file__, encoding="utf-8").read().count("await " + "cap(")
         pos = [W // 2, H // 2]
@@ -242,10 +243,35 @@ async def run(ws_url, args, accounts, workdir):
                 await c.js("(%s)(%d, %d, %s, %s, %s)" % (CAPTION_JS, step[0], total, json.dumps(shown["title"]),
                                                          json.dumps(shown["desc"]), json.dumps(tag)))
 
+        snap_dir = os.path.join(os.path.dirname(HERE), "assets", "demo")
+        if args.snaps:
+            shutil.rmtree(snap_dir, ignore_errors=True)
+            os.makedirs(snap_dir)
+
+        async def snap(name):
+            """產品展示簡報用：先把字幕、游標藏起來，等畫面停好再拍，拍完放回去"""
+            if not args.snaps:
+                return
+            await c.js("['qa-cap','qa-cur'].forEach(function (i) { var e = document.getElementById(i); if (e) e.style.visibility = 'hidden'; })")
+            await asyncio.sleep(0.8)
+            shot = await c.send("Page.captureScreenshot", format="png")
+            with open(os.path.join(snap_dir, name + ".png"), "wb") as f:
+                f.write(base64.b64decode(shot["data"]))
+            await c.js("['qa-cap','qa-cur'].forEach(function (i) { var e = document.getElementById(i); if (e) e.style.visibility = ''; })")
+
+        # 這幾步一出字幕就是要的畫面：直接拍
+        SNAP_AT = {"首頁": "landing", "個人總覽": "home", "解析結果": "parse", "今天的紀錄": "today", "建立活動": "create",
+                   "預先規劃": "planned", "活動的設定": "settings", "邀請朋友": "invite_friend", "活動記帳": "activity",
+                   "邀請家人": "family", "子女收到邀請": "kid_invite", "成員只能看": "kid_readonly",
+                   "零用金自動記帳": "allowance", "子女的鈴鐺": "kid_bell", "統計": "stats", "刪除要輸入密碼": "danger",
+                   "手機版": "mobile"}
+
         async def cap(title, desc):
             step[0] += 1
             shown.update(title=title, desc=desc)
             await recap()
+            if title in SNAP_AT:
+                await snap(SNAP_AT[title])
             print("  %2d/%d %s" % (step[0], total, title), flush=True)
             if trial:
                 await asyncio.sleep(0.4)
@@ -387,6 +413,7 @@ async def run(ws_url, args, accounts, workdir):
         await click("#rgPw", pause=0.2)
         await set_val("#rgPw", parent["password"], change=False)
         await wait(1)
+        await snap("register")
         await click("#regF button[type=submit]")
         ok = await until("document.getElementById('regNote')", 30, need=False)
         if not ok:
@@ -426,6 +453,7 @@ async def run(ws_url, args, accounts, workdir):
         await wait(0.8)
         await click('[data-su-goal="5000"]')
         await wait(1.5)
+        await snap("setup")
         await click("#suGoalF button[type=submit]")
         await until("document.getElementById('suFinF')", 30)
         await cap("理財習慣", "選像自己的就好，財務建議會參考；可以跳過")
@@ -655,6 +683,7 @@ async def run(ws_url, args, accounts, workdir):
         await busy("document.getElementById('advGen') && !document.getElementById('advGen').disabled", keep=3, timeout=120)
         await click(".ad__h", need=False)
         await wait(5)
+        await snap("advice")
 
         # ---------------------------------------------------------------- 10. 刪除要密碼
         await page("#/", "document.querySelector('.hpanel [data-del]')")
@@ -667,7 +696,7 @@ async def run(ws_url, args, accounts, workdir):
         await wait(1)
 
         # ---------------------------------------------------------------- 11. 手機版
-        await c.send("Emulation.setDeviceMetricsOverride", width=375, height=812, deviceScaleFactor=1, mobile=True)
+        await c.send("Emulation.setDeviceMetricsOverride", width=375, height=812, deviceScaleFactor=dsf, mobile=True)
         if not trial:
             await c.send("Page.stopScreencast")
             await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=375, maxHeight=812, everyNthFrame=1)
@@ -676,6 +705,7 @@ async def run(ws_url, args, accounts, workdir):
         await wait(3)
         await c.js("window.scrollTo({top: 900, behavior: 'smooth'})")
         await wait(4)
+        await snap("mobile2")
         await c.js("localStorage.removeItem('fambudget.auth')")
 
         # ---------------------------------------------------------------- 片尾
@@ -763,6 +793,8 @@ def main() -> int:
     ap.add_argument("--trial", action="store_true", help="試跑：不錄影，每一步存一張截圖到 report/qa/trial/")
     ap.add_argument("--accounts", help="（只給本機試跑）帳密的 JSON 檔：{parent: {name, email, password}, kid: {email, password}}")
     ap.add_argument("--show", action="store_true", help="開出 Chrome 視窗（不是無頭），看得到它在做什麼")
+    ap.add_argument("--snaps", action="store_true",
+                    help="（配合 --trial）在重點畫面拍乾淨的高解析截圖（不帶字幕、游標）到 report/assets/demo/，產品展示簡報用")
     args = ap.parse_args()
     accounts = ask_accounts(args)
     front, api, _ = TARGETS[args.target]

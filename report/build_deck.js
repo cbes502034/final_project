@@ -17,10 +17,15 @@ const HERE = __dirname;
 const facts = JSON.parse(fs.readFileSync(path.join(HERE, "data", "facts.json"), "utf8"));
 const asset = (n) => path.join(HERE, "assets", n);
 // 可以帶一個檔名另存（PowerPoint 開著舊檔、或不想蓋掉手動修改的時候）：node report/build_deck.js 新檔名.pptx
-// 預設是重點版：開場 3 頁、四個領域各 3 頁、結語 3 頁。加 --full 是完整版（每個畫面、評測細節、每一輪測試都有）
+// 三種版本：
+//   node build_deck.js          重點版：開場 3 頁、四個領域各 3 頁、結語 3 頁 → 家庭記帳_期末報告.pptx
+//   node build_deck.js --demo   產品展示：照完整流程影片用一輪，畫面為主（13 頁）→ 家庭記帳_產品展示.pptx
+//   node build_deck.js --full   完整版：每個畫面、評測細節、每一輪測試都有 → 家庭記帳_期末報告_完整版.pptx
 const FULL = process.argv.includes("--full");
+const DEMO = process.argv.includes("--demo");
 const outArg = process.argv.slice(2).find((a) => !a.startsWith("--"));
-const OUT = outArg ? path.resolve(outArg) : path.join(HERE, FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
+const OUT = outArg ? path.resolve(outArg)
+  : path.join(HERE, DEMO ? "家庭記帳_產品展示.pptx" : FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
 
 const THEME = {
   name: "FamBudget",
@@ -121,12 +126,12 @@ function qr(slide, x, y, id) {
   slide.addText([{ text: "掃描開啟網站", options: { bold: true, breakLine: true } }, { text: "fambudget-web.onrender.com", options: { fontSize: 9 } }],
     { x: x + 0.1, y: y + 2.08, w: 2.1, h: 0.6, fontSize: 12, color: "16233F", align: "center", valign: "middle", margin: 0, objectName: id + "-cap" });
 }
-/** 領域的小標籤（右上角）：重點版照四個領域分章，看得出現在講到哪一個 */
-function domainTag(slide, name, no) {
+/** 右上角的小標籤：重點版寫「領域 n／4・認證」，產品展示寫「步驟 n／6・記帳」，看得出現在講到哪裡 */
+function pillTag(slide, label) {
   slide.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 10.85, y: 0.52, w: 1.85, h: 0.46, rectRadius: 0.23,
-    fill: { color: "EEF3FA" }, line: { color: "D6E0EE", width: 0.75 }, objectName: "dom-tag" });
-  slide.addText("領域 " + no + "／4・" + name, { x: 10.85, y: 0.52, w: 1.85, h: 0.46, fontSize: 12, bold: true,
-    color: "1F5FBF", align: "center", valign: "middle", margin: 0, objectName: "dom-tag-text" });
+    fill: { color: "EEF3FA" }, line: { color: "D6E0EE", width: 0.75 }, objectName: "pill-tag" });
+  slide.addText(label, { x: 10.85, y: 0.52, w: 1.85, h: 0.46, fontSize: 12, bold: true,
+    color: "1F5FBF", align: "center", valign: "middle", margin: 0, objectName: "pill-tag-text" });
 }
 const pct = (v) => (v === null || v === undefined ? "—" : (v * 100).toFixed(1) + "%");
 const fmt = (n) => Number(n).toLocaleString("en-US");
@@ -141,9 +146,13 @@ async function build() {
   let s;
   let SEC = "開場";
   const DOMAIN_NO = { "認證": 1, "記帳": 2, "數字": 3, "家庭": 4 };
+  const STEP_NO = { "開始使用": 1, "記帳": 2, "活動": 3, "家庭": 4, "回顧": 5, "手機": 6 };
   const slide = (master) => {
     const sl = pres.addSlide({ masterName: master, sectionTitle: SEC });
-    if (DOMAIN_NO[SEC] && master === "CONTENT") domainTag(sl, SEC, DOMAIN_NO[SEC]);
+    if (master === "CONTENT") {
+      if (DEMO && STEP_NO[SEC]) pillTag(sl, "步驟 " + STEP_NO[SEC] + "／6・" + SEC);
+      else if (!DEMO && !FULL && DOMAIN_NO[SEC]) pillTag(sl, "領域 " + DOMAIN_NO[SEC] + "／4・" + SEC);
+    }
     return sl;
   };
   const S = {};
@@ -940,8 +949,168 @@ async function build() {
     s.addNotes("最後是未來展望，分四個方向。AI 方面，把使用者真的改過的解析收回來，變成真實的評測和微調資料，讓自己的小模型上線、降低成本。記帳方面，拍收據、讀電子發票載具，讓記帳更省事。產品方面，做成可以加到主畫面的 PWA，用推播取代輪詢、用排程器取代現在的補做。家庭方面，加上子女的存錢任務，讓這套系統也能拿來教孩子理財。");
   };
 
-  // 重點版：開場 3、四個領域各 3、結語 3；完整版：原本的每一頁
-  const ORDER = FULL
+  // ============================================================ 產品展示（--demo）
+  // 照完整流程影片走一輪：畫面為主、說明一兩句。截圖是 record_demo.py --trial --snaps 同一輪拍的（report/assets/demo/）
+  const D = (n) => "demo/" + n + ".png";
+  const NOTE_LOCAL = "本機示範沒有接 AI 模型，畫面上方會提示「AI 暫時沒有回應」；正式站由 AI 處理。";
+
+  /** 一張大圖，右邊三四點說明 */
+  const demoSingle = async (file, points, note) => {
+    shot(s, D(file), 0.6, 1.45, 8.4, 1.6, "demo-" + file);
+    for (let i = 0; i < points.length; i++) {
+      const y = 1.55 + i * 1.12;
+      await iconCircle(s, "FiCheck", 9.35, y + 0.04, 0.42, C.accent2, HEX.lt1, "demo-pt-" + i);
+      text(s, points[i], { x: 9.9, y, w: 2.85, h: 1.0, fontSize: 15, color: C.text1 });
+    }
+    if (note) text(s, note, { x: 9.35, y: 5.95, w: 3.4, h: 0.75, fontSize: 10.5, color: C.accent5 });
+  };
+  /** 兩張圖並排，各一句說明 */
+  const demoDouble = async (f1, f2, l1, l2, note) => {
+    shot(s, D(f1), 0.6, 1.5, 5.95, 1.6, "demo-" + f1);
+    shot(s, D(f2), 6.78, 1.5, 5.95, 1.6, "demo-" + f2);
+    text(s, l1, { x: 0.6, y: 5.45, w: 5.95, h: 0.9, fontSize: 15, color: C.text1 });
+    text(s, l2, { x: 6.78, y: 5.45, w: 5.95, h: 0.9, fontSize: 15, color: C.text1 });
+    if (note) text(s, note, { x: 0.6, y: 6.45, w: 12.1, h: 0.4, fontSize: 10.5, color: C.accent5 });
+  };
+
+  S.dCover = async () => {
+    s = slide("TITLE_DARK");
+    s.addText("家庭記帳 FamBudget", { placeholder: "title" });
+    s.addText("產品展示：從一個空帳號開始，完整用一輪", { placeholder: "body" });
+    s.addText("冠文・宇傑・明樺・囷洧　｜　2026 年 10 月　｜　LLM 應用期末專題", { placeholder: "meta" });
+    qr(s, 10.35, 0.75, "qr-cover");
+    s.addNotes("大家好，我們是家庭記帳 FamBudget。今天不講程式，直接帶大家從一個空帳號開始，把這個產品完整用一輪。");
+  };
+
+  S.dFlow = async () => {
+    s = slide("CONTENT");
+    s.addText("完整用一輪：六個步驟", { placeholder: "title" });
+    shot(s, D("landing"), 0.6, 1.5, 6.6, 1.6, "demo-landing");
+    const steps = [
+      ["FiUserPlus", "開始使用", "註冊、收驗證信、設定收入與存錢"],
+      ["FiEdit3", "記帳", "一句話記好幾筆，今天記了什麼一眼看完"],
+      ["FiMap", "活動", "旅行、聚餐各記各的，也能先規劃"],
+      ["FiUsers", "家庭", "邀請家人、照看孩子，零用金自動記"],
+      ["FiPieChart", "回顧", "錢花在哪、下個月怎麼做"],
+      ["FiSmartphone", "手機", "同一套功能，手機上一樣好用"],
+    ];
+    for (let i = 0; i < steps.length; i++) {
+      const y = 1.45 + i * 0.86;
+      await iconCircle(s, steps[i][0], 7.6, y, 0.58, C.accent1, HEX.lt1, "flow-" + i);
+      text(s, (i + 1) + "　" + steps[i][1], { x: 8.35, y: y - 0.04, w: 4.4, h: 0.38, fontSize: 16, bold: true, color: C.text2 });
+      text(s, steps[i][2], { x: 8.35, y: y + 0.33, w: 4.4, h: 0.4, fontSize: 12.5, color: C.accent5 });
+    }
+    s.addNotes("這是還沒登入時看到的首頁。接下來照這六個步驟走：開始使用、記帳、活動、家庭、回顧，最後看手機版。");
+  };
+
+  S.dStart = async () => {
+    s = slide("CONTENT");
+    s.addText("開始使用：註冊後一步一步設定", { placeholder: "title" });
+    await demoDouble("register", "setup",
+      "註冊只要名字、email、密碼；點了驗證信才開始用。",
+      "設定收入怎麼來、每個月想存多少；月薪設了入帳日，到了就自動記一筆。");
+    s.addNotes("註冊只要名字、email 和密碼，點了驗證信就直接登入。接著一步一步設定：收入怎麼來、每個月想存多少。月薪設了入帳日，到了那天會自動記一筆收入。");
+  };
+
+  S.dHome = async () => {
+    s = slide("CONTENT");
+    s.addText("打開就知道：這個月還可以花多少", { placeholder: "title" });
+    await demoSingle("home", ["收入 − 每月想存＝這個月可以花的", "月薪已經自動記進來", "常用功能一格一個入口", "第一次進來會問要不要導覽"]);
+    s.addNotes("設定好之後的總覽。最大的數字是這個月還可以花多少：收入減掉每月想存的。月薪已經自動記進來了。右邊是常用功能。");
+  };
+
+  S.dParse = async () => {
+    s = slide("CONTENT");
+    s.addText("一句話，記好幾筆", { placeholder: "title" });
+    await demoSingle("parse", ["打一段平常講話的句子", "自動拆成好幾筆，日期、金額、分類都填好", "每一筆看過、可以改，按確認才寫入"], NOTE_LOCAL);
+    s.addNotes("記帳最麻煩的是一筆一筆填。這裡直接打一段平常講話的句子，例如「早餐蛋餅 45，捷運 30，午餐便當 95」，系統拆成好幾筆、欄位都填好，看過沒問題再按確認寫入。");
+  };
+
+  S.dToday = async () => {
+    s = slide("CONTENT");
+    s.addText("今天記了什麼，一眼看完", { placeholder: "title" });
+    await demoDouble("today", "danger",
+      "總覽下方的面板：第一頁是今天的紀錄，格式跟明細一樣，可以直接改、刪。",
+      "刪除前要輸入自己的密碼，不會一不小心就刪掉。");
+    s.addNotes("記完回到總覽，下方的面板第一頁就是今天的紀錄，格式跟明細一樣，可以直接修改或刪除。刪除要輸入自己的密碼，避免誤刪。");
+  };
+
+  S.dActivity1 = async () => {
+    s = slide("CONTENT");
+    s.addText("活動：旅行、聚餐各記各的", { placeholder: "title" });
+    await demoDouble("create", "planned",
+      "填名稱和一句說明；開始日預設今天，結束日選填。",
+      "開始日訂在以後就是「預先規劃」：到了那天才放進活動選單，並通知成員。");
+    s.addNotes("活動是個人底下的小帳本，旅行、聚餐都可以開一個。填名稱和一句說明就好。開始日可以訂在以後，這樣會先放在預先規劃，到了那天才放進活動選單，並通知每位成員。");
+  };
+
+  S.dActivity2 = async () => {
+    s = slide("CONTENT");
+    s.addText("活動總覽：一張卡看懂這個活動", { placeholder: "title" });
+    await demoDouble("settings", "activity",
+      "設定建立後都能改、只有建立者能改；可以訂目標金額、邀請朋友。",
+      "說明、期間、成員、筆數、目標進度，一張卡看完。");
+    s.addNotes("點開活動可以改設定，但只有建立者能改，避免大家各改各的。可以訂一個目標金額、邀請朋友加入。切到活動之後，總覽的主卡就是這個活動的說明、期間、成員、筆數和目標進度。");
+  };
+
+  S.dFamily = async () => {
+    s = slide("CONTENT");
+    s.addText("家庭：邀請家人一起記", { placeholder: "title" });
+    await demoDouble("family", "kid_invite",
+      "用完整 email 找到人，選身分（子女／家長）再送出。",
+      "對方的總覽最上面就是邀請，按「加入」就進這個家庭。");
+    s.addNotes("接著建立家庭、邀請家人。用完整的 email 找到人，選好身分再送出。換成孩子的帳號，總覽最上面就是邀請，按加入就進來了。");
+  };
+
+  S.dAllowance = async () => {
+    s = slide("CONTENT");
+    s.addText("零用金：到了發放日自動記帳", { placeholder: "title" });
+    await demoDouble("allowance", "kid_bell",
+      "家長照看孩子，設定每月零用金和發放日。",
+      "孩子那邊自動多一筆收入，鈴鐺馬上通知。");
+    s.addNotes("家長按開始照看之後，可以設定每月零用金和發放日。到了發放日，系統自動記一對帳：家長一筆支出、孩子一筆收入，孩子的鈴鐺也馬上收到通知。");
+  };
+
+  S.dReview = async () => {
+    s = slide("CONTENT");
+    s.addText("回顧：錢花在哪、接下來怎麼做", { placeholder: "title" });
+    await demoDouble("stats", "advice",
+      "收支對照、近六個月的趨勢、錢花在哪。",
+      "財務建議：每一個數字都附算式，找得到出處。",
+      NOTE_LOCAL);
+    s.addNotes("最後是回顧。統計看收支對照和錢花在哪；財務建議會根據這個月的數字給建議，而且每一個數字都附上算式，找得到出處。");
+  };
+
+  S.dMobile = async () => {
+    s = slide("CONTENT");
+    s.addText("手機也能用", { placeholder: "title" });
+    const r = 375 / 812;
+    shot(s, D("mobile"), 0.9, 1.45, 2.45, r, "demo-mobile");
+    shot(s, D("mobile2"), 3.75, 1.45, 2.45, r, "demo-mobile2");
+    const pts = ["底部分頁列：總覽、帳本、記一筆、狀況、建議", "總覽、面板、表格都照手機寬度重排", "從註冊到零用金，整輪在手機上都做得到"];
+    for (let i = 0; i < pts.length; i++) {
+      const y = 1.9 + i * 1.3;
+      await iconCircle(s, "FiCheck", 7.0, y + 0.04, 0.48, C.accent2, HEX.lt1, "mob-pt-" + i);
+      text(s, pts[i], { x: 7.65, y, w: 5.0, h: 1.0, fontSize: 17, color: C.text1 });
+    }
+    s.addNotes("同一套功能在手機上也能用：底部是分頁列，總覽和表格都照手機寬度重新排過。");
+  };
+
+  S.dThanks = async () => {
+    s = slide("TITLE_DARK");
+    s.addText("謝謝觀看", { placeholder: "title" });
+    s.addText("Q & A", { placeholder: "body" });
+    s.addText("完整操作影片：家庭記帳_完整流程.mp4（約 6 分鐘）　｜　fambudget-web.onrender.com", { placeholder: "meta" });
+    qr(s, 10.35, 0.75, "qr-end");
+    s.addNotes("以上是完整用一輪的過程，完整的操作影片大約六分鐘。謝謝大家，歡迎提問。");
+  };
+
+  // 重點版：開場 3、四個領域各 3、結語 3；產品展示：照影片用一輪；完整版：原本的每一頁
+  const ORDER = DEMO
+    ? ["§開場", "dCover", "dFlow", "§開始使用", "dStart", "dHome", "§記帳", "dParse", "dToday",
+       "§活動", "dActivity1", "dActivity2", "§家庭", "dFamily", "dAllowance", "§回顧", "dReview", "§手機", "dMobile",
+       "§結語", "dThanks"]
+    : FULL
     ? ["§開場", "cover", "problem", "stats", "§系統", "arch", "tech", "home", "entry", "family", "activity", "account", "admin", "db",
        "§AI 功能", "aiDivider", "paraFlow", "paraScreen", "modelVsCode", "advice",
        "§評測與測試", "evalHow", "evalResult", "errors", "finetune", "tests", "live", "round3", "round4",
