@@ -408,7 +408,7 @@
     var tiles = [
       o.fam ? null : { quick: true, label: '記一筆', icon: 'add', tone: 'add' },
       { nav: 'entry', label: name + '帳本', icon: 'entry', badge: o.count ? '本月 ' + o.count + ' 筆' : '' },
-      activity ? { personal: true, label: '個人帳本', icon: 'entry' } : null,
+      activity ? { personal: true, label: '回到個人', icon: 'entry' } : null,
       isFamily() ? null : { nav: 'groups', label: '活動管理', icon: 'groups', badge: activity ? activeActivity().name : '' },
       { nav: 'stats', label: name + '財務狀況', icon: 'stats' },
       { nav: 'advice', label: name + '財務建議', icon: 'advice', tone: o.warn ? 'warn' : '', badge: o.warn ? o.warn + ' 則要注意' : '' },
@@ -423,7 +423,7 @@
   }
 
   function tile(t) {
-    /* 個人帳本捷徑先清除活動對象，再回到個人總覽。 */
+    /* 活動裡的「回到個人」捷徑先清除活動對象，再回到個人總覽。 */
     var attr = t.id ? ' id="' + t.id + '"'
       : t.personal ? ' data-personal-return' : t.quick ? ' data-quick="entry"' : t.nav !== undefined ? ' data-nav="' + t.nav + '"' : '';
     var tag = t.href ? 'a' : 'button';

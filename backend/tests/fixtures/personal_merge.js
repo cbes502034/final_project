@@ -52,7 +52,7 @@ async function checkUI() {
   activity = {id: 'shared', name: '旅行'};
   const activityTiles = ui.quickTiles({});
   assert.ok(activityTiles.includes('data-personal-return'));
-  assert.ok(activityTiles.includes('>個人帳本</span>') && activityTiles.includes('>活動帳本</span>'));
+  assert.ok(activityTiles.includes('>回到個人</span>') && activityTiles.includes('>活動帳本</span>'));
   assert.ok(!activityTiles.includes('id="logout"'));
   family = true;
   const familyTiles = ui.quickTiles({fam: true});
