@@ -562,34 +562,33 @@
                           warn: warn, fm: fm, famOff: !!fm.__err, canFam: canFamily(m) });
         h += '</div>';
 
-        /* 3. 預算：一個分類一張小卡 */
-        h += '<div class="sec"><h2 class="sec__t">預算使用狀況</h2>' +
-          (budgets.length ? '<span class="sec__n">' + budgets.length + ' 項</span>' : '') +
-          (fam || activeActivity() ? '' : '<a class="sec__link" href="#/profile/budget">調整預算 ›</a>') + '</div>';
-        h += b.__err ? errState(b.__err) : budgets.length
-          ? '<div class="bgrid">' + budgets.map(function (x) {
-              var p = Math.round(x.pct * 100);
-              return '<div class="bcard' + (x.over ? ' is-over' : '') + '">' +
-                '<div class="bcard__top"><span class="dot" style="background:' + tint(x.catColor) + '"></span>' +
-                  '<b>' + esc(x.catName) + '</b>' + (fam ? '<small>' + esc(x.userName) + '</small>' : '') +
-                  '<span class="bcard__p">' + p + '%</span></div>' +
-                '<div class="bcard__bar"><i style="width:' + Math.min(100, p) + '%;background:' +
-                  (x.over ? 'var(--down)' : tint(x.catColor)) + '"></i></div>' +
-                '<div class="bcard__v">' + num(x.used) + '<small> / ' + num(x.limit) + '</small></div>' +
-              '</div>';
-            }).join('') + '</div>'
-          : fam || activeActivity() ? '<div class="card">' + emptyState('還沒有設定預算', '') + '</div>' : '<a class="card bnone" href="#/profile">' + emptyState('還沒有設定預算', '到「個人資料 › 每月預算」替常花的分類設個上限 ›') + '</a>';
-
-        if (fam && !d.__err) {
-          h += '<div class="sec"><h2 class="sec__t">每個人的這個月</h2></div>' +
-            memberTable(d.members, d.expense) +
-            '<div class="card mshare-card">' + memberBar(d.members, d.expense) + '</div>';
-        }
-
-        /* 4. 今天的紀錄：一打開就看得到今天的動向 */
-        h += tx.__err
-          ? '<div class="sec"><h2 class="sec__t">今天的紀錄</h2></div>' + errState(tx.__err)
-          : todayCard(today, fam);
+        /* 3. 儀表板下方：一個面板、分頁切換（今天的紀錄｜預算使用狀況｜家庭模式多「每個人的這個月」），
+              內容在面板裡捲動。第一頁一定是今天的紀錄。 */
+        if (!TXGROUPS.length && !r[2].__err) TXGROUPS = r[2].groups || [];   // 今天的紀錄可以直接修改，表單要列活動
+        var tdy = tx.__err ? { html: errState(tx.__err) } : todayPane(today, fam);
+        h += homePanel([
+          { id: 'today', label: fam ? '家庭今天的紀錄' : '今天的紀錄', n: tx.__err || !today.length ? '' : today.length + ' 筆',
+            link: ['#/entry', '看全部 ›'], sub: tdy.sub, html: tdy.html },
+          /* 預算：一個分類一張小卡 */
+          { id: 'budget', label: '預算使用狀況', n: budgets.length ? budgets.length + ' 項' : '',
+            link: fam || activeActivity() ? null : ['#/profile/budget', '調整預算 ›'],
+            html: b.__err ? errState(b.__err) : budgets.length
+              ? '<div class="bgrid">' + budgets.map(function (x) {
+                  var p = Math.round(x.pct * 100);
+                  return '<div class="bcard' + (x.over ? ' is-over' : '') + '">' +
+                    '<div class="bcard__top"><span class="dot" style="background:' + tint(x.catColor) + '"></span>' +
+                      '<b>' + esc(x.catName) + '</b>' + (fam ? '<small>' + esc(x.userName) + '</small>' : '') +
+                      '<span class="bcard__p">' + p + '%</span></div>' +
+                    '<div class="bcard__bar"><i style="width:' + Math.min(100, p) + '%;background:' +
+                      (x.over ? 'var(--down)' : tint(x.catColor)) + '"></i></div>' +
+                    '<div class="bcard__v">' + num(x.used) + '<small> / ' + num(x.limit) + '</small></div>' +
+                  '</div>';
+                }).join('') + '</div>'
+              : emptyState('還沒有設定預算', fam || activeActivity() ? '' : '到「個人資料 › 每月預算」替常花的分類設個上限') },
+          fam && !d.__err ? { id: 'members', label: '每個人的這個月', n: d.members.length + ' 人',
+            html: memberTable(d.members, d.expense) +
+              '<div class="card mshare-card">' + memberBar(d.members, d.expense) + '</div>' } : null
+        ]);
 
         $view.innerHTML = h + '</div>';
         animate();
@@ -699,48 +698,73 @@
     return '';
   }
 
-  /* 今天的紀錄。上面一條是今天花了多少、收了多少，下面是一筆一筆。
-     ⚠️ 只放今天：完整的明細在「個人帳本」，這裡不做篩選、不做刪除。 */
-  function todayCard(rows, fam) {
-    var MAX = 6, spent = 0, got = 0;
+  /* 儀表板下方的面板：分頁切換，內容在面板裡捲動，整頁不會被拉得很長。
+     tabs：[{ id, label, n（筆數小字）, link: [href, 文字] 或 null, sub（固定在上面、不跟著捲的那一條）, html }]
+     ⚠️ 第一頁一定是今天的紀錄（使用者指定），每次打開總覽都從第一頁開始，不記上次看哪一頁。 */
+  function homePanel(tabs) {
+    tabs = tabs.filter(Boolean);
+    var first = tabs[0];
+    return '<section class="hpanel card card--flush" aria-label="今天與這個月">' +
+      '<div class="hpanel__bar">' +
+        '<div class="hpanel__tabs" role="tablist">' + tabs.map(function (t, i) {
+          return '<button class="hpanel__tab' + (i ? '' : ' on') + '" role="tab" id="hpt-' + t.id + '" aria-controls="hpp-' + t.id + '"' +
+            ' aria-selected="' + (i ? 'false' : 'true') + '" tabindex="' + (i ? '-1' : '0') + '" data-hptab="' + t.id + '"' +
+            (t.link ? ' data-hplink="' + esc(t.link[0]) + '" data-hplinkt="' + esc(t.link[1]) + '"' : '') + '>' +
+            esc(t.label) + (t.n ? '<span class="hpanel__n">' + esc(t.n) + '</span>' : '') + '</button>';
+        }).join('') + '</div>' +
+        '<a class="hpanel__link sec__link" id="hpLink" href="' + (first.link ? esc(first.link[0]) : '#/') + '"' +
+          (first.link ? '' : ' hidden') + '>' + (first.link ? esc(first.link[1]) : '') + '</a>' +
+      '</div>' +
+      tabs.map(function (t, i) {
+        return '<div class="hpanel__pane" role="tabpanel" id="hpp-' + t.id + '" aria-labelledby="hpt-' + t.id + '"' + (i ? ' hidden' : '') + '>' +
+          (t.sub || '') + '<div class="hpanel__scroll" tabindex="0">' + t.html + '</div></div>';
+      }).join('') +
+    '</section>';
+  }
+
+  function hpSwitch(id) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-hptab]'), function (b) {
+      var on = b.dataset.hptab === id;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+      var pane = document.getElementById('hpp-' + b.dataset.hptab);
+      if (pane) pane.hidden = !on;
+      if (on) {
+        var a = document.getElementById('hpLink');
+        if (a) { a.hidden = !b.dataset.hplink; a.href = b.dataset.hplink || '#/'; a.textContent = b.dataset.hplinkt || ''; }
+      }
+    });
+  }
+
+  /* 今天的紀錄（面板第一頁）。格式跟「個人帳本」的明細一樣：同一個表格、同樣能改能刪（txRow／txCan 決定）。
+     上面固定一條今天的支出、收入，下面的表格在面板裡捲動。
+     ⚠️ 只放今天：完整的明細和篩選在「個人帳本」。 */
+  function todayPane(rows, fam) {
+    if (!rows.length) {
+      /* ⚠️ 選了某一個活動的時候，「今天還沒有記帳」會讓人以為真的沒記——其實是被活動篩掉了 */
+      var one = !!activeActivity();
+      return { html: '<div class="tdy--empty">' +
+        (one
+          ? emptyState('這個活動今天還沒有紀錄', '可從右上角切換其他活動查看紀錄。')
+          : emptyState('今天還沒有記帳', fam ? '家人今天記的帳會出現在這裡。' : '花了什麼，說一句話就記好了。')) +
+        (fam ? '' : '<div class="tdy__go"><button class="btn btn--go btn--sm" data-quick="entry">記一筆</button></div>') +
+      '</div>' };
+    }
+    var spent = 0, got = 0;
     rows.forEach(function (t) {
       if (t.kind === 'income') got += t.amount;
       else if (t.kind === 'expense') spent += t.amount;
     });
     var d = new Date(todayKey() + 'T12:00:00');
-    var h = '<div class="sec"><h2 class="sec__t">' + (fam ? '家庭今天的紀錄' : '今天的紀錄') + '</h2>' +
-      (rows.length ? '<span class="sec__n">' + rows.length + ' 筆</span>' : '') +
-      '<a class="sec__link" href="#/entry">看全部 ›</a></div>';
-
-    if (!rows.length) {
-      /* ⚠️ 選了某一個活動的時候，「今天還沒有記帳」會讓人以為真的沒記——其實是被活動篩掉了 */
-      var one = !!activeActivity();
-      return h + '<div class="card tdy tdy--empty">' +
-        (one
-          ? emptyState('這個活動今天還沒有紀錄', '可從右上角切換其他活動查看紀錄。')
-          : emptyState('今天還沒有記帳', fam ? '家人今天記的帳會出現在這裡。' : '花了什麼，說一句話就記好了。')) +
-        (fam ? '' : '<div class="tdy__go"><button class="btn btn--go btn--sm" data-quick="entry">記一筆</button></div>') +
-      '</div>';
-    }
-
-    return h + '<div class="card card--flush tdy">' +
-      '<div class="tdy__sum">' +
+    return {
+      sub: '<div class="tdy__sum">' +
         '<span class="tdy__day">' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日</span>' +
         '<span>支出 <b class="is-out">' + num(spent) + '</b></span>' +
         '<span>收入 <b class="is-in">' + num(got) + '</b></span>' +
-      '</div>' +
-      '<ul class="tdy__l">' + rows.slice(0, MAX).map(function (t) {
-        var sign = t.kind === 'income' ? '+' : t.kind === 'expense' ? '−' : '';
-        return '<li><a class="tdy__i" href="#/entry">' +
-          '<span class="tdy__ic" style="--c:' + tint(t.catColor) + '">' + esc((t.catName || '記').charAt(0)) + '</span>' +
-          '<span class="tdy__m"><b>' + esc(t.merchant || t.note || t.catName) + '<small class="txr__activity-mobile">' + esc(t.activityName || '自行記錄') + '</small>' + '</b>' +
-            '<small>' + esc(t.catName) + (fam ? ' · ' + esc(t.userName) : '') +
-              (t.merchant && t.note && t.note !== t.catName ? ' · ' + esc(t.note) : '') + '</small></span>' +
-          '<span class="tdy__a is-' + esc(t.kind) + '">' + sign + num(t.amount) + '</span>' +
-        '</a></li>';
-      }).join('') + '</ul>' +
-      (rows.length > MAX ? '<a class="tdy__more" href="#/entry">還有 ' + (rows.length - MAX) + ' 筆，看全部 ›</a>' : '') +
-    '</div>';
+      '</div>',
+      html: txTable(rows, null, '')
+    };
   }
 
   var LEVEL_TW = { safe: '進度穩穩的', near: '快到上限了', over: '超出計畫' };
@@ -1520,8 +1544,8 @@
     var t = TXSEEN[id];
     if (!t || txEdOn || isFamily()) return;
     txEdOn = true; txEdRow = t;
-    /* 可以換去的活動：沒結算、沒封存的；原本那本一定要在選項裡 */
-    var gs = TXGROUPS.filter(function (g) { return g.id === t.group || (!g.settledAt && !g.archived); });
+    /* 可以換去的活動：沒結算、沒封存、已經開始的（預先規劃的還不能記）；原本那本一定要在選項裡 */
+    var gs = TXGROUPS.filter(function (g) { return g.id === t.group || (!g.settledAt && !g.archived && !g.planned); });
     var fld = function (label, input, wide) {
       return '<div class="prs__f' + (wide ? ' txe__w' : '') + '"><label>' + label + '</label>' + input + '</div>';
     };
@@ -5140,6 +5164,10 @@
 
     if (t.closest('#singleClear')) { renderMode(); return; }
 
+    /* 總覽下方面板的分頁 */
+    var hpt = t.closest('[data-hptab]');
+    if (hpt) { hpSwitch(hpt.dataset.hptab); return; }
+
     var del = t.closest('[data-del]');
     if (del) {
       var did = del.dataset.del;
@@ -5779,6 +5807,13 @@
   });
 
   document.addEventListener('keydown', function (e) {
+    /* 總覽面板的分頁：左右鍵換頁（分頁的標準操作） */
+    var tab = e.target.closest && e.target.closest('[data-hptab]');
+    if (tab && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      var all = Array.prototype.slice.call(document.querySelectorAll('[data-hptab]'));
+      var next = all[(all.indexOf(tab) + (e.key === 'ArrowRight' ? 1 : all.length - 1)) % all.length];
+      hpSwitch(next.dataset.hptab); next.focus(); e.preventDefault(); return;
+    }
     // 段落是多行輸入，用 Ctrl/Cmd + Enter 送出，直接按 Enter 是換行
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.id === 'paraText') {
       e.preventDefault();

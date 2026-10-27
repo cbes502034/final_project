@@ -1032,7 +1032,7 @@ def test_監管的通知不受帳本限制():
 def test_總覽統計建議各自回答一個問題_不重複():
     """三頁照**問題**分工，每樣資料只出現在一個地方：
 
-        總覽       這個月現在怎樣   疊卡（還可以花＋收入支出）、常用功能、預算、今天的紀錄（全家模式多每個人）
+        總覽       這個月現在怎樣   疊卡（還可以花＋收入支出）、常用功能、下方面板（今天的紀錄｜預算｜全家模式多每個人）
         統計       過去的趨勢       月／年對照、趨勢、分類圓餅
         財務建議   那該怎麼辦       建議清單
 
@@ -2214,21 +2214,26 @@ def test_總覽照銀行_App_疊卡_常用功能_底部分頁():
 # 總覽：今天的紀錄 ／ 右上角：我的帳戶卡
 # ===========================================================================
 
-def test_總覽最下面是今天的紀錄_只看不改():
+def test_總覽下方面板_第一頁是今天的紀錄_格式同明細():
     """使用者要的是「一打開 App 就看得到今天的記帳動向」。
 
-    ⚠️ 只放今天，不是把收支明細搬過來：沒有篩選、沒有刪除、沒有表格。
+    10/27 使用者改規格：儀表板下方整合成一個面板（分頁、面板裡捲動），
+    **第一頁一定是今天的紀錄，格式比照明細**——同一個表格，能改能刪的規則也跟明細一樣（txRow／txCan）。
+    ⚠️ 只放今天：完整的明細和篩選在「個人帳本」。
     """
     app = read("frontend/js/app.js")
     home = (re.search(r"function vHome\(\) \{(.*?)\n  \}", app, re.S).group(1)
             # 功能格子在 quickTiles()：錯誤畫面也要用，所以拆成獨立的函式
             + re.search(r"function quickTiles\(o\) \{(.*?)\n  \}", app, re.S).group(1))
     assert "from: todayKey(), to: todayKey()" in home, "今天的紀錄要用日期範圍去問，不是拿全部回來自己挑"
-    assert home.rindex("todayCard(") > home.index("預算使用狀況"), "今天的紀錄放在最下面"
-    card = re.search(r"function todayCard\(rows, fam\) \{(.*?)\n  \}", app, re.S).group(1)
-    for bad in ("data-del", "<input", "<select", "txTable("):
-        assert bad not in card, "今天的紀錄只看不改，不該有 " + bad
-    assert "fam ? '' : '<div class=\"tdy__go\">" in card, "全家模式沒有記帳，空的時候也不放記一筆"
+    panel = home[home.index("homePanel(["):]
+    assert panel.index("id: 'today'") < panel.index("id: 'budget'"), "面板第一頁一定是今天的紀錄"
+    pane = re.search(r"function todayPane\(rows, fam\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "txTable(rows" in pane, "今天的紀錄格式比照明細：用同一個表格"
+    assert "fam ? '' : '<div class=\"tdy__go\">" in pane, "全家模式沒有記帳，空的時候也不放記一筆"
+    tabs = re.search(r"function homePanel\(tabs\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert 'role="tablist"' in tabs and "aria-selected" in tabs and "hpanel__scroll" in tabs
+    assert "#view .hpanel__scroll { max-height:" in read("frontend/css/app.css"), "內容在面板裡捲動"
 
     key = re.search(r"function todayKey\(\) \{(.*?)\n  \}", app, re.S).group(1)
     assert "fbToday()" in key and "meta.updated" not in key, \
@@ -2811,8 +2816,8 @@ def test_修改與多筆刪除_三層接口與文件都有():
     h = app.index("t.closest('[data-pick-del]')")
     assert "level: 'password'" in app[h:h + 800] and "deleteTransactions(" in app[h:h + 1200], \
         "多筆刪除要輸入密碼，而且一次送出"
-    home = re.search(r"function todayCard\(rows, fam\) \{(.*?)\n  \}", app, re.S).group(1)
-    assert "data-edit" not in home, "總覽的今天紀錄只看不改"
+    pane = re.search(r"function todayPane\(rows, fam\) \{(.*?)\n  \}", app, re.S).group(1)
+    assert "txTable(rows" in pane, "總覽的今天紀錄跟明細同一個表格，改、刪規則一樣（txRow／txCan）"
 
     contract = read("docs/02-前後端串接契約.md")
     assert "### `PATCH /api/transactions/{id}`" in contract and "### `DELETE /api/transactions?ids=" in contract
@@ -3158,7 +3163,7 @@ def test_一個畫面不放兩個同樣的入口():
 def test_預算區的連結到得了設定預算的地方():
     """總覽「預算使用狀況」以前寫「看統計 ›」，但統計頁沒有預算——預算是在個人資料設定的。"""
     app = read("frontend/js/app.js")
-    assert '<a class="sec__link" href="#/profile/budget">調整預算 ›</a>' in app
+    assert "link: fam || activeActivity() ? null : ['#/profile/budget', '調整預算 ›']" in app
     assert "if (at === 'budget')" in app and "foldToggle('bud')" in app
 
 
