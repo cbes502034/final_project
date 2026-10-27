@@ -144,7 +144,7 @@ async function build() {
     ["FiEdit3", C.accent1, "懶得一筆一筆填", "早餐、午餐、加油……每一筆都要選日期、分類、填金額，三天就放棄。",
       "說一段話，模型切成好幾筆、欄位自動填好，人只要檢查"],
     ["FiUsers", C.accent2, "家人各記各的", "爸媽各有一本帳、孩子的零用錢沒人知道，全家花多少錢沒人說得出來。",
-      "家庭、帳本、照看孩子；誰看得到誰由權限決定"],
+      "家庭、活動、照看孩子；誰看得到誰由權限決定"],
     ["FiTrendingUp", C.accent3, "建議沒有根據", "叫 AI 給理財建議，它可能隨口編一個數字，使用者根本無法驗算。",
       "數字全部由資料庫算，模型只寫句子，每個數字都要找得到出處"],
   ];
@@ -226,9 +226,9 @@ async function build() {
   shot(s, "home.png", 0.7, 1.5, 7.9, 1.6, "shot-home");
   const callouts = [
     ["FiSmile", "嗨，名字＋家庭", "像銀行 App 一樣先打招呼，下面寫是哪個家庭的誰"],
-    ["FiPieChart", "這個月還可以花", "收入 − 每月想存＝可支配；用掉幾成一條進度條看完"],
-    ["FiGrid", "常用功能", "記一筆、明細、帳本、統計、建議，一格一個入口"],
-    ["FiSmartphone", "手機也能用", "版面在手機寬度重新排，沒有左右捲動"],
+    ["FiPieChart", "這個月還可以花", "收入 − 每月想存；月薪設了入帳日會自動記一筆，入帳前先照預計的算"],
+    ["FiGrid", "常用功能", "記一筆、個人帳本、活動管理、財務狀況與建議，一格一個入口"],
+    ["FiLayers", "下方面板", "分頁切換、在面板裡捲動；第一頁是今天的紀錄，格式跟明細一樣"],
   ];
   for (let i = 0; i < callouts.length; i++) {
     const y = 1.55 + i * 1.3;
@@ -236,7 +236,7 @@ async function build() {
     text(s, callouts[i][1], { x: 9.8, y: y - 0.02, w: 2.95, h: 0.4, fontSize: 17, bold: true, color: C.text2 });
     text(s, callouts[i][2], { x: 9.8, y: y + 0.4, w: 2.95, h: 0.8, fontSize: 13, color: C.accent5 });
   }
-  s.addNotes("這是登入後的首頁。最重要的數字是「這個月還可以花多少」：收入減掉每月想存的錢，就是可以花的上限。右邊是常用功能。整個網站在手機上也能用。");
+  s.addNotes("這是登入後的首頁。最重要的數字是「這個月還可以花多少」：收入減掉每月想存的錢，就是可以花的上限；月薪設了入帳日，到了那天會自動記一筆收入。右邊是常用功能。下面是一個分頁面板，第一頁一定是今天的紀錄，格式跟明細一樣，內容在面板裡捲動，整頁不會被拉長。");
 
   // ---- 明細與統計
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "系統" });
@@ -244,7 +244,7 @@ async function build() {
   shot(s, "entry.png", 0.7, 1.55, 5.85, 1.6, "shot-entry");
   shot(s, "stats.png", 6.8, 1.55, 5.85, 1.6, "shot-stats");
   text(s, [{ text: "收支明細　", options: { bold: true, color: C.text2 } },
-    { text: "依帳本、收支、來源（段落記帳／手動）篩選；可以改、可以多選刪除", options: {} }],
+    { text: "依活動、收支、來源（段落記帳／手動／自動入帳）篩選；可以改、可以多選刪除；過去的月份自動收進年月包裹", options: {} }],
   { x: 0.7, y: 5.45, w: 5.85, h: 0.9, fontSize: 14, color: C.text1 });
   text(s, [{ text: "統計　", options: { bold: true, color: C.text2 } },
     { text: "按月收支對照、近六個月趨勢、錢花在哪（分類比例）；全家模式看加總", options: {} }],
@@ -255,14 +255,14 @@ async function build() {
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "系統" });
   s.addText("家庭與權限：誰看得到誰，由後端決定", { placeholder: "title" });
   shot(s, "members.png", 0.7, 1.55, 5.6, 1.6, "shot-members");
-  text(s, "邀請碼只顯示一次、可以命名、有效期 7 天、沒用的可以刪；家長可以「照看」孩子並設零用金。",
+  text(s, "邀請碼只顯示一次、有效期 7 天；家長「照看」孩子、設零用金，到了發放日自動記一對帳並通知孩子。",
     { x: 0.7, y: 5.3, w: 5.6, h: 0.9, fontSize: 14, color: C.accent5 });
   const Y = "✓", N = "—";
   const hdr = (t) => ({ text: t, options: { bold: true, color: C.background1, fill: { color: C.text2 }, align: "center", valign: "middle" } });
   const cell = (t, first) => ({ text: t, options: { color: t === Y ? C.accent2 : first ? C.text1 : C.accent5, bold: t === Y, align: first ? "left" : "center", valign: "middle" } });
   const rows = [
     [hdr("能做的事"), hdr("家長"), hdr("子女"), hdr("平台管理員")],
-    ["看自己的帳", Y, Y, N], ["看照看中孩子的帳", Y, N, N], ["看全家的總覽", Y, "自己的", N],
+    ["看自己的帳", Y, Y, N], ["看照看中孩子的帳", Y, N, N], ["看家庭的帳務", Y, N, N],
     ["產生邀請碼、設零用金", Y, N, N], ["停權、看帳號狀態與安全事件", N, N, Y], ["讀任何人的帳", N, N, N],
   ].map((r, i) => (i === 0 ? r : r.map((t, j) => cell(t, j === 0))));
   s.addTable(rows, { x: 6.75, y: 1.55, w: 5.95, colW: [2.75, 1.0, 1.0, 1.2], rowH: 0.55, fontSize: 14,
@@ -270,7 +270,29 @@ async function build() {
   card(s, 6.75, 5.6, 5.95, 0.95, "perm-note", "FFF4EC");
   text(s, "家長不能切換成孩子的帳號、平台管理員讀不到任何人的帳——刻意不做，不是沒做完。",
     { x: 7.0, y: 5.72, w: 5.5, h: 0.75, fontSize: 14, color: C.text1, valign: "middle" });
-  s.addNotes("家庭功能的重點是權限。這張表是後端實際的規則：家長看得到照看中孩子的帳，子女看不到家長的；平台管理員只能停權、看帳號狀態與安全事件，讀不到任何人的帳。家長切換成孩子帳號這個功能，我們刻意不做。");
+  s.addNotes("家庭功能的重點是權限。這張表是後端實際的規則：家長看得到照看中孩子的帳，子女看不到家長的，也不看家庭的帳務；平台管理員只能停權、看帳號狀態與安全事件，讀不到任何人的帳。家長切換成孩子帳號這個功能，我們刻意不做。");
+
+  // ---- 活動：個人底下的小帳本（10/26–27 的改版）
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "系統" });
+  s.addText("活動：個人底下的小帳本", { placeholder: "title" });
+  shot(s, "activity_home.png", 0.7, 1.5, 7.9, 1.6, "shot-activity");
+  const acts = [
+    ["FiFileText", "這個活動是什麼", "主卡放建立者寫的說明、期間、成員、筆數、目標金額"],
+    ["FiCalendar", "開始日與預先規劃", "開始日在以後的先放「預先規劃」，到了那天自動上架並通知成員"],
+    ["FiLock", "設定只有建立者能改", "名稱、說明、期間、顏色、目標金額；成員看得到但不能改"],
+    ["FiUserPlus", "邀請朋友", "完整 email 或只能用一次的邀請碼；不影響家庭關係"],
+    ["FiLogOut", "退出可以合併", "把自己記的幾筆複製到個人帳本；活動裡的原紀錄留著"],
+  ];
+  for (let i = 0; i < acts.length; i++) {
+    const y = 1.5 + i * 1.04;
+    await iconCircle(s, acts[i][0], 9.05, y, 0.56, C.accent1, HEX.lt1, "act-c" + i);
+    text(s, acts[i][1], { x: 9.75, y: y - 0.04, w: 3.0, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
+    text(s, acts[i][2], { x: 9.75, y: y + 0.36, w: 3.0, h: 0.62, fontSize: 12, color: C.accent5 });
+  }
+  text(s, [{ text: "三種視角　", options: { bold: true, color: C.text2 } },
+    { text: "個人＝自己的總帳本；活動＝個人底下的小帳本，各有自己的總覽；家庭＝合併看全家，加上長期目標。活動裡記的帳只算在活動，退出時選「合併」才算進個人。", options: {} }],
+  { x: 0.7, y: 6.6, w: 7.9, h: 0.6, fontSize: 12, color: C.text1 });
+  s.addNotes("活動是個人底下的小帳本，旅行、搬家、聚餐都可以開一個。活動首頁的主卡放的是「這個活動是什麼」：建立者寫的一句說明、期間、成員、筆數和目標金額，不另外讓使用者填目的。開始日可以選以前或以後，訂在以後的會先放在預先規劃，到了那天自動放進活動選單並通知每位成員。為了避免混亂，活動的設定只有建立者能改，成員看得到但不能動。");
 
   // ---- 帳號與資料
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "系統" });
@@ -328,7 +350,7 @@ async function build() {
   s.addText("資料庫：" + facts.tables + " 張表，依四個領域分", { placeholder: "title" });
   const dbcols = [
     ["認證", C.accent1, [["users", "使用者"], ["sessions", "登入中的裝置"], ["password_resets", "重設密碼"], ["security_events", "安全事件"], ["error_logs", "錯誤紀錄"]]],
-    ["記帳", C.accent2, [["transactions", "收支明細"], ["accounts", "帳戶（錢包）"], ["categories", "分類"], ["groups", "帳本"], ["group_members", "帳本成員"], ["nlp_parses", "AI 解析紀錄"]]],
+    ["記帳", C.accent2, [["transactions", "收支明細"], ["accounts", "帳戶（錢包）"], ["categories", "分類"], ["groups", "活動與個人帳本"], ["group_members", "活動成員"], ["nlp_parses", "AI 解析紀錄"]]],
     ["數字", C.accent3, [["budgets", "預算"], ["savings_goals", "存款目標"], ["alert_rules", "提醒門檻"], ["advices", "財務建議"]]],
     ["家庭", C.accent5, [["families", "家庭"], ["family_members", "家庭成員"], ["family_invites", "邀請"], ["guardianships", "照看關係"], ["allowances", "零用金"], ["notifications", "通知"], ["audit_logs", "稽核紀錄"]]],
   ];
@@ -637,7 +659,7 @@ async function build() {
   { x: 0.9, y: 5.1, w: 5.5, h: 1.45 });
   card(s, 6.85, 4.5, 5.85, 2.15, "qa-files", "F7F9FC");
   text(s, "交付的佐證", { x: 7.15, y: 4.65, w: 5.3, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
-  s.addText(["線上測試報告（PDF，每個問題附重現步驟與修正後的驗證）", "使用者評分與改善建議（PDF）", "完整測試流程影片（約 4 分鐘，游標標出每一次點擊）", "AI 線上評測結果與資料庫核對查詢"].map((t, j, a) => ({ text: t, options: { bullet: true, breakLine: j < a.length - 1 } })),
+  s.addText(["線上測試報告（PDF，每個問題附重現步驟與修正後的驗證）", "使用者評分與改善建議（PDF）", "完整流程影片（在線上站從空帳號開始，約 6 分鐘，游標標出每一次點擊）", "AI 線上評測結果與資料庫核對查詢"].map((t, j, a) => ({ text: t, options: { bullet: true, breakLine: j < a.length - 1 } })),
     { x: 7.15, y: 5.1, w: 5.35, h: 1.45, fontSize: 13, color: C.text1, paraSpaceAfter: 4, valign: "top", isTextBox: true, margin: 0 });
   s.addNotes("自動測試之外，我們在部署好的正式網站上，用測試工程師的角度把每個功能實測一遍：收得到的信、寫進資料庫的資料、過期之後關不關得掉、AI 的每一個數字對不對。兩輪一共找到 26 個問題，全部修正、重新部署，再到線上驗一次；第二輪補的是平台管理、防濫用、註冊收信、刪除功能和 AI 的備註。接著換成一般使用者的角度逐項打分，平均從 57.6 分到 85.7 分，低於六十分的功能歸零。");
 
@@ -651,14 +673,37 @@ async function build() {
     ["FiHome", "寫家庭的名字", "常用功能那格寫「林家」，不寫「家庭帳本」"],
     ["FiDroplet", "主題自己一頁", "八套排成卡片，按一下就換"],
     ["FiEyeOff", "用不到的不掛著", "搜尋、帳本切換只在用得到的頁面出現"],
+    ["FiMail", "沒驗證信箱不能登入", "登入給提示；管理頁標「待驗證」，連結過期就從後台消失"],
   ];
   for (let i = 0; i < third.length; i++) {
-    const y = 1.5 + i * 1.02;
+    const y = 1.45 + i * 0.9;
     await iconCircle(s, third[i][0], 8.0, y, 0.55, C.accent1, HEX.lt1, "third-c" + i);
     text(s, third[i][1], { x: 8.7, y: y - 0.04, w: 4.05, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
     text(s, third[i][2], { x: 8.7, y: y + 0.36, w: 4.05, h: 0.5, fontSize: 12.5, color: C.accent5 });
   }
-  s.addNotes("前兩輪是我們用測試帳號替使用者走一遍；第三輪是使用者本人打開網站，指出看了會困惑的地方。共同點是同一件事講太多遍、用不到的東西一直掛著。我們照他的話收乾淨：帳本只剩一份清單、收入支出各自點進去、首頁寫家庭的名字、主題自己一頁、搜尋和帳本切換只在用得到的頁面出現。");
+  s.addNotes("前兩輪是我們用測試帳號替使用者走一遍；第三輪是使用者本人打開網站，指出看了會困惑的地方。共同點是同一件事講太多遍、用不到的東西一直掛著。我們照他的話收乾淨：帳本只剩一份清單、收入支出各自點進去、首頁寫家庭的名字、主題自己一頁、搜尋和帳本切換只在用得到的頁面出現。另外補上信箱驗證的把關：沒點驗證信的帳號不能登入並給提示；平台管理頁把這類帳號標成「待驗證」，驗證連結過期就從後台消失，跟能不能登入同步。");
+
+  // 第四輪：組員改版（活動、個人大帳本）之後，使用者逐項看過再提的規格（10/26–27）
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "評測與測試" });
+  s.addText("第四輪：活動與家庭的細節", { placeholder: "title" });
+  shot(s, "home_panel.png", 0.7, 1.5, 6.9, 1.6, "shot-home-panel");
+  const fourth = [
+    ["FiDollarSign", "零用金自動記帳", "發放日自動記一對帳；改金額只調原本那對，家長刪了孩子那筆一起刪"],
+    ["FiBell", "通知即時進鈴鐺", "家庭與活動邀請、零用金、目標金額、活動開始"],
+    ["FiTrendingUp", "固定收入自動入帳", "月薪設入帳日就自動記；入帳前先照預計的算"],
+    ["FiTarget", "目標金額全員共用", "只有建立者訂；到了通知全部成員"],
+    ["FiClock", "開始日與預先規劃", "結束日不能早於今天或開始日；以後才開始的到日上架"],
+    ["FiLayers", "總覽下方面板", "今天的紀錄（同明細）｜預算｜家庭的每個人，面板裡捲動"],
+  ];
+  for (let i = 0; i < fourth.length; i++) {
+    const y = 1.45 + i * 0.9;
+    await iconCircle(s, fourth[i][0], 8.0, y, 0.55, C.accent1, HEX.lt1, "fourth-c" + i);
+    text(s, fourth[i][1], { x: 8.7, y: y - 0.04, w: 4.05, h: 0.4, fontSize: 16, bold: true, color: C.text2 });
+    text(s, fourth[i][2], { x: 8.7, y: y + 0.36, w: 4.05, h: 0.5, fontSize: 12.5, color: C.accent5 });
+  }
+  text(s, "原則：不讓使用者填「目的」或多餘的設定，資訊都從帳本裡來；同一件事不講兩遍。",
+    { x: 0.7, y: 6.05, w: 6.9, h: 0.6, fontSize: 13, color: C.accent5 });
+  s.addNotes("第四輪是組員把帳本改成活動、加上個人大帳本之後，使用者逐項看過再提的規格。零用金到了發放日自動記一對帳，改金額只調原本那一對；所有通知都即時進鈴鐺；月薪設了入帳日就自動記；活動的目標金額全員共用、只有建立者能改；活動可以先規劃、到了開始日才上架；總覽下方整合成一個分頁面板，第一頁是今天的紀錄，格式跟明細一樣。原則是不讓使用者填多餘的設定，資訊都從帳本來。");
 
   // ============================================================ 結語
   pres.addSection({ title: "結語" });
@@ -673,7 +718,7 @@ async function build() {
   ];
   const nxt = ["把使用者改過的解析（nlp_parses.user_corrected）收進下一版留出集與訓練資料",
     "微調模型跑同一份題目，跟線上那一套放在同一張表比較", "建議加上「跟上個月比」的趨勢敘述（數字一樣由資料庫先算）",
-    "家庭改成開放式（下一頁）"];
+    "家庭改版做到哪裡（下一頁）"];
   const col2 = [["FiAlertTriangle", C.accent3, "限制", lim], ["FiArrowRight", C.accent1, "下一步", nxt]];
   for (let i = 0; i < 2; i++) {
     const [ic, col, head, items] = col2[i];
@@ -686,15 +731,15 @@ async function build() {
   }
   s.addNotes("最後是限制與下一步。最重要的限制是資料由 AI 產生；下一步是把使用者真的改過的解析收回來，變成真實的評測與訓練資料。");
 
-  // 下一版：使用者回饋之後定案的家庭改版（docs/06-家庭與個人.md）。後端第一段已完成，前端下一版上線
+  // 家庭改版做到哪裡：原本規劃的「開放式家庭」（docs/06）跟使用者後來定的規格對照
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "結語" });
-  s.addText("下一版：從「照看子女」改成開放式家庭", { placeholder: "title" });
+  s.addText("家庭改版：已完成的與決定不做的", { placeholder: "title" });
   const redo = [
-    ["FiUsers", C.accent1, "成員一律平等", "拿掉家長／子女與照看、零用金；誰看得到我的帳由我自己決定。動到別人的資料要輸入自己的密碼"],
-    ["FiLayers", C.accent2, "個人／家庭兩種模式", "功能一樣、各有基底與帳本；家庭的明細來自每個人自己選擇「併進家庭」的，個人照算、家庭也算"],
-    ["FiSettings", C.accent3, "家庭的初始化設定", "建立的人先填家庭想存多少、收入怎麼估；AI 建議也能針對全家產生。家庭模式的主題每個人自己選"],
-    ["FiBookOpen", C.accent1, "帳本只剩合併與刪除", "一顆「開一本帳」；活動帳本可設存錢目標（綠光）、花費上限（紅光）與到期日，到期可合併或延長"],
-    ["FiCalendar", C.accent2, "每月自動打包", "過去的月份收成一包：筆數、收入、支出合計，點開才看每一筆"],
+    ["FiCheckCircle", C.accent2, "已完成：活動取代帳本", "活動有自己的邀請（帳號或邀請碼）；成員可退出並把自己的明細合併到個人帳本；設定只有建立者能改"],
+    ["FiCheckCircle", C.accent2, "已完成：三種視角", "個人大帳本＋年月包裹；活動有自己的總覽與目標金額；家庭看合併總覽與長期目標"],
+    ["FiCheckCircle", C.accent2, "已完成：自動記帳與通知", "零用金、固定收入到日自動記帳；邀請、零用金、目標金額、活動開始都即時進鈴鐺"],
+    ["FiMinusCircle", C.accent3, "決定不做：成員一律平等", "保留家長／子女與照看——零用金與對孩子的保護都靠它；子女看不到家庭帳務，可以自己退出家庭"],
+    ["FiMinusCircle", C.accent3, "決定不做：分帳、花費上限", "分帳不屬於記帳；活動只用一個目標金額提醒，存錢或控制花費由使用者自己解讀"],
   ];
   for (let i = 0; i < redo.length; i++) {
     const [ic, col, head, body] = redo[i];
@@ -704,7 +749,7 @@ async function build() {
     text(s, head, { x: 1.6, y: y + 0.1, w: 3.2, h: 0.7, fontSize: 17, bold: true, color: C.text2, valign: "middle" });
     text(s, body, { x: 4.8, y: y + 0.08, w: 7.7, h: 0.74, fontSize: 13, color: C.text1, valign: "middle" });
   }
-  s.addNotes("這是展示前根據使用者回饋定案的下一版。使用者說：這不應該是管理、控制子女的系統，而是開放式的。所以成員一律平等，家庭的帳來自每個人自己選擇併進去的明細，兩邊都算。後端第一段已經完成、測試全部通過，前端會在下一版上線。");
+  s.addNotes("這是家庭改版做到哪裡。原本規劃的是開放式家庭；實際做下來，活動取代了帳本、加上個人大帳本與三種視角，零用金和固定收入到日自動記帳，所有通知即時進鈴鐺。有兩件是使用者看過之後決定不做的：成員一律平等——保留家長、子女與照看，因為零用金和對孩子的保護都靠它；還有分帳和花費上限——分帳不屬於記帳，活動只用一個目標金額提醒。");
 
   s = pres.addSlide({ masterName: "TITLE_DARK", sectionTitle: "結語" });
   s.addText("謝謝聆聽", { placeholder: "title" });

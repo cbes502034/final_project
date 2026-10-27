@@ -4674,7 +4674,7 @@
       var gdd = gop.parentNode;
       gdd.innerHTML = '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(gop.dataset.gopen) + '" ' +
           'placeholder="例如 5000" aria-label="這個活動的目標金額">' +
-        '<div class="lg__hint">填好、離開欄位就會存；到了會通知你</div>';
+        '<div class="lg__hint">填好、離開欄位就會存；到了會通知全部成員</div>';
       gdd.querySelector('input').focus();
       return;
     }

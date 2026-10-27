@@ -1,29 +1,37 @@
-"""完整測試流程的示範影片：本機 Chrome（無頭）依序操作線上站，逐格擷取畫面，疊上中文字幕，合成 MP4。
+"""完整流程的示範影片（10/27 版）：在部署好的網站上，從一個空帳號開始走一遍，逐格擷取畫面、疊上中文字幕，合成 MP4。
 
-    python report/qa/record_demo.py --tokens <只含 access token 的 JSON>   → report/qa/家庭記帳_測試流程.mp4
+    python report/qa/record_demo.py                     → 線上站錄影，產出 report/qa/家庭記帳_完整流程.mp4
+    python report/qa/record_demo.py --trial             → 試跑：不錄影，每一步存一張截圖到 report/qa/trial/（快很多）
+    python report/qa/record_demo.py --target local ...  → 本機（localhost:5195 前端 ＋ 127.0.0.1:8010 後端）
 
-tokens 就是 backend/tools/demo_seed.py --tokens 寫出的檔案（本機 http://localhost:8010 的林家 dad、kid 與 admin）。
+跑的時候在終端機問兩個帳號（密碼用 getpass：不顯示、不存檔，影片裡的密碼欄只看得到圓點）：
+    家長  名字、一個「還沒註冊過」的 email、密碼 → 影片裡現場註冊
+    子女  事先註冊好、點過驗證信、還沒加入家庭的空帳號的 email 與密碼
+    小技巧：Gmail 可以用「名字+任意字@gmail.com」，信都寄到同一個信箱，不用另外開信箱。
+註冊之後到信箱打開驗證信，把信裡的連結貼回終端機；等信的這段不錄，影片從「點了驗證信」接著錄。
 
-⚠️ 只帶 30 分鐘就過期的 access token，不帶 refresh token；線上站的畫面上不輸入任何密碼。
-⚠️ 未登入的四步在線上站錄（右上角標 LIVE）；登入之後都在本機錄（標 LOCAL）：
-   - 新用戶註冊：線上站要建真帳號、要收真的信，所以用本機的示範模式（沒有後端，
-     「信」的連結直接放在畫面上），密碼是這次隨機產生的假值；
-   - 家長、子女、平台管理：錄影不在畫面上輸入密碼，線上測試帳號的登入失效時改用本機示範的林家。
-     本機沒有接模型，AI 那幾步是規則備援（字幕會講）；線上 Claude 的實測結果在測試報告裡。
-   要先開本機前端：python -m http.server 5195 --directory frontend（以及 8010 的後端）。
-⚠️ 寫入的都是本機的示範資料庫（段落記帳 3 筆、刪一則通知），線上站不會多任何資料。
+流程：未登入首頁 → 註冊 → 驗證信 → 個人化設定 → 導覽 → 個人總覽（固定收入自動入帳）→ 段落記帳 → 總覽下方面板
+     → 建立活動（說明、開始日／結束日）→ 預先規劃 → 活動設定與目標金額 → 邀請朋友 → 活動總覽與活動記帳
+     → 建立家庭、邀請子女 → 子女加入家庭與活動（設定只能看）→ 零用金自動記帳 → 子女的鈴鐺 → 統計、財務建議
+     → 刪除要輸入密碼（只拍到對話框）→ 手機版
+
+⚠️ 會在網站上留下資料：兩個帳號、一個家庭、兩個活動、幾筆帳與零用金。錄完可以到「個人資料 › 刪除帳號」刪掉。
+⚠️ 刪除的動作只拍到「輸入密碼」的對話框就按取消，不真的刪。
+⚠️ --accounts（把帳密寫在 JSON 檔）只給本機試跑用，線上一律在終端機輸入。
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 import base64
+import datetime as dt
+import getpass
 import io
 import json
 import os
-import secrets
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -32,19 +40,16 @@ import websockets
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FRONT = "https://fambudget-web.onrender.com"
-BACKEND = "https://fambudget-backend-tdvg.onrender.com"
-LOCAL = "http://localhost:5195"
-LOCAL_API = "http://127.0.0.1:8010"          # 用 IPv4：無頭 Chrome 會把 localhost 先解析成 IPv6，本機後端只聽 IPv4
-TAG_LIVE = "LIVE · fambudget-web.onrender.com"
-DEMO = "LOCAL · 本機示範資料（林家；同一份程式，本機沒接模型）"
+TARGETS = {
+    "live": ("https://fambudget-web.onrender.com", "https://fambudget-backend-tdvg.onrender.com",
+             "LIVE · fambudget-web.onrender.com"),
+    # 用 IPv4：無頭 Chrome 會把 localhost 先解析成 IPv6，本機後端只聽 IPv4
+    "local": ("http://localhost:5195", "http://127.0.0.1:8010", "LOCAL · 本機"),
+}
 CHROME = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
           r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"]
 W, H = 1280, 800
-
-#: 驗證信實測時的第一封（11:09 寄出、11:12 過期）：拿來示範「過期的連結會被拒絕」
-EXPIRED_VERIFY = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJjYmVzNTAyMDM0QGdtYWlsLmNvbSIsInR5cGUiOiJ2ZXJp"
-                  "ZnlfZW1haWwiLCJpYXQiOjE3OTIzNzkzNjksImV4cCI6MTc5MjM3OTU0OX0.DPhhMJB2BCiYaxjOpP5DOzIAZeAHN7tOXMZu50bA2V8")
+TW = dt.timezone(dt.timedelta(hours=8))
 
 CAPTION_JS = r"""
 (function (step, total, title, desc, where) {
@@ -177,7 +182,45 @@ class CDP:
         return r.get("result", {}).get("value")
 
 
-async def run(ws_url, tokens, workdir):
+def jwt_sub(token):
+    """權杖的 sub 就是使用者 id（只讀，不驗簽）"""
+    return str(json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "==="))["sub"])
+
+
+def api_login(api, acc):
+    """子女帳號用 API 登入拿權杖（不在畫面上打密碼）；沒走完個人化設定的先標成走完，一登入才不會被帶去設定頁。"""
+    r = httpx.post(api + "/api/auth/login", json={"email": acc["email"], "password": acc["password"]}, timeout=90)
+    if r.status_code != 200:
+        raise SystemExit("子女帳號登入失敗（%s）：%s" % (r.status_code, r.text[:200]))
+    d = r.json()
+    tok = {k: d[k] for k in ("accessToken", "refreshToken", "expiresIn")}
+    tok["savedAt"] = int(time.time() * 1000)
+    h = {"authorization": "Bearer " + d["accessToken"]}
+    me = httpx.get(api + "/api/auth/me", headers=h, timeout=60).json()
+    if me.get("family"):
+        raise SystemExit("子女帳號已經在一個家庭裡了：影片要示範「邀請子女加入新家庭」，請換一個還沒加入家庭的帳號")
+    if not me["user"].get("onboardedAt"):
+        httpx.patch(api + "/api/auth/me", headers=h, json={"onboarded": True}, timeout=60)
+    return tok, jwt_sub(d["accessToken"]), me["user"].get("name") or "子女"
+
+
+async def run(ws_url, args, accounts, workdir):
+    front, api, tag = TARGETS[args.target]
+    local = args.target == "local"
+    trial = args.trial
+    pace = 0.3 if trial else 1.0
+    parent, kid = accounts["parent"], accounts["kid"]
+    kid_tok, kid_id, kid_name = api_login(api, kid)
+    today = dt.datetime.now(TW).date()
+    trip_end = today + dt.timedelta(days=4)
+    party = dt.date(today.year, 12, 31)
+    if party <= today + dt.timedelta(days=1):
+        party = today + dt.timedelta(days=30)
+    trial_dir = os.path.join(HERE, "trial")
+    if trial:
+        shutil.rmtree(trial_dir, ignore_errors=True)
+        os.makedirs(trial_dir)
+
     async with websockets.connect(ws_url, max_size=256 * 1024 * 1024) as ws:
         c = CDP(ws)
         reader = asyncio.ensure_future(c.reader())
@@ -188,67 +231,125 @@ async def run(ws_url, tokens, workdir):
         total = io.open(__file__, encoding="utf-8").read().count("await " + "cap(")
         pos = [W // 2, H // 2]
         step = [0]
-        where = [TAG_LIVE]
-
         shown = {}
+        ids = {}
 
-        async def cap(title, desc):
-            step[0] += 1
-            shown.update(title=title, desc=desc)
-            await recap()
+        async def wait(sec):
+            await asyncio.sleep(sec * pace)
 
         async def recap():
             # 換頁（重新載入）會把字幕清掉：每次換頁後立刻補上目前這一步的字幕
             if shown:
                 await c.js("(%s)(%d, %d, %s, %s, %s)" % (CAPTION_JS, step[0], total, json.dumps(shown["title"]),
-                                                         json.dumps(shown["desc"]), json.dumps(where[0])))
+                                                         json.dumps(shown["desc"]), json.dumps(tag)))
 
-        async def click(sel, pause=0.6, do=True):
-            """游標移過去、停一下、波紋、點下去。找不到就跳過（不讓整支影片停住）。"""
-            r = await c.js("(%s)(%s, %d, %d, %s, %s)" % (CURSOR_JS, json.dumps(sel), pos[0], pos[1], pause,
+        async def cap(title, desc):
+            step[0] += 1
+            shown.update(title=title, desc=desc)
+            await recap()
+            print("  %2d/%d %s" % (step[0], total, title), flush=True)
+            if trial:
+                await asyncio.sleep(0.4)
+                shot = await c.send("Page.captureScreenshot", format="png")
+                with open(os.path.join(trial_dir, "%02d_%s.png" % (step[0], title.replace("/", "／"))), "wb") as f:
+                    f.write(base64.b64decode(shot["data"]))
+
+        async def click(sel, pause=0.6, do=True, need=True):
+            """游標移過去、停一下、波紋、點下去。找不到：need=True 就停下來說是哪一步，不然跳過。"""
+            r = await c.js("(%s)(%s, %d, %d, %s, %s)" % (CURSOR_JS, json.dumps(sel), pos[0], pos[1], pause * pace,
                                                           "true" if do else "false"), wait=True)
-            # 點下去如果整頁換掉，回傳值會拿不到（或不是兩個數字）：沿用上一個位置就好
             if isinstance(r, (list, tuple)) and len(r) == 2:
                 pos[0], pos[1] = int(r[0]), int(r[1])
+            if r is None and need:
+                raise RuntimeError("畫面上找不到要點的東西：%s（第 %d 步「%s」）" % (sel, step[0], shown.get("title", "")))
             return r is not None
 
         async def point():
             # 換頁之後游標會被清掉：放回上次的位置，不要突然消失
             await c.js("(%s)(null, %d, %d, 0, false)" % (CURSOR_JS, pos[0], pos[1]), wait=True)
 
-        async def go(url, wait=5.0, ready=None, keep=1.0):
-            # 從按下去到畫面準備好的這一段快轉成最多 keep 秒
+        async def until(expr, timeout=40, need=True):
+            # ⚠️ 一定要先轉成 true／false：querySelector 傳回來的 DOM 元素在 Python 這邊會變成空物件 {}
+            t0 = time.time()
+            while time.time() - t0 < timeout:
+                if await c.js("!!(%s)" % expr):
+                    return True
+                await asyncio.sleep(0.4)
+            if need:
+                # 停下來之前留一張截圖和畫面上的提示訊息，才知道卡在哪
+                shot = await c.send("Page.captureScreenshot", format="png")
+                with open(os.path.join(HERE, "record_fail.png"), "wb") as f:
+                    f.write(base64.b64decode(shot["data"]))
+                toasts = await c.js("[...document.querySelectorAll('.toast')].map(x => x.textContent).join(' ／ ')")
+                raise RuntimeError("等不到畫面：%s（第 %d 步「%s」）畫面提示：%s；截圖 report/qa/record_fail.png"
+                                   % (expr, step[0], shown.get("title", ""), toasts))
+            return False
+
+        async def go(url, ready=None, keep=1.0, timeout=60):
+            # 從換頁到畫面準備好的這一段快轉成最多 keep 秒
             t0 = time.time()
             await c.send("Page.navigate", url=url)
             await asyncio.sleep(0.6)
             await recap()
             if ready:
-                await until(ready, 45)
+                await until(ready, timeout)
             else:
-                await asyncio.sleep(max(0.0, wait - 0.6))
+                await asyncio.sleep(1.5)
             await recap()
             if not url.startswith("file:"):
                 await point()
             c.ff.append((t0, time.time(), keep))
 
-        def uid_of(who):
-            # 權杖的 sub 就是使用者 id（只讀，不驗簽）
-            return json.loads(base64.urlsafe_b64decode(tokens[who]["accessToken"].split(".")[1] + "==="))["sub"]
+        async def page(hash_, ready, keep=1.0):
+            await go(front + "/?r=%d%s" % (time.time() * 1000, hash_), ready, keep)
 
-        async def login(who):
-            # 看過導覽記在帳號上（fambudget.tour.<id>）：標成看過，一進總覽才不會先問要不要導覽
-            await c.js("localStorage.setItem('fambudget.auth', %s); localStorage.setItem(%s, 'done')"
-                       % (json.dumps(json.dumps(tokens[who])), json.dumps("fambudget.tour." + str(uid_of(who)))))
-
-        async def until(expr, timeout=40):
-            # ⚠️ 一定要先轉成 true／false：條件常常是 querySelector(...)，DOM 元素傳回來會變成空物件 {}，
-            #    在 Python 裡是「否」，每次都要等到逾時（整支影片曾經因此多等了快 10 分鐘）
+        async def busy(expr, keep=1.5, timeout=60):
+            """等後端或模型做完：這一段快轉"""
             t0 = time.time()
-            while time.time() - t0 < timeout:
-                if await c.js("!!(%s)" % expr):
-                    return True
-                await asyncio.sleep(0.5)
-            return False
+            await until(expr, timeout)
+            c.ff.append((t0, time.time(), keep))
+            await recap()
+
+        async def type_in(sel, text, delay=75):
+            await c.js("""(async (s, t, d) => { const el = document.querySelector(s); el.focus(); el.value = '';
+                          for (const ch of t) { el.value += ch; el.dispatchEvent(new Event('input', {bubbles: true}));
+                          await new Promise(r => setTimeout(r, d)); } })(%s, %s, %d)"""
+                       % (json.dumps(sel), json.dumps(text), int(delay * pace)), wait=True)
+
+        async def set_val(sel, value, change=True):
+            await c.js("""(function (s, v, ch) { var e = document.querySelector(s); e.value = v;
+                          e.dispatchEvent(new Event('input', {bubbles: true}));
+                          if (ch) e.dispatchEvent(new Event('change', {bubbles: true})); })(%s, %s, %s)"""
+                       % (json.dumps(sel), json.dumps(value), "true" if change else "false"))
+
+        async def scroll_to(sel, block="center"):
+            await c.js("var e=document.querySelector(%s); if(e) e.scrollIntoView({block:%s, behavior:'smooth'})"
+                       % (json.dumps(sel), json.dumps(block)))
+            await asyncio.sleep(0.8)
+
+        async def use(tok, uid, tour_done=True):
+            # 換人：權杖放進 localStorage（跟前端登入後存的一樣）；導覽標成看過，一進總覽才不會先問要不要導覽
+            await c.js("localStorage.setItem('fambudget.auth', %s)" % json.dumps(tok if isinstance(tok, str) else json.dumps(tok)))
+            if tour_done:
+                await c.js("localStorage.setItem(%s, 'done')" % json.dumps("fambudget.tour." + str(uid)))
+
+        async def para(text):
+            """記一筆 → 段落記帳 → 打一段話 → 解析 → 等結果"""
+            await click('[data-quick="entry"]')
+            await until("document.querySelector('[data-mode=\"para\"]') || document.querySelector('textarea')", 30)
+            if await c.js("!!(document.querySelector('[data-mode=\"para\"]') && !document.querySelector('[data-mode=\"para\"]').classList.contains('on'))"):
+                await click('[data-mode="para"]')
+            await until("document.querySelector('textarea')", 30)
+            await recap()
+            await click("textarea", pause=0.3)
+            await c.js("""(async (t, d) => { const ta = document.querySelector('textarea'); ta.focus(); ta.value = '';
+                          for (const ch of t) { ta.value += ch; ta.dispatchEvent(new Event('input', {bubbles: true}));
+                          await new Promise(r => setTimeout(r, d)); } })(%s, %d)""" % (json.dumps(text), int(80 * pace)), wait=True)
+            await wait(0.8)
+            await click("#paraGo")
+            await busy("document.getElementById('paraSave')", keep=2.5, timeout=90)
+            await wait(0.8)
+            await scroll_to(".btbl, #paraSave")
 
         def card_url(name, html):
             path = os.path.join(workdir, name + ".html")
@@ -256,291 +357,335 @@ async def run(ws_url, tokens, workdir):
                 f.write(html)
             return "file:///" + path.replace("\\", "/")
 
-        # 片頭（不算步驟）
-        await go(card_url("open", card_html("FAMBUDGET · QA WALKTHROUGH · 2026-10-22", "家庭記帳<br>完整測試流程",
-                                            ["未登入 → 新用戶註冊 → 家長記帳與建議 → 刪除 → 家庭與權限 → 平台管理 → 手機版",
-                                             "右上角標 LIVE 是在 Render 正式網站實測；標 LOCAL 是本機示範資料（同一份程式）",
-                                             "每一步下方的字幕說明正在驗證什麼"])), 0.5)
-        await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
-        c.recording = True
-        await asyncio.sleep(4)
+        # ---------------------------------------------------------------- 片頭（不算步驟）
+        await go(card_url("open", card_html("FAMBUDGET · FULL WALKTHROUGH · " + today.isoformat(), "家庭記帳<br>從一個空帳號開始",
+                                            ["註冊 → 個人化設定 → 記帳 → 活動 → 家庭與零用金 → 統計與建議 → 手機版",
+                                             ("全程在部署好的網站上操作（右上角標 LIVE）" if not local else "本機試跑（右上角標 LOCAL）"),
+                                             "每一步下方的字幕說明正在做什麼；需要密碼的動作只拍到對話框"])), keep=0.5)
+        if not trial:
+            await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
+            c.recording = True
+        await wait(4)
 
-        # ---------- 未登入 ----------
-        await go(FRONT + "/docs/guide.html", 1.5, keep=0.1)
-        await c.js("localStorage.removeItem('fambudget.auth')")
-        await go(FRONT + "/?r=%d#/login" % (time.time() * 1000), ready="document.body.innerText.includes('開始使用')")
-        await cap("首頁", "還沒登入時，先說清楚這個系統能做什麼")
-        await asyncio.sleep(4)
+        # ---------------------------------------------------------------- 1. 註冊
+        await go(front + "/docs/guide.html", keep=0.1)
+        await c.js("localStorage.removeItem('fambudget.auth')" + ("; localStorage.setItem('fambudget.api', %s)" % json.dumps(api) if local else ""))
+        await go(front + "/?r=%d#/login" % (time.time() * 1000), "document.body.innerText.includes('開始使用')")
+        await cap("首頁", "還沒登入時先說清楚這個系統能做什麼")
+        await wait(3.5)
         await click("text:開始使用")
-        await asyncio.sleep(1.5)
-        await cap("登入", "測試帳號已經登入過；影片用登入後的狀態，不在畫面上輸入密碼")
-        await asyncio.sleep(3.5)
-        step[0] += 1
-        shown.update(title="忘記密碼", desc="輸入 email → Brevo 寄出 30 分鐘有效的重設連結（實測收得到）")
-        await go(FRONT + "/#/forgot", ready="document.querySelector('#fgEmail')")
-        step[0] -= 1
-        await cap("忘記密碼", "輸入 email → Brevo 寄出 30 分鐘有效的重設連結（實測收得到）")
-        await asyncio.sleep(3.5)
-        step[0] += 1
-        shown.update(title="過期的驗證連結", desc="這封驗證信 11:12 就過期了：連結被拒絕，網址上的權杖也被拿掉")
-        await go(FRONT + "/?r=%d#/verify/%s" % (time.time() * 1000, EXPIRED_VERIFY),
-                 ready="document.body.innerText.includes('過期') || document.body.innerText.includes('無效')")
-        step[0] -= 1
-        await cap("過期的驗證連結", "這封驗證信 11:12 就過期了：連結被拒絕，網址上的權杖也被拿掉")
-        await asyncio.sleep(5)
-
-        # ---------- 新用戶（本機示範：沒有寄信，信的連結直接放在畫面上） ----------
-        where[0] = "LOCAL · 本機示範：沒有寄信，信的連結放在畫面上"
-        step[0] += 1
-        shown.update(title="註冊", desc="只要名字、email、密碼")
-        await go(LOCAL + "/?api=&r=%d#/register" % (time.time() * 1000), ready="document.getElementById('rgName')")
-        step[0] -= 1
-        await cap("註冊", "只要名字、email、密碼；建好之後寄一封確認信")
+        await until("document.querySelector('[data-gate=\"register\"]')", 15)
+        await wait(1)
+        await click('[data-gate="register"]')
+        await until("document.getElementById('rgName')", 15)
+        await cap("註冊", "只要名字、email、密碼")
         await click("#rgName", pause=0.3)
-        await c.js("""(async (n, m) => { const t = async (id, v) => { const el = document.getElementById(id); el.focus();
-                      for (const ch of v) { el.value += ch; await new Promise(r => setTimeout(r, 70)); } };
-                      await t('rgName', n); await t('rgEmail', m); })(%s, %s)""" % (
-            json.dumps("林小安"), json.dumps("xiaoan.demo@example.com")), wait=True)
-        # 密碼是這次隨機產生的假值（本機示範模式，不是任何真帳號），一次填好，畫面上只看得到圓點
+        await type_in("#rgName", parent["name"])
+        await click("#rgEmail", pause=0.2)
+        await type_in("#rgEmail", parent["email"], 55)
+        # 密碼一次填好，畫面上只看得到圓點；這支腳本不存密碼
         await click("#rgPw", pause=0.2)
-        await c.js("document.getElementById('rgPw').value = %s" % json.dumps("Demo-" + secrets.token_hex(5)))
-        await asyncio.sleep(1.2)
+        await set_val("#rgPw", parent["password"], change=False)
+        await wait(1)
         await click("#regF button[type=submit]")
-        await until("document.getElementById('regNote')", 15)
-        await asyncio.sleep(0.6)
-        await cap("去收信", "註冊完不會直接登入：回到登入頁請他去收信，email 已經填好")
-        await asyncio.sleep(5)
-        await click("#regNote a")
-        await until("document.getElementById('suGoal')", 15)
-        await asyncio.sleep(0.8)
-        await recap()
-        await cap("點了驗證信", "第一次點就直接登入、接著做個人化設定；沒驗證的人進不了這一頁")
-        await asyncio.sleep(2.5)
+        ok = await until("document.getElementById('regNote')", 30, need=False)
+        if not ok:
+            msg = await c.js("[...document.querySelectorAll('.toast')].map(x=>x.textContent).join(' ')")
+            raise SystemExit("註冊沒有成功：%s（這個 email 可能已經註冊過了，換一個沒用過的）" % msg)
+        await wait(0.6)
+        await cap("去收信", "註冊完不會直接登入：請他去收信，email 已經填好")
+        await wait(4.5)
+
+        # ---------------------------------------------------------------- 2. 驗證信 → 個人化設定
+        c.recording = False                                    # 等信的這段不錄
+        t_pause = time.time()
+        if local:
+            # 本機寄不出信：帳號直接算驗證過（docs/02「寄不出信的環境」），用 API 登入代替點信
+            r = httpx.post(api + "/api/auth/login", json={"email": parent["email"], "password": parent["password"]}, timeout=60).json()
+            tok = {k: r[k] for k in ("accessToken", "refreshToken", "expiresIn")}
+            tok["savedAt"] = int(time.time() * 1000)
+            await use(tok, jwt_sub(r["accessToken"]), tour_done=False)
+            link = front + "/?r=%d#/" % (time.time() * 1000)
+        else:
+            print("\n>>> 到信箱打開「確認你的家庭記帳 email」那封信，把信裡按鈕的連結貼在這裡（整串網址）：", flush=True)
+            link = (await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)).strip()
+            if "#/verify/" not in link:
+                raise SystemExit("這不是驗證信的連結（要有 #/verify/）")
+        c.recording = not trial
+        c.ff.append((t_pause, time.time(), 0.3))              # 等信的空檔：合成時壓成一瞬間
+        await go(link, "document.getElementById('suGoalF')", keep=0.8)
+        await cap("點了驗證信", "第一次點就直接登入、接著做個人化設定：收入怎麼來、每個月想存多少")
+        await wait(2.5)
+        await click('label:has(input[name="suType"][value="salary"])')
+        await until("document.getElementById('suAmt')", 10)
+        await wait(0.6)
+        await click("#suAmt", pause=0.3)
+        await type_in("#suAmt", "32000", 110)
+        await click("#suDay", pause=0.3, do=False)
+        await set_val("#suDay", "5")
+        await wait(0.8)
         await click('[data-su-goal="5000"]')
-        await asyncio.sleep(1.8)
+        await wait(1.5)
         await click("#suGoalF button[type=submit]")
-        await until("document.getElementById('suFinF') || document.getElementById('thmRow')", 15)
-        await asyncio.sleep(2.5)
-        await click("[data-su-done]")
-        await until("document.getElementById('tourYes')", 15)
-        await asyncio.sleep(1.2)
-        await cap("新手導覽", "第一次進來會問要不要導覽，照畫面上看得到的東西帶一遍")
-        await asyncio.sleep(2.5)
-        await click("#tourYes")
-        await until("document.getElementById('tourNext')", 10)
-        for _ in range(8):
-            await asyncio.sleep(1.4)
-            last = await c.js("var n=document.getElementById('tourNext'); n?n.textContent:''")
-            await click("#tourNext", pause=0.3)
-            if last != "下一步":
-                break
-        await asyncio.sleep(1.5)
-        where[0] = TAG_LIVE
-
-        # ---------- 家長（本機示範資料：林家三口、近三個月的帳） ----------
-        where[0] = DEMO
-        step[0] += 1
-        shown.update(title="家長總覽", desc="換成家長的帳號")
-        await go(LOCAL + "/docs/guide.html", 1.5, keep=0.1)
-        await c.js("localStorage.setItem('fambudget.api', %s)" % json.dumps(LOCAL_API))
-        await login("dad")
-        await go(LOCAL + "/?r=%d#/" % (time.time() * 1000), ready="document.querySelector('.wal__v') && document.querySelector('.bcard')")
-        await asyncio.sleep(1)
-        step[0] -= 1
-        await cap("家長總覽", "這個月還可以花多少＝收入－每月想存；各分類預算用了幾成，超過的標紅")
-        await asyncio.sleep(5)
-
-        await click('[data-flt="income"]')
-        await until("document.querySelector('.fchip') && document.querySelector('#txList .txr')", 20)
-        await recap()
-        await point()
-        await cap("本月收入", "點「本月收入」就只看這個月的收入（點支出就只看支出）；「本月」標籤按 ✕ 看全部")
-        await asyncio.sleep(4)
-        await go(LOCAL + "/#/", ready="document.querySelector('.wal__v') && document.querySelector('[data-quick=\"entry\"]')")
-
-        await cap("段落記帳", "一句話記好幾筆：直接打一段平常講話的句子")
-        t0 = time.time()
-        await click('[data-quick="entry"]')
-        await asyncio.sleep(0.8)
-        await recap()
-        if await c.js("!!(document.querySelector('[data-mode=\"para\"]') && !document.querySelector('[data-mode=\"para\"]').classList.contains('on'))"):
-            await click('[data-mode="para"]')
-        await until("document.querySelector('textarea') && document.querySelector('#txList .dt, #txList table, #txList .card')", 40)
-        await recap()
-        c.ff.append((t0, time.time(), 1.0))
-        await click("textarea", pause=0.3)
-        text = "早上買蛋餅 45，接著去學校買了10元自動鉛筆，晚上全聯買牙膏 89"
-        await c.js("""(async (t) => { const ta = document.querySelector('textarea'); ta.focus(); ta.value = '';
-                      for (const ch of t) { ta.value += ch; ta.dispatchEvent(new Event('input', {bubbles:true}));
-                      await new Promise(r => setTimeout(r, 80)); } })(%s)""" % json.dumps(text), wait=True)
-        await asyncio.sleep(1)
-        await click("#paraGo")
-        await cap("AI 解析中", "本機沒有接模型（線上接 Claude）：後端回 503，前端先用規則拆好，一樣要人確認才存")
-        t0 = time.time()
-        await until("document.getElementById('paraSave')", 40)
-        c.ff.append((t0, time.time(), 2.5))
-        await asyncio.sleep(1)
-        await c.js("var r=document.querySelector('.btbl, #paraSave'); if(r) r.scrollIntoView({block:'center'})")
-        await cap("解析結果", "備註只留項目（「接著去學校買了10元自動鉛筆」→「自動鉛筆」），原句小字附在下面對照")
-        await asyncio.sleep(8)
-        await click("#paraSave")
-        t0 = time.time()
-        await until("!document.getElementById('paraSave')", 20)
-        await asyncio.sleep(1.5)
-        c.ff.append((t0, time.time(), 1.5))
-        await c.js("window.scrollTo({top: 0, behavior: 'smooth'})")
-        await cap("確認寫入", "3 筆寫進資料庫，出現在收支明細；備註是項目")
-        await asyncio.sleep(6)
-
-        step[0] += 1
-        shown.update(title="統計", desc="收支對照、錢花在哪：數字與總覽、明細同一個來源")
-        await go(LOCAL + "/#/stats", ready="document.querySelector('.donut, svg circle, .dt')")
-        step[0] -= 1
-        await cap("統計", "收支對照、錢花在哪：數字與總覽、明細同一個來源")
-        await asyncio.sleep(5)
-
-        step[0] += 1
-        shown.update(title="財務建議", desc="按「產生這個月的建議」：數字由資料庫先算好")
-        await go(LOCAL + "/#/advice", ready="document.getElementById('advGen')")
-        step[0] -= 1
-        await cap("財務建議", "按「產生這個月的建議」：數字由資料庫先算好，模型只寫句子；本機沒接模型就用同一批數字整理")
-        await asyncio.sleep(2)
-        await click("#advGen")
-        t0 = time.time()
-        await asyncio.sleep(2)
-        await until("document.getElementById('advGen') && !document.getElementById('advGen').disabled", 45)
-        c.ff.append((t0, time.time(), 3.0))
-        await asyncio.sleep(1)
-        await click(".ad__h")
-        await asyncio.sleep(1)
-        await cap("建議的依據", "每個數字都附算式、找得到出處；線上 Claude 寫的也逐一檢查，不合格的那一則不顯示")
-        await asyncio.sleep(7)
-
-        await c.js("window.scrollTo({top: 0, behavior: 'smooth'})")
-        await asyncio.sleep(0.8)
-        await click("#bell")
-        await until("document.querySelector('.bell__del')", 10)
-        await asyncio.sleep(0.8)
-        await cap("刪除", "登記的資料都能刪：通知每則右邊的 ×、已讀的一次清掉；建議 6 秒內可復原；自訂分類、帳號本身也能刪")
-        await asyncio.sleep(3)
-        await click(".bell__del")
-        await asyncio.sleep(3)
-        await click("#bell")
-        await asyncio.sleep(1)
-
-        step[0] += 1
-        shown.update(title="預算", desc="總覽的「調整預算 ›」直接打開個人資料的每月預算")
-        await go(LOCAL + "/#/", ready="document.querySelector('a[href=\"#/profile/budget\"]')")
-        await asyncio.sleep(1)
-        await click('a[href="#/profile/budget"]')
-        t0 = time.time()
-        await until("document.querySelector('#fold-bud input[data-budget]') || document.querySelectorAll('#fold-bud input').length > 2", 40)
-        await recap()
-        c.ff.append((t0, time.time(), 1.0))
-        await asyncio.sleep(1.5)
-        step[0] -= 1
-        await cap("預算", "總覽的「調整預算 ›」直接打開個人資料的每月預算")
-        await asyncio.sleep(5)
-
-        step[0] += 1
-        shown.update(title="帳本", desc="整頁只有一顆「開一本帳」，常設或活動在表單裡選")
-        await go(LOCAL + "/#/groups", ready="document.querySelector('[data-fold=\"gnew\"]') && document.querySelector('.lgl')")
-        step[0] -= 1
-        await cap("帳本", "不分常設、活動，只有一份清單；一本帳平常只佔一行，點開才有細節")
-        await asyncio.sleep(3.5)
-        await click('[data-fold="gnew"]')
-        await asyncio.sleep(0.8)
-        await click("#gnName", pause=0.3)
-        await c.js("""(async (t) => { const el = document.getElementById('gnName'); el.focus(); el.value = '';
-                      for (const ch of t) { el.value += ch; await new Promise(r => setTimeout(r, 90)); } })(%s)"""
-                   % json.dumps("沖繩旅遊"), wait=True)
-        await click("#gnEnd", pause=0.4, do=False)
-        await cap("開一本帳", "填名字就好；結束日選填，旅行這種有結束日的再填（示範到這裡，不真的建立）")
-        await asyncio.sleep(5)
-
-        await go(LOCAL + "/#/", ready="document.querySelector('[data-nav=\"theme\"]')")
-        await click('[data-nav="theme"]')
-        await until("document.querySelectorAll('.thm__i').length > 3", 20)
-        await recap()
-        await point()
-        await cap("主題", "自己一頁，八套排成卡片，按一下就換；存在帳號上，換裝置登入也一樣")
-        await asyncio.sleep(2)
-        await click('[data-theme-pick="tech"]')
-        await asyncio.sleep(3)
+        await until("document.getElementById('suFinF')", 30)
+        await cap("理財習慣", "選像自己的就好，財務建議會參考；可以跳過")
+        await wait(1.5)
+        await click("#suFinF label.pick", pause=0.4)
+        await click("#suFinF label.pick--sm", pause=0.4)
+        await wait(1)
+        await click("#suFinF button[type=submit]")
+        await until("document.getElementById('thmRow')", 30)
+        await cap("主題", "按一下整個系統就換成那個樣子；存在帳號上，換裝置也一樣")
+        await wait(1.2)
         await click('[data-theme-pick="sky"]')
-        await asyncio.sleep(2)
+        await wait(2)
+        await click('[data-su-done="finish"]')
+        await until("document.getElementById('tourYes') || document.querySelector('.wal__card')", 30)
 
-        step[0] += 1
-        shown.update(title="家庭成員", desc="邀請碼過期會被拒絕、重複加入會被擋；家長照看子女")
-        await go(LOCAL + "/#/members", ready="document.querySelector('.mcard, .mem, [data-open]') || document.body.innerText.includes('邀請家人')")
-        step[0] -= 1
-        await cap("家庭成員", "邀請碼過期會被拒絕、重複加入會被擋；家長照看子女")
-        await asyncio.sleep(5)
-        step[0] += 1
-        shown.update(title="子女的紀錄", desc="家長看得到照看的孩子記了什麼，也在這裡設定每月零用金")
-        await go(LOCAL + "/#/member/%s" % uid_of("kid"), ready="document.querySelector('[data-allow]')")
-        step[0] -= 1
-        await cap("子女的紀錄", "家長看得到照看的孩子記了什麼，也在這裡設定每月零用金")
-        await asyncio.sleep(5)
+        # ---------------------------------------------------------------- 3. 導覽與個人總覽
+        # 「第一次用？」是總覽畫好之後才跳出來的：多等幾秒
+        if await until("document.getElementById('tourYes')", 8, need=False):
+            await cap("新手導覽", "第一次進來會問要不要導覽，照畫面上看得到的東西帶一遍")
+            await wait(2)
+            await click("#tourYes")
+            await until("document.getElementById('tourNext')", 10)
+            for _ in range(3):
+                await wait(1.6)
+                await click("#tourNext", pause=0.3, need=False)
+            await wait(1.2)
+            await click("#tourSkip", need=False)
+            await wait(1)
+        parent_uid = await c.js("JSON.parse(localStorage.getItem('fambudget.auth')).accessToken.split('.')[1]")
+        parent_uid = str(json.loads(base64.urlsafe_b64decode(parent_uid + "==="))["sub"])
+        await c.js("localStorage.setItem(%s, 'done')" % json.dumps("fambudget.tour." + parent_uid))
+        await page("#/", "document.querySelector('.wal__card') && document.querySelector('.hpanel')")
+        await cap("個人總覽", "月薪設了每月 5 號入帳：這個月的已經自動記一筆。還可以花 ＝ 收入 − 每月想存")
+        await wait(5)
 
-        # ---------- 子女 ----------
-        step[0] += 1
-        shown.update(title="子女總覽", desc="換成子女的帳號")
-        await login("kid")
-        await go(LOCAL + "/?r=%d#/" % (time.time() * 1000), ready="document.querySelector('.wal__v')")
-        await asyncio.sleep(1)
-        step[0] -= 1
-        await cap("子女總覽", "家長給的零用金算在可花上限裡；子女只看得到自己的帳")
-        await asyncio.sleep(6)
-        step[0] += 1
-        shown.update(title="權限隔離", desc="子女打開家長的紀錄 → 被拒絕")
-        await go(LOCAL + "/#/member/%s" % uid_of("dad"), ready="document.body.innerText.includes('看不到')")
-        step[0] -= 1
-        await cap("權限隔離", "子女打開家長的紀錄 → 被拒絕；家長的帳只有家長自己與照看他的人看得到")
-        await asyncio.sleep(5)
+        # ---------------------------------------------------------------- 4. 段落記帳與總覽下方面板
+        await cap("段落記帳", "一句話記好幾筆：直接打一段平常講話的句子")
+        await para("早餐蛋餅 45，捷運 30，午餐便當 95，晚上全聯買牙膏 89")
+        await cap("解析結果", "AI 把一段話拆成四筆、分好類；要人確認才會存")
+        await wait(6)
+        await click("#paraSave")
+        await busy("!document.getElementById('paraSave')", keep=1.2)
+        await page("#/", "document.querySelector('.hpanel .txr')")
+        await scroll_to(".hpanel", "end")
+        await point()
+        await cap("今天的紀錄", "儀表板下方是分頁面板：第一頁是今天的紀錄，格式跟明細一樣，可以直接改、刪；內容在面板裡捲動")
+        await wait(3)
+        await c.js("var s=document.querySelector('.hpanel__scroll'); if(s) s.scrollTo({top: 400, behavior: 'smooth'})")
+        await wait(2)
+        await click('[data-hptab="budget"]')
+        await wait(2.5)
+        await click('[data-hptab="today"]')
+        await wait(1.5)
 
-        # ---------- 平台管理 ----------
-        step[0] += 1
-        shown.update(title="平台管理", desc="換成平台管理員")
-        await login("admin")
-        await go(LOCAL + "/?r=%d#/admin" % (time.time() * 1000), ready="document.querySelector('#admUsers .lamp')")
-        await asyncio.sleep(1)
-        step[0] -= 1
-        await cap("平台管理", "每個帳號一個紅綠燈（每 10 秒更新）、被規則擋下的安全事件、即時的錯誤訊息；讀不到任何人的帳")
-        await asyncio.sleep(7)
-        await c.js("var e=document.getElementById('admErrors'); if(e) e.scrollIntoView({block:'center'})")
-        await asyncio.sleep(4)
+        # ---------------------------------------------------------------- 5. 活動
+        await page("#/groups", "document.querySelector('[data-fold=\"gnew\"]')")
+        await cap("活動管理", "活動是個人底下的小帳本：旅行、搬家、聚餐，各有自己的總覽")
+        await wait(2.5)
+        await click('[data-fold="gnew"]')
+        await until("document.getElementById('gnName')", 10)
+        await click("#gnName", pause=0.3)
+        await type_in("#gnName", "沖繩畢業旅行", 90)
+        await click("#gnNote", pause=0.3)
+        await type_in("#gnNote", "四天三夜，機票住宿都記在這裡", 70)
+        await click("#gnEnd", pause=0.3, do=False)
+        await set_val("#gnEnd", trip_end.isoformat())
+        await cap("建立活動", "開始日預設今天、可以自己選；結束日不能比今天早，也不能比開始日早")
+        await wait(4)
+        await click("#gnewF button[type=submit]")
+        await busy("[...document.querySelectorAll('.lg__t')].some(e => e.textContent === '沖繩畢業旅行')")
+        await wait(1.5)
+        await click('[data-fold="gnew"]')
+        await until("document.getElementById('gnName')", 10)
+        await click("#gnName", pause=0.3)
+        await type_in("#gnName", "跨年聚餐", 90)
+        await click("#gnNote", pause=0.3)
+        await type_in("#gnNote", "全家一起吃火鍋", 70)
+        await click("#gnStart", pause=0.3, do=False)
+        await set_val("#gnStart", party.isoformat())
+        await click("#gnEnd", pause=0.3, do=False)
+        await set_val("#gnEnd", party.isoformat())
+        await wait(1)
+        await click("#gnewF button[type=submit]")
+        await busy("document.querySelector('[data-fold=\"gplan\"]')")
+        await scroll_to('[data-fold="gplan"]')
+        await point()
+        await cap("預先規劃", "開始日訂在以後：先放在「預先規劃」、不進活動選單；到了那天自動放上去並通知成員")
+        await wait(4)
+        await click("#gswBtn")
+        await wait(2.5)
+        await click("#gswBtn")
+        await wait(0.8)
 
-        # ---------- 手機版 ----------
+        ids["trip"] = await c.js("([...document.querySelectorAll('.lg')].find(x => (x.querySelector('.lg__t')||{}).textContent === '沖繩畢業旅行')||{dataset:{}}).dataset.lgid")
+        trip = ids["trip"]
+        if not trip:
+            raise RuntimeError("找不到剛建立的活動")
+        await click('.lg[data-lgid="%s"] .lg__h' % trip)
+        await until("document.querySelector('[data-gname=\"%s\"]')" % trip, 10)
+        await cap("活動的設定", "名稱、說明、開始日、結束日、顏色、目標金額建立後都能改——只有建立者能改")
+        await wait(3)
+        await click('[data-gopen="%s"]' % trip)
+        await until("document.querySelector('[data-ggoal=\"%s\"]')" % trip, 10)
+        await type_in('[data-ggoal="%s"]' % trip, "20000", 110)
+        await set_val('[data-ggoal="%s"]' % trip, "20000")
+        await wait(2.5)
+        await click('.lg[data-lgid="%s"] details.activity-invite-panel summary' % trip)
+        await wait(0.8)
+        sel = 'form[data-activity-find="%s"] input[name=email]' % trip
+        await click(sel, pause=0.3)
+        await type_in(sel, kid["email"], 45)
+        await click('form[data-activity-find="%s"] button[type=submit]' % trip)
+        await busy("document.querySelector('[data-activity-send=\"%s\"]')" % trip, keep=1)
+        await cap("邀請朋友", "用完整的 email 找到人才送出；也可以產生只能用一次的邀請碼")
+        await wait(2)
+        await click('[data-activity-send="%s"]' % trip)
+        await wait(3)
+
+        await click("#gswBtn")
+        await wait(1.2)
+        await click('.gsw__i[data-group="%s"]' % trip)
+        await wait(1)
+        await page("#/", "document.querySelector('.act__f')")
+        await cap("活動總覽", "主卡是「這個活動是什麼」：說明、期間、成員、筆數、目標金額；上面兩條照樣是收入、支出")
+        await wait(5)
+        await para("機票 8200，民宿訂金 3000")
+        await wait(2)
+        await click("#paraSave")
+        await busy("!document.getElementById('paraSave')", keep=1.2)
+        await page("#/", "document.querySelector('.act__f')")
+        await cap("活動記帳", "記在活動裡的帳只算在活動；目標金額寫明比的是累計支出還是結餘")
+        await wait(5)
+        await click("[data-personal-return]")
+        await wait(2)
+
+        # ---------------------------------------------------------------- 6. 家庭
+        await page("#/members", "document.getElementById('famNewF')")
+        await cap("建立家庭", "建立的人是家長；可以順便填全家的長期存款目標")
+        await click("#famName", pause=0.3)
+        await type_in("#famName", "王家", 120)
+        await click("#famGoalNote", pause=0.3)
+        await type_in("#famGoalNote", "全家出國基金", 70)
+        await set_val("#famGoalAmount", "300000")
+        await wait(1)
+        await click("#famNewF button[type=submit]")
+        await busy("document.querySelector('[data-fold=\"finv\"]')")
+        await wait(1.5)
+        await click('[data-fold="finv"]')
+        await until("document.getElementById('invEmail')", 10)
+        await click("#invEmail", pause=0.3)
+        await type_in("#invEmail", kid["email"], 45)
+        await click("#invFindF button[type=submit]")
+        await busy("document.querySelector('[data-inv-send]')", keep=1)
+        await click('[data-invrole="child"]', need=False)
+        await cap("邀請家人", "找到人之後選身分（子女／家長）再送出，對方的鈴鐺會馬上收到")
+        await wait(2)
+        await click("[data-inv-send]")
+        await wait(3)
+        parent_auth = await c.js("localStorage.getItem('fambudget.auth')")
+
+        # ---------------------------------------------------------------- 7. 子女
+        await use(kid_tok, kid_id)
+        await page("#/", "document.querySelector('[data-inv-accept]')")
+        await cap("子女收到邀請", "換成子女的帳號：總覽最上面就是家庭邀請，按「加入」就進這個家庭")
+        await wait(4)
+        await click("[data-inv-accept]")
+        await busy("!document.querySelector('[data-inv-accept]')", keep=1.5)
+        await wait(1.5)
+        await page("#/groups", "document.querySelector('[data-activity-response$=\"|accept\"]')")
+        await wait(1)
+        await click('[data-activity-response$="|accept"]')
+        await busy("document.querySelector('.lg[data-lgid=\"%s\"]')" % trip, keep=1.5)
+        await click('.lg[data-lgid="%s"] .lg__h' % trip)
+        await until("document.querySelector('.lg[data-lgid=\"%s\"] .lg__ro')" % trip, 10)
+        await cap("成員只能看", "加入活動之後看得到說明、期間、建立者訂的目標金額，但不能改")
+        await wait(5)
+
+        # ---------------------------------------------------------------- 8. 零用金
+        await use(parent_auth, parent_uid)
+        await page("#/members", "document.querySelector('[data-gs-start=\"%s\"]')" % kid_id)
+        await scroll_to('[data-gs-start="%s"]' % kid_id)
+        await point()
+        await cap("照看子女", "子女加入之後，家長按「開始照看」才看得到他的帳、才能給零用金；子女看得到是誰在照看")
+        await wait(2.5)
+        await click('[data-gs-start="%s"]' % kid_id)
+        await busy("[...document.querySelectorAll('.toast')].some(t => t.textContent.includes('開始照看'))", keep=1)
+        await wait(2)
+        await page("#/member/%s" % kid_id, "document.querySelector('[data-allow]')")
+        await cap("零用金", "家長照看子女：每月零用金和發放日；改完離開欄位就存")
+        await wait(2)
+        await click("[data-allow]", pause=0.3)
+        await type_in("[data-allow]", "1500", 120)
+        await set_val("[data-allow]", "1500")
+        await busy("[...document.querySelectorAll('.toast')].some(t => t.textContent.includes('號給'))", keep=1.5)
+        await wait(2)
+        await cap("零用金自動記帳", "到了發放日自動記一對帳：家長一筆支出、孩子一筆收入，並通知孩子")
+        await scroll_to(".txw, .txt", "start")
+        await wait(4)
+
+        await use(kid_tok, kid_id)
+        await page("#/", "document.querySelector('.wal__card')")
+        await wait(1)
+        await click("#bell")
+        await until("document.querySelector('.bell__del, .bell__i, .bell li')", 15)
+        await cap("子女的鈴鐺", "家庭邀請、零用金入帳都即時進鈴鐺；零用金算在子女這個月可以花的錢裡")
+        await wait(5)
+        await click("#bell")
+        await wait(1)
+
+        # ---------------------------------------------------------------- 9. 統計與建議
+        await use(parent_auth, parent_uid)
+        await page("#/stats", "document.querySelector('.donut, svg circle, .dt, .chart')")
+        await cap("統計", "收支對照、錢花在哪：數字跟總覽、明細同一個來源")
+        await wait(5)
+        await page("#/advice", "document.getElementById('advGen')")
+        await cap("財務建議", "數字由資料庫先算好，模型只寫句子；每個數字都附算式")
+        await wait(1.5)
+        await click("#advGen")
+        await wait(2)
+        await busy("document.getElementById('advGen') && !document.getElementById('advGen').disabled", keep=3, timeout=120)
+        await click(".ad__h", need=False)
+        await wait(5)
+
+        # ---------------------------------------------------------------- 10. 刪除要密碼
+        await page("#/", "document.querySelector('.hpanel [data-del]')")
+        await scroll_to(".hpanel", "end")
+        await click(".hpanel [data-del]")
+        await until("document.getElementById('dgPw')", 10)
+        await cap("刪除要輸入密碼", "刪掉就救不回來：要輸入自己的密碼確認（示範到這裡，按取消）")
+        await wait(4)
+        await click("#dgNo")
+        await wait(1)
+
+        # ---------------------------------------------------------------- 11. 手機版
         await c.send("Emulation.setDeviceMetricsOverride", width=375, height=812, deviceScaleFactor=1, mobile=True)
-        await c.send("Page.stopScreencast")
-        await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=375, maxHeight=812, everyNthFrame=1)
-        step[0] += 1
-        shown.update(title="手機版", desc="底部分頁列；常用功能不再重複放明細、統計、建議")
-        await login("dad")
-        await go(LOCAL + "/?r=%d#/" % (time.time() * 1000), ready="document.querySelector('.wal__v') && document.querySelector('.bcard')")
-        await asyncio.sleep(1)
-        step[0] -= 1
-        await cap("手機版", "底部分頁列；常用功能不再重複放明細、統計、建議")
-        await asyncio.sleep(3)
-        await c.js("window.scrollTo({top: 700, behavior: 'smooth'})")
-        await asyncio.sleep(4)
+        if not trial:
+            await c.send("Page.stopScreencast")
+            await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=375, maxHeight=812, everyNthFrame=1)
+        await page("#/", "document.querySelector('.wal__card')")
+        await cap("手機版", "底部分頁列；總覽、面板、表格都照手機寬度重排，沒有左右捲動")
+        await wait(3)
+        await c.js("window.scrollTo({top: 900, behavior: 'smooth'})")
+        await wait(4)
         await c.js("localStorage.removeItem('fambudget.auth')")
 
-        # ---------- 片尾 ----------
-        await c.send("Page.stopScreencast")
+        # ---------------------------------------------------------------- 片尾
+        if not trial:
+            await c.send("Page.stopScreencast")
         await c.send("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=1, mobile=False)
-        await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
-        await c.js("localStorage.removeItem('fambudget.auth')")
+        if not trial:
+            await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
         shown.clear()
-        await go(card_url("end", card_html("RESULT", "測試結果", [
-            "兩輪 26 個問題全部修正並在線上驗證；第三輪照使用者的回饋把畫面收乾淨",
-            "詳細內容：家庭記帳_測試報告.pdf、家庭記帳_使用者評分與改善建議.pdf"],
-            [("99→100%", "AI 解析整題完全正確"), ("11 / 11", "AI 建議數字全對"), ("4 / 4", "過期後關閉存取"),
-             ("57.6→85.7", "使用者評分平均")])), 1, keep=0.5)
-        await asyncio.sleep(6)
+        await go(card_url("end", card_html("END", "謝謝觀看", [
+            "個人、活動、家庭三種視角，同一套記帳",
+            "github.com/cbes502034/final_project　｜　fambudget-web.onrender.com"])), keep=0.5)
+        await wait(5)
         c.recording = False
-        await c.send("Page.stopScreencast")
+        if not trial:
+            await c.send("Page.stopScreencast")
         reader.cancel()
         return c.frames, c.ff
 
@@ -585,16 +730,41 @@ def encode(frames, out_mp4, workdir, ff=()):
                     "-movflags", "+faststart", out_mp4], check=True, capture_output=True)
 
 
+
+def ask_accounts(args):
+    if args.accounts:
+        if args.target != "local":
+            raise SystemExit("--accounts 只給本機試跑用；線上請在終端機輸入帳密")
+        with io.open(args.accounts, encoding="utf-8") as f:
+            return json.load(f)
+    print("影片會在網站上現場註冊一個家長帳號，再邀請一個子女帳號加入家庭與活動。")
+    print("密碼不會顯示、不會存檔，影片裡的密碼欄只看得到圓點。\n")
+    name = input("家長的名字（影片裡會看到，直接按 Enter 用「王小明」）：").strip() or "王小明"
+    email = input("家長的 email（還沒註冊過的，影片裡現場註冊）：").strip()
+    pw = getpass.getpass("家長要設的密碼（至少 8 個字）：")
+    if len(pw) < 8:
+        raise SystemExit("密碼至少 8 個字")
+    kid_email = input("子女帳號的 email（事先註冊好、點過驗證信、還沒加入家庭）：").strip()
+    kid_pw = getpass.getpass("子女帳號的密碼：")
+    if not email or not kid_email or email.lower() == kid_email.lower():
+        raise SystemExit("兩個 email 都要填，而且不能一樣")
+    return {"parent": {"name": name, "email": email, "password": pw},
+            "kid": {"email": kid_email, "password": kid_pw}}
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--tokens", required=True)
+    ap = argparse.ArgumentParser(description="家庭記帳完整流程的示範影片")
+    ap.add_argument("--target", choices=sorted(TARGETS), default="live")
+    ap.add_argument("--trial", action="store_true", help="試跑：不錄影，每一步存一張截圖到 report/qa/trial/")
+    ap.add_argument("--accounts", help="（只給本機試跑）帳密的 JSON 檔：{parent: {name, email, password}, kid: {email, password}}")
+    ap.add_argument("--show", action="store_true", help="開出 Chrome 視窗（不是無頭），看得到它在做什麼")
     args = ap.parse_args()
-    with io.open(args.tokens, encoding="utf-8") as f:
-        tokens = json.load(f)
-    # 免費主機閒置會睡：先把線上後端叫醒，不然第一個請求（過期的驗證連結那一步）會等到前端說連不上
+    accounts = ask_accounts(args)
+    front, api, _ = TARGETS[args.target]
+    # 免費主機閒置會睡：先把後端叫醒
     for _ in range(6):
         try:
-            if httpx.get(BACKEND + "/openapi.json", timeout=90).status_code == 200:
+            if httpx.get(api + "/openapi.json", timeout=90).status_code == 200:
                 break
         except httpx.HTTPError:
             time.sleep(5)
@@ -602,9 +772,11 @@ def main() -> int:
     workdir = tempfile.mkdtemp(prefix="fambudget-video-")
     profile = os.path.join(workdir, "profile")
     port = 9335
-    proc = subprocess.Popen([exe, "--headless=new", "--remote-debugging-port=%d" % port, "--user-data-dir=" + profile,
-                             "--hide-scrollbars", "--no-first-run", "--lang=zh-TW", "--window-size=%d,%d" % (W, H),
-                             "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    flags = ["--remote-debugging-port=%d" % port, "--user-data-dir=" + profile, "--hide-scrollbars",
+             "--no-first-run", "--lang=zh-TW", "--window-size=%d,%d" % (W, H)]
+    if not args.show:
+        flags.insert(0, "--headless=new")
+    proc = subprocess.Popen([exe] + flags + ["about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(60):
             try:
@@ -613,9 +785,12 @@ def main() -> int:
                 break
             except Exception:  # noqa: BLE001
                 time.sleep(0.25)
-        frames, ff = asyncio.run(run(page["webSocketDebuggerUrl"], tokens, workdir))
+        frames, ff = asyncio.run(run(page["webSocketDebuggerUrl"], args, accounts, workdir))
+        if args.trial:
+            print("試跑完成，每一步的截圖在", os.path.join(HERE, "trial"))
+            return 0
         print("frames:", len(frames), "seconds:", round(frames[-1][0] - frames[0][0], 1) if frames else 0)
-        out = os.path.join(HERE, "家庭記帳_測試流程.mp4")
+        out = os.path.join(HERE, "家庭記帳_完整流程.mp4" if args.target == "live" else "家庭記帳_完整流程_本機.mp4")
         encode(frames, out, workdir, ff)
         print(out)
     finally:

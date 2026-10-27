@@ -1,10 +1,12 @@
 """
-報告用的畫面截圖：用本機的 Chrome（無頭模式）以示範帳號登入，逐頁截高解析度的圖到 report/assets/。
+報告用的畫面截圖：用本機的 Chrome（無頭模式）登入，逐頁截高解析度的圖到 report/assets/。
 
-    # 先開本機後端與前端、跑 backend/tools/demo_seed.py 拿到權杖檔，然後：
-    python report/screenshot.py --tokens <暫存資料夾>/demo_tokens.json --front http://localhost:5195 --api http://localhost:8010
+    # 先開本機後端與前端，用 report/qa/record_demo.py --target local 走過一次完整流程（從空帳號開始，帳上才有資料），然後：
+    python report/screenshot.py --accounts <帳密 JSON> --front http://localhost:5195 --api http://127.0.0.1:8010
 
-不在登入畫面打密碼：直接把 demo_seed.py 拿到的權杖放進瀏覽器的 localStorage（跟前端登入後存的一樣）。
+帳密 JSON：{"parent": {"email", "password"}, "kid": {...}, "admin": {...}}——只給本機用。
+不在登入畫面打密碼：用 API 登入拿權杖，放進瀏覽器的 localStorage（跟前端登入後存的一樣）。
+段落記帳那張（parse.png）要真的模型才有意義，本機沒接模型，預設不重截（--only parse 才截）。
 """
 
 from __future__ import annotations
@@ -30,20 +32,27 @@ CHROME = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
           r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"]
 
 #: (檔名, 誰登入, 網址的 hash, 寬, 高, 截圖前要在頁面上做的事（JS）, 等幾秒)
+#: 誰登入後面接 "@活動名稱" 是先切到那個活動（活動模式的總覽）
 SHOTS = [
-    ("home", "dad", "#/", 1280, 800, "", 2.5),
-    ("entry", "dad", "#/entry", 1280, 800, "", 2.5),
-    ("groups", "dad", "#/groups", 1280, 800, "", 2.5),
-    ("stats", "dad", "#/stats", 1280, 800, "", 3),
-    ("advice", "dad", "#/advice", 1280, 800, "", 2.5),
-    ("members", "dad", "#/members", 1280, 800, "", 2.5),
-    ("profile", "dad", "#/profile", 1280, 800, "", 2.5),
-    ("kid_home", "kid", "#/", 1280, 800, "", 2.5),
-    ("home_mobile", "dad", "#/", 390, 844, "", 2.5),
+    ("home", "parent", "#/", 1280, 800, "", 5),          # 第一張：瀏覽器剛開，等久一點
+    ("home_panel", "parent", "#/", 1280, 800, "PANEL", 3),
+    ("entry", "parent", "#/entry", 1280, 800, "", 3),
+    ("groups", "parent", "#/groups", 1280, 800, "", 3),
+    ("activity_home", "parent@沖繩畢業旅行", "#/", 1280, 800, "", 3),
+    ("stats", "parent", "#/stats", 1280, 800, "", 3),
+    ("advice", "parent", "#/advice", 1280, 800, "", 3),
+    ("members", "parent", "#/members", 1280, 800, "", 3),
+    ("profile", "parent", "#/profile", 1280, 800, "", 3),
+    ("kid_home", "kid", "#/", 1280, 800, "", 3),
+    ("home_mobile", "parent", "#/", 390, 844, "", 3),
     ("admin", "admin", "#/admin", 1280, 800, "", 3),
     ("admin_mobile", "admin", "#/admin", 390, 844, "", 3),
-    ("parse", "dad", "#/entry", 1280, 800, "PARSE", 8),
+    ("parse", "parent", "#/entry", 1280, 800, "PARSE", 8),
 ]
+DEFAULT_SKIP = {"parse"}
+
+#: 總覽下方的面板捲到畫面中間
+PANEL_JS = "document.querySelector('.hpanel') && document.querySelector('.hpanel').scrollIntoView({block: 'center'})"
 
 #: 段落記帳：按「記一筆」、選段落記帳、貼一段話、按解析
 PARSE_JS = r"""
@@ -65,7 +74,19 @@ PARSE_JS = r"""
 """
 
 
-async def cdp(ws_url, shots, tokens, front, api):
+def login(api, acc):
+    """用 API 登入拿權杖（本機的帳號），回傳 (權杖, 使用者 id, 活動名稱 → id)"""
+    r = httpx.post(api + "/api/auth/login", json={"email": acc["email"], "password": acc["password"]}, timeout=60)
+    r.raise_for_status()
+    d = r.json()
+    tok = {k: d[k] for k in ("accessToken", "refreshToken", "expiresIn")}
+    tok["savedAt"] = int(time.time() * 1000)
+    uid = json.loads(base64.urlsafe_b64decode(d["accessToken"].split(".")[1] + "==="))["sub"]
+    gs = httpx.get(api + "/api/groups", headers={"authorization": "Bearer " + d["accessToken"]}, timeout=60).json()
+    return tok, str(uid), {g["name"]: g["id"] for g in gs.get("groups", [])}
+
+
+async def cdp(ws_url, shots, people, front, api):
     async with websockets.connect(ws_url, max_size=64 * 1024 * 1024) as ws:
         seq = 0
 
@@ -81,29 +102,31 @@ async def cdp(ws_url, shots, tokens, front, api):
                         raise RuntimeError("%s: %s" % (method, msg["error"]))
                     return msg.get("result", {})
 
+        async def js(expr, wait=False):
+            r = await send("Runtime.evaluate", expression=expr, awaitPromise=wait, returnByValue=True)
+            return r.get("result", {}).get("value")
+
         await send("Page.enable")
         await send("Runtime.enable")
-        await send("Page.navigate", url=front + "/?api=" + api)
+        await send("Page.navigate", url=front + "/docs/guide.html")
         await asyncio.sleep(1.5)
-        current = None
+        await js("localStorage.setItem('fambudget.api', %s)" % json.dumps(api))
         for name, who, hash_, w, h, action, wait in shots:
-            await send("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=2,
-                       mobile=w < 600)
-            if who != current:
-                await send("Runtime.evaluate", expression="localStorage.setItem('fambudget.auth', %s)"
-                           % json.dumps(json.dumps(tokens[who])))
-                # 導覽提示（「第一次用？」）標成看過，截圖才不會被它蓋住。
-                # 看過導覽記在帳號上（fambudget.tour.<id>），id 從權杖的 sub 拿
-                uid = json.loads(base64.urlsafe_b64decode(tokens[who]["accessToken"].split(".")[1] + "==="))["sub"]
-                await send("Runtime.evaluate", expression="localStorage.setItem(%s, 'done')" % json.dumps(TOUR_KEY + "." + str(uid)))
-                current = who
-            await send("Page.navigate", url=front + "/" + hash_)
-            await send("Runtime.evaluate", expression="location.reload()")
-            await asyncio.sleep(wait if not action else 3)
+            who, _, activity = who.partition("@")
+            tok, uid, groups = people[who]
+            await send("Emulation.setDeviceMetricsOverride", width=w, height=h, deviceScaleFactor=2, mobile=w < 600)
+            # 權杖、導覽看過（記在帳號上：fambudget.tour.<id>）、要看哪一個活動（沒有就是個人）
+            await js("localStorage.setItem('fambudget.auth', %s); localStorage.setItem(%s, 'done'); localStorage.setItem('fambudget.group', %s)"
+                     % (json.dumps(json.dumps(tok)), json.dumps(TOUR_KEY + "." + uid), json.dumps(groups.get(activity, "") if activity else "")))
+            await send("Page.navigate", url=front + "/?r=%d%s" % (time.time() * 1000, hash_))
+            await asyncio.sleep(wait + 1.5)          # 資料到了、淡入動畫也跑完
             if action == "PARSE":
-                r = await send("Runtime.evaluate", expression=PARSE_JS, awaitPromise=True, returnByValue=True)
-                print("  段落記帳：", r.get("result", {}).get("value"))
+                r = await js(PARSE_JS, wait=True)
+                print("  段落記帳：", r)
                 await asyncio.sleep(wait)
+            elif action == "PANEL":
+                await js(PANEL_JS)
+                await asyncio.sleep(1)
             shot = await send("Page.captureScreenshot", format="png")
             path = os.path.join(OUT, name + ".png")
             with open(path, "wb") as f:
@@ -113,14 +136,17 @@ async def cdp(ws_url, shots, tokens, front, api):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tokens", required=True)
+    ap.add_argument("--accounts", required=True, help="本機帳號的帳密 JSON：{parent, kid, admin}")
     ap.add_argument("--front", default="http://localhost:5195")
-    ap.add_argument("--api", default="http://localhost:8010")
+    ap.add_argument("--api", default="http://127.0.0.1:8010")
     ap.add_argument("--only", default="", help="只截這幾張（逗號分隔）")
     args = ap.parse_args()
-    with io.open(args.tokens, encoding="utf-8") as f:
-        tokens = json.load(f)
-    shots = [s for s in SHOTS if not args.only or s[0] in args.only.split(",")]
+    with io.open(args.accounts, encoding="utf-8") as f:
+        accounts = json.load(f)
+    api = args.api.rstrip("/")
+    people = {who: login(api, acc) for who, acc in accounts.items() if acc}
+    only = args.only.split(",") if args.only else None
+    shots = [s for s in SHOTS if (s[0] in only if only else s[0] not in DEFAULT_SKIP) and s[1].split("@")[0] in people]
     os.makedirs(OUT, exist_ok=True)
 
     exe = next(p for p in CHROME if os.path.exists(p))
@@ -137,10 +163,13 @@ def main() -> int:
                 break
             except Exception:  # noqa: BLE001  Chrome 還沒起來
                 time.sleep(0.2)
-        asyncio.run(cdp(page["webSocketDebuggerUrl"], shots, tokens, args.front.rstrip("/"), args.api.rstrip("/")))
+        asyncio.run(cdp(page["webSocketDebuggerUrl"], shots, people, args.front.rstrip("/"), api))
     finally:
         proc.terminate()
-        proc.wait(timeout=10)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
         shutil.rmtree(profile, ignore_errors=True)
     return 0
 
