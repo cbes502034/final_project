@@ -3,7 +3,7 @@
 規則（使用者 10/27 定的）：
     開始日可以比今天早，也可以比今天晚
     結束日不能比今天早——整段期間都已經過去的活動，要重新設定日期
-    結束日一定要在開始日之後
+    結束日不能比開始日早（同一天可以，例如一天的聚餐）
     開始日比今天晚＝預先規劃的活動：先不放進活動選單，到了開始日才放上去，並通知每一位成員
 
 舊的活動沒有開始日（starts_on 是 NULL），就當成建立的那一天。
@@ -41,8 +41,8 @@ def check(starts_on: date, ends_on: date | None) -> None:
         return
     if ends_on < today():
         raise errors.bad_request("結束日已經過了，整段期間都在今天以前，請重新設定日期")
-    if ends_on <= starts_on:
-        raise errors.bad_request("結束日要在開始日之後")
+    if ends_on < starts_on:
+        raise errors.bad_request("結束日不能比開始日早")
 
 
 def created_day(group) -> date:

@@ -321,11 +321,11 @@
     return global.fbToday();
   }
 
-  /* 活動期間：結束日不能比今天早、要在開始日之後（同後端 services/activity_dates.check） */
+  /* 活動期間：結束日不能比今天早、也不能比開始日早，同一天可以（同後端 services/activity_dates.check） */
   function rangeCheck(start, end) {
     if (!end) return;
     if (end < todayStr()) throw oops('結束日已經過了，整段期間都在今天以前，請重新設定日期', 400);
-    if (end <= start) throw oops('結束日要在開始日之後', 400);
+    if (end < start) throw oops('結束日不能比開始日早', 400);
   }
 
   function notifyOf(gid, uid) {

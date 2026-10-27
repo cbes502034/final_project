@@ -312,7 +312,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
         422     endsOn 格式不對                       結束日要是 YYYY-MM-DD
         422     startsOn 格式不對                     開始日要是 YYYY-MM-DD
         400     結束日比今天早                        結束日已經過了，整段期間都在今天以前，請重新設定日期
-        400     結束日沒有在開始日之後                結束日要在開始日之後
+        400     結束日比開始日早                      結束日不能比開始日早
         ⚠️ 重名只比「自己家的人開的帳本」：比了別人家的，等於告訴使用者別的家庭有哪些帳本。
 
     【會用到的資料表】
@@ -568,7 +568,7 @@ def update_group(
         400     什麼都沒送                    沒有要改的欄位
         400     個人大帳本送了開始日或結束日  個人大帳本沒有開始日和結束日
         400     結束日比今天早                結束日已經過了，整段期間都在今天以前，請重新設定日期
-        400     結束日沒有在開始日之後        結束日要在開始日之後
+        400     結束日比開始日早              結束日不能比開始日早
         403     不是建立的人                  只有建立這本帳的人可以做這件事（守衛回）
         404     找不到、已經移除              找不到這本帳（守衛回）
         409     新名稱跟家裡另一本重複        家裡已經有一本叫「家用」的帳了
@@ -652,7 +652,7 @@ def update_group(
                 changes["note"] = (body.note or "").strip() or None
 
             # 4. 期間：開始日空的＝今天；結束日有日期＝有期限的活動（temp），清空＝一直記下去（standing）
-            #    規則在 services/activity_dates.py：結束日不能早於今天、要在開始日之後；開始日比今天晚＝預先規劃
+            #    規則在 services/activity_dates.py：結束日不能早於今天、也不能早於開始日（同一天可以）；開始日比今天晚＝預先規劃
             if "startsOn" in sent or "endsOn" in sent:
                 if group.personal_owner_id is not None:
                     raise errors.bad_request("個人大帳本沒有開始日和結束日")
@@ -742,7 +742,7 @@ def update_group(
         changes["note"] = (body.note or "").strip() or None
 
     # 4. 期間：開始日空的＝今天；結束日有日期＝有期限的活動（temp），清空＝一直記下去（standing）
-    #    規則在 services/activity_dates.py：結束日不能早於今天、要在開始日之後；開始日比今天晚＝預先規劃
+    #    規則在 services/activity_dates.py：結束日不能早於今天、也不能早於開始日（同一天可以）；開始日比今天晚＝預先規劃
     if "startsOn" in sent or "endsOn" in sent:
         if group.personal_owner_id is not None:
             raise errors.bad_request("個人大帳本沒有開始日和結束日")

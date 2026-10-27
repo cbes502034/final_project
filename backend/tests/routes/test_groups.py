@@ -160,8 +160,8 @@ def test_create_group_開始日_預先規劃_期間規則(api):
     assert post("沒結束日", startsOn=day(3)).json()["planned"] is True
     assert post("今天結束", startsOn=day(-3), kind="temp", endsOn=day(0)).status_code == 201
     assert post("過去的", startsOn=day(-10), kind="temp", endsOn=day(-1)).status_code == 400   # 整段都在今天以前
-    assert post("倒過來", startsOn=day(5), kind="temp", endsOn=day(3)).status_code == 400       # 結束日要在開始日之後
-    assert post("同一天", startsOn=day(3), kind="temp", endsOn=day(3)).status_code == 400
+    assert post("倒過來", startsOn=day(5), kind="temp", endsOn=day(3)).status_code == 400       # 結束日不能比開始日早
+    assert post("同一天", startsOn=day(3), kind="temp", endsOn=day(3)).status_code == 201       # 一天的活動可以
     assert post("格式", startsOn="11/1").status_code == 422
     listed = {g["name"]: g for g in api.get("/api/groups", headers=h).json()["groups"]}
     assert (listed["下個月"]["planned"], listed["早就開始"]["planned"], listed["早就開始"]["startsOn"]) == \
@@ -203,7 +203,9 @@ def test_update_group_改名換色復原(api):
     assert (r.json()["endsOn"], r.json()["kind"]) == (None, "standing")
     r = api.patch(url, headers=h, json={"startsOn": day(3)})                          # 改成以後才開始＝預先規劃
     assert (r.json()["startsOn"], r.json()["planned"]) == (day(3), True)
-    assert api.patch(url, headers=h, json={"endsOn": day(2)}).status_code == 400      # 結束日要在開始日之後
+    assert api.patch(url, headers=h, json={"endsOn": day(2)}).status_code == 400      # 結束日不能比開始日早
+    assert api.patch(url, headers=h, json={"endsOn": day(3)}).json()["endsOn"] == day(3)   # 同一天可以
+    assert api.patch(url, headers=h, json={"endsOn": None}).status_code == 200
     assert api.patch(url, headers=h, json={"endsOn": day(-1)}).status_code == 400     # 結束日不能比今天早
     r = api.patch(url, headers=h, json={"startsOn": None})                            # 空的＝今天
     assert (r.json()["startsOn"], r.json()["planned"]) == (day(0), False)

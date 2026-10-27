@@ -691,11 +691,11 @@
   }
 
   /* 活動期間的規則，跟後端 services/activity_dates.py 一樣：
-     開始日可以比今天早或晚（晚＝預先規劃）；結束日不能比今天早、而且要在開始日之後。 */
+     開始日可以比今天早或晚（晚＝預先規劃）；結束日不能比今天早、也不能比開始日早（同一天可以）。 */
   function activityRangeError(start, end) {
     if (!end) return '';
     if (end < todayKey()) return '結束日已經過了，整段期間都在今天以前，請重新設定日期';
-    if (start && end <= start) return '結束日要在開始日之後';
+    if (start && end < start) return '結束日不能比開始日早';
     return '';
   }
 
