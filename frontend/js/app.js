@@ -2473,22 +2473,38 @@
 
     var add = editable ? activityInvitePanel(g) : '';
 
+    var ownerName = (g.memberNames || [])[g.members.indexOf(g.owner)] || '';
     return '<div class="lg__b">' +
+      (g.canEdit ? '' : '<p class="lg__hint lg__ro">活動的設定和成員只有建立者' +
+        (ownerName ? '「' + esc(ownerName) + '」' : '') + '能改</p>') +
       '<dl class="lg__f">' +
-        /* 說明＝這個活動在做什麼，會放在活動首頁最上面。只有建立者能改，改完離開欄位就存 */
-        (g.canEdit && !g.settled
-          ? '<dt>說明</dt><dd><input class="lg__note-i" type="text" maxlength="100" data-gnote="' + esc(g.id) + '" ' +
-              'value="' + esc(g.note || '') + '" placeholder="寫一句這個活動在做什麼（選填）" aria-label="活動說明"></dd>'
-          : g.note ? '<dt>說明</dt><dd class="lg__note">' + esc(g.note) + '</dd>' : '') +
-        '<dt>成員</dt><dd><div class="lg__who">' + who + add + '</div>' +
-          (g.canEdit ? '' : '<div class="lg__hint">只有開這個活動的人可以加減成員</div>') + '</dd>' +
+        /* 活動的設定（名稱、說明、結束日、顏色、目標金額）建立後都能改，但只有建立者能改——
+           成員各改各的會亂。建立者看到輸入框，改完離開欄位就存；其他人只看得到內容。 */
+        (editable
+          ? '<dt>活動名稱</dt><dd><input class="lg__in" type="text" maxlength="20" required data-gname="' + esc(g.id) + '" ' +
+              'value="' + esc(g.name) + '" aria-label="活動名稱"></dd>' +
+            /* 說明＝這個活動在做什麼，會放在活動首頁最上面 */
+            '<dt>說明</dt><dd><input class="lg__in" type="text" maxlength="100" data-gnote="' + esc(g.id) + '" ' +
+              'value="' + esc(g.note || '') + '" placeholder="寫一句這個活動在做什麼（選填）" aria-label="活動說明"></dd>' +
+            '<dt>結束日</dt><dd><input class="lg__in lg__in--s" type="date" data-gend="' + esc(g.id) + '" ' +
+              'value="' + esc(g.endsOn || '') + '" aria-label="結束日">' +
+              '<div class="lg__hint">清空就是不設結束日，一直記下去</div></dd>' +
+            '<dt>顏色</dt><dd><select class="lg__in lg__in--s" data-gcolor="' + esc(g.id) + '" aria-label="顏色">' +
+              ((global.DATA && global.DATA.groupColors) || []).map(function (c) {
+                return '<option value="' + esc(c.id) + '"' + (c.id === g.color ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+              }).join('') + '</select></dd>'
+          : (g.note ? '<dt>說明</dt><dd class="lg__note">' + esc(g.note) + '</dd>' : '') +
+            '<dt>期間</dt><dd>' + esc(actPeriod(g)) + '</dd>') +
+        '<dt>成員</dt><dd><div class="lg__who">' + who + add + '</div></dd>' +
         /* 目標金額是一個提醒，怎麼用由使用者決定：想存錢就訂高一點，想控制花費就訂低一點當警訊。
-           活動還沒有收入時比累計支出，有收入後比累計結餘；到了會通知（services/activity_target.py）。
+           活動還沒有收入時比累計支出，有收入後比累計結餘；到了會通知全部成員（services/activity_target.py）。
            ⚠️ 沒設的活動預設收起來，只放一顆「設定」；按了才出現輸入框（使用者：一直擺著輸入框很多餘）。 */
-        '<dt>目標金額</dt><dd>' + (Number(g.goal) > 0
+        '<dt>目標金額</dt><dd>' + (!editable
+          ? (Number(g.goal) > 0 ? num(g.goal) + '<div class="lg__hint">到了會通知你</div>' : '沒有設')
+          : Number(g.goal) > 0
           ? '<input class="goal__i" type="number" min="0" data-ggoal="' + esc(g.id) + '" ' +
               'value="' + Number(g.goal) + '" aria-label="這個活動的目標金額">' +
-            '<div class="lg__hint">到了會通知你；填 0 就是不設</div>'
+            '<div class="lg__hint">到了會通知全部成員；填 0 就是不設</div>'
           : '<button type="button" class="lg__opt" data-gopen="' + esc(g.id) + '">＋ 設定目標金額（選填）</button>' +
             '<div class="lg__hint">想存錢就訂高一點，想控制花費就訂低一點當警訊</div>') + '</dd>' +
         '<dt>通知</dt><dd>' +
@@ -5558,14 +5574,42 @@
       return;
     }
 
-    var gn = e.target.closest ? e.target.closest('[data-gnote]') : null;
+    /* 活動的設定：名稱、說明、結束日、顏色。只有建立者有輸入框（後端也只收建立者），改完離開欄位就存 */
+    var gn = e.target.closest ? e.target.closest('[data-gname],[data-gnote],[data-gend],[data-gcolor]') : null;
     if (gn) {
-      var nv = gn.value.trim();
-      API.updateGroup(gn.dataset.gnote, { note: nv }).then(function () {
-        toast(nv ? '說明存好了' : '說明清掉了', 'ok');
-        if (CURRENT_ACTIVITY && CURRENT_ACTIVITY.id === gn.dataset.gnote) CURRENT_ACTIVITY.note = nv;
-        if (location.hash === '#/' || !location.hash) vHome(); else paintGroups();
-      }).catch(function (err) { toast('沒有存成功：' + err.message, 'err'); });
+      var gd = gn.dataset, gid = gd.gname || gd.gnote || gd.gend || gd.gcolor;
+      var nv = gn.value.trim(), patch, said;
+      if (gd.gname) {
+        if (!nv) { gn.value = gn.defaultValue; toast('活動要有名稱', 'err'); return; }
+        patch = { name: nv }; said = '活動名稱改成「' + nv + '」';
+      } else if (gd.gnote) {
+        patch = { note: nv }; said = nv ? '說明存好了' : '說明清掉了';
+      } else if (gd.gend) {
+        patch = { endsOn: nv || null };
+        said = nv ? '結束日改成 ' + nv.slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/') : '不設結束日了，一直記下去';
+      } else {
+        patch = { color: nv }; said = '顏色換好了';
+      }
+      API.updateGroup(gid, patch).then(function (g) {
+        toast(said, 'ok');
+        var keep = {};
+        ['name', 'note', 'color', 'endsOn', 'kind'].forEach(function (k) { if (k in g) keep[k] = g[k]; });
+        if (CURRENT_ACTIVITY && CURRENT_ACTIVITY.id === gid) Object.assign(CURRENT_ACTIVITY, keep);
+        if (location.hash === '#/' || !location.hash) { vHome(); return; }
+        /* 活動管理：只換那一列的標題（名稱、顏色點、到期日），下面的輸入框不重畫，游標才不會跳掉 */
+        var lg = LG.byId[gid], row = document.querySelector('.lg[data-lgid="' + gid + '"]');
+        if (lg && row) {
+          Object.assign(lg, keep);
+          lg.overdue = !!(lg.endsOn && lg.endsOn < todayKey());
+          var tmp = document.createElement('div');
+          tmp.innerHTML = ledgerRow(lg);
+          row.replaceChild(tmp.querySelector('.lg__h'), row.querySelector('.lg__h'));
+        }
+        paintGroups();
+      }).catch(function (err) {
+        if (gn.tagName === 'INPUT') gn.value = gn.defaultValue;
+        toast('沒有存成功：' + err.message, 'err');
+      });
       return;
     }
 

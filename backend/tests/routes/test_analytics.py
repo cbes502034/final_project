@@ -284,6 +284,8 @@ def test_set_savings_goal_只有本人_一個月一列(api):
     assert crud.get(SavingsGoal, where={"group_id": g.id}).period_key == this_month()
     assert api.put("/api/savings-goal", headers=h, json={"userId": str(kid.id), "goal": 1}).status_code == 403
     assert api.put("/api/savings-goal", headers=h, json={"goal": 1, "groupId": str(theirs.id)}).status_code == 403
+    shared = ledger_of(stranger, me, name="露營")                                   # 別人建立、我只是成員
+    assert api.put("/api/savings-goal", headers=h, json={"goal": 1, "groupId": str(shared.id)}).status_code == 403
     assert api.put("/api/savings-goal", headers=h, json={"goal": -1}).status_code == 422
 
 

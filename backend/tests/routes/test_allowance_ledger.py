@@ -121,9 +121,10 @@ def test_用帳號邀請朋友進活動_對方鈴鐺有通知(api):
 
 @pytest.mark.route("GET", "/api/notifications")
 def test_活動目標金額_到了通知一次_改了目標再到再通知(api):
-    me = user("a@x.tw", "阿明")
-    g = ledger_of(me, name="露營")
+    me, friend = user("a@x.tw", "阿明"), user("f@x.tw", "小美")
+    g = ledger_of(me, friend, name="露營")
     cats = categories()
+    crud.save(SavingsGoal, {"user_id": friend.id, "group_id": g.id, "goal_amount": 1, "created_by": friend.id})  # 成員自己訂的不算
     crud.save(SavingsGoal, {"user_id": me.id, "group_id": g.id, "goal_amount": 1000, "created_by": me.id})
     spend(me, g, cats["餐飲"], 600)
     api.get("/api/notifications", headers=login(me))
@@ -133,6 +134,8 @@ def test_活動目標金額_到了通知一次_改了目標再到再通知(api):
     assert [(n["type"], n["metric"], n["value"], n["goal"]) for n in listed] == [("activity_target", "spent", 1100.0, 1000.0)]
     api.get("/api/notifications", headers=login(me))
     assert len(_notes(me, "activity_target")) == 1                       # 同一個目標只通知一次
+    api.get("/api/notifications", headers=login(friend))
+    assert [n["goal"] for n in _notes(friend, "activity_target")] == [1000.0]   # 目標全員共用，成員也收到
     crud.save(SavingsGoal, {"user_id": me.id, "group_id": g.id, "goal_amount": 1100, "created_by": me.id})
     api.get("/api/notifications", headers=login(me))
     assert len(_notes(me, "activity_target")) == 2

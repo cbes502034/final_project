@@ -407,6 +407,7 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
         狀態碼  什麼時候                              detail
         403     userId 不是自己                       存款目標只有本人可以設定
         403     groupId 是我沒加入、或已經移除的帳本  你不在這本帳裡
+        403     groupId 是活動、但我不是建立者        活動的目標金額只有建立者可以改
         422     goal 小於 0                           （FastAPI 自動回）
 
     【會用到的資料表】
@@ -425,7 +426,7 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
 
     【寫法步驟】
         1. 不是本人 → 403
-        2. 有 groupId：要是我加入、沒移除的帳本（403）
+        2. 有 groupId：要是我加入、沒移除的帳本（403）；是活動的話還要是建立者（403）
         3. 這個月（台灣時間）的那一列：upsert 成新的目標，db.commit()
         4. 回傳：整體的帶 name 與 savingsGoal，帳本的帶 groupId 與 groupName
 
@@ -461,6 +462,9 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
                     group = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
                 if group is None:
                     raise errors.forbidden("你不在這本帳裡")
+                # 活動的目標金額整個活動共用，只有建立者能改（成員各訂各的會亂）；個人大帳本就是自己的
+                if group.personal_owner_id is None and group.created_by != me.id:
+                    raise errors.forbidden("活動的目標金額只有建立者可以改")
 
             # 3. 一個月一列：這個月改好幾次只改同一列，以前月份的不動
             this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())
@@ -511,6 +515,9 @@ def set_savings_goal(body: SavingsGoalIn, me: User, db: Session = Depends(get_db
             group = crud.get(Group, where={"id": group_id, "removed_at__isnull": True}, db=db)
         if group is None:
             raise errors.forbidden("你不在這本帳裡")
+        # 活動的目標金額整個活動共用，只有建立者能改（成員各訂各的會亂）；個人大帳本就是自己的
+        if group.personal_owner_id is None and group.created_by != me.id:
+            raise errors.forbidden("活動的目標金額只有建立者可以改")
 
     # 3. 一個月一列：這個月改好幾次只改同一列，以前月份的不動
     this_month = period.current_month(datetime.now(timezone(timedelta(hours=8))).date())

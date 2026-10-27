@@ -2897,8 +2897,10 @@ body.is-out .foot { display: none; }
 #view .lg.on .lg__cv { transform: rotate(180deg); color: var(--accent); }
 #view .lg__b { padding: 4px var(--pad) 18px calc(var(--pad) + 24px); animation: riseIn .25s var(--out) both; }
 #view .lg__note { font-size: 13.5px; color: var(--ink-soft); }
-#view .lg__note-i { width: 100%; max-width: 440px; height: 36px; padding: 0 10px; background: var(--card-2); border: 1px solid var(--line-2); color: var(--ink); font-family: var(--sans); font-size: 14px; }
-#view .lg__note-i:focus, #view .act__note-i:focus { outline: none; border-color: var(--accent); }
+#view .lg__in { width: 100%; max-width: 440px; height: 36px; padding: 0 10px; background: var(--card-2); border: 1px solid var(--line-2); color: var(--ink); font-family: var(--sans); font-size: 14px; }
+#view .lg__in--s { max-width: 200px; }
+#view .lg__in:focus, #view .act__note-i:focus { outline: none; border-color: var(--accent); }
+#view .lg__ro { margin: 0 0 12px; }
 #view .lg__f { display: grid; grid-template-columns: 64px 1fr; gap: 12px 14px; align-items: center; margin: 0; }
 #view .lg__f dt { font-size: 12.5px; font-weight: 600; color: var(--ink-faint); }
 #view .lg__f dd { margin: 0; min-width: 0; }

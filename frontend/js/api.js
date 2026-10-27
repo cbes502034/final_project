@@ -1578,7 +1578,7 @@
                 count: s.transactions.filter(function (t) {
                   return t.group === g.id;
                 }).length,
-                goal: goalOf(s.me, g.id),
+                goal: goalOf(g.owner, g.id),          // 活動的目標金額＝建立者訂的，全員共用
                 canEdit: g.owner === s.me,
                 notify: notifyOf(g.id, s.me)
               });
@@ -1688,6 +1688,11 @@
         }
         if (p.color !== undefined) q.color = p.color;
         if (p.note !== undefined) q.note = String(p.note);
+        /* 結束日：有日期＝有期限的活動，清空＝一直記下去（同後端 PATCH /api/groups/{gid}） */
+        if (p.endsOn !== undefined) {
+          if (g.personalOwner) throw oops('個人大帳本沒有結束日', 400);
+          q.endsOn = p.endsOn || null; q.kind = p.endsOn ? 'temp' : 'standing';
+        }
         /* 復原：把 id 從封存清單拿掉。
            ⚠️ 封存從頭到尾都沒有動過任何一筆記帳，所以復原不需要還原資料，
            只是讓它重新出現在清單上。 */
@@ -2414,6 +2419,9 @@
           if (visibleGroups(st.me).indexOf(groupId) < 0) {
             var e = new Error('你不在這個群組裡'); e.status = 403; throw e;
           }
+          /* 活動的目標金額整個活動共用，只有建立者能改；個人大帳本就是自己的 */
+          var og = groupOf(groupId) || {};
+          if (!og.personalOwner && og.owner !== st.me) throw oops('活動的目標金額只有建立者可以改', 403);
           st.goalPatch = (st.goalPatch || []).concat([
             { user: userId, group: groupId, goal: v }
           ]);

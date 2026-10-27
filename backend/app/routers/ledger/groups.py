@@ -82,7 +82,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
         kind     standing（一般）／temp（活動帳本，有 endsOn 結束日）
         overdue  活動帳本、還沒結算、而且 endsOn 已經過了（台灣的今天）
         count    這本帳的筆數。我在這本帳裡，這本帳的每一筆我都看得到（可見範圍的 B 路），所以就是全部筆數——跟點進去看到的一樣
-        goal     我在這本帳的每月存款目標（savings_goals 最新的一列），沒設過是 0
+        goal     這個活動的目標金額：建立者訂的（savings_goals 最新的一列），全員看到同一個，沒設過是 0
         canEdit  我是不是建立的人（改名、加人、封存只有建立的人能做；合併每位成員都能做）
         personal 個人大帳本，依 personal_owner_id 識別
         notify   我自己在這本帳的通知開關（group_members.notify）
@@ -96,7 +96,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
         groups         讀      帳本本身
         users          讀      成員的名字
         transactions   讀      每本帳幾筆（只拿 group_id 一欄）
-        savings_goals  讀      我在每本帳的存款目標
+        savings_goals  讀      每本帳建立者訂的目標金額
 
     【每一步用的工具與資料庫方法】
         步驟        呼叫                                               做什麼
@@ -111,7 +111,7 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
 
     【寫法步驟】
         1. 我加入的帳本 id → 查帳本（排掉移除的；沒帶 includeArchived 也排掉封存的）；一本都沒有直接回空的
-        2. 一次查完這幾本帳的成員、名字、筆數、我的存款目標，還有我的通知開關
+        2. 一次查完這幾本帳的成員、名字、筆數、建立者訂的目標金額，還有我的通知開關
         3. 一本一本組成前端要的樣子，回傳 {"me", "groups"}
         ⚠️ 這支只讀不寫，不用 db.commit()。
 
@@ -144,13 +144,15 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
                 return {"me": str(me.id), "groups": []}
             ids = [g.id for g in groups]
 
-            # 2. 一次查完：成員與名字、每本幾筆、我的存款目標、我的通知開關
+            # 2. 一次查完：成員與名字、每本幾筆、建立者訂的目標金額、我的通知開關
             members = crud.find(GroupMember, {"group_id__in": ids}, order_by=("joined_at", "user_id"), db=db)
             names = {u.id: u.display_name for u in crud.find(User, {"id__in": {m.user_id for m in members}}, db=db)}
             counts = Counter(crud.find(Transaction, {"group_id__in": ids}, fields="group_id", db=db))
             goals = {}
-            for row in crud.find(SavingsGoal, {"user_id": me.id, "group_id__in": ids}, order_by="id", db=db):
-                goals[row.group_id] = row.goal_amount              # 後面的蓋掉前面的，留下最新的
+            owner_of = {g.id: g.created_by for g in groups}
+            for row in crud.find(SavingsGoal, {"group_id__in": ids}, order_by="id", db=db):
+                if row.user_id == owner_of[row.group_id]:          # 只算建立者訂的，全員共用
+                    goals[row.group_id] = row.goal_amount          # 後面的蓋掉前面的，留下最新的
             notify_on = {m.group_id: m.notify for m in mine}
             today = datetime.now(timezone(timedelta(hours=8))).date()
 
@@ -207,13 +209,15 @@ def list_groups(me: User, includeArchived: bool = False, db: Session = Depends(g
         return {"me": str(me.id), "groups": []}
     ids = [g.id for g in groups]
 
-    # 2. 一次查完：成員與名字、每本幾筆、我的存款目標、我的通知開關
+    # 2. 一次查完：成員與名字、每本幾筆、建立者訂的目標金額、我的通知開關
     members = crud.find(GroupMember, {"group_id__in": ids}, order_by=("joined_at", "user_id"), db=db)
     names = {u.id: u.display_name for u in crud.find(User, {"id__in": {m.user_id for m in members}}, db=db)}
     counts = Counter(crud.find(Transaction, {"group_id__in": ids}, fields="group_id", db=db))
     goals = {}
-    for row in crud.find(SavingsGoal, {"user_id": me.id, "group_id__in": ids}, order_by="id", db=db):
-        goals[row.group_id] = row.goal_amount              # 後面的蓋掉前面的，留下最新的
+    owner_of = {g.id: g.created_by for g in groups}
+    for row in crud.find(SavingsGoal, {"group_id__in": ids}, order_by="id", db=db):
+        if row.user_id == owner_of[row.group_id]:          # 只算建立者訂的，全員共用
+            goals[row.group_id] = row.goal_amount          # 後面的蓋掉前面的，留下最新的
     notify_on = {m.group_id: m.notify for m in mine}
     today = datetime.now(timezone(timedelta(hours=8))).date()
 
@@ -482,7 +486,7 @@ def create_group(body: GroupIn, me: User, db: Session = Depends(get_db)):
     # raise not_ready("POST /api/groups", OWNER)
 
 
-@router.patch("/groups/{gid}", summary="改名稱、顏色、說明")
+@router.patch("/groups/{gid}", summary="改活動名稱、說明、結束日、顏色")
 # @stub
 def update_group(
     body: GroupPatchIn,
@@ -490,18 +494,19 @@ def update_group(
     me: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    """改名稱、顏色、說明
+    """改活動名稱、說明、結束日、顏色
 
     PATCH /api/groups/{gid}
 
     【這支做什麼】
-        建立的人改帳本的名稱、顏色、說明；或是帶 {"archived": false} 把封存的帳本復原。
+        建立的人改活動的名稱、說明、結束日、顏色；或是帶 {"archived": false} 把封存的帳本復原。
+        ⚠️ 活動的設定只有建立者能改（成員各改各的會亂）；目標金額也一樣，走 PUT /api/savings-goal。
         ⚠️ 封存在使用者眼裡跟刪掉一模一樣，所以「復原」一定要做得出來。
            復原不用還原任何資料：封存從頭到尾沒動過任何一筆紀錄，只是讓它重新出現在清單上。
 
     【前端怎麼打】
         frontend/js/api.js 的 API.updateGroup(gid, patch)
-        帳本頁改名／換色／改說明，以及「已封存」那一區的「復原」。回應是改完的帳本。
+        活動管理改名稱／說明／結束日／顏色、首頁就地寫說明，以及「已封存」那一區的「復原」。回應是改完的帳本。
 
     【誰能打】
         登入、沒被停權，而且這本帳是自己開的。參數 group=Depends(in_group("gid", owner=True)) 已經擋好了：
@@ -516,6 +521,7 @@ def update_group(
         name      字串         1～20 字；同一個家庭裡不能跟別本重名
         color     字串         只收 catalog.GROUP_COLORS 裡的代號
         note      字串         說明；空字串 = 清掉
+        endsOn    字串／null   結束日 YYYY-MM-DD；null 或空字串 = 不設結束日（一直記下去）
         archived  true／false  只收 false（復原封存）；封存本身走 DELETE
         範例：{"name": "家用開銷"}　或　{"archived": false}
         · body.model_fields_set 是「有送來的欄位名字」，沒送的不要動
@@ -528,11 +534,13 @@ def update_group(
     【錯誤回應】detail 會原封不動顯示在畫面上，所以要寫成使用者看得懂的話
         狀態碼  什麼時候                      detail
         400     什麼都沒送                    沒有要改的欄位
+        400     個人大帳本送了 endsOn         個人大帳本沒有結束日
         403     不是建立的人                  只有建立這本帳的人可以做這件事（守衛回）
         404     找不到、已經移除              找不到這本帳（守衛回）
         409     新名稱跟家裡另一本重複        家裡已經有一本叫「家用」的帳了
         422     名稱整理完是空的              帳本要有名字
         422     顏色不在清單裡                沒有這個顏色
+        422     結束日格式不對                結束日要是 YYYY-MM-DD
         422     archived 送 true              封存請用 DELETE；這裡的 archived 只收 false（復原）
         422     不認得的欄位、名稱超過 20 字  （FastAPI 自動回）
 
@@ -552,8 +560,9 @@ def update_group(
         1. 有送 name：整理空白（422）；跟原本不一樣才檢查重名（409）
         2. 有送 color：要在清單裡（422）
         3. 有送 note：去頭尾空白，空的存 NULL
-        4. 有送 archived：只收 false，把 archived_at 設回 NULL（復原）
-        5. 什麼都沒改到 → 400；有的話 crud.save、db.commit()，回傳改完的帳本
+        4. 有送 endsOn：有日期就存成有期限的活動（kind=temp）；空的＝不設結束日（kind=standing）
+        5. 有送 archived：只收 false，把 archived_at 設回 NULL（復原）
+        6. 什麼都沒改到 → 400；有的話 crud.save、db.commit()，回傳改完的帳本
 
     【完整寫法】照下面兩步改，改完這支就做好了
         第一步：（已經放好了，不用動）這個檔案最上面的 import 就是下面這段
@@ -606,7 +615,20 @@ def update_group(
             if "note" in sent:
                 changes["note"] = (body.note or "").strip() or None
 
-            # 4. 復原封存：只收 false
+            # 4. 結束日：有日期＝有期限的活動（temp），清空＝一直記下去（standing）
+            if "endsOn" in sent:
+                if group.personal_owner_id is not None:
+                    raise errors.bad_request("個人大帳本沒有結束日")
+                if body.endsOn:
+                    try:
+                        changes["ends_on"] = date.fromisoformat(body.endsOn)
+                    except ValueError:
+                        raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
+                    changes["kind"] = "temp"
+                else:
+                    changes["ends_on"], changes["kind"] = None, "standing"
+
+            # 5. 復原封存：只收 false
             if "archived" in sent:
                 if body.archived is not False:
                     raise errors.unprocessable("封存請用 DELETE；這裡的 archived 只收 false（復原）")
@@ -680,7 +702,20 @@ def update_group(
     if "note" in sent:
         changes["note"] = (body.note or "").strip() or None
 
-    # 4. 復原封存：只收 false
+    # 4. 結束日：有日期＝有期限的活動（temp），清空＝一直記下去（standing）
+    if "endsOn" in sent:
+        if group.personal_owner_id is not None:
+            raise errors.bad_request("個人大帳本沒有結束日")
+        if body.endsOn:
+            try:
+                changes["ends_on"] = date.fromisoformat(body.endsOn)
+            except ValueError:
+                raise errors.unprocessable("結束日要是 YYYY-MM-DD") from None
+            changes["kind"] = "temp"
+        else:
+            changes["ends_on"], changes["kind"] = None, "standing"
+
+    # 5. 復原封存：只收 false
     if "archived" in sent:
         if body.archived is not False:
             raise errors.unprocessable("封存請用 DELETE；這裡的 archived 只收 false（復原）")

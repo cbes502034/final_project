@@ -16,10 +16,10 @@ async function checkUI() {
     { id: 'personal', name: '自己的帳本', count: 1, personal: true },
     { id: 'closed', name: '已結算', settled: true }];
   const ui = Object.assign(harness.context, { HEADER: harness.header, API: { groups: async () => ({ groups: books }) },
-    GROUP: 'all', isFamily: () => false, esc: String, tint: String, money: String, pushForDrawer() {},
+    GROUP: 'all', global: {}, isFamily: () => false, esc: String, tint: String, money: String, pushForDrawer() {},
     setGroup(id) { ui.GROUP = id; }, LG: { fam: { members: [] } }, activityInvitePanel: () => '' });
   ui.TXGROUPS = [];
-  vm.runInContext(extract('paintGroups') + '\n' + extract('ledgerBody') + '\n' + extract('txLocked'), ui);
+  vm.runInContext(['paintGroups', 'ledgerBody', 'actPeriod', 'txLocked'].map(extract).join('\n'), ui);
   assert.equal(ui.txLocked({ snapshot: true, group: 'shared' }), true);
   await ui.paintGroups(true);
   assert.equal(ui.GROUP, 'personal');

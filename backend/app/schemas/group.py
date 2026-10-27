@@ -28,6 +28,7 @@ class GroupPatchIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=20)
     color: str | None = None
     note: str | None = Field(default=None, max_length=100)
+    endsOn: str | None = Field(default=None, description="結束日 YYYY-MM-DD；null 或空字串＝不設結束日")
     archived: bool | None = Field(default=None, description="只收 false：復原封存")
 
 

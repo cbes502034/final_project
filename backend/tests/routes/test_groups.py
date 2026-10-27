@@ -165,8 +165,16 @@ def test_update_group_改名換色復原(api):
     assert api.patch(url, headers=h, json={"owner": "3"}).status_code == 422
     assert api.patch(url, headers=h, json={"note": "說" * 101}).status_code == 422   # 說明放在活動首頁，一句話就好
     assert api.patch(url, headers=h, json={"note": ""}).json()["note"] == ""          # 空字串＝清掉
+    r = api.patch(url, headers=h, json={"endsOn": "2026-12-31"})                      # 建立後也能補結束日
+    assert (r.json()["endsOn"], r.json()["kind"]) == ("2026-12-31", "temp")
+    r = api.patch(url, headers=h, json={"endsOn": None})                              # 清掉＝一直記下去
+    assert (r.json()["endsOn"], r.json()["kind"]) == (None, "standing")
+    assert api.patch(url, headers=h, json={"endsOn": "12/31"}).status_code == 422
+    mine = ledger_of(me, name="個人", personal_owner_id=me.id)
+    assert api.patch("/api/groups/%d" % mine.id, headers=h, json={"endsOn": "2026-12-31"}).status_code == 400
     assert api.patch(url, headers=h, json={}).status_code == 400
     assert api.patch(url, headers=login(mom), json={"name": "x"}).status_code == 403
+    assert api.patch(url, headers=login(mom), json={"endsOn": None}).status_code == 403  # 設定只有建立者能改
     assert api.patch("/api/groups/99999", headers=h, json={"name": "x"}).status_code == 404
 
 

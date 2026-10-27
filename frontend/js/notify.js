@@ -215,7 +215,7 @@
     }
     if (n.type === 'activity_target') {
       return '「' + esc(n.groupName) + '」' + (n.metric === 'saved' ? '已存到 ' : '已花到 ') +
-        '<b>' + money(n.value) + '</b>，到了你設的目標金額 ' + money(n.goal);
+        '<b>' + money(n.value) + '</b>，到了活動的目標金額 ' + money(n.goal);
     }
     var who = esc(n.actorName || '家人');
     var what = esc(n.catName || '一筆');
