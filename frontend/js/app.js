@@ -495,26 +495,12 @@
               fam && !d.__err ? d.members.length + ' 位家人的收支' : activeActivity() ? '活動這個月的收支' : '');
 
         var sv = d.__err ? null : d.savings, lv = sv ? sv.level : '';
-        /* 活動不套「收入 − 每月想存」：露營、聚餐多半沒有收入，那條公式只會亮紅燈。
-           活動看的是自建立以來的累計，跟使用者自己訂的目標金額比（規則同 services/activity_target.py）：
-           還沒有收入 → 已花多少；有收入 → 已存多少。 */
         var act = !d.__err && !fam ? activeActivity() : null, actCard = '';
         if (act) {
           lv = '';
-          var cumIn = 0, cumOut = 0;
-          (d.yearly || []).forEach(function (y) { cumIn += Number(y.income) || 0; cumOut += Number(y.expense) || 0; });
-          var saved = cumIn > 0, value = saved ? cumIn - cumOut : cumOut, target = Number(act.goal) || 0;
-          var reach = target > 0 ? Math.max(0, Math.min(100, Math.round(value / target * 100))) : 0;
-          actCard = '<div class="wal__k">' + (saved ? '這個活動已存' : '這個活動已花') +
-              (target > 0 && value >= target ? '<span class="pill pill--near">到目標了</span>' : '') + '</div>' +
-            '<div class="wal__v">' + amt(value) + '</div>' +
-            (target > 0
-              ? '<div class="wal__bar" role="progressbar" aria-label="目標金額進度" aria-valuenow="' + reach + '" aria-valuemin="0" aria-valuemax="100">' +
-                  '<i style="width:' + reach + '%"></i></div>' +
-                '<div class="wal__meta"><span>目標金額 <b>' + num(target) + '</b></span><span><b>' + reach + '%</b></span>' +
-                  (value < target ? '<span>還差 <b>' + num(target - value) + '</b></span>' : '') + '</div>'
-              : '<div class="wal__meta"><span>累計收入 <b>' + num(cumIn) + '</b></span><span>累計支出 <b>' + num(cumOut) + '</b></span></div>' +
-                '<a class="wal__hint" href="#/groups">設一個目標金額，到了會通知你 ›</a>');
+          /* 剛重抓的活動清單比較新（筆數、說明、目標），抓不到才用切換時記下的 */
+          act = gs.filter(function (g) { return g.id === act.id; })[0] || act;
+          actCard = actInfo(act, d.yearly);
         }
         /* 收入、零用金、預計收入全都是 0：不是超支，是「還沒設定」。
            上限 0 元會讓第一筆支出就變成「超出計畫」、結餘變負的——改成提醒他去設定（使用者 2026-10-27） */
@@ -635,6 +621,63 @@
       /* 數字拿不到，功能入口仍要能使用 */
       $view.innerHTML = '<div class="page">' + errState(e) + quickTiles({}) + '</div>';
     });
+  }
+
+  /* ---------------------------------------------------------
+     活動首頁的主卡：這個活動是什麼
+
+     活動的目的五花八門（露營、旅遊、集資、社團費、存錢買東西），系統不猜、也不要使用者選「目的」。
+     最上面放建立者自己寫的說明，下面只放帳本裡本來就有的事實：期間、成員、筆數、目標金額。
+     收入、支出上面兩條已經有，這裡不再重複（使用者 2026-10-27）。
+
+     目標金額是選填的提醒，規則同 services/activity_target.py：
+     還沒有收入 → 比累計支出；有收入 → 比累計結餘。卡片上寫明比的是哪一個，不讓人猜。
+     --------------------------------------------------------- */
+  function actInfo(g, yearly) {
+    var rows = [], when = actPeriod(g), names = g.memberNames || [];
+    if (when) rows.push(['期間', esc(when)]);
+    if (names.length) {
+      rows.push(['成員', esc(names.slice(0, 5).join(' · ')) + (names.length > 5 ? ' 等 ' + names.length + ' 人' : '')]);
+    }
+    rows.push(['紀錄', g.count ? '共 ' + num(g.count) + ' 筆' : '還沒有紀錄']);
+
+    var target = Number(g.goal) || 0;
+    if (target > 0) {
+      var cumIn = 0, cumOut = 0;
+      (yearly || []).forEach(function (y) { cumIn += Number(y.income) || 0; cumOut += Number(y.expense) || 0; });
+      var saved = cumIn > 0, value = saved ? cumIn - cumOut : cumOut;
+      var reach = Math.max(0, Math.min(100, Math.round(value / target * 100)));
+      rows.push(['目標', '<span class="act__goal"><b>' + num(target) + '</b>' +
+        (value >= target ? '<span class="pill pill--near">到目標了</span>' : '') + '</span>' +
+        '<span class="wal__bar" role="progressbar" aria-label="目標金額進度" aria-valuenow="' + reach + '" aria-valuemin="0" aria-valuemax="100">' +
+          '<i style="width:' + reach + '%"></i></span>' +
+        '<small>' + (saved ? '累計結餘 ' : '累計支出 ') + num(value) + '（' + reach + '%）</small>']);
+    }
+
+    var note = g.note
+      ? '<p class="act__note">' + esc(g.note) + '</p>'
+      /* 說明只有建立者能寫；別人看到空白就好，不要放一句「還沒有說明」佔位 */
+      : g.canEdit ? '<button type="button" class="act__write" data-actnote="' + esc(g.id) + '">寫一句這個活動在做什麼 ›</button>' : '';
+    return note + '<dl class="act__f">' + rows.map(function (r) {
+      return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>';
+    }).join('') + '</dl>';
+  }
+
+  /* 「10/12 開始 · 還有 7 天結束」。結束日選填：沒填就講進行了幾天 */
+  function actPeriod(g) {
+    if (!g.created) return '';
+    var day = 864e5, today = new Date(todayKey() + 'T12:00:00');
+    var md = function (iso) {
+      var d = new Date(iso + 'T12:00:00');
+      return (d.getFullYear() !== today.getFullYear() ? d.getFullYear() + '/' : '') + (d.getMonth() + 1) + '/' + d.getDate();
+    };
+    var start = md(g.created) + ' 開始';
+    if (g.endsOn) {
+      var left = Math.round((new Date(g.endsOn + 'T12:00:00') - today) / day);
+      return start + ' · ' + (left > 0 ? '還有 ' + left + ' 天結束（' + md(g.endsOn) + '）'
+        : left === 0 ? '今天結束' : md(g.endsOn) + ' 已經結束');
+    }
+    return start + ' · 已經 ' + (Math.round((today - new Date(g.created + 'T12:00:00')) / day) + 1) + ' 天';
   }
 
   /* 今天的紀錄。上面一條是今天花了多少、收了多少，下面是一筆一筆。
@@ -2246,6 +2289,9 @@
         '<form class="card gnew" id="gnewF">' +
           '<label class="fld fld--wide"><span>名字</span>' +
             '<input type="text" id="gnName" placeholder="例如 家用、沖繩旅遊" required></label>' +
+          /* 說明就是這個活動的目的，用使用者自己的話寫；會放在活動首頁最上面 */
+          '<label class="fld fld--wide"><span>說明（選填）</span>' +
+            '<input type="text" id="gnNote" maxlength="100" placeholder="例如 11 月沖繩四天三夜，住宿先刷爸爸的卡"></label>' +
           '<label class="fld"><span>結束日（選填）</span>' +
             '<input type="date" id="gnEnd"></label>' +
           '<label class="fld"><span>顏色</span>' +
@@ -2428,8 +2474,12 @@
     var add = editable ? activityInvitePanel(g) : '';
 
     return '<div class="lg__b">' +
-      (g.note ? '<p class="lg__note">' + esc(g.note) + '</p>' : '') +
       '<dl class="lg__f">' +
+        /* 說明＝這個活動在做什麼，會放在活動首頁最上面。只有建立者能改，改完離開欄位就存 */
+        (g.canEdit && !g.settled
+          ? '<dt>說明</dt><dd><input class="lg__note-i" type="text" maxlength="100" data-gnote="' + esc(g.id) + '" ' +
+              'value="' + esc(g.note || '') + '" placeholder="寫一句這個活動在做什麼（選填）" aria-label="活動說明"></dd>'
+          : g.note ? '<dt>說明</dt><dd class="lg__note">' + esc(g.note) + '</dd>' : '') +
         '<dt>成員</dt><dd><div class="lg__who">' + who + add + '</div>' +
           (g.canEdit ? '' : '<div class="lg__hint">只有開這個活動的人可以加減成員</div>') + '</dd>' +
         /* 目標金額是一個提醒，怎麼用由使用者決定：想存錢就訂高一點，想控制花費就訂低一點當警訊。
@@ -4534,6 +4584,16 @@
     }
 
 
+    /* 活動首頁的說明：按了就地出現輸入框，填好離開欄位就存（data-gnote 那一支） */
+    var an = t.closest('[data-actnote]');
+    if (an) {
+      an.outerHTML = '<input class="act__note-i" type="text" maxlength="100" data-gnote="' + esc(an.dataset.actnote) + '" ' +
+        'placeholder="例如 11 月沖繩四天三夜，住宿先刷爸爸的卡" aria-label="活動說明">';
+      var ani = document.querySelector('.act__note-i');
+      if (ani) ani.focus();
+      return;
+    }
+
     /* 活動的目標金額：選填，按了才出現輸入框 */
     var gop = t.closest('[data-gopen]');
     if (gop) {
@@ -5348,7 +5408,8 @@
         name: document.getElementById('gnName').value,
         color: document.getElementById('gnColor').value,
         kind: ends ? 'temp' : 'standing',
-        endsOn: ends
+        endsOn: ends,
+        note: ((document.getElementById('gnNote') || {}).value || '').trim()
       }).then(function (g) {
         busy(f, false);
         /* 開完就收起來。開活動是一次性動作，不像記帳會連記好幾筆——
@@ -5494,6 +5555,17 @@
         ga.disabled = false; ga.value = '';
         toast(err.message || '加不進去', 'err');
       });
+      return;
+    }
+
+    var gn = e.target.closest ? e.target.closest('[data-gnote]') : null;
+    if (gn) {
+      var nv = gn.value.trim();
+      API.updateGroup(gn.dataset.gnote, { note: nv }).then(function () {
+        toast(nv ? '說明存好了' : '說明清掉了', 'ok');
+        if (CURRENT_ACTIVITY && CURRENT_ACTIVITY.id === gn.dataset.gnote) CURRENT_ACTIVITY.note = nv;
+        if (location.hash === '#/' || !location.hash) vHome(); else paintGroups();
+      }).catch(function (err) { toast('沒有存成功：' + err.message, 'err'); });
       return;
     }
 

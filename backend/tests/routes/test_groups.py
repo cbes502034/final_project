@@ -163,6 +163,8 @@ def test_update_group_改名換色復原(api):
     assert api.patch(url, headers=h, json={"archived": True}).status_code == 422
     assert api.patch(url, headers=h, json={"name": "   "}).status_code == 422
     assert api.patch(url, headers=h, json={"owner": "3"}).status_code == 422
+    assert api.patch(url, headers=h, json={"note": "說" * 101}).status_code == 422   # 說明放在活動首頁，一句話就好
+    assert api.patch(url, headers=h, json={"note": ""}).json()["note"] == ""          # 空字串＝清掉
     assert api.patch(url, headers=h, json={}).status_code == 400
     assert api.patch(url, headers=login(mom), json={"name": "x"}).status_code == 403
     assert api.patch("/api/groups/99999", headers=h, json={"name": "x"}).status_code == 404
