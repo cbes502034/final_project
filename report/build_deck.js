@@ -952,7 +952,6 @@ async function build() {
   // ============================================================ 產品展示（--demo）
   // 照完整流程影片走一輪：畫面為主、說明一兩句。截圖是 record_demo.py --trial --snaps 同一輪拍的（report/assets/demo/）
   const D = (n) => "demo/" + n + ".png";
-  const NOTE_LOCAL = "本機示範沒有接 AI 模型，畫面上方會提示「AI 暫時沒有回應」；正式站由 AI 處理。";
 
   /** 一張大圖，右邊三四點說明 */
   const demoSingle = async (file, points, note) => {
@@ -988,10 +987,10 @@ async function build() {
     shot(s, D("landing"), 0.6, 1.5, 6.6, 1.6, "demo-landing");
     const steps = [
       ["FiUserPlus", "開始使用", "註冊、收驗證信、設定收入與存錢"],
-      ["FiEdit3", "記帳", "一句話記好幾筆，今天記了什麼一眼看完"],
+      ["FiEdit3", "記帳", "說一句話，AI 幫你拆成好幾筆"],
       ["FiMap", "活動", "旅行、聚餐各記各的，也能先規劃"],
       ["FiUsers", "家庭", "邀請家人、照看孩子，零用金自動記"],
-      ["FiPieChart", "回顧", "錢花在哪、下個月怎麼做"],
+      ["FiPieChart", "回顧", "錢花在哪；AI 財務建議，數字都有出處"],
       ["FiSmartphone", "手機", "同一套功能，手機上一樣好用"],
     ];
     for (let i = 0; i < steps.length; i++) {
@@ -1022,8 +1021,46 @@ async function build() {
   S.dParse = async () => {
     s = slide("CONTENT");
     s.addText("一句話，記好幾筆", { placeholder: "title" });
-    await demoSingle("parse", ["打一段平常講話的句子", "自動拆成好幾筆，日期、金額、分類都填好", "每一筆看過、可以改，按確認才寫入"], NOTE_LOCAL);
-    s.addNotes("記帳最麻煩的是一筆一筆填。這裡直接打一段平常講話的句子，例如「早餐蛋餅 45，捷運 30，午餐便當 95」，系統拆成好幾筆、欄位都填好，看過沒問題再按確認寫入。");
+    await demoSingle("parse", ["打一段平常講話的句子", "AI 拆成好幾筆，日期、金額、分類都填好", "每一筆看過、可以改，按確認才寫入"]);
+    s.addNotes("記帳最麻煩的是一筆一筆填。這裡直接打一段平常講話的句子，例如「早餐蛋餅 45，捷運 30，午餐便當 95」，AI 把它拆成好幾筆、欄位都填好，看過沒問題再按確認寫入。");
+  };
+
+  // AI 記帳有多準：數字從評測結果帶入（report/data/facts.json），不手打
+  S.dParseAI = async () => {
+    s = slide("CONTENT");
+    s.addText("AI 記帳：準、快，最後由你確認", { placeholder: "title" });
+    const live = (facts.eval[Object.keys(facts.eval).find((k) => /live/.test(k))] || {}).report;
+    const rules = facts.eval.rules.report;
+    const big = live ? [
+      [pct(live.case_exact), "整題完全正確", "同一份 " + facts.heldout.cases + " 題；只用規則是 " + pct(rules.case_exact), C.accent2],
+      [live.latency_p50 + " 秒", "一句話解析完", "大部分在 " + live.latency_p95 + " 秒內", C.accent1],
+      [pct(live.no_amount.hallucination), "沒講金額卻亂填", "沒講的就留空，讓你自己補", C.accent3],
+    ] : [];
+    for (let i = 0; i < big.length; i++) {
+      const [v, k, sub, col] = big[i];
+      const x = 0.6 + i * 4.1;
+      card(s, x, 1.5, 3.85, 2.25, "ai-big-" + i);
+      text(s, v, { x: x + 0.3, y: 1.65, w: 3.3, h: 0.95, fontSize: 44, bold: true, color: col, fontFace: "Calibri" });
+      text(s, k, { x: x + 0.3, y: 2.6, w: 3.3, h: 0.45, fontSize: 18, bold: true, color: C.text2 });
+      text(s, sub, { x: x + 0.3, y: 3.08, w: 3.3, h: 0.55, fontSize: 13, color: C.accent5 });
+    }
+    const how = [
+      ["FiMessageCircle", "聽得懂口語", "「昨天」「上禮拜三」、中文數字、店名都認得，一段話裡有幾筆就拆幾筆"],
+      ["FiCheckSquare", "程式再對一次", "AI 給的每一筆，程式逐筆對回原句；金額、日期對不上就不採用"],
+      ["FiUserCheck", "你說了算", "每一筆都能改，按確認才寫入；改過的都有記錄，之後拿來讓 AI 更準"],
+    ];
+    for (let i = 0; i < how.length; i++) {
+      const x = 0.6 + i * 4.1;
+      card(s, x, 4.05, 3.85, 2.6, "ai-how-" + i, "F7F9FC");
+      await iconCircle(s, how[i][0], x + 0.3, 4.3, 0.6, C.accent1, HEX.lt1, "ai-how-ic-" + i);
+      text(s, how[i][1], { x: x + 1.05, y: 4.3, w: 2.65, h: 0.6, fontSize: 17, bold: true, color: C.text2, valign: "middle" });
+      text(s, how[i][2], { x: x + 0.3, y: 5.1, w: 3.3, h: 1.4, fontSize: 13.5, color: C.text1 });
+    }
+    text(s, "測試題目由 AI 產生、句子比真人說話整齊，100% 不代表不會錯；所以每一筆最後都由你確認。",
+      { x: 0.6, y: 6.68, w: 12.1, h: 0.3, fontSize: 10.5, color: C.accent5 });
+    s.addNotes("AI 記帳準不準，我們用同一份 " + facts.heldout.cases + " 題來量：上線用的 AI 整題完全正確 " + (live ? pct(live.case_exact) : "") +
+      "，只用規則是 " + pct(rules.case_exact) + "；一句話大約 " + (live ? live.latency_p50 : "") + " 秒就拆好。沒講金額的時候，AI 不會自己亂填。" +
+      "AI 給的每一筆，程式還會逐筆對回原句再確認一次；最後每一筆都由使用者看過、按確認才寫入。");
   };
 
   S.dToday = async () => {
@@ -1071,14 +1108,18 @@ async function build() {
     s.addNotes("家長按開始照看之後，可以設定每月零用金和發放日。到了發放日，系統自動記一對帳：家長一筆支出、孩子一筆收入，孩子的鈴鐺也馬上收到通知。");
   };
 
-  S.dReview = async () => {
+  S.dStats = async () => {
     s = slide("CONTENT");
-    s.addText("回顧：錢花在哪、接下來怎麼做", { placeholder: "title" });
-    await demoDouble("stats", "advice",
-      "收支對照、近六個月的趨勢、錢花在哪。",
-      "財務建議：每一個數字都附算式，找得到出處。",
-      NOTE_LOCAL);
-    s.addNotes("最後是回顧。統計看收支對照和錢花在哪；財務建議會根據這個月的數字給建議，而且每一個數字都附上算式，找得到出處。");
+    s.addText("回顧：錢花在哪", { placeholder: "title" });
+    await demoSingle("stats", ["收支對照：按月、按年", "近六個月的趨勢", "錢花在哪：各分類比例", "數字跟總覽、明細同一個來源"]);
+    s.addNotes("回顧的第一步是統計：收支對照、近六個月的趨勢，還有錢花在哪。這些數字跟總覽、明細是同一個來源。");
+  };
+
+  S.dAdvice = async () => {
+    s = slide("CONTENT");
+    s.addText("AI 財務建議：每個數字都找得到出處", { placeholder: "title" });
+    await demoSingle("advice", ["按一下，AI 依這個月的帳寫建議", "數字由資料庫先算好，AI 只把它寫成好懂的句子", "每個數字都附算式；檢查不過的那則不顯示", "不推薦投資、保險"]);
+    s.addNotes("接著按一下產生建議。這裡的設計是：數字全部由資料庫先算好，AI 只負責把它寫成好懂的句子；每一個數字都附上算式，找得到出處，檢查不通過的那一則就不顯示。AI 也不會推薦投資或保險。");
   };
 
   S.dMobile = async () => {
@@ -1107,8 +1148,8 @@ async function build() {
 
   // 重點版：開場 3、四個領域各 3、結語 3；產品展示：照影片用一輪；完整版：原本的每一頁
   const ORDER = DEMO
-    ? ["§開場", "dCover", "dFlow", "§開始使用", "dStart", "dHome", "§記帳", "dParse", "dToday",
-       "§活動", "dActivity1", "dActivity2", "§家庭", "dFamily", "dAllowance", "§回顧", "dReview", "§手機", "dMobile",
+    ? ["§開場", "dCover", "dFlow", "§開始使用", "dStart", "dHome", "§記帳", "dParse", "dParseAI", "dToday",
+       "§活動", "dActivity1", "dActivity2", "§家庭", "dFamily", "dAllowance", "§回顧", "dStats", "dAdvice", "§手機", "dMobile",
        "§結語", "dThanks"]
     : FULL
     ? ["§開場", "cover", "problem", "stats", "§系統", "arch", "tech", "home", "entry", "family", "activity", "account", "admin", "db",

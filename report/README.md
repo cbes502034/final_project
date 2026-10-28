@@ -10,7 +10,7 @@
 ```bash
 python report/collect.py                 # 數字 → report/data/facts.json（會跑 pytest --collect-only）
 cd report && npm install && node build_deck.js          # 重點版（18 頁）：開場 3、四個領域各 3、結語 3
-node build_deck.js --demo                                  # 產品展示（13 頁）：照完整流程影片用一輪，畫面為主 → 家庭記帳_產品展示.pptx
+node build_deck.js --demo                                  # 產品展示（15 頁）：照完整流程影片用一輪，畫面為主 → 家庭記帳_產品展示.pptx
 node build_deck.js --full                                  # 完整版：每個畫面、評測細節、每一輪測試都有 → 家庭記帳_期末報告_完整版.pptx
 ```
 

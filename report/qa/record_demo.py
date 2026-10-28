@@ -206,6 +206,7 @@ def api_login(api, acc):
 async def run(ws_url, args, accounts, workdir):
     front, api, tag = TARGETS[args.target]
     local = args.target == "local"
+    no_model = local and not args.ai              # 本機沒接模型：AI 那兩步字幕照實說是規則備援
     trial = args.trial
     pace = 0.3 if trial else 1.0
     parent, kid = accounts["parent"], accounts["kid"]
@@ -386,7 +387,8 @@ async def run(ws_url, args, accounts, workdir):
         await go(card_url("open", card_html("FAMBUDGET · FULL WALKTHROUGH · " + today.isoformat(), "家庭記帳<br>從一個空帳號開始",
                                             ["註冊 → 個人化設定 → 記帳 → 活動 → 家庭與零用金 → 統計與建議 → 手機版",
                                              ("全程在部署好的網站上操作" if not local else
-                                              "在本機錄：跟線上同一份程式；本機沒有接模型，AI 那兩步用規則備援"),
+                                              "在本機錄：跟線上同一份程式；本機沒有接模型，AI 那兩步用規則備援" if no_model else
+                                              "在本機錄：跟線上同一份程式、同一個 AI 模型（Claude）"),
                                              "每一步下方的字幕說明正在做什麼；需要密碼的動作只拍到對話框"])), keep=0.5)
         if not trial:
             await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
@@ -493,8 +495,8 @@ async def run(ws_url, args, accounts, workdir):
         # ---------------------------------------------------------------- 4. 段落記帳與總覽下方面板
         await cap("段落記帳", "一句話記好幾筆：直接打一段平常講話的句子")
         await para("早餐蛋餅 45，捷運 30，午餐便當 95，晚上全聯買牙膏 89")
-        await cap("解析結果", "本機沒有接模型：先用規則把一段話拆成四筆、分好類；一樣要人確認才存" if local
-                  else "AI 把一段話拆成四筆、分好類；要人確認才會存")
+        await cap("解析結果", "本機沒有接模型：先用規則把一段話拆成四筆、分好類；一樣要人確認才存" if no_model
+                  else "AI 把一段話拆成四筆，日期、金額、分類都填好；看過、確認才會存")
         await wait(6)
         await click("#paraSave")
         await busy("!document.getElementById('paraSave')", keep=1.2)
@@ -675,8 +677,8 @@ async def run(ws_url, args, accounts, workdir):
         await cap("統計", "收支對照、錢花在哪：數字跟總覽、明細同一個來源")
         await wait(5)
         await page("#/advice", "document.getElementById('advGen')")
-        await cap("財務建議", "數字由資料庫先算好；本機沒接模型，就用同一批數字整理成建議，每個數字都附算式" if local
-                  else "數字由資料庫先算好，模型只寫句子；每個數字都附算式")
+        await cap("財務建議", "數字由資料庫先算好；本機沒接模型，就用同一批數字整理成建議，每個數字都附算式" if no_model
+                  else "數字由資料庫先算好，AI 只把它寫成好懂的建議；每個數字都附算式，找得到出處")
         await wait(1.5)
         await click("#advGen")
         await wait(2)
@@ -793,6 +795,8 @@ def main() -> int:
     ap.add_argument("--trial", action="store_true", help="試跑：不錄影，每一步存一張截圖到 report/qa/trial/")
     ap.add_argument("--accounts", help="（只給本機試跑）帳密的 JSON 檔：{parent: {name, email, password}, kid: {email, password}}")
     ap.add_argument("--show", action="store_true", help="開出 Chrome 視窗（不是無頭），看得到它在做什麼")
+    ap.add_argument("--ai", action="store_true",
+                    help="本機後端有接 AI 模型（backend/.env 填了 MODEL_PROVIDER 與金鑰）：字幕照實寫 AI，不寫規則備援")
     ap.add_argument("--snaps", action="store_true",
                     help="（配合 --trial）在重點畫面拍乾淨的高解析截圖（不帶字幕、游標）到 report/assets/demo/，產品展示簡報用")
     args = ap.parse_args()
