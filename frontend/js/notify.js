@@ -84,6 +84,10 @@
      --------------------------------------------------------- */
   function poll(first) {
     if (!global.API || !global.API.notifications) return Promise.resolve();
+    /* 分頁在背景就不問，切回來 onVisible 馬上補一次。
+       ⚠️ 背景分頁還一直問的話，後端會當成「有在用」，忘了關的分頁就讓登入永遠不過期
+       （後端閒置 30 分鐘自動登出，見 app/toolkit/security.py 的 keep_session）。 */
+    if (document.visibilityState === 'hidden') return Promise.resolve();
 
     /* 同時只允許一次請求在飛。
        會撞在一起的情境：20 秒的定時輪詢還沒回來，使用者剛好切回分頁

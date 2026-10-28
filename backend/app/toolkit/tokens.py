@@ -30,6 +30,11 @@ refresh token 存在 `sessions` 表，登出時把它標記成作廢就好。
 結果是：使用者不用每 30 分鐘重新登入（前端會自動續期），
 但帳號被盜時撤銷 refresh token，攻擊者最多再撐 30 分鐘。
 
+**閒置自動登出**：sessions.expires_at 不是 14 天後，是「最後一次有動作＋SESSION_IDLE_MINUTES（30 分鐘）」。
+守衛每次請求把它往後推（app.toolkit.security.keep_session），所以一直在用的人不會被登出；
+關掉分頁、電腦睡著、分頁一直在背景，30 分鐘沒有任何請求，這一台就換不到新的 token 了。
+refresh token 本身的 14 天只是上限——每換一次就重新算。
+
 ⚠️ **存進資料庫的不可以是 token 原文，要存雜湊值。**
 道理跟密碼一樣：資料庫外洩時，攻擊者拿到原文就能直接冒用登入。
 這個檔案有提供 `fingerprint()` 幫你算。
@@ -52,6 +57,7 @@ __all__ = [
     "WrongTokenType",
     "make_access_token",
     "make_refresh_token",
+    "session_deadline",
     "read_token",
     "read_access_token",
     "read_refresh_token",
@@ -130,8 +136,10 @@ def make_refresh_token(user_id) -> tuple[str, datetime]:
         user_id: 使用者 ID。
 
     回傳
-        tuple[str, datetime]: `(token 字串, 到期時間)`。
+        tuple[str, datetime]: `(token 字串, 這一台的到期時間)`。
             到期時間要一起存進 `sessions` 表，才能查詢「哪些登入還有效」。
+            ⚠️ 它是**閒置期限**（`session_deadline()`：現在＋SESSION_IDLE_MINUTES），不是 token 本身的 14 天：
+            之後每次請求由守衛往後推，30 分鐘沒有動作就過期＝自動登出。
 
     範例
         >>> t, exp = make_refresh_token(1)
@@ -146,10 +154,18 @@ def make_refresh_token(user_id) -> tuple[str, datetime]:
         兩台裝置的 sessions 分不開，/api/auth/refresh 輪替時也可能換回同一張，舊的就沒作廢。
     """
     now = datetime.now(UTC)
-    expires = now + timedelta(days=settings.refresh_token_days)
-    token = _encode({"sub": str(user_id), "type": "refresh", "iat": now, "exp": expires,
+    token = _encode({"sub": str(user_id), "type": "refresh", "iat": now,
+                     "exp": now + timedelta(days=settings.refresh_token_days),
                      "jti": secrets.token_urlsafe(12)})
-    return token, expires
+    return token, session_deadline(now)
+
+
+def session_deadline(at: datetime | None = None) -> datetime:
+    """這一台閒置到什麼時候就自動登出：`at`（預設現在）＋ SESSION_IDLE_MINUTES。
+
+    登入、換發 token 時存進 sessions.expires_at；之後每次請求由守衛往後推（security.keep_session）。
+    """
+    return (at or datetime.now(UTC)) + timedelta(minutes=settings.session_idle_minutes)
 
 
 def read_token(token: str) -> dict[str, Any]:

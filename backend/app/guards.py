@@ -99,9 +99,10 @@ def _models():
 # ===========================================================================
 def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_db),
                  payload: dict = Depends(current_token_payload)):
-    """驗 token → 撈使用者 → 擋停權 → 記最後活動時間 → 掛上家庭與角色。每一個守衛的第一步。"""
+    """驗 token → 撈使用者 → 擋停權 → 記最後活動時間、延長閒置期限 → 掛上家庭與角色。每一個守衛的第一步。"""
     m = _models()
     user = db.get(m.User, uid)
+    session = None
     if user is None or user.deleted_at is not None:
         # 刪除帳號之後，手上那張 access token（最多 30 分鐘）也不能再用
         raise errors.unauthorized("登入資訊無效，請重新登入")
@@ -112,14 +113,19 @@ def current_user(uid: int = Depends(current_user_id), db: Session = Depends(get_
             sid = uuid.UUID(payload["sid"])
         except (ValueError, TypeError):
             raise errors.unauthorized("登入資訊無效，請重新登入") from None
-        if not crud.exists(m.UserSession, {"id": sid, "user_id": uid, "revoked_at__isnull": True,
-                                          "expires_at__gt": datetime.now(timezone.utc)}, db=db):
+        session = crud.get(m.UserSession, where={"id": sid, "user_id": uid, "revoked_at__isnull": True,
+                                                 "expires_at__gt": datetime.now(timezone.utc)}, db=db)
+        if session is None:
+            # 按了登出、別的裝置按全部登出、改了密碼、被停權，或閒置超過 SESSION_IDLE_MINUTES
             raise errors.unauthorized("這台裝置已登出，請重新登入")
     if user.suspended_at is not None:
         # ⚠️ 已經登入的人被停權，下一次請求就要擋，不是等他 token 過期
         raise errors.forbidden("這個帳號已被停權：" + (user.suspended_reason or "違反使用規範"))
     # 平台管理頁的紅綠燈：最後一次有登入狀態的請求（30 秒內不重寫）
     security.touch(user, db=db)
+    # 閒置自動登出：有動作就把這一台的期限往後推（30 秒內不重寫）
+    if session is not None:
+        security.keep_session(session, db=db)
     fm = crud.get(m.FamilyMember, where={"user_id": user.id, "status": "active"}, db=db)
     user.family_id = fm.family_id if fm else None
     user.family_role = fm.role if fm else None

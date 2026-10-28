@@ -646,7 +646,7 @@ db.refresh(tx)      <span class="tk-cm"># 把資料庫產生的 id 讀回來</sp
         <div class="fl"><div class="fl__n">3</div><div class="fl__b">
           <div class="fl__t">發兩張 token</div>
           <div class="fl__d"><b>access token</b>（30 分鐘，每次請求都帶）＋
-          <b>refresh token</b>（14 天，只用來換新的 access token）</div></div></div>
+          <b>refresh token</b>（只用來換新的 access token；30 分鐘沒有任何請求就作廢，上限 14 天）</div></div></div>
         <div class="fl"><div class="fl__ar">↓</div><div class="fl__b" style="padding-bottom:10px"></div></div>
         <div class="fl"><div class="fl__n">4</div><div class="fl__b">
           <div class="fl__t">之後每個請求都帶著 access token</div>
@@ -666,9 +666,11 @@ db.refresh(tx)      <span class="tk-cm"># 把資料庫產生的 id 讀回來</sp
           它<b>不存在資料庫裡</b>，所以沒辦法主動撤銷。這就是為什麼要設短。</p>
         </div>
         <div class="vs__c">
-          <h4 style="color:var(--accent-hi)">refresh token · 14 天</h4>
+          <h4 style="color:var(--accent-hi)">refresh token · 閒置 30 分鐘作廢</h4>
           <p>只在換新 access token 時用，露臉次數少。<br><br>
-          它<b>存在資料庫的 sessions 表裡</b>，所以登出時可以標記成作廢。</p>
+          它<b>存在資料庫的 sessions 表裡</b>，所以登出時可以標記成作廢。
+          <code>expires_at</code> 是「最後一次有動作＋30 分鐘」，每次請求往後推：
+          一直在用的人不會被登出，關掉分頁 30 分鐘就自動登出（上限 14 天）。</p>
         </div>
       </div>
 

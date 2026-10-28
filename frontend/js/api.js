@@ -3324,12 +3324,15 @@
     if (refreshing) return refreshing;
 
     var t = tokens();
-    if (!t || !t.refreshToken) return Promise.reject(new Error('尚未登入'));
+    if (!t || !t.refreshToken) return Promise.reject(Object.assign(new Error('尚未登入'), { status: 401 }));
 
     refreshing = send('/api/auth/refresh', {
       method: 'POST', body: { refreshToken: t.refreshToken }
     }).then(function (r) {
-      if (!r.ok) { setTokens(null); return fail(r, '/api/auth/refresh'); }
+      if (!r.ok) {
+        setTokens(null);
+        return fail(r, '/api/auth/refresh').catch(function (e) { signedOut(e); throw e; });
+      }
       return r.json();
     }).then(function (d) {
       setTokens({
@@ -3346,6 +3349,15 @@
     });
     return refreshing;
   }
+  /* 換不到新的 token＝後端已經把這一台登出了：閒置超過 30 分鐘、別的裝置按了全部登出、改了密碼、被停權。
+     通知畫面（app.js）帶回登入頁並講原因。⚠️ 不通知的話，鈴鐺這種背景請求失敗是安靜的，
+     畫面會停在原頁，要等下一個動作才莫名其妙出錯。 */
+  function signedOut(e) {
+    try {
+      global.dispatchEvent(new CustomEvent('fambudget:signedout', { detail: { status: e && e.status, message: e && e.message } }));
+    } catch (x) {}
+  }
+
   function qs(f) {
     var p = Object.keys(f || {})
       .filter(function (k) { var v = f[k]; return v !== undefined && v !== null && v !== '' && v !== 'all'; })

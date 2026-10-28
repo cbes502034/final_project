@@ -204,7 +204,7 @@
 
   var ROLE_TW = { master: '平台管理員', parent: '家長', child: '子女' };
 
-  function toast(msg, kind, undo) {
+  function toast(msg, kind, undo, ms) {
     var t = el('<div class="toast' + (kind ? ' toast--' + kind : '') + '">' +
       '<span class="toast__t">' + esc(msg) + '</span>' +
       (undo ? '<button class="toast__u">復原</button>' : '') + '</div>');
@@ -214,7 +214,7 @@
       t.style.transition = 'opacity .25s, transform .25s';
       t.style.opacity = '0'; t.style.transform = 'translateX(16px)';
       setTimeout(function () { t.remove(); }, 260);
-    }, undo ? 6000 : 3200);
+    }, ms || (undo ? 6000 : 3200));
   }
 
   function skeleton(n, cls) {
@@ -5880,6 +5880,21 @@
     paintWho();
     paint();
   });
+  /* 後端把這一台登出了（api.js 換不到新 token 時發 fambudget:signedout）：
+     閒置超過 30 分鐘、別的裝置按了全部登出、改了密碼、被停權。回登入頁並講原因——
+     ⚠️ 不處理的話，鈴鐺這種背景請求失敗是安靜的，畫面會停在原頁，下一個動作才莫名其妙出錯。 */
+  window.addEventListener('fambudget:signedout', function (e) {
+    var d = e.detail || {};
+    if (document.getElementById('idle')) idleClose();
+    if (global.Notify) { global.Notify.stop(); global.Notify.reset(); }
+    ME = null; CATS = [];
+    document.body.classList.remove('is-admin', 'role-child');
+    document.body.classList.add('is-out');
+    location.hash = '#/login';
+    paint();
+    /* 回到分頁的那一刻才看得到，停久一點 */
+    toast(d.status === 403 && d.message ? d.message : '太久沒有動作，或在其他地方登出了，請重新登入', 'err', null, 8000);
+  });
 
   /* 更早的版本有一個顯示 API 模式的小徽章。那是給開發者看的，
      介面上已經拿掉——這裡留一個保險，元素不在就不要炸。 */
@@ -5986,7 +6001,8 @@
     API.renew().then(function () {
       idleClose();
     }, function () {
-      idleLogout('登入已經過期，請重新登入');
+      /* 後端已經登出這一台的話，api.js 發了 fambudget:signedout，已經帶回登入頁（ME 清掉了） */
+      if (ME) idleLogout('登入已經過期，請重新登入'); else idleClose();
     });
   }
 

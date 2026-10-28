@@ -312,9 +312,10 @@ window.DATA = {
       cols: [['id', 'UUID', 'PK'], ['user_id', 'BIGINT', 'FK → users'],
              ['refresh_token_hash', 'TEXT', '只存雜湊'],
              ['user_agent', 'TEXT', ''], ['ip_hash', 'TEXT', ''],
-             ['issued_at', 'TIMESTAMPTZ', ''], ['expires_at', 'TIMESTAMPTZ', ''],
+             ['issued_at', 'TIMESTAMPTZ', ''],
+             ['expires_at', 'TIMESTAMPTZ', '閒置期限：最後一次有動作＋30 分鐘（SESSION_IDLE_MINUTES）。每次請求往後推，過了就是自動登出'],
              ['revoked_at', 'TIMESTAMPTZ', 'NULL = 仍有效'],
-             ['last_seen_at', 'TIMESTAMPTZ', '最近一次用這張 refresh token 的時間。「登入中的裝置」要顯示']] },
+             ['last_seen_at', 'TIMESTAMPTZ', '這一台最近一次有動作（登入、換 token、任何請求；30 秒內不重寫）。「登入中的裝置」要顯示']] },
 
     { t: 'password_resets', label: '重設密碼連結', note: '忘記密碼寄出的一次性連結。30 分鐘失效、只能用一次',
       cols: [['id', 'BIGSERIAL', 'PK'], ['user_id', 'BIGINT', 'FK → users'],

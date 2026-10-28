@@ -264,6 +264,27 @@ def touch(user: Any, *, db) -> None:
     set_committed_value(user, "last_active_at", t)     # 不要讓這個物件變成「改過」，路由 commit 時才不會再寫一次
 
 
+def keep_session(session: Any, *, db) -> None:
+    """閒置自動登出的另一半：這一台有動作，就把 sessions.expires_at 往後推到「現在＋SESSION_IDLE_MINUTES」。
+
+    守衛每個請求都呼叫，距離上次推超過 TOUCH_SECONDS 才寫。一直有在用的人（線上、綠燈）永遠不會被登出；
+    30 分鐘沒有任何請求，expires_at 就過了——守衛擋下 access token、/api/auth/refresh 也換不到，就是登出。
+    ⚠️ 前端分頁在背景時鈴鐺不問（notify.js），背景分頁才不會讓登入一直不過期。
+    """
+    t = now()
+    seen = aware(session.last_seen_at)
+    if seen is not None and (t - seen).total_seconds() < TOUCH_SECONDS:
+        return
+    from app.toolkit import tokens
+    m = _models()
+    from sqlalchemy import update
+    db.execute(update(m.UserSession)
+               .where(m.UserSession.id == session.id, m.UserSession.revoked_at.is_(None))
+               .values(expires_at=tokens.session_deadline(t), last_seen_at=t)
+               .execution_options(synchronize_session=False))
+    db.commit()
+
+
 def last_seen(user: Any) -> datetime | None:
     """最後一次有動靜的時間：最後一次請求（last_active_at）與最後一次登入（last_login_at）取比較晚的。
 

@@ -94,6 +94,14 @@ class Settings(BaseSettings):
         description="access token 有效期（分鐘）。刻意設短：外洩時損害只持續這麼久，前端會自動續期。",
     )
     refresh_token_days: int = Field(default=14, description="refresh token 有效期（天）。存在 sessions 表，可以撤銷。")
+    session_idle_minutes: int = Field(
+        default=30,
+        gt=0,
+        description=(
+            "閒置多久自動登出（分鐘）。這一台超過這麼久沒有任何請求（關掉分頁、電腦睡著、分頁一直在背景），"
+            "sessions.expires_at 就過了，換不到新的 token；一直有在用的人每次請求都會往後推，不會被登出。"
+        ),
+    )
     email_verify_minutes: int = Field(
         default=1440,
         gt=0,

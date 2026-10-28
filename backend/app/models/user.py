@@ -101,10 +101,11 @@ class UserSession(Base):
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
     ip_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    # 閒置期限：最後一次有動作＋30 分鐘（SESSION_IDLE_MINUTES）。每次請求往後推，過了就是自動登出
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # NULL = 仍有效
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # 最近一次用這張 refresh token 的時間。「登入中的裝置」要顯示
+    # 這一台最近一次有動作（登入、換 token、任何請求；30 秒內不重寫）。「登入中的裝置」要顯示
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
