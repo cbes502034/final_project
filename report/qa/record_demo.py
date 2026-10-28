@@ -1,4 +1,4 @@
-"""完整流程的示範影片（10/27 版）：在部署好的網站上，從一個空帳號開始走一遍，逐格擷取畫面、疊上中文字幕，合成 MP4。
+"""完整流程的示範影片（10/27 版）：在部署好的網站上，從一個空帳號開始走一遍，逐格擷取畫面、下面接一條中文字幕帶（不疊在網頁上），合成 MP4。
 
     python report/qa/record_demo.py                     → 線上站錄影，產出 report/qa/家庭記帳_完整流程.mp4
     python report/qa/record_demo.py --trial             → 試跑：不錄影，每一步存一張截圖到 report/qa/trial/（快很多）
@@ -51,25 +51,56 @@ CHROME = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
 W, H = 1280, 800
 TW = dt.timezone(dt.timedelta(hours=8))
 
-CAPTION_JS = r"""
-(function (step, total, title, desc, where) {
-  var id = 'qa-cap', el = document.getElementById(id);
-  if (!el) {
-    el = document.createElement('div'); el.id = id;
-    el.setAttribute('style', [
-      'position:fixed', 'left:0', 'right:0', 'bottom:0', 'z-index:2147483647', 'pointer-events:none',
-      'background:rgba(11,15,20,.92)', 'border-top:2px solid #0ABAB5', 'color:#e6edf3',
-      'font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif', 'padding:14px 28px 16px',
-      'display:flex', 'flex-wrap:wrap', 'gap:4px 18px', 'align-items:baseline'].join(';'));
-    document.documentElement.appendChild(el);
-  }
-  var small = innerWidth < 600;
-  el.style.padding = small ? '10px 14px 12px' : '14px 28px 16px';
-  el.innerHTML = '<span style="font:700 ' + (small ? 12 : 15) + 'px Consolas,monospace;color:#0ABAB5;white-space:nowrap">' + step + ' / ' + total + '</span>' +
-    '<span style="font-size:' + (small ? 17 : 21) + 'px;font-weight:700;white-space:nowrap">' + title + '</span>' +
-    '<span style="font-size:' + (small ? 13 : 15) + 'px;color:#a9b6c3">' + desc + '</span>';
-})
-"""
+#: 字幕帶：接在網頁畫面下面，不疊在網頁上（使用者：字幕要清楚，但不能遮住原本的畫面）
+BAND = 128
+FONTS = r"C:\Windows\Fonts"
+_fonts, _bands = {}, {}
+
+
+def font(name, size):
+    from PIL import ImageFont
+    if (name, size) not in _fonts:
+        _fonts[name, size] = ImageFont.truetype(os.path.join(FONTS, name), size)
+    return _fonts[name, size]
+
+
+def caption_band(cap):
+    """字幕帶：第一行「第幾步＋標題」、第二行說明，置中。cap 是 (第幾步, 共幾步, 標題, 說明)；None 是片頭片尾（空白）"""
+    if cap not in _bands:
+        from PIL import ImageDraw
+        img = Image.new("RGB", (W, BAND), (11, 15, 20))
+        d = ImageDraw.Draw(img)
+        d.rectangle([0, 0, W, 2], fill=(10, 186, 181))
+        if cap:
+            n, total, title, desc = cap
+            title, desc = title.replace("−", "－"), desc.replace("−", "－")      # 正黑體沒有數學減號
+            tag, f_tag, f_title = "%d / %d" % (n, total), font("consolab.ttf", 20), font("msjhbd.ttc", 34)
+            tag_w = d.textlength(tag, font=f_tag) + 20
+            x = (W - tag_w - 16 - d.textlength(title, font=f_title)) / 2
+            d.rectangle([x, 28, x + tag_w, 58], fill=(10, 186, 181))
+            d.text((x + tag_w / 2, 43), tag, font=f_tag, fill=(11, 15, 20), anchor="mm")
+            d.text((x + tag_w + 16, 43), title, font=f_title, fill=(255, 255, 255), anchor="lm")
+            size = 24
+            while size > 16 and d.textlength(desc, font=font("msjh.ttc", size)) > W - 80:
+                size -= 1
+            d.text((W / 2, 92), desc, font=font("msjh.ttc", size), fill=(219, 228, 236), anchor="mm")
+        _bands[cap] = img
+    return _bands[cap]
+
+
+def compose(img, cap):
+    """網頁畫面（手機畫面放在深色畫布正中間）＋下面的字幕帶"""
+    if img.size != (W, H):
+        scale = H / img.size[1]
+        img = img.resize((max(1, int(img.size[0] * scale)), H))
+        page = Image.new("RGB", (W, H), (11, 15, 20))
+        page.paste(img, ((W - img.size[0]) // 2, 0))
+        img = page
+    out = Image.new("RGB", (W, H + BAND))
+    out.paste(img, (0, 0))
+    out.paste(caption_band(cap), (0, H))
+    return out
+
 
 #: 畫面上的滑鼠游標。無頭 Chrome 錄不到真的游標，所以畫一個：
 #: 從上一個位置滑到目標（0.8 秒）→ 停一下 → 點的地方出現波紋 → 才真的點下去，看的人跟得上。
@@ -147,6 +178,7 @@ class CDP:
         self.ws, self.seq, self.wait, self.frames = ws, 0, {}, []
         self.recording = False
         self.ff = []          # [(開始, 結束, 合成後最多幾秒)]：等載入、等模型的片段，合成時快轉
+        self.caps = []        # [(時間, (第幾步, 共幾步, 標題, 說明) 或 None)]：字幕帶什麼時候換字
         self.errors = []      # 頁面上的 JavaScript 錯誤：卡住的時候印出來
 
     async def reader(self):
@@ -238,12 +270,6 @@ async def run(ws_url, args, accounts, workdir):
         async def wait(sec):
             await asyncio.sleep(sec * pace)
 
-        async def recap():
-            # 換頁（重新載入）會把字幕清掉：每次換頁後立刻補上目前這一步的字幕
-            if shown:
-                await c.js("(%s)(%d, %d, %s, %s, %s)" % (CAPTION_JS, step[0], total, json.dumps(shown["title"]),
-                                                         json.dumps(shown["desc"]), json.dumps(tag)))
-
         snap_dir = os.path.join(os.path.dirname(HERE), "assets", "demo")
         if args.snaps:
             shutil.rmtree(snap_dir, ignore_errors=True)
@@ -252,12 +278,12 @@ async def run(ws_url, args, accounts, workdir):
         marks = {}
 
         async def snap(name, spots=None):
-            """專案報告用：先把字幕、游標藏起來，等畫面停好再拍，拍完放回去。
+            """專案報告用：先把游標藏起來，等畫面停好再拍，拍完放回去。
             spots：要在簡報上標 ①②③ 的元件（CSS 選擇器，或 "js:" 開頭的運算式），
             記下它們在畫面上的位置（佔寬、高的比例）到 marks.json，簡報照這個位置畫編號，不用目測"""
             if not args.snaps:
                 return
-            await c.js("['qa-cap','qa-cur'].forEach(function (i) { var e = document.getElementById(i); if (e) e.style.visibility = 'hidden'; })")
+            await c.js("var e = document.getElementById('qa-cur'); if (e) e.style.visibility = 'hidden'")
             await asyncio.sleep(0.8)
             if spots:
                 marks[name] = await c.js("""(function (specs) { return specs.map(function (sp) {
@@ -272,7 +298,7 @@ async def run(ws_url, args, accounts, workdir):
             shot = await c.send("Page.captureScreenshot", format="png")
             with open(os.path.join(snap_dir, name + ".png"), "wb") as f:
                 f.write(base64.b64decode(shot["data"]))
-            await c.js("['qa-cap','qa-cur'].forEach(function (i) { var e = document.getElementById(i); if (e) e.style.visibility = ''; })")
+            await c.js("var e = document.getElementById('qa-cur'); if (e) e.style.visibility = ''")
 
         # 這幾步一出字幕就是要的畫面：直接拍。後面的清單是簡報上要標編號的元件
         SNAP_AT = {
@@ -304,15 +330,15 @@ async def run(ws_url, args, accounts, workdir):
         async def cap(title, desc):
             step[0] += 1
             shown.update(title=title, desc=desc)
-            await recap()
+            c.caps.append((time.time(), (step[0], total, title, desc)))
             if title in SNAP_AT:
                 await snap(*SNAP_AT[title])
             print("  %2d/%d %s" % (step[0], total, title), flush=True)
             if trial:
                 await asyncio.sleep(0.4)
                 shot = await c.send("Page.captureScreenshot", format="png")
-                with open(os.path.join(trial_dir, "%02d_%s.png" % (step[0], title.replace("/", "／"))), "wb") as f:
-                    f.write(base64.b64decode(shot["data"]))
+                img = Image.open(io.BytesIO(base64.b64decode(shot["data"]))).convert("RGB")
+                compose(img, c.caps[-1][1]).save(os.path.join(trial_dir, "%02d_%s.png" % (step[0], title.replace("/", "／"))))
 
         async def click(sel, pause=0.6, do=True, need=True):
             """游標移過去、停一下、波紋、點下去。找不到：need=True 就停下來說是哪一步，不然跳過。"""
@@ -350,12 +376,10 @@ async def run(ws_url, args, accounts, workdir):
             t0 = time.time()
             await c.send("Page.navigate", url=url)
             await asyncio.sleep(0.6)
-            await recap()
             if ready:
                 await until(ready, timeout)
             else:
                 await asyncio.sleep(1.5)
-            await recap()
             if not url.startswith("file:"):
                 await point()
             c.ff.append((t0, time.time(), keep))
@@ -368,7 +392,6 @@ async def run(ws_url, args, accounts, workdir):
             t0 = time.time()
             await until(expr, timeout)
             c.ff.append((t0, time.time(), keep))
-            await recap()
 
         async def type_in(sel, text, delay=75):
             await c.js("""(async (s, t, d) => { const el = document.querySelector(s); el.focus(); el.value = '';
@@ -387,6 +410,13 @@ async def run(ws_url, args, accounts, workdir):
                        % (json.dumps(sel), json.dumps(block)))
             await asyncio.sleep(0.8)
 
+        async def reveal(expr):
+            """往下捲到這個元件整個露出來（頂端不要被頁首蓋住）。expr 是傳回元件的 JS 運算式"""
+            await c.js("(function (e) { if (!e) return; var r = e.getBoundingClientRect();"
+                       " var dy = Math.min(r.bottom - innerHeight + 16, r.top - 80);"
+                       " if (dy > 0) window.scrollBy({top: dy, behavior: 'smooth'}); })(%s)" % expr)
+            await asyncio.sleep(0.8)
+
         async def use(tok, uid, tour_done=True):
             # 換人：權杖放進 localStorage（跟前端登入後存的一樣）；導覽標成看過，一進總覽才不會先問要不要導覽
             await c.js("localStorage.setItem('fambudget.auth', %s)" % json.dumps(tok if isinstance(tok, str) else json.dumps(tok)))
@@ -400,7 +430,6 @@ async def run(ws_url, args, accounts, workdir):
             if await c.js("!!(document.querySelector('[data-mode=\"para\"]') && !document.querySelector('[data-mode=\"para\"]').classList.contains('on'))"):
                 await click('[data-mode="para"]')
             await until("document.querySelector('textarea')", 30)
-            await recap()
             await click("textarea", pause=0.3)
             await c.js("""(async (t, d) => { const ta = document.querySelector('textarea'); ta.focus(); ta.value = '';
                           for (const ch of t) { ta.value += ch; ta.dispatchEvent(new Event('input', {bubbles: true}));
@@ -722,7 +751,9 @@ async def run(ws_url, args, accounts, workdir):
         await use(parent_auth, parent_uid)
         await page("#/stats", "document.querySelector('.donut, svg circle, .dt, .chart')")
         await cap("統計", "收支對照、錢花在哪：數字跟總覽、明細同一個來源")
-        await wait(5)
+        await wait(2.5)
+        await reveal("[...document.querySelectorAll('#view .card')].pop()")      # 錢花在哪（字幕框下面）
+        await wait(3)
         await page("#/advice", "document.getElementById('advGen')")
         await cap("財務建議", "數字由資料庫先算好；本機沒接模型，就用同一批數字整理成建議，每個數字都附算式" if no_model
                   else "數字由資料庫先算好，AI 只把它寫成好懂的建議；每個數字都附算式，找得到出處")
@@ -772,6 +803,7 @@ async def run(ws_url, args, accounts, workdir):
         if not trial:
             await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=W, maxHeight=H, everyNthFrame=1)
         shown.clear()
+        c.caps.append((time.time(), None))
         await go(card_url("end", card_html("END", "謝謝觀看", [
             "個人、活動、家庭三種視角，同一套記帳"])), keep=0.5)
         await wait(5)
@@ -779,7 +811,7 @@ async def run(ws_url, args, accounts, workdir):
         if not trial:
             await c.send("Page.stopScreencast")
         reader.cancel()
-        return c.frames, c.ff
+        return c.frames, c.ff, c.caps
 
 
 def remap(ff):
@@ -796,24 +828,28 @@ def remap(ff):
     return f
 
 
-def encode(frames, out_mp4, workdir, ff=()):
+def encode(frames, caps, out_mp4, workdir, ff=()):
+    import bisect
     import imageio_ffmpeg
     frames.sort(key=lambda f: f[0])
     tmap = remap(ff)
-    lines = []
-    for i, (ts, data) in enumerate(frames):
-        img = Image.open(io.BytesIO(data)).convert("RGB")
-        if img.size != (W, H):                        # 手機畫面：放在深色畫布正中間
-            scale = H / img.size[1]
-            img = img.resize((max(1, int(img.size[0] * scale)), H))
-            canvas = Image.new("RGB", (W, H), (11, 15, 20))
-            canvas.paste(img, ((W - img.size[0]) // 2, 0))
-            img = canvas
-        path = os.path.join(workdir, "f%05d.jpg" % i)
-        img.save(path, quality=90)
-        nxt = frames[i + 1][0] if i + 1 < len(frames) else ts + 1.5
+    end = frames[-1][0] + 1.5
+    # 截圖串流只在網頁畫面有變的時候送一格；字幕換字時畫面不一定有變，所以換字的時間點也要切一刀
+    cuts = sorted(set([f[0] for f in frames] + [tc for tc, _ in caps if frames[0][0] < tc < end]))
+    cap_t = [tc for tc, _ in caps]
+    lines, made, fi = [], {}, 0
+    for i, ts in enumerate(cuts):
+        while fi + 1 < len(frames) and frames[fi + 1][0] <= ts:
+            fi += 1
+        k = bisect.bisect_right(cap_t, ts) - 1
+        cap = caps[k][1] if k >= 0 else None
+        path = made.get((fi, cap))
+        if not path:
+            path = made[fi, cap] = os.path.join(workdir, "f%05d.jpg" % len(made))
+            compose(Image.open(io.BytesIO(frames[fi][1])).convert("RGB"), cap).save(path, quality=90)
+        nxt = cuts[i + 1] if i + 1 < len(cuts) else end
         lines.append("file '%s'\nduration %.3f" % (path.replace("\\", "/"), max(0.001, tmap(nxt) - tmap(ts))))
-    lines.append("file '%s'" % os.path.join(workdir, "f%05d.jpg" % (len(frames) - 1)).replace("\\", "/"))
+    lines.append("file '%s'" % path.replace("\\", "/"))
     lst = os.path.join(workdir, "list.txt")
     with io.open(lst, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -881,13 +917,13 @@ def main() -> int:
                 break
             except Exception:  # noqa: BLE001
                 time.sleep(0.25)
-        frames, ff = asyncio.run(run(page["webSocketDebuggerUrl"], args, accounts, workdir))
+        frames, ff, caps = asyncio.run(run(page["webSocketDebuggerUrl"], args, accounts, workdir))
         if args.trial:
             print("試跑完成，每一步的截圖在", os.path.join(HERE, "trial"))
             return 0
         print("frames:", len(frames), "seconds:", round(frames[-1][0] - frames[0][0], 1) if frames else 0)
         out = os.path.join(HERE, "家庭記帳_完整流程.mp4")
-        encode(frames, out, workdir, ff)
+        encode(frames, caps, out, workdir, ff)
         print(out)
     finally:
         proc.terminate()
