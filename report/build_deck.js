@@ -17,19 +17,23 @@ const HERE = __dirname;
 const facts = JSON.parse(fs.readFileSync(path.join(HERE, "data", "facts.json"), "utf8"));
 const asset = (n) => path.join(HERE, "assets", n);
 // 可以帶一個檔名另存（PowerPoint 開著舊檔、或不想蓋掉手動修改的時候）：node report/build_deck.js 新檔名.pptx
-// 三種版本：
-//   node build_deck.js          重點版：開場 3 頁、四個領域各 3 頁、結語 3 頁 → 家庭記帳_期末報告.pptx
-//   node build_deck.js --demo   產品展示：照完整流程影片用一輪，畫面為主（15 頁）→ 家庭記帳_產品展示.pptx
-//   node build_deck.js --demo2  產品介紹 v2：同一輪、講得更細（畫面標 ①②③ 逐一說明，26 頁）→ 家庭記帳_產品展示_v2.pptx
-//   node build_deck.js --demo3  產品介紹 v3：v2 的未來展望改成兩件事（AI 換成自己的模型、語音與圖片記帳）→ 家庭記帳_產品展示_v3.pptx
-//   node build_deck.js --full   完整版：每個畫面、評測細節、每一輪測試都有 → 家庭記帳_期末報告_完整版.pptx
+// 交出去的是「專案報告」：node build_deck.js → 家庭記帳_專案報告.pptx
+//   產品介紹：照完整流程影片用一輪，畫面標 ①②③ 逐一說明，最後是接下來上線的兩件事（26 頁）
+// 其他版本只在需要時另外產生，不放進 repo：
+//   --tech   技術重點版：開場 3、四個領域各 3、結語 3 → 家庭記帳_期末報告.pptx
+//   --full   技術完整版：每個畫面、評測細節、每一輪測試 → 家庭記帳_期末報告_完整版.pptx
+//   --demo   產品展示精簡版（15 頁）→ 家庭記帳_產品展示.pptx
+//   --demo2  產品介紹 v2（未來展望是四個方向）→ 家庭記帳_產品展示_v2.pptx
 const FULL = process.argv.includes("--full");
-const DEMO3 = process.argv.includes("--demo3");
-const DEMO2 = process.argv.includes("--demo2") || DEMO3;   // v3 只換未來展望，其餘跟 v2 一樣
-const DEMO = process.argv.includes("--demo") || DEMO2;   // v2 沿用產品展示的頁面與版型
+const TECH = process.argv.includes("--tech") || FULL;
+const DEMO1 = process.argv.includes("--demo");
+const DEMO3 = !TECH && !DEMO1 && !process.argv.includes("--demo2");   // 預設：專案報告
+const DEMO2 = process.argv.includes("--demo2") || DEMO3;              // 專案報告沿用 v2 的頁面，只換未來展望
+const DEMO = DEMO1 || DEMO2;                                          // v2 沿用產品展示的頁面與版型
 const outArg = process.argv.slice(2).find((a) => !a.startsWith("--"));
 const OUT = outArg ? path.resolve(outArg)
-  : path.join(HERE, DEMO3 ? "家庭記帳_產品展示_v3.pptx" : DEMO2 ? "家庭記帳_產品展示_v2.pptx" : DEMO ? "家庭記帳_產品展示.pptx" : FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
+  : path.join(HERE, DEMO3 ? "家庭記帳_專案報告.pptx" : DEMO2 ? "家庭記帳_產品展示_v2.pptx" : DEMO ? "家庭記帳_產品展示.pptx"
+    : FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
 
 const THEME = {
   name: "FamBudget",
@@ -1435,16 +1439,16 @@ async function build() {
     s.addNotes("最後用一頁整理今天看到的：開始使用、記帳、活動、家庭、回顧五大塊，手機、平板、電腦都能用。");
   };
 
-  // v3 的未來展望：使用者定的兩件事（10/28）——AI 換成自己訓練的 Qwen 蒸餾模型、記帳加上語音與圖片
+  // v3 的未來展望：使用者定的兩件事（10/28）——AI 換成 Hugging Face 上的開源模型（不用蒸餾模型）、記帳加上語音與圖片
   S.v3Future = async () => {
     s = slide("CONTENT");
     s.addText("未來展望：接下來上線的兩件事", { placeholder: "title" });
     const plans = [
-      ["FiCpu", C.accent1, "AI：換成我們自己訓練的模型", ["Anthropic API", "自己的 Qwen 蒸餾模型"], [
-        "以 Qwen 蒸餾模型為底，用我們的記帳資料再訓練：" + fmt(facts.train.cases) + " 題訓練資料，加上使用者改過的解析",
+      ["FiCpu", C.accent1, "AI：換成 Hugging Face 的開源模型", ["Anthropic API", "Hugging Face 開源模型"], [
+        "從 Hugging Face 挑合適的開源模型，用我們的記帳資料再訓練：" + fmt(facts.train.cases) + " 題訓練資料，加上使用者改過的解析",
         "上線前用同一份 " + facts.heldout.cases + " 題評測，準確率跟現在一樣才換",
-        "跑在自己的伺服器：不用付 API 費用，記帳資料不送到外面",
-        "延伸：財務建議也換成自己的模型",
+        "部署在 Hugging Face Space（或自己的伺服器），不用再付商業 API 的費用",
+        "延伸：財務建議也換成同一個模型",
       ]],
       ["FiMic", C.accent2, "記帳更省事：語音與圖片", ["打一段字", "說一段話／拍一張照"], [
         "語音：按住說話，轉成文字後走同一套 AI 拆帳",
@@ -1470,7 +1474,7 @@ async function build() {
       s.addText(items.map((t, j) => ({ text: t, options: { bullet: true, breakLine: j < items.length - 1 } })),
         { x: x + 0.35, y: 3.55, w: 5.3, h: 2.95, fontSize: 14.5, color: C.text1, paraSpaceAfter: 10, valign: "top", isTextBox: true, margin: 0 });
     }
-    s.addNotes("接下來要上線的有兩件事。第一，AI 換成我們自己訓練的模型：以 Qwen 蒸餾模型為底，用我們的記帳資料再訓練，上線前用同一份題目評測，準確率跟現在一樣才換；這樣不用付 API 費用，記帳資料也不用送到外面。第二，記帳更省事：除了打字，還能直接說一段話，或拍一張收據、發票，一樣由 AI 拆成好幾筆，最後由你確認才寫入。");
+    s.addNotes("接下來要上線的有兩件事。第一，AI 從現在的 Anthropic API，換成 Hugging Face 上的開源模型：用我們的記帳資料再訓練，上線前用同一份題目評測，準確率跟現在一樣才換；部署在 Hugging Face Space 或自己的伺服器，就不用再付商業 API 的費用。第二，記帳更省事：除了打字，還能直接說一段話，或拍一張收據、發票，一樣由 AI 拆成好幾筆，最後由你確認才寫入。");
   };
 
   // 重點版：開場 3、四個領域各 3、結語 3；產品展示：照影片用一輪；v2：同一輪講得更細；v3：v2 換未來展望；完整版：原本的每一頁

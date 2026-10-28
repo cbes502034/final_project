@@ -1,7 +1,8 @@
-# report/：期末報告簡報
+# report/：專案報告
 
-成品：**`家庭記帳_期末報告.pptx`**（每一頁都有講者備註；封面與結尾有網站的 QR code）；
-**`qa/家庭記帳_完整流程.mp4`**（在本機從空帳號開始走一遍的影片，約 6 分鐘；線上站也能錄，見下面）。
+成品：**`家庭記帳_專案報告.pptx`**（26 頁，產品介紹：照完整流程影片用一輪，畫面標 ①②③ 逐一說明，
+最後是接下來上線的兩件事；每一頁都有講者備註，封面與結尾有網站的 QR code）；
+**`qa/家庭記帳_完整流程.mp4`**（在本機從空帳號開始走一遍的影片，接 Claude，約 6 分鐘；線上站也能錄，見下面）。
 
 簡報上的數字都不是手打的，是從程式與結果檔算出來的。模型評測跑完、測試重跑之後，照下面重新產生，數字就會更新。
 
@@ -9,11 +10,16 @@
 
 ```bash
 python report/collect.py                 # 數字 → report/data/facts.json（會跑 pytest --collect-only）
-cd report && npm install && node build_deck.js          # 重點版（18 頁）：開場 3、四個領域各 3、結語 3
-node build_deck.js --demo                                  # 產品展示（15 頁）：照完整流程影片用一輪，畫面為主 → 家庭記帳_產品展示.pptx
-node build_deck.js --demo2                                 # 產品介紹 v2（26 頁）：同一輪講得更細，畫面標 ①②③ 逐一說明 → 家庭記帳_產品展示_v2.pptx
-node build_deck.js --demo3                                 # 產品介紹 v3：v2 的未來展望改成兩件事（AI 換成自己的 Qwen 蒸餾模型、語音與圖片記帳）→ 家庭記帳_產品展示_v3.pptx
-node build_deck.js --full                                  # 完整版：每個畫面、評測細節、每一輪測試都有 → 家庭記帳_期末報告_完整版.pptx
+cd report && npm install && node build_deck.js            # 專案報告 → 家庭記帳_專案報告.pptx
+```
+
+其他版本只在需要時另外產生，**不放進 repo**（.gitignore 已排除）：
+
+```bash
+node build_deck.js --tech     # 技術重點版（18 頁）：開場 3、四個領域各 3、結語 3 → 家庭記帳_期末報告.pptx
+node build_deck.js --full     # 技術完整版：每個畫面、評測細節、每一輪測試 → 家庭記帳_期末報告_完整版.pptx
+node build_deck.js --demo     # 產品展示精簡版（15 頁）→ 家庭記帳_產品展示.pptx
+node build_deck.js --demo2    # 產品介紹 v2（未來展望是四個方向）→ 家庭記帳_產品展示_v2.pptx
 ```
 
 模型的成績：在 `backend/` 底下跑 `python tools/eval_nlp.py --label <名稱>`，結果會存到 `backend/eval/results/`；
