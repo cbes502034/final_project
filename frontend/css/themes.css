@@ -280,7 +280,6 @@ html[data-theme="tech"] #view .wal__card { border-top: 2px solid var(--accent); 
 /* 滑過去：螢光綠的光 */
 html[data-theme="tech"] #view .dtile:hover .dtile__ic,
 html[data-theme="tech"] .btn:hover,
-html[data-theme="tech"] #view .wal__go:hover,
 html[data-theme="tech"] #view .thm__i:hover,
 html[data-theme="tech"] .appbar__add:hover {
   border-color: var(--accent);
@@ -459,7 +458,6 @@ html[data-theme="pop"] #view .bcard,
 html[data-theme="pop"] #view .lgl,
 html[data-theme="pop"] #view .mt,
 html[data-theme="pop"] #view .thm__i,
-html[data-theme="pop"] .acctm__p,
 html[data-theme="pop"] .appbar .bell__panel { border: 2px solid var(--ink); }
 html[data-theme="pop"] #view .wal__strip { border-bottom: 0; }
 html[data-theme="pop"] #view .dtile__ic { border: 2px solid var(--ink); }

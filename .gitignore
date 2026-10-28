@@ -28,7 +28,5 @@ report/qa/out/
 report/qa/trial/
 report/qa/record_fail.png
 
-# 簡報只交「家庭記帳_專案報告.pptx」；其他版本（--tech／--full／--demo／--demo2）與 PowerPoint 的鎖定檔不進 repo
-report/家庭記帳_期末報告*.pptx
-report/家庭記帳_產品展示*.pptx
+# PowerPoint 開著簡報時的鎖定檔
 report/~$*

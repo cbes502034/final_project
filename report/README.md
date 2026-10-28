@@ -13,17 +13,8 @@ python report/collect.py                 # 數字 → report/data/facts.json（�
 cd report && npm install && node build_deck.js            # 專案報告 → 家庭記帳_專案報告.pptx
 ```
 
-其他版本只在需要時另外產生，**不放進 repo**（.gitignore 已排除）：
-
-```bash
-node build_deck.js --tech     # 技術重點版（18 頁）：開場 3、四個領域各 3、結語 3 → 家庭記帳_期末報告.pptx
-node build_deck.js --full     # 技術完整版：每個畫面、評測細節、每一輪測試 → 家庭記帳_期末報告_完整版.pptx
-node build_deck.js --demo     # 產品展示精簡版（15 頁）→ 家庭記帳_產品展示.pptx
-node build_deck.js --demo2    # 產品介紹 v2（未來展望是四個方向）→ 家庭記帳_產品展示_v2.pptx
-```
-
 模型的成績：在 `backend/` 底下跑 `python tools/eval_nlp.py --label <名稱>`，結果會存到 `backend/eval/results/`；
-再跑上面兩行，「評測結果」那一頁會自動多一欄，「錯誤分析」會改成看模型錯在哪。
+再跑上面兩行，「AI 記帳：準、快」那一頁就換成新的成績（取名稱含 live 的那一份）。
 
 ## 檔案
 
@@ -31,11 +22,11 @@ node build_deck.js --demo2    # 產品介紹 v2（未來展望是四個方向）
 |---|---|
 | `collect.py` | 收集數字：路由數、資料表數、測試數、留出集題型、評測結果、端到端結果 |
 | `build_deck.js` | 用 pptxgenjs 產生簡報（版型、配色、圖表都在這裡） |
-| `screenshot.py` | 用本機 Chrome（無頭模式）截畫面到 `assets/`；用 API 登入本機帳號拿權杖，不在畫面上打密碼 |
+| `screenshot.py` | 用本機 Chrome（無頭模式）截「個人帳本」那張（`assets/entry.png`）；用 API 登入本機帳號拿權杖，不在畫面上打密碼 |
 | `qa/record_demo.py` | 完整流程影片：在線上站現場註冊一個家長、邀請一個子女，逐步錄影加字幕；`--trial` 只截圖試跑 |
 | `data/e2e.json` | `backend/tools/e2e_check.py` 的結果 |
 | `data/facts.json` | `collect.py` 的輸出 |
-| `assets/` | 畫面截圖 |
+| `assets/` | 畫面截圖：`demo/` 是錄影腳本 `--trial --snaps` 拍的（`marks.json` 是 ①②③ 的位置）、`entry.png` 是 `screenshot.py` 拍的、`qr_site.png` 是網站的 QR code |
 | `lib/apply_theme.js` | 把配色寫進簡報的佈景主題（pptxgenjs 本身做不到） |
 
 ## 截圖怎麼重拍
@@ -47,9 +38,10 @@ node build_deck.js --demo2    # 產品介紹 v2（未來展望是四個方向）
 # 2. 準備帳密 JSON（只給本機用，放暫存資料夾、不要進 repo）：
 #    {"parent": {"name", "email", "password"}, "kid": {"email", "password"}, "admin": {"email", "password"}}
 #    kid 先用 /api/auth/register 建好；admin 建好之後跑 python -m app.cli make-admin <email>
-# 3. 本機走一遍完整流程，帳上才有資料
-python report/qa/record_demo.py --target local --accounts <帳密 JSON>
-# 4. 截圖（段落記帳那張要真模型，預設不重截）
+# 3. 本機走一遍完整流程，帳上才有資料；加 --trial --snaps 是不錄影、改拍簡報用的截圖到 report/assets/demo/
+#    （每跑一次都會現場註冊家長，要一個沒註冊過的 email；AI 那幾張要 backend/.env 接上模型、加 --ai）
+python report/qa/record_demo.py --target local --trial --snaps --ai --accounts <帳密 JSON>
+# 4. 個人帳本那張（assets/entry.png）
 python report/screenshot.py --accounts <帳密 JSON>
 ```
 

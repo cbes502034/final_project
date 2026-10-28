@@ -252,7 +252,7 @@ async def run(ws_url, args, accounts, workdir):
         marks = {}
 
         async def snap(name, spots=None):
-            """產品展示簡報用：先把字幕、游標藏起來，等畫面停好再拍，拍完放回去。
+            """專案報告用：先把字幕、游標藏起來，等畫面停好再拍，拍完放回去。
             spots：要在簡報上標 ①②③ 的元件（CSS 選擇器，或 "js:" 開頭的運算式），
             記下它們在畫面上的位置（佔寬、高的比例）到 marks.json，簡報照這個位置畫編號，不用目測"""
             if not args.snaps:
@@ -277,7 +277,6 @@ async def run(ws_url, args, accounts, workdir):
         # 這幾步一出字幕就是要的畫面：直接拍。後面的清單是簡報上要標編號的元件
         SNAP_AT = {
             "首頁": ("landing", None),
-            "去收信": ("verify_mail", None),
             "理財習慣": ("finance", None),
             "主題": ("theme", None),
             "個人總覽": ("home", ['[data-flt="income"]', '[data-flt="expense"]', ".wal__v", ".wal__meta", ".qk", ".hpanel"]),
@@ -288,7 +287,6 @@ async def run(ws_url, args, accounts, workdir):
             "預先規劃": ("planned", None),
             "活動的設定": ("settings", None),
             "邀請朋友": ("invite_friend", None),
-            "活動總覽": ("activity_new", None),
             "活動記帳": ("activity", [".act__note", ".act__f dt:nth-of-type(2)", ".act__goal", '[data-flt="expense"]',
                                   "[data-personal-return]", ".hpanel"]),
             "邀請家人": ("family", None),
@@ -855,7 +853,7 @@ def main() -> int:
     ap.add_argument("--ai", action="store_true",
                     help="本機後端有接 AI 模型（backend/.env 填了 MODEL_PROVIDER 與金鑰）：字幕照實寫 AI，不寫規則備援")
     ap.add_argument("--snaps", action="store_true",
-                    help="（配合 --trial）在重點畫面拍乾淨的高解析截圖（不帶字幕、游標）到 report/assets/demo/，產品展示簡報用")
+                    help="（配合 --trial）在重點畫面拍乾淨的高解析截圖（不帶字幕、游標）到 report/assets/demo/，專案報告用")
     args = ap.parse_args()
     accounts = ask_accounts(args)
     front, api, _ = TARGETS[args.target]

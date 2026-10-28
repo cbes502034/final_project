@@ -77,7 +77,6 @@ html { scrollbar-gutter: stable; }
 .phead__tools .gsw__m i { font-family: var(--sans); font-style: normal; font-size: 12px; color: var(--ink-faint); }
 .phead__tools .gsw__empty { margin: 0; padding: 12px 16px 4px; color: var(--ink-faint); font-size: 14px; }
 .phead__tools .gsw__create { color: var(--accent); font-weight: 600; }
-.phead__tools .gsw__more { display: block; margin-top: 4px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 14px; font-weight: 600; color: var(--accent); }
 .phead__tools .gsw[hidden], .phead__tools .gsw__p[hidden], .phead__tools #searchDrawer[hidden] { display: none; }
 .phead-actions { display: flex; justify-content: flex-end; gap: 12px; max-width: var(--page-w); margin: 0 auto; padding: 8px var(--page-x) 0; }
 .phead-actions[hidden], body.is-out .phead { display: none; }

@@ -281,7 +281,6 @@ code, pre, kbd, samp { font-family: var(--code); }
   font-variant-numeric: tabular-nums;
   letter-spacing: -.01em;
 }
-.serif { font-family: var(--serif); }
 
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -298,22 +297,6 @@ code, pre, kbd, samp { font-family: var(--code); }
 ::-webkit-scrollbar-thumb:hover { background: var(--line-3); background-clip: content-box; }
 
 ::selection { background: var(--accent-wash); color: var(--accent-hi); }
-
-/* ============================================================
-   互動的共通語彙
-   ------------------------------------------------------------
-   任何「可以按」的東西都掛上 .tap，就有一致的手感：
-   滑過去浮起來，按下去壓回去。
-   ============================================================ */
-.tap {
-  transition: transform .18s var(--back),
-              box-shadow .18s var(--out),
-              background-color .16s var(--ease),
-              border-color .16s var(--ease),
-              color .16s var(--ease);
-}
-.tap:hover { transform: translateY(-1px); }
-.tap:active { transform: translateY(0) scale(.985); transition-duration: .06s; }
 
 /* ---------- 動態 ---------- */
 @keyframes riseIn {
@@ -342,8 +325,6 @@ code, pre, kbd, samp { font-family: var(--code); }
   60%      { transform: translateX(3px); }
 }
 
-.rise { animation: riseIn .5s var(--out) both; }
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
@@ -351,5 +332,4 @@ code, pre, kbd, samp { font-family: var(--code); }
     transition-duration: .01ms !important;
   }
   html { scroll-behavior: auto; }
-  .tap:hover, .tap:active { transform: none; }
 }
