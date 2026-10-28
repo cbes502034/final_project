@@ -21,13 +21,15 @@ const asset = (n) => path.join(HERE, "assets", n);
 //   node build_deck.js          重點版：開場 3 頁、四個領域各 3 頁、結語 3 頁 → 家庭記帳_期末報告.pptx
 //   node build_deck.js --demo   產品展示：照完整流程影片用一輪，畫面為主（15 頁）→ 家庭記帳_產品展示.pptx
 //   node build_deck.js --demo2  產品介紹 v2：同一輪、講得更細（畫面標 ①②③ 逐一說明，26 頁）→ 家庭記帳_產品展示_v2.pptx
+//   node build_deck.js --demo3  產品介紹 v3：v2 的未來展望改成兩件事（AI 換成自己的模型、語音與圖片記帳）→ 家庭記帳_產品展示_v3.pptx
 //   node build_deck.js --full   完整版：每個畫面、評測細節、每一輪測試都有 → 家庭記帳_期末報告_完整版.pptx
 const FULL = process.argv.includes("--full");
-const DEMO2 = process.argv.includes("--demo2");
+const DEMO3 = process.argv.includes("--demo3");
+const DEMO2 = process.argv.includes("--demo2") || DEMO3;   // v3 只換未來展望，其餘跟 v2 一樣
 const DEMO = process.argv.includes("--demo") || DEMO2;   // v2 沿用產品展示的頁面與版型
 const outArg = process.argv.slice(2).find((a) => !a.startsWith("--"));
 const OUT = outArg ? path.resolve(outArg)
-  : path.join(HERE, DEMO2 ? "家庭記帳_產品展示_v2.pptx" : DEMO ? "家庭記帳_產品展示.pptx" : FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
+  : path.join(HERE, DEMO3 ? "家庭記帳_產品展示_v3.pptx" : DEMO2 ? "家庭記帳_產品展示_v2.pptx" : DEMO ? "家庭記帳_產品展示.pptx" : FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
 
 const THEME = {
   name: "FamBudget",
@@ -1433,7 +1435,45 @@ async function build() {
     s.addNotes("最後用一頁整理今天看到的：開始使用、記帳、活動、家庭、回顧五大塊，手機、平板、電腦都能用。");
   };
 
-  // 重點版：開場 3、四個領域各 3、結語 3；產品展示：照影片用一輪；v2：同一輪講得更細；完整版：原本的每一頁
+  // v3 的未來展望：使用者定的兩件事（10/28）——AI 換成自己訓練的 Qwen 蒸餾模型、記帳加上語音與圖片
+  S.v3Future = async () => {
+    s = slide("CONTENT");
+    s.addText("未來展望：接下來上線的兩件事", { placeholder: "title" });
+    const plans = [
+      ["FiCpu", C.accent1, "AI：換成我們自己訓練的模型", ["Anthropic API", "自己的 Qwen 蒸餾模型"], [
+        "以 Qwen 蒸餾模型為底，用我們的記帳資料再訓練：" + fmt(facts.train.cases) + " 題訓練資料，加上使用者改過的解析",
+        "上線前用同一份 " + facts.heldout.cases + " 題評測，準確率跟現在一樣才換",
+        "跑在自己的伺服器：不用付 API 費用，記帳資料不送到外面",
+        "延伸：財務建議也換成自己的模型",
+      ]],
+      ["FiMic", C.accent2, "記帳更省事：語音與圖片", ["打一段字", "說一段話／拍一張照"], [
+        "語音：按住說話，轉成文字後走同一套 AI 拆帳",
+        "圖片：拍收據或發票，讀出店家、品項、金額，拆成好幾筆",
+        "跟現在一樣：拆好之後由你看過、按確認才寫入",
+        "延伸：電子發票載具自動匯入",
+      ]],
+    ];
+    for (let i = 0; i < plans.length; i++) {
+      const [ic, col, head, [from, to], items] = plans[i];
+      const x = 0.6 + i * 6.15;
+      card(s, x, 1.5, 5.95, 5.15, "plan-" + i);
+      await iconCircle(s, ic, x + 0.35, 1.75, 0.7, col, HEX.lt1, "plan-ic-" + i);
+      text(s, head, { x: x + 1.25, y: 1.75, w: 4.5, h: 0.7, fontSize: 20, bold: true, color: C.text2, valign: "middle" });
+      // 現在 → 之後
+      s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: x + 0.35, y: 2.75, w: 2.15, h: 0.55, rectRadius: 0.27,
+        fill: { color: "FFFFFF" }, line: { color: "D6E0EE", width: 1 }, objectName: "plan-from-" + i });
+      text(s, from, { x: x + 0.35, y: 2.75, w: 2.15, h: 0.55, fontSize: 13, color: C.accent5, align: "center", valign: "middle" });
+      arrow(s, x + 2.6, 3.02, 0.55, "plan-arrow-" + i, col);
+      s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: x + 3.25, y: 2.75, w: 2.35, h: 0.55, rectRadius: 0.27,
+        fill: { color: col }, line: { color: col }, objectName: "plan-to-" + i });
+      text(s, to, { x: x + 3.25, y: 2.75, w: 2.35, h: 0.55, fontSize: 13, bold: true, color: "FFFFFF", align: "center", valign: "middle" });
+      s.addText(items.map((t, j) => ({ text: t, options: { bullet: true, breakLine: j < items.length - 1 } })),
+        { x: x + 0.35, y: 3.55, w: 5.3, h: 2.95, fontSize: 14.5, color: C.text1, paraSpaceAfter: 10, valign: "top", isTextBox: true, margin: 0 });
+    }
+    s.addNotes("接下來要上線的有兩件事。第一，AI 換成我們自己訓練的模型：以 Qwen 蒸餾模型為底，用我們的記帳資料再訓練，上線前用同一份題目評測，準確率跟現在一樣才換；這樣不用付 API 費用，記帳資料也不用送到外面。第二，記帳更省事：除了打字，還能直接說一段話，或拍一張收據、發票，一樣由 AI 拆成好幾筆，最後由你確認才寫入。");
+  };
+
+  // 重點版：開場 3、四個領域各 3、結語 3；產品展示：照影片用一輪；v2：同一輪講得更細；v3：v2 換未來展望；完整版：原本的每一頁
   const ORDER = DEMO2
     ? ["§開場", "v2Cover", "v2Why", "v2Views", "dFlow",
        "§開始使用", "v2Setup", "v2Theme",
@@ -1442,7 +1482,7 @@ async function build() {
        "§家庭", "dFamily", "v2Guardian", "v2Allowance", "v2Bell",
        "§回顧", "dStats", "v2Advice",
        "§手機", "dMobile",
-       "§結語", "v2Summary", "future", "dThanks"]
+       "§結語", "v2Summary", DEMO3 ? "v3Future" : "future", "dThanks"]
     : DEMO
     ? ["§開場", "dCover", "dFlow", "§開始使用", "dStart", "dHome", "§記帳", "dParse", "dParseAI", "dToday",
        "§活動", "dActivity1", "dActivity2", "§家庭", "dFamily", "dAllowance", "§回顧", "dStats", "dAdvice", "§手機", "dMobile",
