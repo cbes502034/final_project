@@ -88,6 +88,80 @@ def caption_band(cap):
     return _bands[cap]
 
 
+#: 專案報告每一頁的影片片段：錄影時記下起訖（clip_in／clip_out），錄完從同一批畫面切出來，最後一格停住
+CLIPS_DIR = os.path.join(os.path.dirname(HERE), "assets", "clips")
+HOLD = 1.2                     # 片段最後停格幾秒
+HOLD_MARKS = 0.6, 3.0          # 有編號的：先停 0.6 秒，再浮出 ①②③ 停 3 秒
+
+
+def draw_marks(img, marks):
+    """在停格的那一格畫 ①②③：橘色圓點、白字，放在元件左邊（先畫大三倍再縮小，邊緣才平滑）"""
+    from PIL import ImageDraw
+    k, dia = 3, 56
+    w, h = img.size
+    layer = Image.new("RGBA", (w * k, h * k), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    dd, placed = dia * k, []
+    for i, p in enumerate(marks):
+        if not p:
+            continue
+        x, y = max(4 * k, p[0] * w * k - dd * 0.75), p[1] * h * k - dd / 2
+        # 兩個編號靠太近就往右錯開，不要疊在一起
+        while any(abs(px - x) < dd + 6 * k and abs(py - y) < dd + 6 * k for px, py in placed):
+            x += dd + 12 * k
+        placed.append((x, y))
+        d.ellipse([x, y, x + dd, y + dd], fill=(232, 102, 61, 255), outline=(255, 255, 255, 255), width=4 * k)
+        d.text((x + dd / 2, y + dd / 2), str(i + 1), font=font("msjhbd.ttc", 28 * k), fill=(255, 255, 255, 255), anchor="mm")
+    out = img.convert("RGBA")
+    out.alpha_composite(layer.resize((w, h), Image.LANCZOS))
+    return out.convert("RGB")
+
+
+def make_clips(frames, ff, clips, workdir):
+    """每一段：起點那一格到終點那一格（等待的片段照樣快轉），最後一格停住；有編號的停格上畫 ①②③。
+    輸出 report/assets/clips/<名稱>.mp4 與 <名稱>.png（封面＝停格那一格，簡報上沒播放時看到的就是它）"""
+    import bisect
+    import imageio_ffmpeg
+    frames.sort(key=lambda f: f[0])
+    times = [f[0] for f in frames]
+    tmap = remap(ff)
+    shutil.rmtree(CLIPS_DIR, ignore_errors=True)
+    os.makedirs(CLIPS_DIR)
+    for name, cl in clips.items():
+        i0 = max(0, bisect.bisect_right(times, cl["t0"]) - 1)
+        i1 = max(i0, bisect.bisect_right(times, cl["t1"]) - 1)
+        last = Image.open(io.BytesIO(frames[i1][1])).convert("RGB")
+        # 換成手機尺寸的那一刻前後：只留跟最後一格同尺寸的畫面
+        sel = [f for f in frames[i0:i1 + 1] if Image.open(io.BytesIO(f[1])).size == last.size]
+        d = os.path.join(workdir, "clip_" + name)
+        os.makedirs(d)
+        lines = []
+        for j, (ts, data) in enumerate(sel):
+            path = os.path.join(d, "%05d.jpg" % j)
+            Image.open(io.BytesIO(data)).convert("RGB").save(path, quality=92)
+            nxt = sel[j + 1][0] if j + 1 < len(sel) else cl["t1"]
+            lines.append("file '%s'\nduration %.3f" % (path.replace("\\", "/"), max(0.001, tmap(nxt) - tmap(max(ts, cl["t0"])))))
+        poster = last
+        if cl.get("marks"):
+            path = os.path.join(d, "plain.jpg")
+            last.save(path, quality=92)
+            lines.append("file '%s'\nduration %.3f" % (path.replace("\\", "/"), HOLD_MARKS[0]))
+            poster = draw_marks(last, cl["marks"])
+        path = os.path.join(d, "poster.jpg")
+        poster.save(path, quality=92)
+        lines.append("file '%s'\nduration %.3f" % (path.replace("\\", "/"), HOLD_MARKS[1] if cl.get("marks") else HOLD))
+        lines.append("file '%s'" % path.replace("\\", "/"))
+        lst = os.path.join(d, "list.txt")
+        with io.open(lst, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-f", "concat", "-safe", "0", "-i", lst,
+                        "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2,fps=30,format=yuv420p", "-c:v", "libx264", "-crf", "23",
+                        "-preset", "medium", "-an", "-movflags", "+faststart", os.path.join(CLIPS_DIR, name + ".mp4")],
+                       check=True, capture_output=True)
+        poster.save(os.path.join(CLIPS_DIR, name + ".png"), optimize=True)
+        print("  片段 %-20s %5.1f 秒" % (name, tmap(cl["t1"]) - tmap(cl["t0"])), flush=True)
+
+
 def compose(img, cap):
     """網頁畫面（手機畫面放在深色畫布正中間）＋下面的字幕帶"""
     if img.size != (W, H):
@@ -179,6 +253,7 @@ class CDP:
         self.recording = False
         self.ff = []          # [(開始, 結束, 合成後最多幾秒)]：等載入、等模型的片段，合成時快轉
         self.caps = []        # [(時間, (第幾步, 共幾步, 標題, 說明) 或 None)]：字幕帶什麼時候換字
+        self.clips = {}       # {名稱: {t0, t1, marks}}：專案報告每一頁的影片片段
         self.errors = []      # 頁面上的 JavaScript 錯誤：卡住的時候印出來
 
     async def reader(self):
@@ -258,8 +333,7 @@ async def run(ws_url, args, accounts, workdir):
         reader = asyncio.ensure_future(c.reader())
         await c.send("Page.enable")
         await c.send("Runtime.enable")
-        dsf = 2 if args.snaps else 1
-        await c.send("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=dsf, mobile=False)
+        await c.send("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=1, mobile=False)
         # 步驟數＝這支腳本裡呼叫 cap() 的次數（以前寫死，加步驟忘了改就會出現 26 / 24）
         total = io.open(__file__, encoding="utf-8").read().count("await " + "cap(")
         pos = [W // 2, H // 2]
@@ -270,69 +344,28 @@ async def run(ws_url, args, accounts, workdir):
         async def wait(sec):
             await asyncio.sleep(sec * pace)
 
-        snap_dir = os.path.join(os.path.dirname(HERE), "assets", "demo")
-        if args.snaps:
-            shutil.rmtree(snap_dir, ignore_errors=True)
-            os.makedirs(snap_dir)
+        async def clip_in(name):
+            """專案報告那一頁的影片片段從這裡開始"""
+            c.clips[name] = {"t0": time.time()}
 
-        marks = {}
-
-        async def snap(name, spots=None):
-            """專案報告用：先把游標藏起來，等畫面停好再拍，拍完放回去。
-            spots：要在簡報上標 ①②③ 的元件（CSS 選擇器，或 "js:" 開頭的運算式），
-            記下它們在畫面上的位置（佔寬、高的比例）到 marks.json，簡報照這個位置畫編號，不用目測"""
-            if not args.snaps:
-                return
-            await c.js("var e = document.getElementById('qa-cur'); if (e) e.style.visibility = 'hidden'")
-            await asyncio.sleep(0.8)
+        async def clip_out(name, spots=None):
+            """片段到這裡結束（最後一格停住）。spots：停格上要標 ①②③ 的元件（CSS 選擇器，或 "js:" 開頭的運算式），
+            記下它們在畫面上的位置（佔寬、高的比例），合成時畫上去，跟右邊的編號說明對得起來"""
+            await asyncio.sleep(0.4)                          # 讓最後一格送到
+            c.clips[name]["t1"] = time.time()
             if spots:
-                marks[name] = await c.js("""(function (specs) { return specs.map(function (sp) {
+                c.clips[name]["marks"] = await c.js("""(function (specs) { return specs.map(function (sp) {
                     var e = sp.indexOf('js:') === 0 ? eval(sp.slice(3)) : document.querySelector(sp);
                     if (!e) return null;
                     var r = e.getBoundingClientRect();
                     if (r.bottom < 0 || r.top > innerHeight || r.width === 0) return null;
                     return [Math.max(0, r.left) / innerWidth, (r.top + Math.min(r.height, 56) / 2) / innerHeight];
                   }); })(%s)""" % json.dumps(spots))
-                with open(os.path.join(snap_dir, "marks.json"), "w", encoding="utf-8") as f:
-                    json.dump(marks, f, ensure_ascii=False, indent=1)
-            shot = await c.send("Page.captureScreenshot", format="png")
-            with open(os.path.join(snap_dir, name + ".png"), "wb") as f:
-                f.write(base64.b64decode(shot["data"]))
-            await c.js("var e = document.getElementById('qa-cur'); if (e) e.style.visibility = ''")
-
-        # 這幾步一出字幕就是要的畫面：直接拍。後面的清單是簡報上要標編號的元件
-        SNAP_AT = {
-            "首頁": ("landing", None),
-            "理財習慣": ("finance", None),
-            "主題": ("theme", None),
-            "個人總覽": ("home", ['[data-flt="income"]', '[data-flt="expense"]', ".wal__v", ".wal__meta", ".qk", ".hpanel"]),
-            "解析結果": ("parse", [".btbl__raw", '.btbl__r [data-b="date"]', '.btbl__r [data-b="amount"]', '.btbl__r [data-b="cat"]',
-                               "js:[...document.querySelectorAll('.btbl__r [data-b=merchant]')].pop()", "#paraSave"]),
-            "今天的紀錄": ("today", None),
-            "建立活動": ("create", None),
-            "預先規劃": ("planned", None),
-            "活動的設定": ("settings", None),
-            "邀請朋友": ("invite_friend", None),
-            "活動記帳": ("activity", [".act__note", ".act__f dt:nth-of-type(2)", ".act__goal", '[data-flt="expense"]',
-                                  "[data-personal-return]", ".hpanel"]),
-            "邀請家人": ("family", None),
-            "子女收到邀請": ("kid_invite", None),
-            "成員只能看": ("kid_readonly", None),
-            "照看子女": ("guardian", None),
-            "零用金": ("allowance_form", None),
-            "零用金自動記帳": ("allowance", None),
-            "子女的鈴鐺": ("kid_bell", None),
-            "統計": ("stats", None),
-            "刪除要輸入密碼": ("danger", None),
-            "手機版": ("mobile", None),
-        }
 
         async def cap(title, desc):
             step[0] += 1
             shown.update(title=title, desc=desc)
             c.caps.append((time.time(), (step[0], total, title, desc)))
-            if title in SNAP_AT:
-                await snap(*SNAP_AT[title])
             print("  %2d/%d %s" % (step[0], total, title), flush=True)
             if trial:
                 await asyncio.sleep(0.4)
@@ -471,13 +504,16 @@ async def run(ws_url, args, accounts, workdir):
         await go(front + "/docs/guide.html", keep=0.1)
         await c.js("localStorage.removeItem('fambudget.auth')" + ("; localStorage.setItem('fambudget.api', %s)" % json.dumps(api) if local else ""))
         await go(front + "/?r=%d#/login" % (time.time() * 1000), "document.body.innerText.includes('開始使用')")
+        await clip_in("landing")
         await cap("首頁", "還沒登入時先說清楚這個系統能做什麼")
         await wait(3.5)
+        await clip_out("landing")
         await click("text:開始使用")
         await until("document.querySelector('[data-gate=\"register\"]')", 15)
         await wait(1)
         await click('[data-gate="register"]')
         await until("document.getElementById('rgName')", 15)
+        await clip_in("register")
         await cap("註冊", "只要名字、email、密碼")
         await click("#rgName", pause=0.3)
         await type_in("#rgName", parent["name"])
@@ -487,7 +523,7 @@ async def run(ws_url, args, accounts, workdir):
         await click("#rgPw", pause=0.2)
         await set_val("#rgPw", parent["password"], change=False)
         await wait(1)
-        await snap("register")
+        await clip_out("register")
         await click("#regF button[type=submit]")
         ok = await until("document.getElementById('regNote')", 30, need=False)
         if not ok:
@@ -515,6 +551,7 @@ async def run(ws_url, args, accounts, workdir):
         c.recording = not trial
         c.ff.append((t_pause, time.time(), 0.3))              # 等信的空檔：合成時壓成一瞬間
         await go(link, "document.getElementById('suGoalF')", keep=0.8)
+        await clip_in("setup")
         await cap("點了驗證信", "第一次點就直接登入、接著做個人化設定：收入怎麼來、每個月想存多少")
         await wait(2.5)
         await click('label:has(input[name="suType"][value="salary"])')
@@ -527,56 +564,69 @@ async def run(ws_url, args, accounts, workdir):
         await wait(0.8)
         await click('[data-su-goal="5000"]')
         await wait(1.5)
-        await snap("setup")
+        await clip_out("setup")
         await click("#suGoalF button[type=submit]")
         await until("document.getElementById('suFinF')", 30)
+        await clip_in("finance")
         await cap("理財習慣", "選像自己的就好，財務建議會參考；可以跳過")
         await wait(1.5)
         await click("#suFinF label.pick", pause=0.4)
         await click("#suFinF label.pick--sm", pause=0.4)
         await wait(1)
+        await clip_out("finance")
         await click("#suFinF button[type=submit]")
         await until("document.getElementById('thmRow')", 30)
+        await clip_in("theme")
         await cap("主題", "按一下整個系統就換成那個樣子；存在帳號上，換裝置也一樣")
         await wait(1.2)
         await click('[data-theme-pick="sky"]')
         await wait(2)
+        await clip_out("theme")
         await click('[data-su-done="finish"]')
         await until("document.getElementById('tourYes') || document.querySelector('.wal__card')", 30)
 
         # ---------------------------------------------------------------- 3. 導覽與個人總覽
         # 「第一次用？」是總覽畫好之後才跳出來的：多等幾秒
         if await until("document.getElementById('tourYes')", 8, need=False):
+            await clip_in("tour")
             await cap("新手導覽", "第一次進來會問要不要導覽，照畫面上看得到的東西帶一遍")
             await wait(2)
             await click("#tourYes")
             await until("document.getElementById('tourNext')", 10)
             await wait(1)
-            await snap("tour")
             for _ in range(3):
                 await wait(1.6)
                 await click("#tourNext", pause=0.3, need=False)
             await wait(1.2)
+            await clip_out("tour")
             await click("#tourSkip", need=False)
             await wait(1)
         parent_uid = await c.js("JSON.parse(localStorage.getItem('fambudget.auth')).accessToken.split('.')[1]")
         parent_uid = str(json.loads(base64.urlsafe_b64decode(parent_uid + "==="))["sub"])
         await c.js("localStorage.setItem(%s, 'done')" % json.dumps("fambudget.tour." + parent_uid))
+        await clip_in("home")
+        await clip_in("view_home")                            # 「三種視角」那頁的小縮圖：同一段，不畫編號
         await page("#/", "document.querySelector('.wal__card') && document.querySelector('.hpanel')")
         await cap("個人總覽", "月薪設了每月 5 號入帳：這個月的已經自動記一筆。還可以花 ＝ 收入 − 每月想存")
         await wait(5)
+        await clip_out("home", ['[data-flt="income"]', '[data-flt="expense"]', ".wal__v", ".wal__meta", ".qk", ".hpanel"])
+        await clip_out("view_home")
 
         # ---------------------------------------------------------------- 4. 段落記帳與總覽下方面板
+        await clip_in("parse")
         await cap("段落記帳", "一句話記好幾筆：直接打一段平常講話的句子")
         await para("早餐蛋餅 45，捷運 30，午餐便當 95，晚上全聯買牙膏 89")
         await cap("解析結果", "本機沒有接模型：先用規則把一段話拆成四筆、分好類；一樣要人確認才存" if no_model
                   else "AI 把一段話拆成四筆，日期、金額、分類都填好；看過、確認才會存")
         await wait(6)
+        await clip_out("parse", [".btbl__raw", '.btbl__r [data-b="date"]', '.btbl__r [data-b="amount"]', '.btbl__r [data-b="cat"]',
+                                 "js:[...document.querySelectorAll('.btbl__r [data-b=merchant]')].pop()", "#paraSave"])
         await click("#paraSave")
         await busy("!document.getElementById('paraSave')", keep=1.2)
         await page("#/", "document.querySelector('.hpanel .txr')")
         await scroll_to(".hpanel", "end")
         await point()
+        await clip_in("today")
         await cap("今天的紀錄", "儀表板下方是分頁面板：第一頁是今天的紀錄，格式跟明細一樣，可以直接改、刪；內容在面板裡捲動")
         await wait(3)
         await c.js("var s=document.querySelector('.hpanel__scroll'); if(s) s.scrollTo({top: 400, behavior: 'smooth'})")
@@ -585,8 +635,19 @@ async def run(ws_url, args, accounts, workdir):
         await wait(2.5)
         await click('[data-hptab="today"]')
         await wait(1.5)
+        await clip_out("today")
+
+        await clip_in("entry")
+        await page("#/entry", "document.querySelector('#view .txr')")
+        await cap("個人帳本", "所有紀錄都在這裡：收支、來源、活動都能篩，每一筆都能改；上個月以前自動收進年月包裹")
+        await wait(2.5)
+        await scroll_to("#view .txr")
+        await point()
+        await wait(3)
+        await clip_out("entry")
 
         # ---------------------------------------------------------------- 5. 活動
+        await clip_in("create")
         await page("#/groups", "document.querySelector('[data-fold=\"gnew\"]')")
         await cap("活動管理", "活動是個人底下的小帳本：旅行、搬家、聚餐，各有自己的總覽")
         await wait(2.5)
@@ -600,9 +661,11 @@ async def run(ws_url, args, accounts, workdir):
         await set_val("#gnEnd", trip_end.isoformat())
         await cap("建立活動", "開始日預設今天、可以自己選；結束日不能比今天早，也不能比開始日早")
         await wait(4)
+        await clip_out("create")
         await click("#gnewF button[type=submit]")
         await busy("[...document.querySelectorAll('.lg__t')].some(e => e.textContent === '沖繩畢業旅行')")
         await wait(1.5)
+        await clip_in("planned")
         await click('[data-fold="gnew"]')
         await until("document.getElementById('gnName')", 10)
         await click("#gnName", pause=0.3)
@@ -620,9 +683,11 @@ async def run(ws_url, args, accounts, workdir):
         await point()
         await cap("預先規劃", "開始日訂在以後：先放在「預先規劃」、不進活動選單；到了那天自動放上去並通知成員")
         await wait(4)
+        await clip_out("planned")
+        await clip_in("dropdown")
         await click("#gswBtn")
         await wait(2.5)
-        await snap("dropdown")
+        await clip_out("dropdown")
         await click("#gswBtn")
         await wait(0.8)
 
@@ -630,6 +695,7 @@ async def run(ws_url, args, accounts, workdir):
         trip = ids["trip"]
         if not trip:
             raise RuntimeError("找不到剛建立的活動")
+        await clip_in("settings")
         await click('.lg[data-lgid="%s"] .lg__h' % trip)
         await until("document.querySelector('[data-gname=\"%s\"]')" % trip, 10)
         await cap("活動的設定", "名稱、說明、開始日、結束日、顏色、目標金額建立後都能改——只有建立者能改")
@@ -639,6 +705,8 @@ async def run(ws_url, args, accounts, workdir):
         await type_in('[data-ggoal="%s"]' % trip, "20000", 110)
         await set_val('[data-ggoal="%s"]' % trip, "20000")
         await wait(2.5)
+        await clip_out("settings")
+        await clip_in("invite_friend")
         await click('.lg[data-lgid="%s"] details.activity-invite-panel summary' % trip)
         await wait(0.8)
         sel = 'form[data-activity-find="%s"] input[name=email]' % trip
@@ -650,12 +718,15 @@ async def run(ws_url, args, accounts, workdir):
         await wait(2)
         await click('[data-activity-send="%s"]' % trip)
         await wait(3)
+        await clip_out("invite_friend")
 
         await click("#gswBtn")
         await wait(1.2)
         await click('.gsw__i[data-group="%s"]' % trip)
         await wait(1)
         await page("#/", "document.querySelector('.act__f')")
+        await clip_in("activity")
+        await clip_in("view_activity")
         await cap("活動總覽", "主卡是「這個活動是什麼」：說明、期間、成員、筆數、目標金額；上面兩條照樣是收入、支出")
         await wait(5)
         await para("機票 8200，民宿訂金 3000")
@@ -665,11 +736,15 @@ async def run(ws_url, args, accounts, workdir):
         await page("#/", "document.querySelector('.act__f')")
         await cap("活動記帳", "記在活動裡的帳只算在活動；目標金額寫明比的是累計支出還是結餘")
         await wait(5)
+        await clip_out("activity", [".act__note", ".act__f dt:nth-of-type(2)", ".act__goal", '[data-flt="expense"]',
+                                    "[data-personal-return]", ".hpanel"])
+        await clip_out("view_activity")
         await click("[data-personal-return]")
         await wait(2)
 
         # ---------------------------------------------------------------- 6. 家庭
         await page("#/members", "document.getElementById('famNewF')")
+        await clip_in("family")
         await cap("建立家庭", "建立的人是家長；可以順便填全家的長期存款目標")
         await click("#famName", pause=0.3)
         await type_in("#famName", "王家", 120)
@@ -691,10 +766,12 @@ async def run(ws_url, args, accounts, workdir):
         await wait(2)
         await click("[data-inv-send]")
         await wait(3)
+        await clip_out("family")
         parent_auth = await c.js("localStorage.getItem('fambudget.auth')")
 
         # ---------------------------------------------------------------- 7. 子女
         await use(kid_tok, kid_id)
+        await clip_in("kid_invite")
         await page("#/", "document.querySelector('[data-inv-accept]')")
         await cap("子女收到邀請", "換成子女的帳號：總覽最上面就是家庭邀請，按「加入」就進這個家庭")
         await wait(4)
@@ -705,18 +782,23 @@ async def run(ws_url, args, accounts, workdir):
             await page("#/", "document.querySelector('.wal__card') && !document.querySelector('[data-inv-accept]')")
         c.ff.append((t0, time.time(), 1.5))
         await wait(1.5)
+        await clip_out("kid_invite")
+        await clip_in("kid_activity_invite")
         await page("#/groups", "document.querySelector('[data-activity-response$=\"|accept\"]')")
-        await wait(1)
-        await snap("kid_activity_invite")
+        await wait(1.5)
+        await clip_out("kid_activity_invite")                 # 停在邀請畫面；按「加入」接到下一段
+        await clip_in("kid_readonly")
         await click('[data-activity-response$="|accept"]')
         await busy("document.querySelector('.lg[data-lgid=\"%s\"]')" % trip, keep=1.5)
         await click('.lg[data-lgid="%s"] .lg__h' % trip)
         await until("document.querySelector('.lg[data-lgid=\"%s\"] .lg__ro')" % trip, 10)
         await cap("成員只能看", "加入活動之後看得到說明、期間、建立者訂的目標金額，但不能改")
         await wait(5)
+        await clip_out("kid_readonly")
 
         # ---------------------------------------------------------------- 8. 零用金
         await use(parent_auth, parent_uid)
+        await clip_in("guardian")
         await page("#/members", "document.querySelector('[data-gs-start=\"%s\"]')" % kid_id)
         await scroll_to('[data-gs-start="%s"]' % kid_id)
         await point()
@@ -725,6 +807,8 @@ async def run(ws_url, args, accounts, workdir):
         await click('[data-gs-start="%s"]' % kid_id)
         await busy("[...document.querySelectorAll('.toast')].some(t => t.textContent.includes('開始照看'))", keep=1)
         await wait(2)
+        await clip_out("guardian")
+        await clip_in("allowance_form")
         await page("#/member/%s" % kid_id, "document.querySelector('[data-allow]')")
         await cap("零用金", "家長照看子女：每月零用金和發放日；改完離開欄位就存")
         await wait(2)
@@ -733,27 +817,35 @@ async def run(ws_url, args, accounts, workdir):
         await set_val("[data-allow]", "1500")
         await busy("[...document.querySelectorAll('.toast')].some(t => t.textContent.includes('號給'))", keep=1.5)
         await wait(2)
+        await clip_out("allowance_form")
+        await clip_in("allowance")
         await cap("零用金自動記帳", "到了發放日自動記一對帳：家長一筆支出、孩子一筆收入，並通知孩子")
         await scroll_to(".txw, .txt", "start")
         await wait(4)
+        await clip_out("allowance")
 
         await use(kid_tok, kid_id)
+        await clip_in("kid_bell")
         await page("#/", "document.querySelector('.wal__card')")
         await wait(1)
         await click("#bell")
         await until("document.querySelector('.bell__del, .bell__i, .bell li')", 15)
         await cap("子女的鈴鐺", "家庭邀請、零用金入帳都即時進鈴鐺；零用金算在子女這個月可以花的錢裡")
         await wait(5)
+        await clip_out("kid_bell")
         await click("#bell")
         await wait(1)
 
         # ---------------------------------------------------------------- 9. 統計與建議
         await use(parent_auth, parent_uid)
+        await clip_in("stats")
         await page("#/stats", "document.querySelector('.donut, svg circle, .dt, .chart')")
         await cap("統計", "收支對照、錢花在哪：數字跟總覽、明細同一個來源")
         await wait(2.5)
-        await reveal("[...document.querySelectorAll('#view .card')].pop()")      # 錢花在哪（字幕框下面）
+        await reveal("[...document.querySelectorAll('#view .card')].pop()")      # 錢花在哪
         await wait(3)
+        await clip_out("stats")
+        await clip_in("advice")
         await page("#/advice", "document.getElementById('advGen')")
         await cap("財務建議", "數字由資料庫先算好；本機沒接模型，就用同一批數字整理成建議，每個數字都附算式" if no_model
                   else "數字由資料庫先算好，AI 只把它寫成好懂的建議；每個數字都附算式，找得到出處")
@@ -771,29 +863,34 @@ async def run(ws_url, args, accounts, workdir):
             c.ff.append((t0, time.time(), 1.5))
         await click(".ad__h", need=False)
         await wait(5)
-        await snap("advice", [".ad__lv", ".ad__t", ".ad__b", ".ad__k", "js:document.querySelectorAll('.ad__k')[1]", "#advGen"])
+        await clip_out("advice", [".ad__lv", ".ad__t", ".ad__b", ".ad__k", "js:document.querySelectorAll('.ad__k')[1]", "#advGen"])
 
         # ---------------------------------------------------------------- 10. 刪除要密碼
+        await clip_in("danger")
         await page("#/", "document.querySelector('.hpanel [data-del]')")
         await scroll_to(".hpanel", "end")
         await click(".hpanel [data-del]")
         await until("document.getElementById('dgPw')", 10)
         await cap("刪除要輸入密碼", "刪掉就救不回來：要輸入自己的密碼確認（示範到這裡，按取消）")
         await wait(4)
+        await clip_out("danger")
         await click("#dgNo")
         await wait(1)
 
         # ---------------------------------------------------------------- 11. 手機版
-        await c.send("Emulation.setDeviceMetricsOverride", width=375, height=812, deviceScaleFactor=dsf, mobile=True)
+        await c.send("Emulation.setDeviceMetricsOverride", width=375, height=812, deviceScaleFactor=1, mobile=True)
         if not trial:
             await c.send("Page.stopScreencast")
             await c.send("Page.startScreencast", format="jpeg", quality=82, maxWidth=375, maxHeight=812, everyNthFrame=1)
         await page("#/", "document.querySelector('.wal__card')")
+        await clip_in("mobile")
         await cap("手機版", "底部分頁列；總覽、面板、表格都照手機寬度重排，沒有左右捲動")
         await wait(3)
+        await clip_out("mobile")
+        await clip_in("mobile2")
         await c.js("window.scrollTo({top: 900, behavior: 'smooth'})")
         await wait(4)
-        await snap("mobile2")
+        await clip_out("mobile2")
         await c.js("localStorage.removeItem('fambudget.auth')")
 
         # ---------------------------------------------------------------- 片尾
@@ -811,7 +908,7 @@ async def run(ws_url, args, accounts, workdir):
         if not trial:
             await c.send("Page.stopScreencast")
         reader.cancel()
-        return c.frames, c.ff, c.caps
+        return c.frames, c.ff, c.caps, c.clips
 
 
 def remap(ff):
@@ -888,8 +985,6 @@ def main() -> int:
     ap.add_argument("--show", action="store_true", help="開出 Chrome 視窗（不是無頭），看得到它在做什麼")
     ap.add_argument("--ai", action="store_true",
                     help="本機後端有接 AI 模型（backend/.env 填了 MODEL_PROVIDER 與金鑰）：字幕照實寫 AI，不寫規則備援")
-    ap.add_argument("--snaps", action="store_true",
-                    help="（配合 --trial）在重點畫面拍乾淨的高解析截圖（不帶字幕、游標）到 report/assets/demo/，專案報告用")
     args = ap.parse_args()
     accounts = ask_accounts(args)
     front, api, _ = TARGETS[args.target]
@@ -917,7 +1012,7 @@ def main() -> int:
                 break
             except Exception:  # noqa: BLE001
                 time.sleep(0.25)
-        frames, ff, caps = asyncio.run(run(page["webSocketDebuggerUrl"], args, accounts, workdir))
+        frames, ff, caps, clips = asyncio.run(run(page["webSocketDebuggerUrl"], args, accounts, workdir))
         if args.trial:
             print("試跑完成，每一步的截圖在", os.path.join(HERE, "trial"))
             return 0
@@ -925,6 +1020,8 @@ def main() -> int:
         out = os.path.join(HERE, "家庭記帳_完整流程.mp4")
         encode(frames, caps, out, workdir, ff)
         print(out)
+        make_clips(frames, ff, clips, workdir)
+        print("專案報告的影片片段：", CLIPS_DIR)
     finally:
         proc.terminate()
         try:

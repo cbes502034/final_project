@@ -1,7 +1,8 @@
 // 專案報告產生器：node report/build_deck.js → report/家庭記帳_專案報告.pptx
 //
 // 產品介紹：照完整流程影片用一輪，畫面標 ①②③ 逐一說明，最後是接下來上線的兩件事（26 頁）。
-// 截圖是 qa/record_demo.py --trial --snaps 同一輪拍的（report/assets/demo/），個人帳本那張是 screenshot.py 拍的（assets/entry.png）。
+// 畫面都是影片片段：qa/record_demo.py 錄完整流程影片時同一輪切出來的（report/assets/clips/），一進到那一頁就自動播放，
+// 播完停在最後一格；①②③ 畫在停格上（錄影時從網頁讀元件位置，一定對得準）。自動播放用這台電腦的 PowerPoint 設定（lib/autoplay.ps1）。
 // AI 記帳那一頁與未來展望的數字從 report/data/facts.json 讀（python report/collect.py 產生），不手打。
 //
 // 版型：16:9 寬版；深藍封面與結尾、白底內容頁；截圖放在白色圓角框裡（整份的視覺母題）。
@@ -84,15 +85,17 @@ function card(slide, x, y, w, h, id, fill) {
     x, y, w, h, rectRadius: 0.14, fill: { color: fill || C.background2 }, line: { color: fill || C.background2 }, objectName: id,
   });
 }
-/** 截圖放進白色圓角框（整份的視覺母題）。給寬度，高度照圖的比例。 */
-function shot(slide, file, x, y, w, ratio, id) {
+/** 影片片段放進白色圓角框（整份的視覺母題）。給寬度，高度照畫面的比例。
+ *  封面＝片段停格的那一格（有編號的頁，編號已經畫在上面），沒播放、匯出 PDF 時看到的就是它。 */
+function clip(slide, name, x, y, w, ratio, id) {
   const h = w / ratio;
   const pad = 0.09;
   slide.addShape(pres.shapes.ROUNDED_RECTANGLE, {
     x: x - pad, y: y - pad, w: w + 2 * pad, h: h + 2 * pad, rectRadius: 0.12,
     fill: { color: C.background1 }, line: { color: "D6E0EE", width: 0.75 }, shadow: shadow(), objectName: id + "-frame",
   });
-  slide.addImage({ path: asset(file), x, y, w, h, objectName: id });
+  const cover = "image/png;base64," + fs.readFileSync(asset("clips/" + name + ".png")).toString("base64");
+  slide.addMedia({ type: "video", path: asset("clips/" + name + ".mp4"), cover, x, y, w, h, objectName: id });
   return h;
 }
 function text(slide, t, o) {
@@ -130,12 +133,11 @@ async function build() {
   const S = {};
 
   // ============================================================ 頁面
-  // 照完整流程影片走一輪。截圖是 record_demo.py --trial --snaps 同一輪拍的（report/assets/demo/）
-  const D = (n) => "demo/" + n + ".png";
+  // 照完整流程影片走一輪，每一頁的畫面是那一步的影片片段
 
   /** 一張大圖，右邊三四點說明 */
   const demoSingle = async (file, points, note) => {
-    shot(s, D(file), 0.6, 1.45, 8.4, 1.6, "demo-" + file);
+    clip(s, file, 0.6, 1.45, 8.4, 1.6, "demo-" + file);
     for (let i = 0; i < points.length; i++) {
       const y = 1.55 + i * 1.12;
       await iconCircle(s, "FiCheck", 9.35, y + 0.04, 0.42, C.accent2, HEX.lt1, "demo-pt-" + i);
@@ -145,8 +147,8 @@ async function build() {
   };
   /** 兩張圖並排，各一句說明 */
   const demoDouble = async (f1, f2, l1, l2, note) => {
-    shot(s, D(f1), 0.6, 1.5, 5.95, 1.6, "demo-" + f1);
-    shot(s, D(f2), 6.78, 1.5, 5.95, 1.6, "demo-" + f2);
+    clip(s, f1, 0.6, 1.5, 5.95, 1.6, "demo-" + f1);
+    clip(s, f2, 6.78, 1.5, 5.95, 1.6, "demo-" + f2);
     text(s, l1, { x: 0.6, y: 5.45, w: 5.95, h: 0.9, fontSize: 15, color: C.text1 });
     text(s, l2, { x: 6.78, y: 5.45, w: 5.95, h: 0.9, fontSize: 15, color: C.text1 });
     if (note) text(s, note, { x: 0.6, y: 6.45, w: 12.1, h: 0.4, fontSize: 10.5, color: C.accent5 });
@@ -155,7 +157,7 @@ async function build() {
   S.dFlow = async () => {
     s = slide("CONTENT");
     s.addText("完整用一輪：六個步驟", { placeholder: "title" });
-    shot(s, D("landing"), 0.6, 1.5, 6.6, 1.6, "demo-landing");
+    clip(s, "landing", 0.6, 1.5, 6.6, 1.6, "demo-landing");
     const steps = [
       ["FiUserPlus", "開始使用", "註冊、收驗證信、設定收入與存錢"],
       ["FiEdit3", "記帳", "說一句話，AI 幫你拆成好幾筆"],
@@ -249,8 +251,8 @@ async function build() {
     s = slide("CONTENT");
     s.addText("手機也能用", { placeholder: "title" });
     const r = 375 / 812;
-    shot(s, D("mobile"), 0.9, 1.45, 2.45, r, "demo-mobile");
-    shot(s, D("mobile2"), 3.75, 1.45, 2.45, r, "demo-mobile2");
+    clip(s, "mobile", 0.9, 1.45, 2.45, r, "demo-mobile");
+    clip(s, "mobile2", 3.75, 1.45, 2.45, r, "demo-mobile2");
     const pts = ["底部分頁列：總覽、帳本、記一筆、狀況、建議", "總覽、面板、表格都照手機寬度重排", "從註冊到零用金，整輪在手機上都做得到"];
     for (let i = 0; i < pts.length; i++) {
       const y = 1.9 + i * 1.3;
@@ -269,27 +271,6 @@ async function build() {
     s.addNotes("以上是完整用一輪的過程，完整的操作影片大約六分鐘。謝謝大家，歡迎提問。");
   };
 
-  // 畫面上標 ①②③（位置是 record_demo.py --snaps 拍的時候從網頁讀的，見 demo/marks.json），旁邊逐一說明
-  const MARKS = fs.existsSync(asset("demo/marks.json")) ? JSON.parse(fs.readFileSync(asset("demo/marks.json"), "utf8")) : {};
-  const NUM = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"];
-
-  /** 截圖＋編號標記（橘色圓點，放在元件左邊） */
-  const markShot = (file, x, y, w, ratio, id) => {
-    const h = shot(s, D(file), x, y, w, ratio, "v2-" + id);
-    const placed = [];
-    (MARKS[file] || []).forEach((p, i) => {
-      if (!p) return;
-      const d = 0.36;
-      let mx = Math.max(x - 0.08, x + p[0] * w - d * 0.75);
-      const my = y + p[1] * h - d / 2;
-      // 兩個編號靠太近就往右錯開，不要疊在一起
-      while (placed.some(([px, py]) => Math.abs(px - mx) < d + 0.04 && Math.abs(py - my) < d + 0.04)) mx += d + 0.08;
-      placed.push([mx, my]);
-      s.addShape(pres.shapes.OVAL, { x: mx, y: my, w: d, h: d, fill: { color: HEX.accent3 }, line: { color: "FFFFFF", width: 1.5 }, objectName: id + "-m" + i });
-      s.addText(String(i + 1), { x: mx, y: my, w: d, h: d, fontSize: 12, bold: true, color: "FFFFFF", align: "center", valign: "middle", margin: 0, objectName: id + "-mt" + i });
-    });
-    return h;
-  };
   /** 右邊的編號說明：①標題＋一句說明 */
   const legend = (items, x, y, w, gap) => {
     items.forEach(([head, body], i) => {
@@ -304,7 +285,7 @@ async function build() {
   const tripleShots = (files, labels) => {
     files.forEach((f, i) => {
       const x = 0.6 + i * 4.1;
-      shot(s, D(f), x, 1.55, 3.85, 1.6, "v2-tri-" + i);
+      clip(s, f, x, 1.55, 3.85, 1.6, "v2-tri-" + i);
       text(s, labels[i], { x, y: 4.15, w: 3.85, h: 1.3, fontSize: 14, color: C.text1 });
     });
   };
@@ -350,13 +331,13 @@ async function build() {
     s = slide("CONTENT");
     s.addText("三種視角，同一套記帳", { placeholder: "title" });
     const views = [
-      ["home", "個人", "自己的總帳本：這個月還可以花多少、今天記了什麼"],
-      ["activity", "活動", "個人底下的小帳本：一趟旅行、一場聚餐，有自己的總覽和目標"],
+      ["view_home", "個人", "自己的總帳本：這個月還可以花多少、今天記了什麼"],
+      ["view_activity", "活動", "個人底下的小帳本：一趟旅行、一場聚餐，有自己的總覽和目標"],
       ["family", "家庭", "全家合起來看：家庭的收支、長期目標、照看孩子與零用金"],
     ];
     views.forEach(([f, head, body], i) => {
       const x = 0.6 + i * 4.1;
-      shot(s, D(f), x, 1.55, 3.85, 1.6, "v2-view-" + i);
+      clip(s, f, x, 1.55, 3.85, 1.6, "v2-view-" + i);
       text(s, head, { x, y: 4.2, w: 3.85, h: 0.5, fontSize: 20, bold: true, color: C.text2 });
       text(s, body, { x, y: 4.72, w: 3.85, h: 1.0, fontSize: 14, color: C.accent5 });
     });
@@ -388,7 +369,7 @@ async function build() {
   S.v2Home = async () => {
     s = slide("CONTENT");
     s.addText("總覽：打開就知道這個月還可以花多少", { placeholder: "title" });
-    markShot("home", 0.6, 1.45, 7.9, 1.6, "home");
+    clip(s, "home", 0.6, 1.45, 7.9, 1.6, "v2-home");
     legend([
       ["本月收入", "點進去只看這個月的收入；月薪已經自動記進來"],
       ["本月支出", "點進去只看這個月的支出"],
@@ -403,7 +384,7 @@ async function build() {
   S.v2Parse = async () => {
     s = slide("CONTENT");
     s.addText("一句話，記好幾筆", { placeholder: "title" });
-    markShot("parse", 0.6, 1.45, 7.9, 1.6, "parse");
+    clip(s, "parse", 0.6, 1.45, 7.9, 1.6, "v2-parse");
     card(s, 8.95, 1.45, 3.8, 0.95, "parse-in", "F7F9FC");
     text(s, [{ text: "輸入：", options: { bold: true, color: C.text2 } }, { text: "早餐蛋餅 45，捷運 30，午餐便當 95，晚上全聯買牙膏 89", options: { color: C.text1 } }],
       { x: 9.1, y: 1.5, w: 3.55, h: 0.85, fontSize: 12.5, valign: "middle" });
@@ -421,7 +402,7 @@ async function build() {
   S.v2Ledger = async () => {
     s = slide("CONTENT");
     s.addText("個人帳本：所有紀錄都在這裡", { placeholder: "title" });
-    shot(s, "entry.png", 0.6, 1.45, 7.9, 1.6, "v2-entry");
+    clip(s, "entry", 0.6, 1.45, 7.9, 1.6, "v2-entry");
     await checks(["收支、來源（AI 解析／手動／自動入帳）、活動都能篩", "每一筆都能改；選取多筆一次刪除（要密碼）",
       "上個月以前自動收進「年月包裹」，點開才展開", "右上角搜尋，直接找某一筆"], 8.95, 1.6, 1.15);
     s.addNotes("個人帳本放所有紀錄，可以依收支、來源、活動篩選；每一筆都能修改，也可以選取多筆一次刪除，刪除要輸入密碼。上個月以前的紀錄會自動收進年月包裹，畫面不會越來越長。");
@@ -430,7 +411,7 @@ async function build() {
   S.v2ActMenu = async () => {
     s = slide("CONTENT");
     s.addText("活動選單：只放進行中的活動", { placeholder: "title" });
-    shot(s, D("dropdown"), 0.6, 1.45, 7.9, 1.6, "v2-dropdown");
+    clip(s, "dropdown", 0.6, 1.45, 7.9, 1.6, "v2-dropdown");
     await checks(["預先規劃（還沒開始）的不會出現在選單", "到了開始日自動放上去，並通知每位成員",
       "選了活動，總覽、帳本、狀況、建議都換成這個活動的", "按「回到個人」一鍵回到自己的帳"], 8.95, 1.6, 1.15);
     s.addNotes("右上角的活動選單只放進行中的活動，預先規劃的要到開始日才會出現，同時通知每位成員。選了某個活動，總覽、帳本、財務狀況、建議都會換成這個活動的；按回到個人就回來。");
@@ -448,7 +429,7 @@ async function build() {
   S.v2ActHome = async () => {
     s = slide("CONTENT");
     s.addText("活動總覽：一張卡看懂這個活動", { placeholder: "title" });
-    markShot("activity", 0.6, 1.45, 7.9, 1.6, "act");
+    clip(s, "activity", 0.6, 1.45, 7.9, 1.6, "v2-act");
     legend([
       ["說明", "建立者寫的一句話：這個活動在做什麼"],
       ["期間、成員、紀錄", "幾號開始、還有幾天結束；誰在裡面；記了幾筆"],
@@ -472,7 +453,7 @@ async function build() {
   S.v2Guardian = async () => {
     s = slide("CONTENT");
     s.addText("照看：家長看得到孩子的帳", { placeholder: "title" });
-    shot(s, D("guardian"), 0.6, 1.45, 7.9, 1.6, "v2-guardian");
+    clip(s, "guardian", 0.6, 1.45, 7.9, 1.6, "v2-guardian");
     await checks(["孩子加入後，家長按「開始照看」", "孩子看得到是誰在照看", "家長看得到孩子的帳，也能給零用金",
       "孩子看不到家長的帳，也看不到家庭帳務", "孩子可以自己退出家庭"], 8.95, 1.55, 0.98, 14);
     s.addNotes("孩子加入家庭之後，家長按開始照看，才看得到孩子的帳、才能給零用金；孩子也看得到是誰在照看。反過來，孩子看不到家長的帳，也看不到家庭的帳務。孩子可以自己退出家庭。");
@@ -517,7 +498,7 @@ async function build() {
   S.v2Advice = async () => {
     s = slide("CONTENT");
     s.addText("AI 財務建議：每個數字都找得到出處", { placeholder: "title" });
-    markShot("advice", 0.6, 1.45, 7.9, 1.6, "adv");
+    clip(s, "advice", 0.6, 1.45, 7.9, 1.6, "v2-adv");
     legend([
       ["等級", "良好、參考……一眼看這一則的狀況"],
       ["標題", "一句話說重點"],
@@ -606,6 +587,10 @@ async function build() {
 
   await pres.writeFile({ fileName: OUT });
   await applyTheme(OUT, THEME);
+  // 影片一進到那一頁就自動播放：pptxgenjs 做不到，借這台電腦的 PowerPoint 打開、設定、存檔；不行就維持點一下才播
+  const ps = require("child_process").spawnSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+    path.join(HERE, "lib", "autoplay.ps1"), OUT], { encoding: "utf8", timeout: 300000 });
+  console.log(ps.status === 0 ? ps.stdout.trim() : "⚠️ 自動播放沒設成功（要點一下影片才播）：" + (ps.stderr || ps.error || "").toString().trim());
   console.log("寫好了：" + OUT);
 }
 
