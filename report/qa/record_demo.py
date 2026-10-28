@@ -249,30 +249,66 @@ async def run(ws_url, args, accounts, workdir):
             shutil.rmtree(snap_dir, ignore_errors=True)
             os.makedirs(snap_dir)
 
-        async def snap(name):
-            """產品展示簡報用：先把字幕、游標藏起來，等畫面停好再拍，拍完放回去"""
+        marks = {}
+
+        async def snap(name, spots=None):
+            """產品展示簡報用：先把字幕、游標藏起來，等畫面停好再拍，拍完放回去。
+            spots：要在簡報上標 ①②③ 的元件（CSS 選擇器，或 "js:" 開頭的運算式），
+            記下它們在畫面上的位置（佔寬、高的比例）到 marks.json，簡報照這個位置畫編號，不用目測"""
             if not args.snaps:
                 return
             await c.js("['qa-cap','qa-cur'].forEach(function (i) { var e = document.getElementById(i); if (e) e.style.visibility = 'hidden'; })")
             await asyncio.sleep(0.8)
+            if spots:
+                marks[name] = await c.js("""(function (specs) { return specs.map(function (sp) {
+                    var e = sp.indexOf('js:') === 0 ? eval(sp.slice(3)) : document.querySelector(sp);
+                    if (!e) return null;
+                    var r = e.getBoundingClientRect();
+                    if (r.bottom < 0 || r.top > innerHeight || r.width === 0) return null;
+                    return [Math.max(0, r.left) / innerWidth, (r.top + Math.min(r.height, 56) / 2) / innerHeight];
+                  }); })(%s)""" % json.dumps(spots))
+                with open(os.path.join(snap_dir, "marks.json"), "w", encoding="utf-8") as f:
+                    json.dump(marks, f, ensure_ascii=False, indent=1)
             shot = await c.send("Page.captureScreenshot", format="png")
             with open(os.path.join(snap_dir, name + ".png"), "wb") as f:
                 f.write(base64.b64decode(shot["data"]))
             await c.js("['qa-cap','qa-cur'].forEach(function (i) { var e = document.getElementById(i); if (e) e.style.visibility = ''; })")
 
-        # 這幾步一出字幕就是要的畫面：直接拍
-        SNAP_AT = {"首頁": "landing", "個人總覽": "home", "解析結果": "parse", "今天的紀錄": "today", "建立活動": "create",
-                   "預先規劃": "planned", "活動的設定": "settings", "邀請朋友": "invite_friend", "活動記帳": "activity",
-                   "邀請家人": "family", "子女收到邀請": "kid_invite", "成員只能看": "kid_readonly",
-                   "零用金自動記帳": "allowance", "子女的鈴鐺": "kid_bell", "統計": "stats", "刪除要輸入密碼": "danger",
-                   "手機版": "mobile"}
+        # 這幾步一出字幕就是要的畫面：直接拍。後面的清單是簡報上要標編號的元件
+        SNAP_AT = {
+            "首頁": ("landing", None),
+            "去收信": ("verify_mail", None),
+            "理財習慣": ("finance", None),
+            "主題": ("theme", None),
+            "個人總覽": ("home", ['[data-flt="income"]', '[data-flt="expense"]', ".wal__v", ".wal__meta", ".qk", ".hpanel"]),
+            "解析結果": ("parse", [".btbl__raw", '.btbl__r [data-b="date"]', '.btbl__r [data-b="amount"]', '.btbl__r [data-b="cat"]',
+                               "js:[...document.querySelectorAll('.btbl__r [data-b=merchant]')].pop()", "#paraSave"]),
+            "今天的紀錄": ("today", None),
+            "建立活動": ("create", None),
+            "預先規劃": ("planned", None),
+            "活動的設定": ("settings", None),
+            "邀請朋友": ("invite_friend", None),
+            "活動總覽": ("activity_new", None),
+            "活動記帳": ("activity", [".act__note", ".act__f dt:nth-of-type(2)", ".act__goal", '[data-flt="expense"]',
+                                  "[data-personal-return]", ".hpanel"]),
+            "邀請家人": ("family", None),
+            "子女收到邀請": ("kid_invite", None),
+            "成員只能看": ("kid_readonly", None),
+            "照看子女": ("guardian", None),
+            "零用金": ("allowance_form", None),
+            "零用金自動記帳": ("allowance", None),
+            "子女的鈴鐺": ("kid_bell", None),
+            "統計": ("stats", None),
+            "刪除要輸入密碼": ("danger", None),
+            "手機版": ("mobile", None),
+        }
 
         async def cap(title, desc):
             step[0] += 1
             shown.update(title=title, desc=desc)
             await recap()
             if title in SNAP_AT:
-                await snap(SNAP_AT[title])
+                await snap(*SNAP_AT[title])
             print("  %2d/%d %s" % (step[0], total, title), flush=True)
             if trial:
                 await asyncio.sleep(0.4)
@@ -374,6 +410,15 @@ async def run(ws_url, args, accounts, workdir):
             await wait(0.8)
             await click("#paraGo")
             await busy("document.getElementById('paraSave')", keep=2.5, timeout=90)
+            # 接了 AI 卻偶爾逾時（畫面寫「AI 暫時沒有回應」、改用規則）：重新解析，最多再試兩次
+            for _ in range(2 if args.ai else 0):
+                if not await c.js("document.body.innerText.includes('AI 暫時沒有回應')"):
+                    break
+                t0 = time.time()
+                await click("#paraGo", pause=0.2)
+                await asyncio.sleep(1.5)
+                await until("document.getElementById('paraSave') && !document.getElementById('paraGo').disabled", 90)
+                c.ff.append((t0, time.time(), 1.0))
             await wait(0.8)
             await scroll_to(".btbl, #paraSave")
 
@@ -479,6 +524,8 @@ async def run(ws_url, args, accounts, workdir):
             await wait(2)
             await click("#tourYes")
             await until("document.getElementById('tourNext')", 10)
+            await wait(1)
+            await snap("tour")
             for _ in range(3):
                 await wait(1.6)
                 await click("#tourNext", pause=0.3, need=False)
@@ -548,6 +595,7 @@ async def run(ws_url, args, accounts, workdir):
         await wait(4)
         await click("#gswBtn")
         await wait(2.5)
+        await snap("dropdown")
         await click("#gswBtn")
         await wait(0.8)
 
@@ -632,6 +680,7 @@ async def run(ws_url, args, accounts, workdir):
         await wait(1.5)
         await page("#/groups", "document.querySelector('[data-activity-response$=\"|accept\"]')")
         await wait(1)
+        await snap("kid_activity_invite")
         await click('[data-activity-response$="|accept"]')
         await busy("document.querySelector('.lg[data-lgid=\"%s\"]')" % trip, keep=1.5)
         await click('.lg[data-lgid="%s"] .lg__h' % trip)
@@ -683,9 +732,17 @@ async def run(ws_url, args, accounts, workdir):
         await click("#advGen")
         await wait(2)
         await busy("document.getElementById('advGen') && !document.getElementById('advGen').disabled", keep=3, timeout=120)
+        for _ in range(2 if args.ai else 0):                   # 同上：AI 偶爾逾時就再產生一次
+            if not await c.js("document.body.innerText.includes('AI 暫時沒有回應')"):
+                break
+            t0 = time.time()
+            await click("#advGen", pause=0.2)
+            await asyncio.sleep(2)
+            await until("document.getElementById('advGen') && !document.getElementById('advGen').disabled", 120)
+            c.ff.append((t0, time.time(), 1.5))
         await click(".ad__h", need=False)
         await wait(5)
-        await snap("advice")
+        await snap("advice", [".ad__lv", ".ad__t", ".ad__b", ".ad__k", "js:document.querySelectorAll('.ad__k')[1]", "#advGen"])
 
         # ---------------------------------------------------------------- 10. 刪除要密碼
         await page("#/", "document.querySelector('.hpanel [data-del]')")

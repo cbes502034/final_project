@@ -19,13 +19,15 @@ const asset = (n) => path.join(HERE, "assets", n);
 // 可以帶一個檔名另存（PowerPoint 開著舊檔、或不想蓋掉手動修改的時候）：node report/build_deck.js 新檔名.pptx
 // 三種版本：
 //   node build_deck.js          重點版：開場 3 頁、四個領域各 3 頁、結語 3 頁 → 家庭記帳_期末報告.pptx
-//   node build_deck.js --demo   產品展示：照完整流程影片用一輪，畫面為主（13 頁）→ 家庭記帳_產品展示.pptx
+//   node build_deck.js --demo   產品展示：照完整流程影片用一輪，畫面為主（15 頁）→ 家庭記帳_產品展示.pptx
+//   node build_deck.js --demo2  產品介紹 v2：同一輪、講得更細（畫面標 ①②③ 逐一說明，26 頁）→ 家庭記帳_產品展示_v2.pptx
 //   node build_deck.js --full   完整版：每個畫面、評測細節、每一輪測試都有 → 家庭記帳_期末報告_完整版.pptx
 const FULL = process.argv.includes("--full");
-const DEMO = process.argv.includes("--demo");
+const DEMO2 = process.argv.includes("--demo2");
+const DEMO = process.argv.includes("--demo") || DEMO2;   // v2 沿用產品展示的頁面與版型
 const outArg = process.argv.slice(2).find((a) => !a.startsWith("--"));
 const OUT = outArg ? path.resolve(outArg)
-  : path.join(HERE, DEMO ? "家庭記帳_產品展示.pptx" : FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
+  : path.join(HERE, DEMO2 ? "家庭記帳_產品展示_v2.pptx" : DEMO ? "家庭記帳_產品展示.pptx" : FULL ? "家庭記帳_期末報告_完整版.pptx" : "家庭記帳_期末報告.pptx");
 
 const THEME = {
   name: "FamBudget",
@@ -1146,8 +1148,302 @@ async function build() {
     s.addNotes("以上是完整用一輪的過程，完整的操作影片大約六分鐘。謝謝大家，歡迎提問。");
   };
 
-  // 重點版：開場 3、四個領域各 3、結語 3；產品展示：照影片用一輪；完整版：原本的每一頁
-  const ORDER = DEMO
+  // ============================================================ 產品介紹 v2（--demo2）
+  // 比產品展示多講細節：畫面上標 ①②③（位置是 record_demo.py --snaps 拍的時候從網頁讀的，見 demo/marks.json），旁邊逐一說明
+  const MARKS = fs.existsSync(asset("demo/marks.json")) ? JSON.parse(fs.readFileSync(asset("demo/marks.json"), "utf8")) : {};
+  const NUM = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"];
+
+  /** 截圖＋編號標記（橘色圓點，放在元件左邊） */
+  const markShot = (file, x, y, w, ratio, id) => {
+    const h = shot(s, D(file), x, y, w, ratio, "v2-" + id);
+    const placed = [];
+    (MARKS[file] || []).forEach((p, i) => {
+      if (!p) return;
+      const d = 0.36;
+      let mx = Math.max(x - 0.08, x + p[0] * w - d * 0.75);
+      const my = y + p[1] * h - d / 2;
+      // 兩個編號靠太近就往右錯開，不要疊在一起
+      while (placed.some(([px, py]) => Math.abs(px - mx) < d + 0.04 && Math.abs(py - my) < d + 0.04)) mx += d + 0.08;
+      placed.push([mx, my]);
+      s.addShape(pres.shapes.OVAL, { x: mx, y: my, w: d, h: d, fill: { color: HEX.accent3 }, line: { color: "FFFFFF", width: 1.5 }, objectName: id + "-m" + i });
+      s.addText(String(i + 1), { x: mx, y: my, w: d, h: d, fontSize: 12, bold: true, color: "FFFFFF", align: "center", valign: "middle", margin: 0, objectName: id + "-mt" + i });
+    });
+    return h;
+  };
+  /** 右邊的編號說明：①標題＋一句說明 */
+  const legend = (items, x, y, w, gap) => {
+    items.forEach(([head, body], i) => {
+      const yy = y + i * gap;
+      s.addShape(pres.shapes.OVAL, { x, y: yy, w: 0.36, h: 0.36, fill: { color: HEX.accent3 }, line: { color: HEX.accent3 }, objectName: "lg-c" + i });
+      s.addText(String(i + 1), { x, y: yy, w: 0.36, h: 0.36, fontSize: 12, bold: true, color: "FFFFFF", align: "center", valign: "middle", margin: 0, objectName: "lg-n" + i });
+      text(s, head, { x: x + 0.5, y: yy - 0.03, w: w - 0.5, h: 0.36, fontSize: 15, bold: true, color: C.text2 });
+      text(s, body, { x: x + 0.5, y: yy + 0.32, w: w - 0.5, h: gap - 0.36, fontSize: 12, color: C.accent5 });
+    });
+  };
+  /** 三張圖並排，各一段說明 */
+  const tripleShots = (files, labels) => {
+    files.forEach((f, i) => {
+      const x = 0.6 + i * 4.1;
+      shot(s, D(f), x, 1.55, 3.85, 1.6, "v2-tri-" + i);
+      text(s, labels[i], { x, y: 4.15, w: 3.85, h: 1.3, fontSize: 14, color: C.text1 });
+    });
+  };
+  /** 右邊打勾的幾點 */
+  const checks = async (points, x, y, gap, size) => {
+    for (let i = 0; i < points.length; i++) {
+      await iconCircle(s, "FiCheck", x, y + i * gap + 0.03, 0.4, C.accent2, HEX.lt1, "v2-ck-" + i);
+      text(s, points[i], { x: x + 0.55, y: y + i * gap, w: 12.75 - x - 0.55, h: gap - 0.1, fontSize: size || 14.5, color: C.text1 });
+    }
+  };
+
+  S.v2Cover = async () => {
+    s = slide("TITLE_DARK");
+    s.addText("家庭記帳 FamBudget", { placeholder: "title" });
+    s.addText("產品介紹：說一段話就記好帳，個人、活動、家庭一起看得懂", { placeholder: "body" });
+    s.addText("冠文・宇傑・明樺・囷洧　｜　2026 年 10 月　｜　LLM 應用期末專題", { placeholder: "meta" });
+    qr(s, 10.35, 0.75, "qr-cover");
+    s.addNotes("大家好，我們是家庭記帳 FamBudget。接下來用一個空帳號，把整個產品從註冊到看建議完整走一輪，每一頁都會講到畫面上的細節。");
+  };
+
+  S.v2Why = async () => {
+    s = slide("CONTENT");
+    s.addText("為什麼做這個產品", { placeholder: "title" });
+    const rows = [
+      ["FiEdit3", C.accent1, "記帳太麻煩", "早餐、午餐、加油……一筆一筆選日期、分類、填金額，三天就放棄。", "說一段話，AI 拆成好幾筆、欄位都填好，你只要看過按確認"],
+      ["FiLayers", C.accent2, "錢分散在不同地方", "自己的生活費、一趟旅行、家裡給孩子的零用錢，混在一起算不清楚。", "個人、活動、家庭三種視角，各算各的，也能合起來看"],
+      ["FiHelpCircle", C.accent3, "看了數字不知道怎麼辦", "知道花了多少，卻不知道算不算多、下個月該怎麼調。", "AI 財務建議，每個數字都附算式、找得到出處"],
+    ];
+    for (let i = 0; i < 3; i++) {
+      const [ic, col, head, pain, ours] = rows[i];
+      const x = 0.6 + i * 4.1;
+      card(s, x, 1.55, 3.85, 5.1, "why-" + i);
+      await iconCircle(s, ic, x + 0.35, 1.9, 0.8, col, HEX.lt1, "why-ic-" + i);
+      text(s, head, { x: x + 0.35, y: 2.95, w: 3.15, h: 0.5, fontSize: 22, bold: true, color: C.text2 });
+      text(s, pain, { x: x + 0.35, y: 3.55, w: 3.15, h: 1.3, fontSize: 14.5, color: C.accent5 });
+      text(s, "我們的做法", { x: x + 0.35, y: 4.95, w: 3.15, h: 0.35, fontSize: 13, bold: true, color: col });
+      text(s, ours, { x: x + 0.35, y: 5.3, w: 3.15, h: 1.2, fontSize: 15, color: C.text1 });
+    }
+    s.addNotes("我們想解決三件事：記帳太麻煩、錢分散在不同地方算不清楚、看了數字不知道怎麼辦。對應的做法是：說一段話由 AI 拆帳；個人、活動、家庭三種視角；以及每個數字都有出處的 AI 財務建議。");
+  };
+
+  S.v2Views = async () => {
+    s = slide("CONTENT");
+    s.addText("三種視角，同一套記帳", { placeholder: "title" });
+    const views = [
+      ["home", "個人", "自己的總帳本：這個月還可以花多少、今天記了什麼"],
+      ["activity", "活動", "個人底下的小帳本：一趟旅行、一場聚餐，有自己的總覽和目標"],
+      ["family", "家庭", "全家合起來看：家庭的收支、長期目標、照看孩子與零用金"],
+    ];
+    views.forEach(([f, head, body], i) => {
+      const x = 0.6 + i * 4.1;
+      shot(s, D(f), x, 1.55, 3.85, 1.6, "v2-view-" + i);
+      text(s, head, { x, y: 4.2, w: 3.85, h: 0.5, fontSize: 20, bold: true, color: C.text2 });
+      text(s, body, { x, y: 4.72, w: 3.85, h: 1.0, fontSize: 14, color: C.accent5 });
+    });
+    text(s, "右上角一鍵切換「個人｜家庭」、選活動；底部分頁和常用功能跟著換名字：個人帳本、活動帳本、家庭帳本。",
+      { x: 0.6, y: 6.0, w: 12.1, h: 0.6, fontSize: 14, color: C.text1 });
+    s.addNotes("這個產品有三種視角，用的是同一套記帳。個人是自己的總帳本；活動是個人底下的小帳本，例如一趟旅行；家庭是全家合起來看。右上角一鍵切換，頁面名稱也跟著換，看名字就知道現在算的是誰的錢。");
+  };
+
+  S.v2Setup = async () => {
+    s = slide("CONTENT");
+    s.addText("開始使用：註冊後三步設定", { placeholder: "title" });
+    tripleShots(["register", "setup", "finance"], [
+      "註冊：名字、email、密碼（至少 8 個字）。寄驗證信，點了才開始用。",
+      "收入與存錢：收入怎麼來（月薪、打工、接案…）、怎麼估、每月想存多少。月薪設入帳日，到了自動記。",
+      "理財習慣：理財風格、最在意的事。只拿來讓 AI 建議更貼近你，每一步都能跳過。",
+    ]);
+    s.addNotes("註冊只要名字、email、密碼，點了驗證信才開始。接著三步設定：收入與存錢、理財習慣、主題。收入的部分可以選收入怎麼來和怎麼估；月薪設了入帳日，到了那天會自動記一筆。每一步都可以跳過。");
+  };
+
+  S.v2Theme = async () => {
+    s = slide("CONTENT");
+    s.addText("挑主題、走一遍導覽", { placeholder: "title" });
+    await demoDouble("theme", "tour",
+      "八套主題，按一下整個系統就換；存在帳號上，換裝置也一樣。",
+      "第一次進來會問要不要導覽，照畫面上看得到的東西一步一步帶，隨時可以跳過。");
+    s.addNotes("最後一步挑主題，按一下整個系統就換成那個樣子，設定存在帳號上。進到總覽，第一次會問要不要導覽，照畫面上的東西一步一步帶。");
+  };
+
+  S.v2Home = async () => {
+    s = slide("CONTENT");
+    s.addText("總覽：打開就知道這個月還可以花多少", { placeholder: "title" });
+    markShot("home", 0.6, 1.45, 7.9, 1.6, "home");
+    legend([
+      ["本月收入", "點進去只看這個月的收入；月薪已經自動記進來"],
+      ["本月支出", "點進去只看這個月的支出"],
+      ["這個月還可以花", "收入 − 每月想存 ＝ 可花上限，再扣掉已經花的"],
+      ["已用幾成", "進度條、可花上限、每月想存，超過會變紅"],
+      ["常用功能", "記一筆、個人帳本、活動、財務狀況與建議"],
+      ["下方面板", "今天的紀錄｜預算使用狀況，在面板裡捲動"],
+    ], 8.95, 1.5, 3.8, 0.88);
+    s.addNotes("這是總覽。上面兩條是本月收入和支出，點進去只看那一類。中間最大的數字是這個月還可以花多少：收入減掉每月想存就是可花上限，再扣掉已經花的。下面是進度、常用功能，最下面是今天的紀錄和預算的分頁面板。");
+  };
+
+  S.v2Parse = async () => {
+    s = slide("CONTENT");
+    s.addText("一句話，記好幾筆", { placeholder: "title" });
+    markShot("parse", 0.6, 1.45, 7.9, 1.6, "parse");
+    card(s, 8.95, 1.45, 3.8, 0.95, "parse-in", "F7F9FC");
+    text(s, [{ text: "輸入：", options: { bold: true, color: C.text2 } }, { text: "早餐蛋餅 45，捷運 30，午餐便當 95，晚上全聯買牙膏 89", options: { color: C.text1 } }],
+      { x: 9.1, y: 1.5, w: 3.55, h: 0.85, fontSize: 12.5, valign: "middle" });
+    legend([
+      ["原句對照", "每一筆都標出是從哪一句拆出來的"],
+      ["日期", "「昨天」「上禮拜三」會自動換算"],
+      ["金額", "沒講金額的留空，不會亂填"],
+      ["分類", "照你家的分類挑；家庭自訂的也行"],
+      ["店家", "「全聯」這類店名自動抓出來"],
+      ["確認寫入", "看過、改過，一次寫入全部"],
+    ], 8.95, 2.6, 3.8, 0.74);
+    s.addNotes("記帳時直接打一段話，例如「早餐蛋餅 45，捷運 30，午餐便當 95，晚上全聯買牙膏 89」。AI 把它拆成四筆：每一筆標出原句、日期自動換算、金額、分類都填好，連店家全聯都抓出來。沒講的金額會留空讓你補，不會亂填。看過沒問題，按確認一次寫入。");
+  };
+
+  S.v2Ledger = async () => {
+    s = slide("CONTENT");
+    s.addText("個人帳本：所有紀錄都在這裡", { placeholder: "title" });
+    shot(s, "entry.png", 0.6, 1.45, 7.9, 1.6, "v2-entry");
+    await checks(["收支、來源（AI 解析／手動／自動入帳）、活動都能篩", "每一筆都能改；選取多筆一次刪除（要密碼）",
+      "上個月以前自動收進「年月包裹」，點開才展開", "右上角搜尋，直接找某一筆"], 8.95, 1.6, 1.15);
+    s.addNotes("個人帳本放所有紀錄，可以依收支、來源、活動篩選；每一筆都能修改，也可以選取多筆一次刪除，刪除要輸入密碼。上個月以前的紀錄會自動收進年月包裹，畫面不會越來越長。");
+  };
+
+  S.v2ActMenu = async () => {
+    s = slide("CONTENT");
+    s.addText("活動選單：只放進行中的活動", { placeholder: "title" });
+    shot(s, D("dropdown"), 0.6, 1.45, 7.9, 1.6, "v2-dropdown");
+    await checks(["預先規劃（還沒開始）的不會出現在選單", "到了開始日自動放上去，並通知每位成員",
+      "選了活動，總覽、帳本、狀況、建議都換成這個活動的", "按「回到個人」一鍵回到自己的帳"], 8.95, 1.6, 1.15);
+    s.addNotes("右上角的活動選單只放進行中的活動，預先規劃的要到開始日才會出現，同時通知每位成員。選了某個活動，總覽、帳本、財務狀況、建議都會換成這個活動的；按回到個人就回來。");
+  };
+
+  S.v2ActSettings = async () => {
+    s = slide("CONTENT");
+    s.addText("活動的設定與邀請朋友", { placeholder: "title" });
+    await demoDouble("settings", "invite_friend",
+      "名稱、說明、開始日、結束日、顏色、目標金額，建立後都能改——只有建立者能改。",
+      "用完整 email 找到朋友再送出；或產生只能用一次、7 天有效的邀請碼。");
+    s.addNotes("點開活動可以改所有設定，但只有建立者能改，避免大家各改各的。邀請朋友可以用完整的 email 找人，也可以產生只能用一次的邀請碼。");
+  };
+
+  S.v2ActHome = async () => {
+    s = slide("CONTENT");
+    s.addText("活動總覽：一張卡看懂這個活動", { placeholder: "title" });
+    markShot("activity", 0.6, 1.45, 7.9, 1.6, "act");
+    legend([
+      ["說明", "建立者寫的一句話：這個活動在做什麼"],
+      ["期間、成員、紀錄", "幾號開始、還有幾天結束；誰在裡面；記了幾筆"],
+      ["目標金額", "到了幾成；到了通知全部成員"],
+      ["活動的支出", "只算這個活動裡的帳，不混進個人"],
+      ["回到個人", "一鍵離開活動，回到自己的總覽"],
+      ["活動今天的紀錄", "下方面板也換成這個活動的"],
+    ], 8.95, 1.5, 3.8, 0.88);
+    s.addNotes("切到活動之後，總覽的主卡變成這個活動是什麼：說明、期間、成員、筆數和目標金額的進度。上面的收支只算活動裡的帳，不會混進個人。");
+  };
+
+  S.v2ActFriend = async () => {
+    s = slide("CONTENT");
+    s.addText("朋友這邊：收到邀請、加入、看得到不能改", { placeholder: "title" });
+    await demoDouble("kid_activity_invite", "kid_readonly",
+      "活動管理最上面就是邀請，按「加入」。",
+      "看得到說明、期間、建立者訂的目標金額；設定只有建立者能改。想離開可以退出，自己記的可以合併回個人帳本。");
+    s.addNotes("換到被邀請的人這邊，活動管理最上面就是邀請，按加入就進來了。成員看得到所有資訊，但設定只有建立者能改。想離開可以退出，退出時可以把自己記的那幾筆合併回個人帳本。");
+  };
+
+  S.v2Guardian = async () => {
+    s = slide("CONTENT");
+    s.addText("照看：家長看得到孩子的帳", { placeholder: "title" });
+    shot(s, D("guardian"), 0.6, 1.45, 7.9, 1.6, "v2-guardian");
+    await checks(["孩子加入後，家長按「開始照看」", "孩子看得到是誰在照看", "家長看得到孩子的帳，也能給零用金",
+      "孩子看不到家長的帳，也看不到家庭帳務", "孩子可以自己退出家庭"], 8.95, 1.55, 0.98, 14);
+    s.addNotes("孩子加入家庭之後，家長按開始照看，才看得到孩子的帳、才能給零用金；孩子也看得到是誰在照看。反過來，孩子看不到家長的帳，也看不到家庭的帳務。孩子可以自己退出家庭。");
+  };
+
+  S.v2Allowance = async () => {
+    s = slide("CONTENT");
+    s.addText("零用金：到了發放日自動記帳", { placeholder: "title" });
+    tripleShots(["allowance_form", "allowance", "kid_bell"], [
+      "設定每月零用金和發放日（1～28 號，沒選就是每月 1 號），改完離開欄位就存好。",
+      "到了發放日自動記一對帳：家長一筆支出、孩子一筆收入。改金額只調原本那一對。",
+      "孩子的鈴鐺馬上收到；零用金也算進孩子這個月可以花的錢裡。",
+    ]);
+    s.addNotes("家長在孩子的頁面設定每月零用金和發放日。到了發放日，系統自動記一對帳：家長那邊一筆支出、孩子那邊一筆收入；之後改金額只會調原本那一對，不會多記。孩子的鈴鐺會馬上收到通知。");
+  };
+
+  S.v2Bell = async () => {
+    s = slide("CONTENT");
+    s.addText("所有通知都即時進鈴鐺", { placeholder: "title" });
+    const kinds = [
+      ["FiHome", "家庭邀請", "有人用帳號邀你加入家庭"],
+      ["FiMap", "活動邀請", "朋友邀你加入一個活動"],
+      ["FiDollarSign", "零用金", "發放、調整、取消都會通知孩子"],
+      ["FiTrendingUp", "固定收入入帳", "月薪到了入帳日自動記一筆"],
+      ["FiTarget", "目標金額到了", "活動到了目標，全部成員都收到"],
+      ["FiCalendar", "活動開始", "預先規劃的活動到了開始日"],
+      ["FiEdit3", "孩子記帳", "照看的孩子記了一筆"],
+      ["FiAlertCircle", "階段性提醒", "這個月花到你設的比例"],
+    ];
+    for (let i = 0; i < kinds.length; i++) {
+      const x = 0.6 + (i % 4) * 3.08, y = 1.55 + Math.floor(i / 4) * 2.45;
+      card(s, x, y, 2.88, 2.2, "bell-" + i);
+      await iconCircle(s, kinds[i][0], x + 0.3, y + 0.3, 0.6, C.accent1, HEX.lt1, "bell-ic-" + i);
+      text(s, kinds[i][1], { x: x + 0.3, y: y + 1.0, w: 2.4, h: 0.45, fontSize: 16, bold: true, color: C.text2 });
+      text(s, kinds[i][2], { x: x + 0.3, y: y + 1.45, w: 2.4, h: 0.65, fontSize: 12.5, color: C.accent5 });
+    }
+    text(s, "打開系統時每 5 秒更新一次；做完會產生通知的動作，馬上再問一次。每一則都能刪，已讀的可以一次清掉。",
+      { x: 0.6, y: 6.5, w: 12.1, h: 0.4, fontSize: 13, color: C.text1 });
+    s.addNotes("所有通知都即時進鈴鐺：家庭和活動的邀請、零用金、固定收入入帳、目標金額到了、活動開始、孩子記帳，還有花到自己設的比例時的提醒。每一則都可以刪。");
+  };
+
+  S.v2Advice = async () => {
+    s = slide("CONTENT");
+    s.addText("AI 財務建議：每個數字都找得到出處", { placeholder: "title" });
+    markShot("advice", 0.6, 1.45, 7.9, 1.6, "adv");
+    legend([
+      ["等級", "良好、參考……一眼看這一則的狀況"],
+      ["標題", "一句話說重點"],
+      ["說明", "AI 寫成好懂的句子"],
+      ["依據", "每個數字都附算式，資料庫先算好的"],
+      ["建議", "接下來可以怎麼做"],
+      ["產生建議", "按一下，依這個月的帳重新寫"],
+    ], 8.95, 1.5, 3.8, 0.8);
+    text(s, "檢查不過的那則不顯示；不推薦投資、保險。", { x: 8.95, y: 6.35, w: 3.8, h: 0.4, fontSize: 11.5, color: C.accent5 });
+    s.addNotes("財務建議按一下就產生。每一則有等級、標題、AI 寫的說明，下面的依據列出每個數字和算式——這些數字由資料庫先算好，AI 只負責寫成好懂的句子；最後是具體的建議。檢查不通過的那則不會顯示，也不會推薦投資或保險。");
+  };
+
+  S.v2Summary = async () => {
+    s = slide("CONTENT");
+    s.addText("一頁看完：做了哪些事", { placeholder: "title" });
+    const cols = [
+      ["FiUserPlus", "開始使用", ["註冊與驗證信", "收入與存錢設定", "理財習慣、主題", "新手導覽"]],
+      ["FiEdit3", "記帳", ["一句話記好幾筆（AI）", "今天的紀錄", "個人帳本與年月包裹", "固定收入自動入帳"]],
+      ["FiMap", "活動", ["說明、期間、目標", "預先規劃", "邀請朋友", "退出可合併"]],
+      ["FiUsers", "家庭", ["邀請家人", "照看孩子", "零用金自動記帳", "鈴鐺即時通知"]],
+      ["FiPieChart", "回顧", ["收支對照與趨勢", "錢花在哪", "預算與提醒", "AI 財務建議"]],
+    ];
+    for (let i = 0; i < cols.length; i++) {
+      const [ic, head, items] = cols[i];
+      const x = 0.6 + i * 2.46;
+      card(s, x, 1.55, 2.3, 4.9, "sum-" + i);
+      await iconCircle(s, ic, x + 0.25, 1.8, 0.6, C.accent1, HEX.lt1, "sum-ic-" + i);
+      text(s, head, { x: x + 0.25, y: 2.55, w: 1.9, h: 0.45, fontSize: 18, bold: true, color: C.text2 });
+      s.addText(items.map((t, j) => ({ text: t, options: { bullet: true, breakLine: j < items.length - 1 } })),
+        { x: x + 0.25, y: 3.1, w: 1.95, h: 3.2, fontSize: 13, color: C.text1, paraSpaceAfter: 8, valign: "top", isTextBox: true, margin: 0 });
+    }
+    text(s, "手機、平板、電腦都能用；每一頁都照螢幕寬度重新排。", { x: 0.6, y: 6.6, w: 12.1, h: 0.35, fontSize: 13, color: C.accent5 });
+    s.addNotes("最後用一頁整理今天看到的：開始使用、記帳、活動、家庭、回顧五大塊，手機、平板、電腦都能用。");
+  };
+
+  // 重點版：開場 3、四個領域各 3、結語 3；產品展示：照影片用一輪；v2：同一輪講得更細；完整版：原本的每一頁
+  const ORDER = DEMO2
+    ? ["§開場", "v2Cover", "v2Why", "v2Views", "dFlow",
+       "§開始使用", "v2Setup", "v2Theme",
+       "§記帳", "v2Home", "v2Parse", "dParseAI", "dToday", "v2Ledger",
+       "§活動", "dActivity1", "v2ActMenu", "v2ActSettings", "v2ActHome", "v2ActFriend",
+       "§家庭", "dFamily", "v2Guardian", "v2Allowance", "v2Bell",
+       "§回顧", "dStats", "v2Advice",
+       "§手機", "dMobile",
+       "§結語", "v2Summary", "future", "dThanks"]
+    : DEMO
     ? ["§開場", "dCover", "dFlow", "§開始使用", "dStart", "dHome", "§記帳", "dParse", "dParseAI", "dToday",
        "§活動", "dActivity1", "dActivity2", "§家庭", "dFamily", "dAllowance", "§回顧", "dStats", "dAdvice", "§手機", "dMobile",
        "§結語", "dThanks"]
